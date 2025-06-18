@@ -1,0 +1,180 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createSupabaseClient } from '@/utils/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PlaidLinkButton from './plaid-link-button';
+
+interface Transaction {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: string[];
+  pending: boolean;
+}
+
+interface Account {
+  account_id: string;
+  name: string;
+  type: string;
+  subtype: string;
+}
+
+export default function TransactionDashboard() {
+  const [isConnected, setIsConnected] = useState(false);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const supabase = createSupabaseClient();
+
+  async function checkConnection() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if user has any connected items
+      const { data: items } = await supabase
+        .from('items')
+        .select('*')
+        .eq('user_id', user.id);
+
+      setIsConnected(!!(items && items.length > 0));
+      
+      if (items && items.length > 0) {
+        await fetchTransactions();
+      }
+    } catch (error) {
+      console.error('Error checking connection:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function fetchTransactions() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await fetch('/api/plaid/transactions', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data.transactions || []);
+        setAccounts(data.accounts || []);
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    }
+  }
+
+  useEffect(() => {
+    checkConnection();
+  }, []);
+
+  const handleConnectionSuccess = () => {
+    setIsConnected(true);
+    fetchTransactions();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>🏦 Connect Your Bank Account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              Connect your Schwab account to start tracking transactions automatically.
+              Once connected, new transactions will sync via webhooks instantly!
+            </p>
+            <PlaidLinkButton onSuccess={handleConnectionSuccess} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Your Financial Dashboard</h1>
+        <Button onClick={fetchTransactions} variant="outline">
+          🔄 Refresh
+        </Button>
+      </div>
+
+      {/* Connected Accounts */}
+      {accounts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Connected Accounts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-2">
+              {accounts.map((account) => (
+                <div key={account.account_id} className="flex justify-between items-center p-2 border rounded">
+                  <div>
+                    <div className="font-medium">{account.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {account.type} - {account.subtype}
+                    </div>
+                  </div>
+                  <div className="text-green-600">✅ Connected</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Transactions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Transactions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transactions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No transactions found. Make a purchase and it will appear here automatically!
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {transactions.slice(0, 10).map((transaction) => (
+                <div key={transaction.id} className="flex justify-between items-center p-3 border rounded">
+                  <div>
+                    <div className="font-medium">{transaction.name}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {transaction.date} • {transaction.category?.[0]}
+                      {transaction.pending && <span className="ml-2 text-yellow-600">Pending</span>}
+                    </div>
+                  </div>
+                  <div className={`font-medium ${transaction.amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    ${Math.abs(transaction.amount).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="text-center text-sm text-muted-foreground">
+        🔄 Transactions sync automatically via Plaid webhooks
+      </div>
+    </div>
+  );
+} 

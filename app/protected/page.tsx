@@ -1,5 +1,6 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
+import TransactionDashboard from "@/components/transaction-dashboard";
 
 export default async function ProtectedPage() {
   const client = await createSupabaseClient();
@@ -17,13 +18,16 @@ export default async function ProtectedPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <h1 className="text-2xl font-medium">Account</h1>
+          <h1 className="text-2xl font-medium">BudgeNudge Dashboard</h1>
           <p className="text-muted-foreground mt-2">
-            Manage your account settings
+            Track your spending automatically with Plaid webhooks
           </p>
         </div>
         <AuthPageSignOutButton />
       </div>
+
+      {/* Plaid Transaction Dashboard */}
+      <TransactionDashboard />
 
       <div className="space-y-6">
         <div className="border rounded-lg p-6 space-y-4">
