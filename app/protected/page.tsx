@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
+import SyncExistingButton from "@/components/sync-existing-button";
 
 export default async function ProtectedPage() {
   const client = await createSupabaseClient();
@@ -24,6 +25,15 @@ export default async function ProtectedPage() {
           </p>
         </div>
         <AuthPageSignOutButton />
+      </div>
+
+      {/* Quick Fix for Existing Connections */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 className="font-semibold text-yellow-800 mb-2">🔧 Quick Fix</h3>
+        <p className="text-yellow-700 text-sm mb-3">
+          If you&apos;re connected but seeing 0 accounts/transactions, click to fetch your missing data:
+        </p>
+        <SyncExistingButton />
       </div>
 
       {/* Plaid Transaction Dashboard */}
