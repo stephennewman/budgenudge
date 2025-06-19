@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
-import { Button } from '@/components/ui/button';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PlaidLinkButton from './plaid-link-button';
 
@@ -62,8 +62,10 @@ export default function TransactionDashboard() {
           'Authorization': `Bearer ${session.access_token}`
         }
       });
+      
+      const data = await response.json();
+      
       if (response.ok) {
-        const data = await response.json();
         setTransactions(data.transactions || []);
         setAccounts(data.accounts || []);
       }
@@ -112,9 +114,6 @@ export default function TransactionDashboard() {
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Your Financial Dashboard</h1>
-        <Button onClick={fetchTransactions} variant="outline">
-          🔄 Refresh
-        </Button>
       </div>
 
       {/* Connected Accounts */}
@@ -144,7 +143,7 @@ export default function TransactionDashboard() {
       {/* Recent Transactions */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Transactions</CardTitle>
+          <CardTitle>All Transactions ({transactions.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {transactions.length === 0 ? (
@@ -152,8 +151,8 @@ export default function TransactionDashboard() {
               No transactions found. Make a purchase and it will appear here automatically!
             </div>
           ) : (
-            <div className="space-y-2">
-              {transactions.slice(0, 10).map((transaction) => (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {transactions.map((transaction) => (
                 <div key={transaction.id} className="flex justify-between items-center p-3 border rounded">
                   <div>
                     <div className="font-medium">{transaction.name}</div>

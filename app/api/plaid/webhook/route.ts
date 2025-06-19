@@ -2,8 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/utils/plaid/client';
 import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/server';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Use CORS headers
+    
     const body = await request.json();
     
     console.log('🎯 WEBHOOK RECEIVED:', body);
@@ -28,12 +40,12 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled webhook type: ${webhook_type}`);
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error) {
     console.error('❌ WEBHOOK ERROR:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 }
@@ -71,6 +83,36 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         await storeTransactions(response.data.transactions, item_id);
         
         console.log(`✅ WEBHOOK SUCCESS: Stored ${response.data.transactions.length} transactions for item ${item_id}`);
+        
+        // Send SMS notification via T-Mobile email gateway
+        if (response.data.transactions.length > 0) {
+          try {
+            const latestTransaction = response.data.transactions[0];
+            const message = `💳 BudgeNudge: ${response.data.transactions.length} new transaction(s)! Latest: $${Math.abs(latestTransaction.amount)} at ${latestTransaction.merchant_name || latestTransaction.name}`;
+            
+            const smsResponse = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: 'webhooks@budgenudge.com',
+                to: ['6173472721@tmomail.net'],
+                subject: '',
+                text: message
+              }),
+            });
+            
+            if (smsResponse.ok) {
+              console.log('📱 SMS notification sent successfully');
+            } else {
+              console.log('📱 SMS notification failed:', await smsResponse.text());
+            }
+          } catch (error) {
+            console.log('📱 SMS notification error:', error);
+          }
+        }
       } catch (error) {
         console.error('❌ Error fetching transactions:', error);
       }
