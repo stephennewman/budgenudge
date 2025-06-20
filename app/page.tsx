@@ -1,90 +1,65 @@
-import NextLogo from "@/components/next-logo";
 import { Button } from "@/components/ui/button";
-import UpdateLogo from "@/components/update-logo";
 import Link from "next/link";
 
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center px-4 py-16">
-      <div className="mx-auto max-w-xl flex flex-col">
-        <div className="flex gap-8 justify-start w-full items-center">
-          <a
-            href="https://update.dev/?utm_source=create-update-app&utm_medium=template&utm_term=nextjs"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <UpdateLogo className="w-[128px]" />
-          </a>
-          <span className="border-l rotate-45 h-6" />
-          <a href="https://nextjs.org/" target="_blank" rel="noreferrer">
-            <NextLogo />
-          </a>
+      <div className="mx-auto max-w-2xl flex flex-col text-center">
+        <div className="flex justify-center items-center mb-8">
+          <div className="text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            💳 BudgeNudge
+          </div>
         </div>
-        <p className="text-3xl lg:text-4xl !leading-tight mt-4">
-          Build software faster with{" "}
-          <a
-            href="https://update.dev/?utm_source=create-update-app&utm_medium=template&utm_term=nextjs"
-            target="_blank"
-            className="font-bold hover:underline"
-            rel="noreferrer"
-          >
-            Update
-          </a>{" "}
-          and{" "}
-          <a
-            href="https://nextjs.org/"
-            target="_blank"
-            className="font-bold hover:underline"
-            rel="noreferrer"
-          >
-            Next.js
-          </a>
+        
+        <h1 className="text-4xl lg:text-5xl font-bold !leading-tight mb-6">
+          Real-Time Transaction Monitoring
+        </h1>
+        
+        <p className="text-xl text-muted-foreground mb-8 max-w-lg mx-auto">
+          Get instant SMS alerts for every financial transaction. Connected to your Charles Schwab account 
+          with live Plaid webhooks for real-time monitoring.
         </p>
-        <p className="text-muted-foreground mt-4">
-          To see your account, plans, and more, sign in or sign up to gain
-          access to the protected page. Make sure to set your .env file before
-          signing in.
-        </p>
-        <div className="flex gap-[8px] mt-4">
-          <Button asChild className="mt-4 w-fit">
-            <Link href="/sign-in">Sign in</Link>
+
+        <div className="flex gap-4 justify-center mb-12">
+          <Button asChild size="lg" className="text-lg px-8">
+            <Link href="/sign-in">View Dashboard</Link>
           </Button>
-          <Button variant="outline" asChild className="mt-4 w-fit">
-            <Link href="/sign-up">Sign up</Link>
+          <Button variant="outline" asChild size="lg" className="text-lg px-8">
+            <Link href="/sign-up">Get Started</Link>
           </Button>
         </div>
-        <div className="h-[1px] w-full bg-border my-12" />
-        <div className="grid grid-cols-2 gap-4">
-          <div className="border rounded-lg p-4">
-            <h3 className="font-medium mb-2">Join Our Community</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Get help, share your work, and connect with other developers.
+
+        <div className="grid md:grid-cols-3 gap-6 mt-8">
+          <div className="border rounded-xl p-6 bg-gradient-to-b from-background to-muted/20">
+            <div className="text-3xl mb-4">⚡</div>
+            <h3 className="font-semibold mb-2">Instant Notifications</h3>
+            <p className="text-sm text-muted-foreground">
+              Get SMS alerts within seconds of any transaction on your accounts
             </p>
-            <Button variant="secondary" asChild size="sm">
-              <a
-                href="https://discord.gg/Guege5tXFK"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Join Discord
-              </a>
-            </Button>
           </div>
-          <div className="border rounded-lg p-4">
-            <h3 className="font-medium mb-2">Read the Docs</h3>
-            <p className="text-sm text-muted-foreground mb-3">
-              Learn how to build amazing apps with our documentation.
+          
+          <div className="border rounded-xl p-6 bg-gradient-to-b from-background to-muted/20">
+            <div className="text-3xl mb-4">🔒</div>
+            <h3 className="font-semibold mb-2">Bank-Level Security</h3>
+            <p className="text-sm text-muted-foreground">
+              Powered by Plaid&apos;s secure API with read-only access to your accounts
             </p>
-            <Button variant="secondary" asChild size="sm">
-              <a
-                href="https://update.dev/docs"
-                target="_blank"
-                rel="noreferrer"
-              >
-                View Documentation
-              </a>
-            </Button>
           </div>
+          
+          <div className="border rounded-xl p-6 bg-gradient-to-b from-background to-muted/20">
+            <div className="text-3xl mb-4">📊</div>
+            <h3 className="font-semibold mb-2">Live Dashboard</h3>
+            <p className="text-sm text-muted-foreground">
+              View all transactions in real-time with automatic categorization
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-12 p-6 border rounded-xl bg-green-50 dark:bg-green-950/20">
+          <div className="text-2xl mb-2">✅ System Status: LIVE</div>
+          <p className="text-sm text-muted-foreground">
+            Webhook monitoring active • 100+ transactions tracked • SMS alerts enabled
+          </p>
         </div>
       </div>
     </div>

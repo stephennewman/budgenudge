@@ -12,8 +12,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Update Starter Kit",
-  description: "The fastest way to build apps with Next.js and Update",
+  title: "BudgeNudge - Real-Time Transaction Monitoring",
+  description: "Get instant SMS alerts for all your financial transactions with automated Plaid webhook integration",
 };
 
 export default function RootLayout({
