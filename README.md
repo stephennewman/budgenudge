@@ -6,7 +6,7 @@
 
 - **✅ Real-time webhook processing** - Plaid → BudgeNudge → SMS alerts
 - **✅ Charles Schwab integration** - Live monitoring of account transactions  
-- **✅ Instant SMS notifications** - Alerts sent to 617-347-2721 within seconds
+- **✅ Near-time SMS notifications** - Alerts sent to phone number via text
 - **✅ 100+ transactions tracked** - Complete transaction history in Supabase
 - **✅ Zero manual intervention** - Fully automated monitoring system
 
@@ -32,22 +32,21 @@ BudgeNudge monitors your financial accounts in real-time and sends instant SMS a
 ## 📊 Current Metrics
 
 - **Webhook URL**: `https://budgenudge.vercel.app/api/plaid/webhook`
-- **Connected Accounts**: 1 (Charles Schwab Investor Checking)
 - **Total Transactions**: 100+ and growing
-- **SMS Delivery**: Active to 617-347-2721
+- **SMS Delivery**: Active
 - **Response Time**: < 5 seconds from transaction to SMS
 
 ## 🔥 Key Features
 
-### Real-Time Monitoring
-- Instant webhook processing when transactions occur
+### Near-Time Monitoring
+- Webhook processing sooner after transactions occur
 - Automatic storage in Supabase database
 - Live dashboard showing all transaction history
 
 ### SMS Notifications  
-- Immediate SMS alerts via T-Mobile email gateway
+- SMS alerts via T-Mobile email gateway
 - Transaction details including amount and merchant
-- No delays or manual checking required
+- No manual checking required
 
 ### Bank-Level Security
 - Read-only access via Plaid's secure API

@@ -87,8 +87,40 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         // Send SMS notification via T-Mobile email gateway
         if (response.data.transactions.length > 0) {
           try {
-            const latestTransaction = response.data.transactions[0];
-            const message = `💳 BudgeNudge: ${response.data.transactions.length} new transaction(s)! Latest: $${Math.abs(latestTransaction.amount)} at ${latestTransaction.merchant_name || latestTransaction.name}`;
+            const transactions = response.data.transactions;
+            const transactionCount = transactions.length;
+            
+            // Calculate totals for deposits and debits
+            let totalDebits = 0;
+            let totalDeposits = 0;
+            let debitCount = 0;
+            let depositCount = 0;
+            
+            transactions.forEach(transaction => {
+              if (transaction.amount > 0) {
+                // Positive amounts are debits (money going out)
+                totalDebits += transaction.amount;
+                debitCount++;
+              } else {
+                // Negative amounts are deposits (money coming in)
+                totalDeposits += Math.abs(transaction.amount);
+                depositCount++;
+              }
+            });
+            
+            // Build message with transaction counts and totals
+            const latestTransaction = transactions[0];
+            let message = `${transactionCount} new transaction(s) found!`;
+            
+            if (debitCount > 0 && depositCount > 0) {
+              message += ` ${debitCount} debit(s): $${totalDebits.toFixed(2)}, ${depositCount} deposit(s): $${totalDeposits.toFixed(2)}.`;
+            } else if (debitCount > 0) {
+              message += ` ${debitCount} debit(s) totaling $${totalDebits.toFixed(2)}.`;
+            } else if (depositCount > 0) {
+              message += ` ${depositCount} deposit(s) totaling $${totalDeposits.toFixed(2)}.`;
+            }
+            
+            message += ` Latest: $${Math.abs(latestTransaction.amount)} at ${latestTransaction.merchant_name || latestTransaction.name}`;
             
             const smsResponse = await fetch('https://api.resend.com/emails', {
               method: 'POST',
@@ -99,7 +131,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
               body: JSON.stringify({
                 from: 'BudgeNudge <noreply@krezzo.com>',
                 to: ['6173472721@tmomail.net'],
-                subject: '',
+                subject: 'BudgeNudge Alert!',
                 text: message
               }),
             });
