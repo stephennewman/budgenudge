@@ -129,12 +129,19 @@ Dashboard Update
 
 ## 🔄 RECENT DEPLOYMENTS
 
-### Last Deploy: **STABLE PRODUCTION** ✅
-**Build Status**: ✅ PASSING
+### Last Deploy: **June 21, 2025 - SMS ENHANCEMENT** ✅
+**Deployment**: `budgenudge-h6473szu0-krezzo.vercel.app`
+**Build Status**: ✅ PASSING (46s build time)
 - ✅ `npm run build` - Clean build
 - ✅ TypeScript compilation - No errors  
 - ✅ ESLint validation - Passed
 - ✅ Production deployment - Live
+
+**Changes Deployed**:
+- ✅ Enhanced SMS template with transaction counting
+- ✅ Separate deposit/debit total calculations
+- ✅ Smart messaging adapts to transaction types
+- ✅ Subject line updated to "BudgeNudge Alert!"
 
 **Git Status**: Clean working tree
 **Vercel Status**: Production deployment active
