@@ -75,7 +75,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
       try {
         const response = await plaidClient.transactionsGet({
           access_token: item.plaid_access_token,
-          start_date: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 30 days
+          start_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 90 days
           end_date: new Date().toISOString().split('T')[0],
         });
 
