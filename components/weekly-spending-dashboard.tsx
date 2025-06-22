@@ -271,7 +271,7 @@ export default function WeeklySpendingDashboard() {
                                 if (sortedWeeks.length === 0) return null;
                                 
                                 const maxAmount = Math.max(...sortedWeeks.map(w => w.amount));
-                                const minAmount = Math.min(...sortedWeeks.map(w => w.amount));
+                                const minAmount = 0; // Always start Y-axis at $0
                                 const range = maxAmount - minAmount || maxAmount || 1;
                                 
                                 const points = sortedWeeks.map((week, index) => {
@@ -322,7 +322,7 @@ export default function WeeklySpendingDashboard() {
                                       ${maxAmount.toFixed(0)}
                                     </text>
                                     <text x="5" y="85" fontSize="10" fill="#6b7280" textAnchor="start">
-                                      ${minAmount.toFixed(0)}
+                                      $0
                                     </text>
                                   </>
                                 );
