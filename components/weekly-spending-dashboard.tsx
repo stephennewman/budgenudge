@@ -41,6 +41,9 @@ interface MerchantSpending {
   weeksWithSpending: number;
   forecastedMonthlySpending: number;
   weeklyBreakdown: WeekData[];
+  cadence: 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'irregular';
+  cadenceConfidence: number;
+  intervalDays: number;
 }
 
 interface MerchantMonthlySpending {
@@ -59,6 +62,10 @@ interface MerchantMonthlySpending {
   paceVariance: number;
   projectedMonthEnd: number;
   paceStatus: 'ahead' | 'behind' | 'on-track';
+  // Cadence detection
+  cadence: 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'irregular';
+  cadenceConfidence: number;
+  intervalDays: number;
 }
 
 interface WeeklyAnalysis {
@@ -190,13 +197,138 @@ export default function WeeklySpendingDashboard() {
     return months.sort((a, b) => b.year - a.year || parseInt(b.month.split('-')[1]) - parseInt(a.month.split('-')[1]));
   }, []);
 
-  // Analyze spending by merchant with complete week coverage
+  // Detect transaction cadence for a merchant
+  function detectMerchantCadence(transactions: Transaction[]): {
+    cadence: 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'irregular';
+    intervalDays: number;
+    confidence: number;
+  } {
+    if (transactions.length < 2) {
+      return { cadence: 'irregular', intervalDays: 0, confidence: 0 };
+    }
+
+    // Sort transactions by date
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Calculate intervals between consecutive transactions
+    const intervals: number[] = [];
+    for (let i = 1; i < sortedTransactions.length; i++) {
+      const prevDate = new Date(sortedTransactions[i - 1].date);
+      const currDate = new Date(sortedTransactions[i].date);
+      const daysDiff = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+      intervals.push(daysDiff);
+    }
+
+    // Find the most common interval (with tolerance)
+    const intervalCounts = new Map<number, number>();
+    const tolerance = 3; // ±3 days tolerance
+
+    intervals.forEach(interval => {
+      let matched = false;
+      for (const [existingInterval, count] of intervalCounts) {
+        if (Math.abs(interval - existingInterval) <= tolerance) {
+          intervalCounts.set(existingInterval, count + 1);
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) {
+        intervalCounts.set(interval, 1);
+      }
+    });
+
+    // Find the most frequent interval
+    let mostCommonInterval = 0;
+    let maxCount = 0;
+    for (const [interval, count] of intervalCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommonInterval = interval;
+      }
+    }
+
+    const confidence = maxCount / intervals.length;
+
+    // Classify the cadence based on interval
+    let cadence: 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'irregular';
+    
+    if (Math.abs(mostCommonInterval - 7) <= 2) {
+      cadence = 'weekly';
+    } else if (Math.abs(mostCommonInterval - 14) <= 3) {
+      cadence = 'bi-weekly';
+    } else if (mostCommonInterval >= 28 && mostCommonInterval <= 35) {
+      cadence = 'monthly';
+    } else if (mostCommonInterval >= 85 && mostCommonInterval <= 95) {
+      cadence = 'quarterly';
+    } else {
+      cadence = 'irregular';
+    }
+
+    return { cadence, intervalDays: mostCommonInterval, confidence };
+  }
+
+  // Check if a period is complete for a given merchant cadence
+  function isPeriodCompleteForCadence(
+    periodStart: string, 
+    periodEnd: string, 
+    cadence: 'weekly' | 'bi-weekly' | 'monthly' | 'quarterly' | 'irregular',
+    transactions: Transaction[]
+  ): boolean {
+    if (cadence === 'irregular') {
+      return true; // Include all periods for irregular merchants
+    }
+
+    const startDate = new Date(periodStart);
+    const endDate = new Date(periodEnd);
+    const today = new Date();
+
+    // Don't include current periods
+    if (endDate >= today) {
+      return false;
+    }
+
+    // Check if there are transactions in this period
+    const periodTransactions = transactions.filter(t => {
+      const tDate = new Date(t.date);
+      return tDate >= startDate && tDate <= endDate;
+    });
+
+    if (periodTransactions.length === 0) {
+      return true; // Empty periods are complete
+    }
+
+    // For cadence-based merchants, check if we have the expected pattern
+    switch (cadence) {
+      case 'weekly':
+        // For weekly cadence, any week with transactions should be complete
+        return true;
+      
+      case 'bi-weekly':
+        // For bi-weekly, check if it's been at least 14 days since period end
+        const daysSincePeriodEnd = Math.round((today.getTime() - endDate.getTime()) / (1000 * 60 * 60 * 24));
+        return daysSincePeriodEnd >= 14;
+      
+      case 'monthly':
+        // For monthly cadence, only include complete months
+        return true; // Month periods are already complete by definition
+      
+      case 'quarterly':
+        // For quarterly, ensure full quarter has passed
+        const monthsSincePeriodEnd = (today.getFullYear() - endDate.getFullYear()) * 12 + 
+                                   (today.getMonth() - endDate.getMonth());
+        return monthsSincePeriodEnd >= 3;
+      
+      default:
+        return true;
+    }
+  }
+
+  // Analyze spending by merchant with cadence-aware complete period detection
   const analyzeWeeklySpending = useCallback((transactions: Transaction[]) => {
     const weeks = parseInt(timeRange);
     const allWeeks = generateAllWeeks(weeks);
-    const today = new Date();
-    const currentWeekStart = getWeekStart(today);
-    const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
 
     // Filter to spending transactions only (positive amounts)
     const spendingTransactions = transactions.filter(t => t.amount > 0);
@@ -212,8 +344,11 @@ export default function WeeklySpendingDashboard() {
       merchantMap.get(merchant)!.push(transaction);
     });
 
-    // Analyze each merchant with complete week coverage
+    // Analyze each merchant with cadence-aware complete period detection
     const merchantAnalysis: MerchantSpending[] = Array.from(merchantMap.entries()).map(([merchant, transactions]) => {
+      // Detect merchant's transaction cadence
+      const cadenceInfo = detectMerchantCadence(transactions);
+
       // Create a fresh copy of all weeks for this merchant
       const merchantWeeks = allWeeks.map(week => ({
         ...week,
@@ -234,15 +369,17 @@ export default function WeeklySpendingDashboard() {
         }
       });
 
-      // Separate complete and incomplete weeks
-      const completeWeeks = merchantWeeks.filter(w => w.weekStart !== currentWeekKey);
+      // Filter to complete weeks based on merchant's cadence
+      const completeWeeks = merchantWeeks.filter(w => 
+        isPeriodCompleteForCadence(w.weekStart, w.weekEnd, cadenceInfo.cadence, transactions)
+      );
 
-      // Calculate merchant statistics using ONLY complete weeks
+      // Calculate merchant statistics using ONLY cadence-appropriate complete weeks
       const totalSpentComplete = completeWeeks.reduce((sum, week) => sum + week.amount, 0);
       const averageWeeklySpending = completeWeeks.length > 0 ? totalSpentComplete / completeWeeks.length : 0;
       const forecastedMonthlySpending = (averageWeeklySpending * 52) / 12;
 
-      // Total includes current week for display purposes
+      // Total includes all weeks for display purposes
       const totalSpent = merchantWeeks.reduce((sum, week) => sum + week.amount, 0);
       const transactionCount = merchantWeeks.reduce((sum, week) => sum + week.transactions, 0);
       const weeksWithSpending = merchantWeeks.filter(w => w.amount > 0).length;
@@ -254,7 +391,10 @@ export default function WeeklySpendingDashboard() {
         averageWeeklySpending,
         weeksWithSpending,
         forecastedMonthlySpending,
-        weeklyBreakdown: merchantWeeks
+        weeklyBreakdown: merchantWeeks,
+        cadence: cadenceInfo.cadence,
+        cadenceConfidence: cadenceInfo.confidence,
+        intervalDays: cadenceInfo.intervalDays
       };
     });
 
@@ -296,8 +436,11 @@ export default function WeeklySpendingDashboard() {
       merchantMap.get(merchant)!.push(transaction);
     });
 
-    // Analyze each merchant with complete month coverage and pacing
+    // Analyze each merchant with cadence-aware complete period detection
     const merchantAnalysis: MerchantMonthlySpending[] = Array.from(merchantMap.entries()).map(([merchant, transactions]) => {
+      // Detect merchant's transaction cadence
+      const cadenceInfo = detectMerchantCadence(transactions);
+
       // Create a fresh copy of all months for this merchant
       const merchantMonths = allMonths.map(month => ({
         ...month,
@@ -317,15 +460,25 @@ export default function WeeklySpendingDashboard() {
         }
       });
 
-      // Separate complete and incomplete months
-      const completeMonths = merchantMonths.filter(m => m.month !== currentMonthKey);
+      // Filter to complete months based on merchant's cadence
+      const completeMonths = merchantMonths.filter(m => {
+        const monthStart = new Date(m.year, parseInt(m.month.split('-')[1]) - 1, 1);
+        const monthEnd = new Date(m.year, parseInt(m.month.split('-')[1]), 0);
+        return isPeriodCompleteForCadence(
+          monthStart.toISOString().split('T')[0], 
+          monthEnd.toISOString().split('T')[0], 
+          cadenceInfo.cadence, 
+          transactions
+        );
+      });
+      
       const currentMonth = merchantMonths.find(m => m.month === currentMonthKey);
 
-      // Calculate basic merchant statistics using ONLY complete months
+      // Calculate basic merchant statistics using ONLY cadence-appropriate complete months
       const totalSpentComplete = completeMonths.reduce((sum, month) => sum + month.amount, 0);
       const averageMonthlySpending = completeMonths.length > 0 ? totalSpentComplete / completeMonths.length : 0;
 
-      // Total includes current month for display purposes
+      // Total includes all months for display purposes
       const totalSpent = merchantMonths.reduce((sum, month) => sum + month.amount, 0);
       const transactionCount = merchantMonths.reduce((sum, month) => sum + month.transactions, 0);
       const monthsWithSpending = merchantMonths.filter(m => m.amount > 0).length;
@@ -335,7 +488,7 @@ export default function WeeklySpendingDashboard() {
       const currentMonthDays = currentMonth?.currentDay || today.getDate();
       const currentMonthTotalDays = currentMonth?.daysInMonth || 30;
 
-      // Pacing calculations using complete month averages
+      // Pacing calculations using cadence-appropriate complete month averages
       const expectedDailyPace = averageMonthlySpending / 30; // Use 30 as standard month for comparison
       const dailyPace = currentMonthDays > 0 ? currentMonthSpent / currentMonthDays : 0;
       const expectedPaceAmount = expectedDailyPace * currentMonthDays;
@@ -361,7 +514,10 @@ export default function WeeklySpendingDashboard() {
         expectedDailyPace,
         paceVariance,
         projectedMonthEnd,
-        paceStatus
+        paceStatus,
+        cadence: cadenceInfo.cadence,
+        cadenceConfidence: cadenceInfo.confidence,
+        intervalDays: cadenceInfo.intervalDays
       };
     });
 
@@ -613,10 +769,21 @@ export default function WeeklySpendingDashboard() {
                         </div>
                         <div>
                           <h3 className="font-semibold text-xl">{merchant.merchant}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
-                            {merchant.weeksWithSpending} of {weeklyAnalysis.totalWeeksAnalyzed} weeks active
-                          </p>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="text-muted-foreground">
+                              {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
+                              {merchant.weeksWithSpending} of {weeklyAnalysis.totalWeeksAnalyzed} weeks active
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              merchant.cadence === 'monthly' ? 'bg-blue-100 text-blue-800' :
+                              merchant.cadence === 'weekly' ? 'bg-green-100 text-green-800' :
+                              merchant.cadence === 'bi-weekly' ? 'bg-yellow-100 text-yellow-800' :
+                              merchant.cadence === 'quarterly' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {merchant.cadence} ({Math.round(merchant.cadenceConfidence * 100)}% confidence)
+                            </span>
+                          </div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -787,24 +954,16 @@ export default function WeeklySpendingDashboard() {
                     {/* Forecasting Insight */}
                     <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Forecasting:</strong> Based on {(() => {
-                          const completeWeeks = merchant.weeklyBreakdown.filter(w => {
-                            const today = new Date();
-                            const currentWeekStart = getWeekStart(today);
-                            const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
-                            return w.weekStart !== currentWeekKey && w.amount > 0;
-                          }).length;
-                          const totalCompleteWeeks = merchant.weeklyBreakdown.filter(w => {
-                            const today = new Date();
-                            const currentWeekStart = getWeekStart(today);
-                            const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
-                            return w.weekStart !== currentWeekKey;
-                          }).length;
-                          return `${completeWeeks} active weeks out of ${totalCompleteWeeks} complete weeks`;
-                        })()} analyzed (excluding current incomplete week), 
-                        this merchant averages {formatCurrency(merchant.averageWeeklySpending)} per week, 
+                        <strong>Smart Forecasting:</strong> Detected <strong>{merchant.cadence}</strong> spending pattern 
+                        ({merchant.intervalDays} day intervals, {Math.round(merchant.cadenceConfidence * 100)}% confidence). 
+                        Using only complete {merchant.cadence} cycles for accurate averaging: {formatCurrency(merchant.averageWeeklySpending)} per week, 
                         forecasting {formatCurrency(merchant.forecastedMonthlySpending)} monthly budget needed.
                       </p>
+                      {merchant.cadence === 'monthly' && (
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                          💡 Monthly merchants: Weekly analysis may not be meaningful. Consider monthly view for better insights.
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -842,7 +1001,17 @@ export default function WeeklySpendingDashboard() {
                           <h3 className="font-semibold text-xl">{merchant.merchant}</h3>
                           <div className="flex items-center gap-3 text-sm">
                             <span className="text-muted-foreground">
-                              Day {merchant.currentMonthDays} • {merchant.transactionCount} total transactions
+                              Day {merchant.currentMonthDays} • {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
+                              {merchant.monthsWithSpending} of {monthlyAnalysis.totalMonthsAnalyzed} months active
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              merchant.cadence === 'monthly' ? 'bg-blue-100 text-blue-800' :
+                              merchant.cadence === 'weekly' ? 'bg-green-100 text-green-800' :
+                              merchant.cadence === 'bi-weekly' ? 'bg-yellow-100 text-yellow-800' :
+                              merchant.cadence === 'quarterly' ? 'bg-purple-100 text-purple-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {merchant.cadence} ({Math.round(merchant.cadenceConfidence * 100)}% confidence)
                             </span>
                             <span className={`font-medium ${getPaceStatusColor(merchant.paceStatus)}`}>
                               {getPaceStatusText(merchant.paceStatus)}
@@ -919,19 +1088,12 @@ export default function WeeklySpendingDashboard() {
                           )}
                         </p>
                         <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
-                          <strong>Based on:</strong> {(() => {
-                            const completeMonths = merchant.monthlyBreakdown.filter(m => {
-                              const today = new Date();
-                              const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
-                              return m.month !== currentMonthKey && m.amount > 0;
-                            }).length;
-                            const totalCompleteMonths = merchant.monthlyBreakdown.filter(m => {
-                              const today = new Date();
-                              const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
-                              return m.month !== currentMonthKey;
-                            }).length;
-                            return `${completeMonths} active out of ${totalCompleteMonths} complete months (current incomplete month excluded)`;
-                          })()}
+                          <strong>Smart Analysis:</strong> Detected <strong>{merchant.cadence}</strong> spending pattern 
+                          ({merchant.intervalDays} day intervals, {Math.round(merchant.cadenceConfidence * 100)}% confidence). 
+                          Using only complete {merchant.cadence} cycles to calculate {formatCurrency(merchant.averageMonthlySpending)} monthly average.
+                          {merchant.cadence !== 'monthly' && merchant.cadence !== 'irregular' && (
+                            <span className="block mt-1">💡 This merchant may be better suited for {merchant.cadence} tracking rather than monthly analysis.</span>
+                          )}
                         </p>
                       </div>
                     </div>
