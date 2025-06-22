@@ -18,6 +18,10 @@ export default async function ProtectedSidebar() {
           href: "/weekly-spending",
         },
         {
+          label: "Predictive Calendar",
+          href: "/calendar",
+        },
+        {
           label: "Pricing",
           href: "/pricing",
         },
