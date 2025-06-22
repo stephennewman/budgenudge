@@ -194,6 +194,9 @@ export default function WeeklySpendingDashboard() {
   const analyzeWeeklySpending = useCallback((transactions: Transaction[]) => {
     const weeks = parseInt(timeRange);
     const allWeeks = generateAllWeeks(weeks);
+    const today = new Date();
+    const currentWeekStart = getWeekStart(today);
+    const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
 
     // Filter to spending transactions only (positive amounts)
     const spendingTransactions = transactions.filter(t => t.amount > 0);
@@ -231,12 +234,18 @@ export default function WeeklySpendingDashboard() {
         }
       });
 
-      // Calculate merchant statistics
+      // Separate complete and incomplete weeks
+      const completeWeeks = merchantWeeks.filter(w => w.weekStart !== currentWeekKey);
+
+      // Calculate merchant statistics using ONLY complete weeks
+      const totalSpentComplete = completeWeeks.reduce((sum, week) => sum + week.amount, 0);
+      const averageWeeklySpending = completeWeeks.length > 0 ? totalSpentComplete / completeWeeks.length : 0;
+      const forecastedMonthlySpending = (averageWeeklySpending * 52) / 12;
+
+      // Total includes current week for display purposes
       const totalSpent = merchantWeeks.reduce((sum, week) => sum + week.amount, 0);
       const transactionCount = merchantWeeks.reduce((sum, week) => sum + week.transactions, 0);
       const weeksWithSpending = merchantWeeks.filter(w => w.amount > 0).length;
-      const averageWeeklySpending = merchantWeeks.length > 0 ? totalSpent / merchantWeeks.length : 0;
-      const forecastedMonthlySpending = (averageWeeklySpending * 52) / 12;
 
       return {
         merchant,
@@ -271,6 +280,7 @@ export default function WeeklySpendingDashboard() {
     const months = parseInt(timeRange);
     const allMonths = generateAllMonths(months);
     const today = new Date();
+    const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
 
     // Filter to spending transactions only (positive amounts)
     const spendingTransactions = transactions.filter(t => t.amount > 0);
@@ -307,19 +317,25 @@ export default function WeeklySpendingDashboard() {
         }
       });
 
-      // Calculate basic merchant statistics
+      // Separate complete and incomplete months
+      const completeMonths = merchantMonths.filter(m => m.month !== currentMonthKey);
+      const currentMonth = merchantMonths.find(m => m.month === currentMonthKey);
+
+      // Calculate basic merchant statistics using ONLY complete months
+      const totalSpentComplete = completeMonths.reduce((sum, month) => sum + month.amount, 0);
+      const averageMonthlySpending = completeMonths.length > 0 ? totalSpentComplete / completeMonths.length : 0;
+
+      // Total includes current month for display purposes
       const totalSpent = merchantMonths.reduce((sum, month) => sum + month.amount, 0);
       const transactionCount = merchantMonths.reduce((sum, month) => sum + month.transactions, 0);
       const monthsWithSpending = merchantMonths.filter(m => m.amount > 0).length;
-      const averageMonthlySpending = merchantMonths.length > 0 ? totalSpent / merchantMonths.length : 0;
 
       // Calculate current month pacing
-      const currentMonth = merchantMonths.find(m => m.currentDay !== undefined);
       const currentMonthSpent = currentMonth?.amount || 0;
       const currentMonthDays = currentMonth?.currentDay || today.getDate();
       const currentMonthTotalDays = currentMonth?.daysInMonth || 30;
 
-      // Pacing calculations
+      // Pacing calculations using complete month averages
       const expectedDailyPace = averageMonthlySpending / 30; // Use 30 as standard month for comparison
       const dailyPace = currentMonthDays > 0 ? currentMonthSpent / currentMonthDays : 0;
       const expectedPaceAmount = expectedDailyPace * currentMonthDays;
@@ -771,7 +787,21 @@ export default function WeeklySpendingDashboard() {
                     {/* Forecasting Insight */}
                     <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                       <p className="text-sm text-blue-800 dark:text-blue-200">
-                        <strong>Forecasting:</strong> Based on {merchant.weeksWithSpending} active weeks out of {weeklyAnalysis.totalWeeksAnalyzed} analyzed, 
+                        <strong>Forecasting:</strong> Based on {(() => {
+                          const completeWeeks = merchant.weeklyBreakdown.filter(w => {
+                            const today = new Date();
+                            const currentWeekStart = getWeekStart(today);
+                            const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
+                            return w.weekStart !== currentWeekKey && w.amount > 0;
+                          }).length;
+                          const totalCompleteWeeks = merchant.weeklyBreakdown.filter(w => {
+                            const today = new Date();
+                            const currentWeekStart = getWeekStart(today);
+                            const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
+                            return w.weekStart !== currentWeekKey;
+                          }).length;
+                          return `${completeWeeks} active weeks out of ${totalCompleteWeeks} complete weeks`;
+                        })()} analyzed (excluding current incomplete week), 
                         this merchant averages {formatCurrency(merchant.averageWeeklySpending)} per week, 
                         forecasting {formatCurrency(merchant.forecastedMonthlySpending)} monthly budget needed.
                       </p>
@@ -875,18 +905,33 @@ export default function WeeklySpendingDashboard() {
                       <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
                         <h5 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-200">🎯 Pacing Insight</h5>
                         <p className="text-sm text-blue-800 dark:text-blue-200">
-                                                     {merchant.paceStatus === 'ahead' && (
-                             <>You&apos;re spending {formatCurrency(Math.abs(merchant.paceVariance))} more than usual. 
-                             At this pace, you&apos;ll spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your typical {formatCurrency(merchant.averageMonthlySpending)}.</>
-                           )}
-                           {merchant.paceStatus === 'behind' && (
-                             <>You&apos;re {formatCurrency(Math.abs(merchant.paceVariance))} under your typical pace. 
-                             You&apos;ll likely spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your usual {formatCurrency(merchant.averageMonthlySpending)}.</>
-                           )}
-                           {merchant.paceStatus === 'on-track' && (
-                             <>You&apos;re tracking close to your typical spending pattern. 
-                             Projected {formatCurrency(merchant.projectedMonthEnd)} vs usual {formatCurrency(merchant.averageMonthlySpending)}.</>
-                           )}
+                          {merchant.paceStatus === 'ahead' && (
+                            <>You&apos;re spending {formatCurrency(Math.abs(merchant.paceVariance))} more than usual. 
+                            At this pace, you&apos;ll spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your typical {formatCurrency(merchant.averageMonthlySpending)}.</>
+                          )}
+                          {merchant.paceStatus === 'behind' && (
+                            <>You&apos;re {formatCurrency(Math.abs(merchant.paceVariance))} under your typical pace. 
+                            You&apos;ll likely spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your usual {formatCurrency(merchant.averageMonthlySpending)}.</>
+                          )}
+                          {merchant.paceStatus === 'on-track' && (
+                            <>You&apos;re tracking close to your typical spending pattern. 
+                            Projected {formatCurrency(merchant.projectedMonthEnd)} vs usual {formatCurrency(merchant.averageMonthlySpending)}.</>
+                          )}
+                        </p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-2">
+                          <strong>Based on:</strong> {(() => {
+                            const completeMonths = merchant.monthlyBreakdown.filter(m => {
+                              const today = new Date();
+                              const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+                              return m.month !== currentMonthKey && m.amount > 0;
+                            }).length;
+                            const totalCompleteMonths = merchant.monthlyBreakdown.filter(m => {
+                              const today = new Date();
+                              const currentMonthKey = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}`;
+                              return m.month !== currentMonthKey;
+                            }).length;
+                            return `${completeMonths} active out of ${totalCompleteMonths} complete months (current incomplete month excluded)`;
+                          })()}
                         </p>
                       </div>
                     </div>
