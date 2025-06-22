@@ -41,19 +41,45 @@ export async function POST() {
         const endDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // 90 days ago
         
-        // Fetch historical transactions for the missing period
-        const response = await plaidClient.transactionsGet({
-          access_token: item.plaid_access_token,
-          start_date: startDate.toISOString().split('T')[0],
-          end_date: endDate.toISOString().split('T')[0],
-        });
+        // Fetch ALL historical transactions for the missing period (with pagination)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let allTransactions: any[] = [];
+        let offset = 0;
+        const count = 500; // Maximum per request
+        let hasMore = true;
 
-        if (response.data.transactions.length > 0) {
-          // Store the historical transactions
-          await storeTransactions(response.data.transactions, item.plaid_item_id);
-          totalBackfilled += response.data.transactions.length;
+        while (hasMore) {
+          const response = await plaidClient.transactionsGet({
+            access_token: item.plaid_access_token,
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+            options: {
+              count: count,
+              offset: offset
+            }
+          });
+
+          allTransactions = allTransactions.concat(response.data.transactions);
           
-          console.log(`✅ Backfilled ${response.data.transactions.length} transactions for item ${item.plaid_item_id}`);
+          console.log(`📄 Fetched ${response.data.transactions.length} transactions (offset: ${offset}) for item ${item.plaid_item_id}`);
+          
+          // Check if we have more transactions to fetch
+          hasMore = response.data.transactions.length === count;
+          offset += count;
+          
+          // Safety check to prevent infinite loops
+          if (offset > 10000) {
+            console.log(`⚠️ Safety limit reached for item ${item.plaid_item_id}`);
+            break;
+          }
+        }
+
+        if (allTransactions.length > 0) {
+          // Store all the historical transactions
+          await storeTransactions(allTransactions, item.plaid_item_id);
+          totalBackfilled += allTransactions.length;
+          
+          console.log(`✅ Backfilled ${allTransactions.length} total transactions for item ${item.plaid_item_id}`);
         } else {
           console.log(`ℹ️ No historical transactions found for item ${item.plaid_item_id}`);
         }
