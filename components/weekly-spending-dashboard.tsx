@@ -50,19 +50,6 @@ export default function WeeklySpendingDashboard() {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - (weeks * 7));
 
-    // Generate ALL weeks in the time period first
-    const allWeeks: { weekStart: Date; weekEnd: Date; weekKey: string }[] = [];
-    for (let i = weeks - 1; i >= 0; i--) {
-      const weekStartDate = new Date();
-      weekStartDate.setDate(weekStartDate.getDate() - (i * 7));
-      const weekStart = getWeekStart(weekStartDate);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      const weekKey = weekStart.toISOString().split('T')[0];
-      
-      allWeeks.push({ weekStart, weekEnd, weekKey });
-    }
-
     // Filter transactions to only include spending (positive amounts) within time range
     const spendingTransactions = transactions.filter(t => {
       const transactionDate = new Date(t.date);
@@ -76,48 +63,38 @@ export default function WeeklySpendingDashboard() {
       weeklyBreakdown: Map<string, { amount: number; transactions: number; weekStart: Date; weekEnd: Date }>;
     }>();
 
-    // Initialize all merchants with all weeks (starting at $0)
-    spendingTransactions.forEach(transaction => {
-      const merchant = transaction.merchant_name || transaction.name || 'Unknown Merchant';
-      
-      if (!merchantData.has(merchant)) {
-        const weeklyBreakdown = new Map<string, { amount: number; transactions: number; weekStart: Date; weekEnd: Date }>();
-        
-        // Initialize ALL weeks with $0 for this merchant
-        allWeeks.forEach(week => {
-          weeklyBreakdown.set(week.weekKey, {
-            amount: 0,
-            transactions: 0,
-            weekStart: week.weekStart,
-            weekEnd: week.weekEnd
-          });
-        });
-
-        merchantData.set(merchant, {
-          totalSpent: 0,
-          transactionCount: 0,
-          weeklyBreakdown
-        });
-      }
-    });
-
-    // Now populate actual spending data
     spendingTransactions.forEach(transaction => {
       const merchant = transaction.merchant_name || transaction.name || 'Unknown Merchant';
       const transactionDate = new Date(transaction.date);
       const weekStart = getWeekStart(transactionDate);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
       const weekKey = weekStart.toISOString().split('T')[0];
+
+      if (!merchantData.has(merchant)) {
+        merchantData.set(merchant, {
+          totalSpent: 0,
+          transactionCount: 0,
+          weeklyBreakdown: new Map()
+        });
+      }
 
       const data = merchantData.get(merchant)!;
       data.totalSpent += transaction.amount;
       data.transactionCount += 1;
 
-      // Add to the specific week (which already exists with $0 default)
-      if (data.weeklyBreakdown.has(weekKey)) {
-        const weekData = data.weeklyBreakdown.get(weekKey)!;
-        weekData.amount += transaction.amount;
-        weekData.transactions += 1;
+      if (!data.weeklyBreakdown.has(weekKey)) {
+        data.weeklyBreakdown.set(weekKey, {
+          amount: 0,
+          transactions: 0,
+          weekStart,
+          weekEnd
+        });
       }
+
+      const weekData = data.weeklyBreakdown.get(weekKey)!;
+      weekData.amount += transaction.amount;
+      weekData.transactions += 1;
     });
 
     // Convert to array and sort by total spending (highest to lowest)
@@ -133,7 +110,7 @@ export default function WeeklySpendingDashboard() {
             amount: week.amount,
             transactions: week.transactions
           }))
-          .sort((a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()) // Chronological order
+          .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
       }))
       .sort((a, b) => b.totalSpent - a.totalSpent);
 
