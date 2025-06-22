@@ -155,13 +155,19 @@ export default function WeeklySpendingDashboard() {
     const startDate = new Date();
     startDate.setMonth(endDate.getMonth() - monthsCount);
 
-    let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+    const startMonth = startDate.getMonth();
+    const startYear = startDate.getFullYear();
+    const endMonth = endDate.getMonth();
+    const endYear = endDate.getFullYear();
 
-    while (currentDate <= endMonth) {
+    let currentYear = startYear;
+    let currentMonth = startMonth;
+
+    while (currentYear < endYear || (currentYear === endYear && currentMonth <= endMonth)) {
+      const currentDate = new Date(currentYear, currentMonth, 1);
       const { month, year, monthName, daysInMonth } = getMonthInfo(currentDate);
-      const isCurrentMonth = currentDate.getFullYear() === endDate.getFullYear() && 
-                            currentDate.getMonth() === endDate.getMonth();
+      const isCurrentMonth = currentYear === endDate.getFullYear() && 
+                            currentMonth === endDate.getMonth();
 
       months.push({
         month,
@@ -174,7 +180,11 @@ export default function WeeklySpendingDashboard() {
       });
 
       // Move to next month
-      currentDate.setMonth(currentDate.getMonth() + 1);
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
     }
 
     return months.sort((a, b) => b.year - a.year || parseInt(b.month.split('-')[1]) - parseInt(a.month.split('-')[1]));
