@@ -23,6 +23,16 @@ interface WeekData {
   transactions: number;
 }
 
+interface MonthData {
+  month: string;
+  year: number;
+  monthName: string;
+  amount: number;
+  transactions: number;
+  daysInMonth: number;
+  currentDay?: number; // For current month tracking
+}
+
 interface MerchantSpending {
   merchant: string;
   totalSpent: number;
@@ -33,6 +43,24 @@ interface MerchantSpending {
   weeklyBreakdown: WeekData[];
 }
 
+interface MerchantMonthlySpending {
+  merchant: string;
+  totalSpent: number;
+  transactionCount: number;
+  averageMonthlySpending: number;
+  monthsWithSpending: number;
+  monthlyBreakdown: MonthData[];
+  // Current month pacing data
+  currentMonthSpent: number;
+  currentMonthDays: number;
+  expectedPaceAmount: number;
+  dailyPace: number;
+  expectedDailyPace: number;
+  paceVariance: number;
+  projectedMonthEnd: number;
+  paceStatus: 'ahead' | 'behind' | 'on-track';
+}
+
 interface WeeklyAnalysis {
   merchants: MerchantSpending[];
   totalSpending: number;
@@ -40,10 +68,21 @@ interface WeeklyAnalysis {
   totalWeeksAnalyzed: number;
 }
 
+interface MonthlyAnalysis {
+  merchants: MerchantMonthlySpending[];
+  totalSpending: number;
+  totalTransactions: number;
+  totalMonthsAnalyzed: number;
+  currentMonthTotalSpent: number;
+  currentMonthProjectedTotal: number;
+}
+
 export default function WeeklySpendingDashboard() {
+  const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
   const [weeklyAnalysis, setWeeklyAnalysis] = useState<WeeklyAnalysis | null>(null);
+  const [monthlyAnalysis, setMonthlyAnalysis] = useState<MonthlyAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('12'); // weeks
+  const [timeRange, setTimeRange] = useState('12'); // weeks/months
   const supabase = createSupabaseClient();
 
   // Get the start of a week (Sunday = 0)
@@ -66,8 +105,17 @@ export default function WeeklySpendingDashboard() {
     return { week, year: d.getFullYear() };
   }
 
+  // Get month info
+  function getMonthInfo(date: Date): { month: string; year: number; monthName: string; daysInMonth: number } {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(year, date.getMonth() + 1, 0).getDate();
+    return { month: `${year}-${month}`, year, monthName, daysInMonth };
+  }
+
   // Generate all weeks in the time range
-  function generateAllWeeks(weeksCount: number): WeekData[] {
+  const generateAllWeeks = useCallback((weeksCount: number): WeekData[] => {
     const weeks: WeekData[] = [];
     const endDate = new Date();
     const startDate = new Date();
@@ -98,7 +146,39 @@ export default function WeeklySpendingDashboard() {
     }
 
     return weeks.sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime());
-  }
+  }, []);
+
+  // Generate all months in the time range
+  const generateAllMonths = useCallback((monthsCount: number): MonthData[] => {
+    const months: MonthData[] = [];
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setMonth(endDate.getMonth() - monthsCount);
+
+    let currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const endMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1);
+
+    while (currentDate <= endMonth) {
+      const { month, year, monthName, daysInMonth } = getMonthInfo(currentDate);
+      const isCurrentMonth = currentDate.getFullYear() === endDate.getFullYear() && 
+                            currentDate.getMonth() === endDate.getMonth();
+
+      months.push({
+        month,
+        year,
+        monthName,
+        amount: 0,
+        transactions: 0,
+        daysInMonth,
+        currentDay: isCurrentMonth ? endDate.getDate() : undefined
+      });
+
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
+    }
+
+    return months.sort((a, b) => b.year - a.year || parseInt(b.month.split('-')[1]) - parseInt(a.month.split('-')[1]));
+  }, []);
 
   // Analyze spending by merchant with complete week coverage
   const analyzeWeeklySpending = useCallback((transactions: Transaction[]) => {
@@ -174,7 +254,111 @@ export default function WeeklySpendingDashboard() {
     };
 
     setWeeklyAnalysis(analysis);
-  }, [timeRange]);
+  }, [timeRange, generateAllWeeks]);
+
+  // Analyze monthly spending with pacing
+  const analyzeMonthlySpending = useCallback((transactions: Transaction[]) => {
+    const months = parseInt(timeRange);
+    const allMonths = generateAllMonths(months);
+    const today = new Date();
+
+    // Filter to spending transactions only (positive amounts)
+    const spendingTransactions = transactions.filter(t => t.amount > 0);
+
+    // Group transactions by merchant
+    const merchantMap = new Map<string, Transaction[]>();
+    
+    spendingTransactions.forEach(transaction => {
+      const merchant = transaction.merchant_name || transaction.name || 'Unknown Merchant';
+      if (!merchantMap.has(merchant)) {
+        merchantMap.set(merchant, []);
+      }
+      merchantMap.get(merchant)!.push(transaction);
+    });
+
+    // Analyze each merchant with complete month coverage and pacing
+    const merchantAnalysis: MerchantMonthlySpending[] = Array.from(merchantMap.entries()).map(([merchant, transactions]) => {
+      // Create a fresh copy of all months for this merchant
+      const merchantMonths = allMonths.map(month => ({
+        ...month,
+        amount: 0,
+        transactions: 0
+      }));
+
+      // Populate months with this merchant's transactions
+      transactions.forEach(transaction => {
+        const transactionDate = new Date(transaction.date);
+        const { month: monthKey } = getMonthInfo(transactionDate);
+
+        const monthData = merchantMonths.find(m => m.month === monthKey);
+        if (monthData) {
+          monthData.amount += transaction.amount;
+          monthData.transactions += 1;
+        }
+      });
+
+      // Calculate basic merchant statistics
+      const totalSpent = merchantMonths.reduce((sum, month) => sum + month.amount, 0);
+      const transactionCount = merchantMonths.reduce((sum, month) => sum + month.transactions, 0);
+      const monthsWithSpending = merchantMonths.filter(m => m.amount > 0).length;
+      const averageMonthlySpending = merchantMonths.length > 0 ? totalSpent / merchantMonths.length : 0;
+
+      // Calculate current month pacing
+      const currentMonth = merchantMonths.find(m => m.currentDay !== undefined);
+      const currentMonthSpent = currentMonth?.amount || 0;
+      const currentMonthDays = currentMonth?.currentDay || today.getDate();
+      const currentMonthTotalDays = currentMonth?.daysInMonth || 30;
+
+      // Pacing calculations
+      const expectedDailyPace = averageMonthlySpending / 30; // Use 30 as standard month for comparison
+      const dailyPace = currentMonthDays > 0 ? currentMonthSpent / currentMonthDays : 0;
+      const expectedPaceAmount = expectedDailyPace * currentMonthDays;
+      const paceVariance = currentMonthSpent - expectedPaceAmount;
+      const projectedMonthEnd = dailyPace * currentMonthTotalDays;
+
+      let paceStatus: 'ahead' | 'behind' | 'on-track' = 'on-track';
+      if (Math.abs(paceVariance) > expectedDailyPace * 2) { // More than 2 days variance
+        paceStatus = paceVariance > 0 ? 'ahead' : 'behind';
+      }
+
+      return {
+        merchant,
+        totalSpent,
+        transactionCount,
+        averageMonthlySpending,
+        monthsWithSpending,
+        monthlyBreakdown: merchantMonths,
+        currentMonthSpent,
+        currentMonthDays,
+        expectedPaceAmount,
+        dailyPace,
+        expectedDailyPace,
+        paceVariance,
+        projectedMonthEnd,
+        paceStatus
+      };
+    });
+
+    // Sort merchants by total spending (highest to lowest)
+    merchantAnalysis.sort((a, b) => b.totalSpent - a.totalSpent);
+
+    // Calculate overall statistics
+    const totalSpending = merchantAnalysis.reduce((sum, merchant) => sum + merchant.totalSpent, 0);
+    const totalTransactions = merchantAnalysis.reduce((sum, merchant) => sum + merchant.transactionCount, 0);
+    const currentMonthTotalSpent = merchantAnalysis.reduce((sum, merchant) => sum + merchant.currentMonthSpent, 0);
+    const currentMonthProjectedTotal = merchantAnalysis.reduce((sum, merchant) => sum + merchant.projectedMonthEnd, 0);
+
+    const analysis: MonthlyAnalysis = {
+      merchants: merchantAnalysis,
+      totalSpending,
+      totalTransactions,
+      totalMonthsAnalyzed: allMonths.length,
+      currentMonthTotalSpent,
+      currentMonthProjectedTotal
+    };
+
+    setMonthlyAnalysis(analysis);
+  }, [timeRange, generateAllMonths]);
 
   const fetchTransactions = useCallback(async () => {
     try {
@@ -190,14 +374,16 @@ export default function WeeklySpendingDashboard() {
       const data = await response.json();
       
       if (response.ok) {
-        analyzeWeeklySpending(data.transactions || []);
+        const transactions = data.transactions || [];
+        analyzeWeeklySpending(transactions);
+        analyzeMonthlySpending(transactions);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [supabase.auth, analyzeWeeklySpending]);
+  }, [supabase.auth, analyzeWeeklySpending, analyzeMonthlySpending]);
 
   useEffect(() => {
     fetchTransactions();
@@ -218,15 +404,33 @@ export default function WeeklySpendingDashboard() {
     }).format(amount);
   }
 
+  function getPaceStatusColor(status: 'ahead' | 'behind' | 'on-track'): string {
+    switch (status) {
+      case 'ahead': return 'text-red-600'; // Red for overspending
+      case 'behind': return 'text-green-600'; // Green for under budget
+      case 'on-track': return 'text-blue-600'; // Blue for on track
+    }
+  }
+
+  function getPaceStatusText(status: 'ahead' | 'behind' | 'on-track'): string {
+    switch (status) {
+      case 'ahead': return 'Ahead of Pace';
+      case 'behind': return 'Behind Pace';
+      case 'on-track': return 'On Track';
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading weekly spending analysis...</div>
+        <div className="text-muted-foreground">Loading spending analysis...</div>
       </div>
     );
   }
 
-  if (!weeklyAnalysis) {
+  const currentAnalysis = activeTab === 'weekly' ? weeklyAnalysis : monthlyAnalysis;
+
+  if (!currentAnalysis) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-muted-foreground">Unable to load spending data</div>
@@ -234,268 +438,480 @@ export default function WeeklySpendingDashboard() {
     );
   }
 
-  const { merchants, totalSpending, totalTransactions, totalWeeksAnalyzed } = weeklyAnalysis;
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">📊 Weekly Spending by Merchant</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">📊 Spending Analysis</h1>
+          
+          {/* Tabs */}
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('weekly')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'weekly'
+                  ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              📅 Weekly
+            </button>
+            <button
+              onClick={() => setActiveTab('monthly')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'monthly'
+                  ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              📈 Monthly
+            </button>
+          </div>
+        </div>
+
         <select 
           value={timeRange}
           onChange={(e) => setTimeRange(e.target.value)}
           className="px-3 py-2 border rounded-md bg-background"
         >
-          <option value="4">Last 4 weeks</option>
-          <option value="8">Last 8 weeks</option>
-          <option value="12">Last 12 weeks</option>
-          <option value="24">Last 6 months</option>
-          <option value="52">Last year</option>
+          <option value="4">Last 4 {activeTab === 'weekly' ? 'weeks' : 'months'}</option>
+          <option value="8">Last 8 {activeTab === 'weekly' ? 'weeks' : 'months'}</option>
+          <option value="12">Last 12 {activeTab === 'weekly' ? 'weeks' : 'months'}</option>
+          <option value="24">Last {activeTab === 'weekly' ? '6 months' : '2 years'}</option>
+          <option value="52">Last {activeTab === 'weekly' ? 'year' : '4+ years'}</option>
         </select>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground">Total Spending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{formatCurrency(totalSpending)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across {merchants.length} merchants</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground">Total Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalTransactions}</div>
-            <p className="text-xs text-muted-foreground mt-1">Over {totalWeeksAnalyzed} weeks</p>
-          </CardContent>
-        </Card>
+      {activeTab === 'weekly' && weeklyAnalysis && (
+        <div className="grid md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Total Spending</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(weeklyAnalysis.totalSpending)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Across {weeklyAnalysis.merchants.length} merchants</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Total Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{weeklyAnalysis.totalTransactions}</div>
+              <p className="text-xs text-muted-foreground mt-1">Over {weeklyAnalysis.totalWeeksAnalyzed} weeks</p>
+            </CardContent>
+          </Card>
 
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Active Merchants</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{weeklyAnalysis.merchants.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Unique spending sources</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {activeTab === 'monthly' && monthlyAnalysis && (
+        <div className="grid md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Month So Far</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{formatCurrency(monthlyAnalysis.currentMonthTotalSpent)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Current month spending</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Projected Month-End</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">{formatCurrency(monthlyAnalysis.currentMonthProjectedTotal)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Based on current pace</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Historical Total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">{formatCurrency(monthlyAnalysis.totalSpending)}</div>
+              <p className="text-xs text-muted-foreground mt-1">Over {monthlyAnalysis.totalMonthsAnalyzed} months</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm text-muted-foreground">Active Merchants</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{monthlyAnalysis.merchants.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Spending sources</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Weekly Analysis */}
+      {activeTab === 'weekly' && weeklyAnalysis && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-muted-foreground">Active Merchants</CardTitle>
+          <CardHeader>
+            <CardTitle>🏪 Merchants Ranked by Total Spending (Last {timeRange} weeks)</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Each merchant shows complete weekly breakdown including $0 weeks
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{merchants.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Unique spending sources</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Merchant Analysis */}
-      <Card>
-        <CardHeader>
-          <CardTitle>🏪 Merchants Ranked by Total Spending (Last {timeRange} weeks)</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Each merchant shows complete weekly breakdown including $0 weeks
-          </p>
-        </CardHeader>
-        <CardContent>
-          {merchants.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No spending data found for the selected time period.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {merchants.map((merchant, index) => (
-                <div key={merchant.merchant} className="border rounded-lg p-6 space-y-4">
-                  {/* Merchant Header */}
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-10 h-10 bg-blue-100 text-blue-800 rounded-full font-bold">
-                        #{index + 1}
+            {weeklyAnalysis.merchants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No spending data found for the selected time period.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {weeklyAnalysis.merchants.map((merchant, index) => (
+                  <div key={merchant.merchant} className="border rounded-lg p-6 space-y-4">
+                    {/* Merchant Header */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 text-blue-800 rounded-full font-bold">
+                          #{index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-xl">{merchant.merchant}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
+                            {merchant.weeksWithSpending} of {weeklyAnalysis.totalWeeksAnalyzed} weeks active
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-xl">{merchant.merchant}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
-                          {merchant.weeksWithSpending} of {totalWeeksAnalyzed} weeks active
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-red-600">
+                          {formatCurrency(merchant.totalSpent)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {((merchant.totalSpent / weeklyAnalysis.totalSpending) * 100).toFixed(1)}% of total spending
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Merchant Statistics */}
+                    <div className="grid md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{formatCurrency(merchant.averageWeeklySpending)}</div>
+                        <div className="text-xs text-muted-foreground">Average per week</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-blue-600">{formatCurrency(merchant.forecastedMonthlySpending)}</div>
+                        <div className="text-xs text-muted-foreground">Forecasted monthly</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{((merchant.weeksWithSpending / weeklyAnalysis.totalWeeksAnalyzed) * 100).toFixed(0)}%</div>
+                        <div className="text-xs text-muted-foreground">Activity rate</div>
+                      </div>
+                    </div>
+                    
+                    {/* Weekly Chart */}
+                    <div>
+                      <h4 className="font-medium mb-3 text-sm">📈 Weekly Spending Pattern</h4>
+                      <div className="relative h-32 bg-white dark:bg-gray-800 rounded-lg p-3 border">
+                        <svg className="w-full h-full" viewBox="0 0 600 100">
+                          {/* Chart background grid */}
+                          <defs>
+                            <pattern id={`grid-${index}`} width="50" height="25" patternUnits="userSpaceOnUse">
+                              <path d="M 50 0 L 0 0 0 25" fill="none" stroke="#e5e7eb" strokeWidth="0.5"/>
+                            </pattern>
+                            <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                              <stop offset="0%" style={{stopColor: '#3b82f6', stopOpacity: 0.3}} />
+                              <stop offset="100%" style={{stopColor: '#3b82f6', stopOpacity: 0}} />
+                            </linearGradient>
+                          </defs>
+                          <rect width="100%" height="100%" fill={`url(#grid-${index})`} />
+                          
+                          {/* Chart content */}
+                          {(() => {
+                            // Sort weeks chronologically for proper chart display
+                            const sortedWeeks = [...merchant.weeklyBreakdown].sort((a, b) => 
+                              new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+                            );
+                            
+                            if (sortedWeeks.length === 0) return null;
+                            
+                            const maxAmount = Math.max(...sortedWeeks.map(w => w.amount), merchant.averageWeeklySpending * 1.5);
+                            const range = maxAmount || 1;
+                            
+                            const points = sortedWeeks.map((week, weekIndex) => {
+                              const x = (weekIndex / Math.max(sortedWeeks.length - 1, 1)) * 560 + 20;
+                              const y = 80 - ((week.amount) / range) * 60;
+                              return { x, y, week };
+                            });
+                            
+                            const pathData = points.map((point, pointIndex) => 
+                              `${pointIndex === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
+                            ).join(' ');
+                            
+                            const areaData = `${pathData} L ${points[points.length - 1]?.x || 20} 80 L 20 80 Z`;
+                            
+                            return (
+                              <>
+                                {/* Area fill */}
+                                <path 
+                                  d={areaData} 
+                                  fill={`url(#gradient-${index})`}
+                                />
+                                {/* Line */}
+                                <path 
+                                  d={pathData} 
+                                  fill="none" 
+                                  stroke="#3b82f6" 
+                                  strokeWidth="2"
+                                />
+                                {/* Points */}
+                                {points.map((point, pointIndex) => (
+                                  <g key={pointIndex}>
+                                    <circle 
+                                      cx={point.x} 
+                                      cy={point.y} 
+                                      r={point.week.amount > 0 ? "4" : "2"} 
+                                      fill={point.week.amount > 0 ? "#3b82f6" : "#e5e7eb"}
+                                      stroke="white"
+                                      strokeWidth="1"
+                                    />
+                                    <title>
+                                      {formatDateRange(point.week.weekStart, point.week.weekEnd)}: {formatCurrency(point.week.amount)}
+                                      {point.week.transactions > 0 && ` (${point.week.transactions} transactions)`}
+                                    </title>
+                                  </g>
+                                ))}
+                                
+                                {/* Average line */}
+                                {(() => {
+                                  const avgY = 80 - (merchant.averageWeeklySpending / range) * 60;
+                                  return (
+                                    <>
+                                      <line 
+                                        x1="20" 
+                                        y1={avgY} 
+                                        x2="580" 
+                                        y2={avgY} 
+                                        stroke="#ef4444" 
+                                        strokeWidth="1" 
+                                        strokeDasharray="3,3"
+                                      />
+                                      <text x="585" y={avgY + 3} fontSize="8" fill="#ef4444">
+                                        Avg
+                                      </text>
+                                    </>
+                                  );
+                                })()}
+                                
+                                {/* Y-axis labels */}
+                                <text x="5" y="15" fontSize="10" fill="#6b7280">
+                                  {formatCurrency(maxAmount)}
+                                </text>
+                                <text x="5" y="85" fontSize="10" fill="#6b7280">
+                                  $0
+                                </text>
+                              </>
+                            );
+                          })()}
+                        </svg>
+                      </div>
+                    </div>
+
+                    {/* Weekly Breakdown - Show only non-zero weeks in summary */}
+                    <div>
+                      <h4 className="font-medium mb-2 text-sm">📋 Active Weeks Summary</h4>
+                      <div className="grid gap-2 max-h-32 overflow-y-auto">
+                        {merchant.weeklyBreakdown
+                          .filter(week => week.amount > 0)
+                          .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
+                          .slice(0, 8) // Show most recent 8 active weeks
+                          .map((week) => (
+                            <div key={week.weekStart} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
+                              <span className="text-muted-foreground">
+                                {formatDateRange(week.weekStart, week.weekEnd)}
+                              </span>
+                              <div className="flex gap-4">
+                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                  {week.transactions} txn{week.transactions !== 1 ? 's' : ''}
+                                </span>
+                                <span className="font-medium text-red-600 dark:text-red-400 min-w-[60px] text-right">
+                                  {formatCurrency(week.amount)}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                      {merchant.weeksWithSpending > 8 && (
+                        <div className="text-xs text-muted-foreground mt-2 text-center">
+                          Showing most recent 8 active weeks of {merchant.weeksWithSpending} total
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Forecasting Insight */}
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        <strong>Forecasting:</strong> Based on {merchant.weeksWithSpending} active weeks out of {weeklyAnalysis.totalWeeksAnalyzed} analyzed, 
+                        this merchant averages {formatCurrency(merchant.averageWeeklySpending)} per week, 
+                        forecasting {formatCurrency(merchant.forecastedMonthlySpending)} monthly budget needed.
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Monthly Analysis with Pacing */}
+      {activeTab === 'monthly' && monthlyAnalysis && (
+        <Card>
+          <CardHeader>
+            <CardTitle>📈 Monthly Pacing Analysis</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Current month progress vs historical averages with month-end projections
+            </p>
+          </CardHeader>
+          <CardContent>
+            {monthlyAnalysis.merchants.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No spending data found for the selected time period.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {monthlyAnalysis.merchants.map((merchant, index) => (
+                  <div key={merchant.merchant} className="border rounded-lg p-6 space-y-4">
+                    {/* Merchant Header with Pacing Status */}
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-10 h-10 bg-blue-100 text-blue-800 rounded-full font-bold">
+                          #{index + 1}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-xl">{merchant.merchant}</h3>
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className="text-muted-foreground">
+                              Day {merchant.currentMonthDays} • {merchant.transactionCount} total transactions
+                            </span>
+                            <span className={`font-medium ${getPaceStatusColor(merchant.paceStatus)}`}>
+                              {getPaceStatusText(merchant.paceStatus)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-red-600">
+                          {formatCurrency(merchant.currentMonthSpent)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          This month so far
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Pacing Statistics */}
+                    <div className="grid md:grid-cols-4 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{formatCurrency(merchant.expectedPaceAmount)}</div>
+                        <div className="text-xs text-muted-foreground">Expected by day {merchant.currentMonthDays}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className={`text-lg font-semibold ${merchant.paceVariance >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {merchant.paceVariance >= 0 ? '+' : ''}{formatCurrency(merchant.paceVariance)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Pace variance</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-purple-600">{formatCurrency(merchant.projectedMonthEnd)}</div>
+                        <div className="text-xs text-muted-foreground">Projected month-end</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{formatCurrency(merchant.averageMonthlySpending)}</div>
+                        <div className="text-xs text-muted-foreground">Historical average</div>
+                      </div>
+                    </div>
+
+                    {/* Daily Pace Breakdown */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                        <h5 className="font-medium text-sm mb-2">📊 Daily Pace Comparison</h5>
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span>Current daily pace:</span>
+                            <span className="font-medium">{formatCurrency(merchant.dailyPace)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Expected daily pace:</span>
+                            <span className="font-medium">{formatCurrency(merchant.expectedDailyPace)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Days remaining:</span>
+                            <span className="font-medium">{(monthlyAnalysis.merchants[0]?.monthlyBreakdown[0]?.daysInMonth || 30) - merchant.currentMonthDays}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                        <h5 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-200">🎯 Pacing Insight</h5>
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                                                     {merchant.paceStatus === 'ahead' && (
+                             <>You&apos;re spending {formatCurrency(Math.abs(merchant.paceVariance))} more than usual. 
+                             At this pace, you&apos;ll spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your typical {formatCurrency(merchant.averageMonthlySpending)}.</>
+                           )}
+                           {merchant.paceStatus === 'behind' && (
+                             <>You&apos;re {formatCurrency(Math.abs(merchant.paceVariance))} under your typical pace. 
+                             You&apos;ll likely spend {formatCurrency(merchant.projectedMonthEnd)} this month vs your usual {formatCurrency(merchant.averageMonthlySpending)}.</>
+                           )}
+                           {merchant.paceStatus === 'on-track' && (
+                             <>You&apos;re tracking close to your typical spending pattern. 
+                             Projected {formatCurrency(merchant.projectedMonthEnd)} vs usual {formatCurrency(merchant.averageMonthlySpending)}.</>
+                           )}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-red-600">
-                        {formatCurrency(merchant.totalSpent)}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {((merchant.totalSpent / totalSpending) * 100).toFixed(1)}% of total spending
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Merchant Statistics */}
-                  <div className="grid md:grid-cols-3 gap-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                    <div className="text-center">
-                      <div className="text-lg font-semibold">{formatCurrency(merchant.averageWeeklySpending)}</div>
-                      <div className="text-xs text-muted-foreground">Average per week</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold text-blue-600">{formatCurrency(merchant.forecastedMonthlySpending)}</div>
-                      <div className="text-xs text-muted-foreground">Forecasted monthly</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold">{((merchant.weeksWithSpending / totalWeeksAnalyzed) * 100).toFixed(0)}%</div>
-                      <div className="text-xs text-muted-foreground">Activity rate</div>
-                    </div>
-                  </div>
-                  
-                  {/* Weekly Chart */}
-                  <div>
-                    <h4 className="font-medium mb-3 text-sm">📈 Weekly Spending Pattern</h4>
-                    <div className="relative h-32 bg-white dark:bg-gray-800 rounded-lg p-3 border">
-                      <svg className="w-full h-full" viewBox="0 0 600 100">
-                        {/* Chart background grid */}
-                        <defs>
-                          <pattern id={`grid-${index}`} width="50" height="25" patternUnits="userSpaceOnUse">
-                            <path d="M 50 0 L 0 0 0 25" fill="none" stroke="#e5e7eb" strokeWidth="0.5"/>
-                          </pattern>
-                          <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" style={{stopColor: '#3b82f6', stopOpacity: 0.3}} />
-                            <stop offset="100%" style={{stopColor: '#3b82f6', stopOpacity: 0}} />
-                          </linearGradient>
-                        </defs>
-                        <rect width="100%" height="100%" fill={`url(#grid-${index})`} />
-                        
-                        {/* Chart content */}
-                        {(() => {
-                          // Sort weeks chronologically for proper chart display
-                          const sortedWeeks = [...merchant.weeklyBreakdown].sort((a, b) => 
-                            new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
-                          );
-                          
-                          if (sortedWeeks.length === 0) return null;
-                          
-                          const maxAmount = Math.max(...sortedWeeks.map(w => w.amount), merchant.averageWeeklySpending * 1.5);
-                          const range = maxAmount || 1;
-                          
-                          const points = sortedWeeks.map((week, weekIndex) => {
-                            const x = (weekIndex / Math.max(sortedWeeks.length - 1, 1)) * 560 + 20;
-                            const y = 80 - ((week.amount) / range) * 60;
-                            return { x, y, week };
-                          });
-                          
-                          const pathData = points.map((point, pointIndex) => 
-                            `${pointIndex === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
-                          ).join(' ');
-                          
-                          const areaData = `${pathData} L ${points[points.length - 1]?.x || 20} 80 L 20 80 Z`;
-                          
-                          return (
-                            <>
-                              {/* Area fill */}
-                              <path 
-                                d={areaData} 
-                                fill={`url(#gradient-${index})`}
-                              />
-                              {/* Line */}
-                              <path 
-                                d={pathData} 
-                                fill="none" 
-                                stroke="#3b82f6" 
-                                strokeWidth="2"
-                              />
-                              {/* Points */}
-                              {points.map((point, pointIndex) => (
-                                <g key={pointIndex}>
-                                  <circle 
-                                    cx={point.x} 
-                                    cy={point.y} 
-                                    r={point.week.amount > 0 ? "4" : "2"} 
-                                    fill={point.week.amount > 0 ? "#3b82f6" : "#e5e7eb"}
-                                    stroke="white"
-                                    strokeWidth="1"
-                                  />
-                                  <title>
-                                    {formatDateRange(point.week.weekStart, point.week.weekEnd)}: {formatCurrency(point.week.amount)}
-                                    {point.week.transactions > 0 && ` (${point.week.transactions} transactions)`}
-                                  </title>
-                                </g>
-                              ))}
-                              
-                              {/* Average line */}
-                              {(() => {
-                                const avgY = 80 - (merchant.averageWeeklySpending / range) * 60;
-                                return (
-                                  <>
-                                    <line 
-                                      x1="20" 
-                                      y1={avgY} 
-                                      x2="580" 
-                                      y2={avgY} 
-                                      stroke="#ef4444" 
-                                      strokeWidth="1" 
-                                      strokeDasharray="3,3"
-                                    />
-                                    <text x="585" y={avgY + 3} fontSize="8" fill="#ef4444">
-                                      Avg
-                                    </text>
-                                  </>
-                                );
-                              })()}
-                              
-                              {/* Y-axis labels */}
-                              <text x="5" y="15" fontSize="10" fill="#6b7280">
-                                {formatCurrency(maxAmount)}
-                              </text>
-                              <text x="5" y="85" fontSize="10" fill="#6b7280">
-                                $0
-                              </text>
-                            </>
-                          );
-                        })()}
-                      </svg>
-                    </div>
-                  </div>
-
-                  {/* Weekly Breakdown - Show only non-zero weeks in summary */}
-                  <div>
-                    <h4 className="font-medium mb-2 text-sm">📋 Active Weeks Summary</h4>
-                    <div className="grid gap-2 max-h-32 overflow-y-auto">
-                      {merchant.weeklyBreakdown
-                        .filter(week => week.amount > 0)
-                        .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
-                        .slice(0, 8) // Show most recent 8 active weeks
-                        .map((week) => (
-                          <div key={week.weekStart} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
-                            <span className="text-muted-foreground">
-                              {formatDateRange(week.weekStart, week.weekEnd)}
-                            </span>
-                            <div className="flex gap-4">
-                              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
-                                {week.transactions} txn{week.transactions !== 1 ? 's' : ''}
+                    {/* Recent Months Summary */}
+                    <div>
+                      <h4 className="font-medium mb-2 text-sm">📅 Recent Months</h4>
+                      <div className="grid gap-2 max-h-32 overflow-y-auto">
+                        {merchant.monthlyBreakdown
+                          .filter(month => month.amount > 0)
+                          .slice(0, 6) // Show most recent 6 months
+                          .map((month) => (
+                            <div key={month.month} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
+                              <span className="text-muted-foreground">
+                                {month.monthName}
                               </span>
-                              <span className="font-medium text-red-600 dark:text-red-400 min-w-[60px] text-right">
-                                {formatCurrency(week.amount)}
-                              </span>
+                              <div className="flex gap-4">
+                                <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                  {month.transactions} txn{month.transactions !== 1 ? 's' : ''}
+                                </span>
+                                <span className="font-medium text-red-600 dark:text-red-400 min-w-[60px] text-right">
+                                  {formatCurrency(month.amount)}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                    </div>
-                    {merchant.weeksWithSpending > 8 && (
-                      <div className="text-xs text-muted-foreground mt-2 text-center">
-                        Showing most recent 8 active weeks of {merchant.weeksWithSpending} total
+                          ))}
                       </div>
-                    )}
+                    </div>
                   </div>
-
-                  {/* Forecasting Insight */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-sm text-blue-800 dark:text-blue-200">
-                      <strong>Forecasting:</strong> Based on {merchant.weeksWithSpending} active weeks out of {totalWeeksAnalyzed} analyzed, 
-                      this merchant averages {formatCurrency(merchant.averageWeeklySpending)} per week, 
-                      forecasting {formatCurrency(merchant.forecastedMonthlySpending)} monthly budget needed.
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 
