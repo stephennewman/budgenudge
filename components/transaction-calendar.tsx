@@ -33,9 +33,18 @@ interface CalendarDay {
   predictedTransactions: PredictedTransaction[];
 }
 
+interface MerchantSpending {
+  name: string;
+  totalSpent: number;
+  transactionCount: number;
+  averageAmount: number;
+}
+
 export default function TransactionCalendar() {
   const [predictions, setPredictions] = useState<PredictedTransaction[]>([]);
   const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
+  const [merchantSpendingRanked, setMerchantSpendingRanked] = useState<MerchantSpending[]>([]);
+  const [totalSpending, setTotalSpending] = useState(0);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createSupabaseClient();
@@ -250,6 +259,30 @@ export default function TransactionCalendar() {
 
         setPredictions(allPredictions);
 
+        // Calculate merchant spending rankings
+        const merchantSpendingData: MerchantSpending[] = [];
+        let totalSpent = 0;
+
+        merchantMap.forEach((merchantTransactions, merchant) => {
+          const merchantTotal = merchantTransactions.reduce((sum, t) => sum + t.amount, 0);
+          const merchantAverage = merchantTotal / merchantTransactions.length;
+          
+          totalSpent += merchantTotal;
+          
+          merchantSpendingData.push({
+            name: merchant,
+            totalSpent: merchantTotal,
+            transactionCount: merchantTransactions.length,
+            averageAmount: merchantAverage
+          });
+        });
+
+        // Sort by total spending (highest to lowest)
+        merchantSpendingData.sort((a, b) => b.totalSpent - a.totalSpent);
+        
+        setMerchantSpendingRanked(merchantSpendingData);
+        setTotalSpending(totalSpent);
+
         // Generate calendar days
         const calendarDays = generateCalendarDays(currentDate, transactions, allPredictions);
         setCalendarDays(calendarDays);
@@ -303,51 +336,106 @@ export default function TransactionCalendar() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">📅 Predictive Transaction Calendar</h1>
-        <div className="text-sm text-muted-foreground">
-          {predictions.length} predictions from {new Set(predictions.map(p => p.merchant)).size} merchants
+        <div className="text-right">
+          <div className="text-lg font-semibold text-red-600">
+            {formatCurrency(totalSpending)} Total Spending
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {predictions.length} predictions from {merchantSpendingRanked.length} merchants
+          </div>
         </div>
       </div>
 
-      {/* Upcoming Predictions Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>🔮 Upcoming Predictions</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {upcomingPredictions.length === 0 ? (
-            <div className="text-center py-4 text-muted-foreground">
-              No upcoming predictions found. Need more transaction history for reliable patterns.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {upcomingPredictions.map((prediction, index) => (
-                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getCadenceColor(prediction.cadence)}`}>
-                      {prediction.cadence}
-                    </span>
-                    <div>
-                      <div className="font-medium">{prediction.merchant}</div>
+      {/* Stack Ranked Spending Analysis */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>📊 Top Spending Merchants</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {merchantSpendingRanked.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No spending data available.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {merchantSpendingRanked.slice(0, 8).map((merchant, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                        index === 0 ? 'bg-yellow-100 text-yellow-800' :
+                        index === 1 ? 'bg-gray-100 text-gray-800' :
+                        index === 2 ? 'bg-orange-100 text-orange-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        #{index + 1}
+                      </div>
+                      <div>
+                        <div className="font-medium">{merchant.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {merchant.transactionCount} transaction{merchant.transactionCount !== 1 ? 's' : ''} • 
+                          Avg: {formatCurrency(merchant.averageAmount)}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-red-600 text-lg">{formatCurrency(merchant.totalSpent)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {Math.round(prediction.confidence * 100)}% confidence
+                        {((merchant.totalSpent / totalSpending) * 100).toFixed(1)}% of total
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-medium text-red-600">{formatCurrency(prediction.averageAmount)}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {prediction.predictedDate.toLocaleDateString('en-US', { 
-                        month: 'short', 
-                        day: 'numeric' 
-                      })}
+                ))}
+                {merchantSpendingRanked.length > 8 && (
+                  <div className="text-center text-sm text-muted-foreground pt-2 border-t">
+                    +{merchantSpendingRanked.length - 8} more merchants
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>🔮 Upcoming Predictions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {upcomingPredictions.length === 0 ? (
+              <div className="text-center py-4 text-muted-foreground">
+                No upcoming predictions found. Need more transaction history for reliable patterns.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {upcomingPredictions.map((prediction, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2 py-1 rounded text-xs font-medium border ${getCadenceColor(prediction.cadence)}`}>
+                        {prediction.cadence}
+                      </span>
+                      <div>
+                        <div className="font-medium">{prediction.merchant}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {Math.round(prediction.confidence * 100)}% confidence
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-red-600">{formatCurrency(prediction.averageAmount)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {prediction.predictedDate.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Calendar */}
       <Card>
