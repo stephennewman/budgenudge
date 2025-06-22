@@ -238,26 +238,122 @@ export default function WeeklySpendingDashboard() {
                     </div>
                   </div>
                   
-                  {/* Weekly Breakdown */}
-                  <div className="bg-gray-50 dark:bg-gray-900 rounded p-3">
-                    <h4 className="font-medium mb-2 text-sm">Weekly Breakdown:</h4>
-                    <div className="grid gap-2">
-                      {merchant.weeklyBreakdown.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">No transactions this period</div>
-                      ) : (
-                                                 merchant.weeklyBreakdown.map((week) => (
-                          <div key={week.weekStart} className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">
-                              {formatDateRange(new Date(week.weekStart), new Date(week.weekEnd))}
-                            </span>
-                            <div className="flex gap-4">
-                              <span>{week.transactions} transaction{week.transactions !== 1 ? 's' : ''}</span>
-                              <span className="font-medium text-red-600">${week.amount.toFixed(2)}</span>
-                            </div>
+                  {/* Weekly Chart and Breakdown */}
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded p-4 space-y-4">
+                    {merchant.weeklyBreakdown.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">No transactions this period</div>
+                    ) : (
+                      <>
+                        {/* Weekly Spending Chart */}
+                        <div>
+                          <h4 className="font-medium mb-3 text-sm">📈 Weekly Spending Trend</h4>
+                          <div className="relative h-32 bg-white dark:bg-gray-800 rounded-lg p-3 border">
+                            <svg className="w-full h-full" viewBox="0 0 400 100">
+                              {/* Chart background grid */}
+                              <defs>
+                                <pattern id={`grid-${index}`} width="50" height="25" patternUnits="userSpaceOnUse">
+                                  <path d="M 50 0 L 0 0 0 25" fill="none" stroke="#e5e7eb" strokeWidth="0.5"/>
+                                </pattern>
+                                <linearGradient id={`gradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" style={{stopColor: '#3b82f6', stopOpacity: 0.3}} />
+                                  <stop offset="100%" style={{stopColor: '#3b82f6', stopOpacity: 0}} />
+                                </linearGradient>
+                              </defs>
+                              <rect width="100%" height="100%" fill={`url(#grid-${index})`} />
+                              
+                              {/* Chart line and area */}
+                              {(() => {
+                                // Sort weeks chronologically for proper chart display
+                                const sortedWeeks = [...merchant.weeklyBreakdown].sort((a, b) => 
+                                  new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime()
+                                );
+                                
+                                if (sortedWeeks.length === 0) return null;
+                                
+                                const maxAmount = Math.max(...sortedWeeks.map(w => w.amount));
+                                const minAmount = Math.min(...sortedWeeks.map(w => w.amount));
+                                const range = maxAmount - minAmount || maxAmount || 1;
+                                
+                                const points = sortedWeeks.map((week, index) => {
+                                  const x = (index / Math.max(sortedWeeks.length - 1, 1)) * 360 + 20;
+                                  const y = 80 - ((week.amount - minAmount) / range) * 60;
+                                  return { x, y, amount: week.amount, week };
+                                });
+                                
+                                const pathData = points.map((point, index) => 
+                                  `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`
+                                ).join(' ');
+                                
+                                const areaData = `${pathData} L ${points[points.length - 1]?.x || 0} 80 L 20 80 Z`;
+                                
+                                return (
+                                  <>
+                                    {/* Area fill */}
+                                    <path 
+                                      d={areaData} 
+                                      fill={`url(#gradient-${index})`}
+                                    />
+                                    {/* Line */}
+                                    <path 
+                                      d={pathData} 
+                                      fill="none" 
+                                      stroke="#3b82f6" 
+                                      strokeWidth="2"
+                                      className="drop-shadow-sm"
+                                    />
+                                    {/* Points */}
+                                    {points.map((point, pointIndex) => (
+                                      <g key={pointIndex}>
+                                        <circle 
+                                          cx={point.x} 
+                                          cy={point.y} 
+                                          r="3" 
+                                          fill="#3b82f6"
+                                          stroke="white"
+                                          strokeWidth="1"
+                                          className="drop-shadow-sm"
+                                        />
+                                        <title>${point.amount.toFixed(2)} - Week of {new Date(point.week.weekStart).toLocaleDateString()}</title>
+                                      </g>
+                                    ))}
+                                    
+                                    {/* Y-axis labels */}
+                                    <text x="5" y="15" fontSize="10" fill="#6b7280" textAnchor="start">
+                                      ${maxAmount.toFixed(0)}
+                                    </text>
+                                    <text x="5" y="85" fontSize="10" fill="#6b7280" textAnchor="start">
+                                      ${minAmount.toFixed(0)}
+                                    </text>
+                                  </>
+                                );
+                              })()}
+                            </svg>
                           </div>
-                        ))
-                      )}
-                    </div>
+                        </div>
+
+                        {/* Weekly Breakdown Table */}
+                        <div>
+                          <h4 className="font-medium mb-2 text-sm">📋 Weekly Breakdown</h4>
+                          <div className="grid gap-2 max-h-40 overflow-y-auto">
+                            {merchant.weeklyBreakdown.map((week) => (
+                              <div key={week.weekStart} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
+                                <span className="text-muted-foreground">
+                                  {formatDateRange(new Date(week.weekStart), new Date(week.weekEnd))}
+                                </span>
+                                <div className="flex gap-4">
+                                  <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                    {week.transactions} txn{week.transactions !== 1 ? 's' : ''}
+                                  </span>
+                                  <span className="font-medium text-red-600 dark:text-red-400 min-w-[60px] text-right">
+                                    ${week.amount.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
