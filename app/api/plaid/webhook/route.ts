@@ -87,40 +87,13 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         // Send SMS notification via T-Mobile email gateway
         if (response.data.transactions.length > 0) {
           try {
-            const transactions = response.data.transactions;
-            const transactionCount = transactions.length;
-            
-            // Calculate totals for deposits and debits
-            let totalDebits = 0;
-            let totalDeposits = 0;
-            let debitCount = 0;
-            let depositCount = 0;
-            
-            transactions.forEach(transaction => {
-              if (transaction.amount > 0) {
-                // Positive amounts are debits (money going out)
-                totalDebits += transaction.amount;
-                debitCount++;
-              } else {
-                // Negative amounts are deposits (money coming in)
-                totalDeposits += Math.abs(transaction.amount);
-                depositCount++;
-              }
-            });
-            
-            // Build message with transaction counts and totals
-            const latestTransaction = transactions[0];
-            let message = `${transactionCount} new transaction(s) found!`;
-            
-            if (debitCount > 0 && depositCount > 0) {
-              message += ` ${debitCount} debit(s): $${totalDebits.toFixed(2)}, ${depositCount} deposit(s): $${totalDeposits.toFixed(2)}.`;
-            } else if (debitCount > 0) {
-              message += ` ${debitCount} debit(s) totaling $${totalDebits.toFixed(2)}.`;
-            } else if (depositCount > 0) {
-              message += ` ${depositCount} deposit(s) totaling $${totalDeposits.toFixed(2)}.`;
-            }
-            
-            message += ` Latest: $${Math.abs(latestTransaction.amount)} at ${latestTransaction.merchant_name || latestTransaction.name}`;
+            // Get all historical transactions for analysis
+            const { data: allTransactions } = await supabase
+              .from('transactions')
+              .select('*')
+              .order('date', { ascending: false });
+
+            const message = await buildAdvancedSMSMessage(allTransactions || []);
             
             const smsResponse = await fetch('https://api.resend.com/emails', {
               method: 'POST',
@@ -166,6 +139,144 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
     default:
       console.log(`Unhandled transaction webhook code: ${webhook_code}`);
   }
+}
+
+interface Transaction {
+  date: string;
+  merchant_name?: string;
+  name: string;
+  amount: number;
+}
+
+async function buildAdvancedSMSMessage(allTransactions: Transaction[]): Promise<string> {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // 1. UPCOMING BILLS - Find recurring bills
+  const upcomingBills = findUpcomingBills(allTransactions);
+  let billsSection = '💳 UPCOMING BILLS:\n';
+  upcomingBills.slice(0, 4).forEach(bill => {
+    const date = new Date(bill.predictedDate);
+    const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+    const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+    billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount}\n`;
+  });
+  
+  // 2. PUBLIX THIS WEEK
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay()); // Start of week (Sunday)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
+  
+  const publixThisWeek = allTransactions
+    .filter(t => {
+      const transDate = new Date(t.date);
+      return (t.merchant_name || t.name || '').toLowerCase().includes('publix') && 
+             transDate >= weekStart && transDate <= weekEnd;
+    })
+    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  
+  // Calculate average weekly Publix spending (last 8 weeks)
+  const avgPublixWeekly = calculateAverageWeeklyPublix(allTransactions);
+  const publixDiff = publixThisWeek - avgPublixWeekly;
+  const publixPercent = avgPublixWeekly > 0 ? Math.round((publixDiff / avgPublixWeekly) * 100) : 0;
+  
+  const weekStartStr = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
+  const weekEndStr = `${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+  let publixSection = `\n🏪 PUBLIX THIS WEEK (${weekStartStr}-${weekEndStr}):\n`;
+  publixSection += `$${publixThisWeek.toFixed(2)} vs $${avgPublixWeekly.toFixed(2)} avg`;
+  if (publixPercent > 0) {
+    publixSection += ` (+${publixPercent}% over)`;
+  } else if (publixPercent < 0) {
+    publixSection += ` (${publixPercent}% under)`;
+  }
+  
+  // 3. LAST 10 TRANSACTIONS
+  let recentSection = '\n\n📋 LAST 10 TRANSACTIONS:\n';
+  allTransactions.slice(0, 10).forEach(t => {
+    const transDate = new Date(t.date);
+    const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
+    const merchant = t.merchant_name || t.name || 'Unknown';
+    recentSection += `${dateStr}: ${merchant} $${Math.abs(t.amount)}\n`;
+  });
+  
+  return billsSection + publixSection + recentSection;
+}
+
+interface Bill {
+  merchant: string;
+  amount: string;
+  predictedDate: Date;
+  confidence: string;
+}
+
+function findUpcomingBills(transactions: Transaction[]): Bill[] {
+  // Group transactions by merchant
+  const merchantGroups: { [key: string]: Transaction[] } = {};
+  transactions.forEach(t => {
+    const merchant = (t.merchant_name || t.name || '').toLowerCase();
+    if (!merchantGroups[merchant]) merchantGroups[merchant] = [];
+    merchantGroups[merchant].push(t);
+  });
+  
+  const bills: Bill[] = [];
+  const now = new Date();
+  
+  // Look for recurring patterns
+  Object.entries(merchantGroups).forEach(([merchant, merchantTransactions]) => {
+    if (merchantTransactions.length < 2) return;
+    
+    // Sort by date
+    merchantTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Check for monthly recurring bills (Netflix, utilities, etc.)
+    const intervals: number[] = [];
+    for (let i = 0; i < merchantTransactions.length - 1; i++) {
+      const date1 = new Date(merchantTransactions[i].date);
+      const date2 = new Date(merchantTransactions[i + 1].date);
+      const diffDays = Math.abs((date1.getTime() - date2.getTime()) / (1000 * 60 * 60 * 24));
+      intervals.push(diffDays);
+    }
+    
+    // Check if intervals suggest monthly billing (25-35 days)
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    if (avgInterval >= 25 && avgInterval <= 35 && intervals.length >= 2) {
+      const lastTransaction = merchantTransactions[0];
+      const lastDate = new Date(lastTransaction.date);
+      const predictedNext = new Date(lastDate);
+      predictedNext.setDate(predictedNext.getDate() + Math.round(avgInterval));
+      
+      // Only include if predicted date is in future
+      if (predictedNext > now) {
+        bills.push({
+          merchant: merchant.charAt(0).toUpperCase() + merchant.slice(1),
+          amount: `$${Math.abs(lastTransaction.amount).toFixed(2)}`,
+          predictedDate: predictedNext,
+          confidence: 'monthly'
+        });
+      }
+    }
+  });
+  
+  // Sort by predicted date
+  return bills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
+}
+
+function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
+  const now = new Date();
+  const eightWeeksAgo = new Date(now);
+  eightWeeksAgo.setDate(now.getDate() - 56); // 8 weeks ago
+  
+  const publixTransactions = transactions.filter(t => {
+    const transDate = new Date(t.date);
+    return (t.merchant_name || t.name || '').toLowerCase().includes('publix') && 
+           transDate >= eightWeeksAgo && transDate <= now;
+  });
+  
+  if (publixTransactions.length === 0) return 0;
+  
+  const totalSpent = publixTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  return totalSpent / 8; // Average over 8 weeks
 }
 
 async function handleItemWebhook(webhook_code: string, item_id: string, body: Record<string, unknown>) {
