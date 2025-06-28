@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
     );
 
     for (const account of accountsResponse.data.accounts) {
+      const balance = account.balances;
       await supabaseService
         .from('accounts')
         .upsert({
@@ -76,6 +77,10 @@ export async function POST(request: NextRequest) {
           type: account.type,
           subtype: account.subtype,
           mask: account.mask,
+          current_balance: balance.current,
+          available_balance: balance.available,
+          iso_currency_code: balance.iso_currency_code || 'USD',
+          balance_last_updated: new Date().toISOString(),
         }, { onConflict: 'plaid_account_id' });
     }
 

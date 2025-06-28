@@ -159,36 +159,30 @@ Integrate with Plaid's financial API and get webhooks working properly for autom
 
 ## 🚀 LATEST DEPLOYMENT - June 26, 2025
 
-### 🎯 ADVANCED SMS TEMPLATE WITH FINANCIAL INSIGHTS ✅ DEPLOYED
-**Deployment:** `budgenudge-9fsm0yv25-krezzo.vercel.app`  
+### 📅 UPCOMING BILLS PREDICTION TABLE ✅ DEPLOYED
+**Deployment:** `budgenudge-gekrmeo4a-krezzo.vercel.app`  
 **Status:** ● Ready (47s build time)  
-**Deploy Time:** 7:55 AM EDT, June 26, 2025
+**Deploy Time:** 8:15 AM EDT, June 26, 2025
 
-**🔥 MAJOR ENHANCEMENT:**
-- ✅ **Multi-line SMS template** with clear sections (bills, spending, recent)
-- ✅ **Recurring bill prediction** with specific dates and merchants
-- ✅ **Publix weekly spending tracking** vs 8-week historical average
-- ✅ **Last 10 transactions** with dates for financial context
-- ✅ **TypeScript interfaces** for improved code quality
+**🔥 NEW FEATURE:**
+- ✅ **Clean table view** for bill predictions at `/protected/calendar`
+- ✅ **4-column table** with Merchant, Date Prediction, Amount Prediction, and Confidence
+- ✅ **Sorted by soonest date** (earliest upcoming bills first)
+- ✅ **Confidence percentage** based on payment regularity using coefficient of variation
+- ✅ **Same prediction logic** as SMS template for consistency
+- ✅ **Professional styling** with clear headers and responsive design
 
-**New SMS Format (Option C):**
+**Table Features:**
 ```
-💳 UPCOMING BILLS:
-6/30 (Mon): Netflix $15.99
-7/1 (Tue): Phone $120  
-7/5 (Fri): Electric ~$85
-
-🏪 PUBLIX THIS WEEK (6/23-6/29): 
-$127.45 vs $95.20 avg (+34% over)
-
-📋 LAST 10 TRANSACTIONS:
-6/26: Chick-fil-A $38.66
-6/25: Starbucks $4.99
-6/24: Amazon $24.17
+Merchant         | Date Prediction | Amount Prediction | Confidence
+Netflix          | 6/30 (Mon)      | $15.99           | 95%
+Phone            | 7/1 (Tue)       | $120.00          | 88%
+Electric         | 7/5 (Fri)       | ~$85.00          | 72%
 ```
 
-**Impact:** Transformed from bulk transaction dump to actionable financial intelligence
-**Test:** ✅ SMS successfully delivered to 617-347-2721
+**Previous Deployment:** `budgenudge-9fsm0yv25-krezzo.vercel.app` - Advanced SMS Template  
+**Impact:** Added visual calendar interface to complement SMS financial insights
+**User Experience:** Simple table replaces complex calendar for better bill management
 
 ---
 

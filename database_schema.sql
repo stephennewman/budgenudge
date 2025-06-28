@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS accounts (
   subtype TEXT,
   mask TEXT,
   verification_status TEXT,
+  current_balance DECIMAL(12,2),
+  available_balance DECIMAL(12,2),
+  iso_currency_code TEXT DEFAULT 'USD',
+  balance_last_updated TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
