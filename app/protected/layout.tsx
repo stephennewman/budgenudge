@@ -10,7 +10,7 @@ export default function ProtectedLayout({
     <Content>
       <div className="flex w-full h-full">
         <ProtectedSidebar />
-        <div className="flex-1 px-6">{children}</div>
+        <div className="flex-1 px-8 py-4">{children}</div>
       </div>
     </Content>
   );
