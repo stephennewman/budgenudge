@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     console.log('🎯 WEBHOOK RECEIVED:', body);
+    console.log(`🕐 WEBHOOK TIMESTAMP: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} EST`);
 
     // Verify webhook (you should implement proper verification in production)
     // const signature = request.headers.get('plaid-signature');
@@ -119,6 +120,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         
         // Send SMS notification via T-Mobile email gateway
         if (response.data.transactions.length > 0) {
+          console.log(`📱 NEW TRANSACTIONS FOUND: Sending SMS for ${response.data.transactions.length} transactions`);
           try {
             // Get all historical transactions for analysis
             const { data: allTransactions } = await supabase
@@ -157,6 +159,8 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
           } catch (error) {
             console.log('📱 SMS notification error:', error);
           }
+        } else {
+          console.log(`📱 NO NEW TRANSACTIONS: Webhook fired but found ${response.data.transactions.length} new transactions - no SMS sent`);
         }
       } catch (error) {
         console.error('❌ Error fetching transactions:', error);
