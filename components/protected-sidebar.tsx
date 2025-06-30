@@ -14,6 +14,10 @@ export default async function ProtectedSidebar() {
           href: "/",
         },
         {
+          label: "Transactions",
+          href: "/transactions",
+        },
+        {
           label: "Weekly Spending",
           href: "/weekly-spending",
         },
