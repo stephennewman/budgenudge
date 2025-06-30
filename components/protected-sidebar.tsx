@@ -18,6 +18,10 @@ export default async function ProtectedSidebar() {
           href: "/transactions",
         },
         {
+          label: "Analysis",
+          href: "/analysis",
+        },
+        {
           label: "Weekly Spending",
           href: "/weekly-spending",
         },

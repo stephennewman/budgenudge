@@ -36,6 +36,18 @@ interface Transaction {
   updated_at?: string;
 }
 
+// Merchant analytics data from database
+interface MerchantAnalyticsData {
+  merchant_name: string;
+  total_transactions: number;
+  total_spending: number;
+  spending_transactions: number;
+  avg_weekly_spending: number;
+  avg_monthly_spending: number;
+  avg_weekly_transactions: number;
+  avg_monthly_transactions: number;
+}
+
 // Extended interface with calculated analytics
 interface TransactionWithAnalytics extends Transaction {
   id: string | number;
@@ -49,10 +61,22 @@ interface TransactionWithAnalytics extends Transaction {
   merchantTransactionCount: number;
   merchantTransactionsPerWeek: number;
   merchantTransactionsPerMonth: number;
+  // NEW: Spending-focused analytics
+  totalHistoricalSpending: number;
+  avgWeeklySpending: number;
+  avgMonthlySpending: number;
+  totalSpendingTransactions: number;
 }
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionWithAnalytics[]>([]);
+  // Removed merchantAnalytics state - data is now used directly in fetchData
+  const [overallAnalytics, setOverallAnalytics] = useState({
+    totalSpendingTransactions: 0,
+    totalHistoricalSpending: 0,
+    avgWeeklySpending: 0,
+    avgMonthlySpending: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -60,105 +84,89 @@ export default function TransactionsPage() {
   
   const supabase = createSupabaseClient();
 
-  // Calculate analytics for each transaction
-  const calculateAnalytics = (transactions: Transaction[]): TransactionWithAnalytics[] => {
-    if (!transactions || transactions.length === 0) {
-      return [];
-    }
-    
-    const totalTransactions = transactions.length;
-    
-    // Calculate date range (oldest to newest transaction)
-    const dates = transactions.map(t => new Date(t.date)).sort((a, b) => a.getTime() - b.getTime());
-    const oldestDate = dates[0]; // First transaction chronologically
-    const newestDate = dates[dates.length - 1]; // Last transaction chronologically
-    const daysBetween = Math.max(1, Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24)));
-    
-    // Calculate historical data spans
-    const weeksOfHistoricalData = Math.max(1, daysBetween / 7);
-    const monthsOfHistoricalData = Math.max(1, daysBetween / 30.44); // Average days per month
-    
-    const avgTransactionsMonthly = totalTransactions / monthsOfHistoricalData;
-    const avgTransactionsWeekly = totalTransactions / weeksOfHistoricalData;
+  // Analytics are now fetched from cached merchant_analytics table for performance
 
-    // Group by merchant for advanced analytics
-    const merchantData = transactions.reduce((acc, t) => {
-      const merchant = t.merchant_name || t.name;
-      if (!acc[merchant]) {
-        acc[merchant] = [];
-      }
-      acc[merchant].push(new Date(t.date));
-      return acc;
-    }, {} as Record<string, Date[]>);
-
-    // Calculate merchant frequency analytics based on total dataset timespan
-    const totalWeeksOfData = weeksOfHistoricalData;
-    
-    const merchantAnalytics = Object.entries(merchantData).reduce((acc, [merchant, dates]) => {
-      const transactionCount = dates.length;
-      const transactionsPerWeek = transactionCount / totalWeeksOfData;
-      const transactionsPerMonth = (transactionsPerWeek * 52) / 12;
-
-      acc[merchant] = {
-        count: transactionCount,
-        transactionsPerWeek: transactionsPerWeek,
-        transactionsPerMonth: transactionsPerMonth,
-      };
-      return acc;
-    }, {} as Record<string, { count: number; transactionsPerWeek: number; transactionsPerMonth: number }>);
-
-    return transactions.map(transaction => {
-      const merchant = transaction.merchant_name || transaction.name;
-      const analytics = merchantAnalytics[merchant];
-      
-      return {
-        ...transaction,
-        id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
-        totalTransactionsAllTime: totalTransactions,
-        avgTransactionsMonthly: Math.round(avgTransactionsMonthly * 100) / 100,
-        avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
-        daysSinceFirstTransaction: daysBetween,
-        daysOfHistoricalData: daysBetween,
-        weeksOfHistoricalData: Math.round(weeksOfHistoricalData * 10) / 10,
-        monthsOfHistoricalData: Math.round(monthsOfHistoricalData * 10) / 10,
-        merchantTransactionCount: analytics?.count || 0,
-        merchantTransactionsPerWeek: analytics?.transactionsPerWeek || 0,
-        merchantTransactionsPerMonth: analytics?.transactionsPerMonth || 0,
-      };
-    });
-  };
-
-  // Fetch transactions from API
-  async function fetchTransactions() {
+  // Fetch transactions and cached merchant analytics
+  async function fetchData() {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const response = await fetch('/api/plaid/transactions', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
-      });
+      // Fetch both transactions and cached merchant analytics in parallel
+      const [transactionsResponse, analyticsResponse] = await Promise.all([
+        fetch('/api/plaid/transactions', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        }),
+        fetch('/api/merchant-analytics', {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        })
+      ]);
       
-      const data = await response.json();
+      const transactionsData = await transactionsResponse.json();
+      const analyticsData = await analyticsResponse.json();
       
-      if (response.ok && data.transactions) {
-        console.log('Raw transaction data:', data.transactions[0]); // Debug log
-        const analyticsData = calculateAnalytics(data.transactions);
-        setTransactions(analyticsData);
+      if (transactionsResponse.ok && transactionsData.transactions && 
+          analyticsResponse.ok && analyticsData.merchants) {
+        
+        console.log('Transactions fetched:', transactionsData.transactions.length);
+        console.log('Cached analytics fetched:', analyticsData.merchants.length);
+        
+        // Create a lookup map for merchant analytics
+        const merchantLookup = analyticsData.merchants.reduce((acc: Record<string, MerchantAnalyticsData>, merchant: MerchantAnalyticsData) => {
+          acc[merchant.merchant_name] = merchant;
+          return acc;
+        }, {});
+        
+        // Enhance transactions with cached analytics
+        const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => {
+          const merchantKey = transaction.merchant_name || transaction.name;
+          const merchantData = merchantLookup[merchantKey] || {};
+          
+          return {
+            ...transaction,
+            id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
+            // Use cached analytics instead of calculating
+            merchantTransactionCount: merchantData.total_transactions || 0,
+            merchantTransactionsPerWeek: merchantData.avg_weekly_transactions || 0,
+            merchantTransactionsPerMonth: merchantData.avg_monthly_transactions || 0,
+            totalHistoricalSpending: merchantData.total_spending || 0,
+            avgWeeklySpending: merchantData.avg_weekly_spending || 0,
+            avgMonthlySpending: merchantData.avg_monthly_spending || 0,
+            totalSpendingTransactions: merchantData.spending_transactions || 0,
+            // Keep these for backward compatibility (calculated from overall data)
+            totalTransactionsAllTime: transactionsData.transactions.length,
+            avgTransactionsMonthly: 0, // Could calculate from overall if needed
+            avgTransactionsWeekly: 0,  // Could calculate from overall if needed
+            daysSinceFirstTransaction: 0,
+            daysOfHistoricalData: 0,
+            weeksOfHistoricalData: 0,
+            monthsOfHistoricalData: 0,
+          };
+        });
+        
+        setTransactions(enhancedTransactions);
+        
+        // Use summary from cached analytics
+        setOverallAnalytics({
+          totalSpendingTransactions: analyticsData.summary?.totalSpendingTransactions || 0,
+          totalHistoricalSpending: analyticsData.summary?.totalSpending || 0,
+          avgWeeklySpending: analyticsData.summary?.avgWeeklySpending || 0,
+          avgMonthlySpending: analyticsData.summary?.avgMonthlySpending || 0,
+        });
+        
       } else {
-        console.error('API Response:', data);
+        console.error('API Responses:', { transactions: transactionsData, analytics: analyticsData });
       }
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchTransactions();
+    fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Column definitions
@@ -227,6 +235,43 @@ export default function TransactionsPage() {
       header: 'Per Month',
       cell: ({ getValue }: { getValue: () => number }) => Math.round(getValue()),
     },
+    // NEW: Merchant-Specific Spending Analytics Columns
+    {
+      accessorKey: 'totalHistoricalSpending',
+      header: 'Merchant Total Spending',
+      cell: ({ getValue }: { getValue: () => number }) => (
+        <span className="font-medium text-red-600">
+          ${getValue().toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'avgWeeklySpending',
+      header: 'Merchant Weekly Avg',
+      cell: ({ getValue }: { getValue: () => number }) => (
+        <span className="font-medium text-orange-600">
+          ${getValue().toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'avgMonthlySpending',
+      header: 'Merchant Monthly Avg', 
+      cell: ({ getValue }: { getValue: () => number }) => (
+        <span className="font-medium text-blue-600">
+          ${getValue().toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'totalSpendingTransactions',
+      header: 'Merchant Spending Count',
+      cell: ({ getValue }: { getValue: () => number }) => (
+        <span className="text-gray-600">
+          {getValue().toLocaleString()}
+        </span>
+      ),
+    },
     {
       accessorKey: 'plaid_transaction_id',
       header: 'Transaction ID',
@@ -276,9 +321,9 @@ export default function TransactionsPage() {
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Transaction Analytics</h1>
+            <h1 className="text-2xl font-bold">Transaction & Spending Analytics</h1>
             <p className="text-muted-foreground">
-              Complete transaction data with intelligent analytics
+              Transaction data with cached merchant analytics for fast performance
             </p>
           </div>
           <div className="text-sm text-muted-foreground">
@@ -288,44 +333,87 @@ export default function TransactionsPage() {
 
         {/* Macro Stats Summary */}
         {transactions.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="bg-blue-50 p-4 rounded-lg border">
-              <div className="text-sm text-blue-600 font-medium">Total Transactions</div>
-              <div className="text-2xl font-bold text-blue-900">
-                {transactions[0]?.totalTransactionsAllTime.toLocaleString() || 0}
+          <>
+            {/* Spending Analytics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-red-50 p-4 rounded-lg border">
+                <div className="text-sm text-red-600 font-medium">Total Historical Spending</div>
+                <div className="text-2xl font-bold text-red-900">
+                  ${Math.round((overallAnalytics.totalHistoricalSpending || 0) * 100) / 100}
+                </div>
+                <div className="text-xs text-red-500 mt-1">
+                  {overallAnalytics.totalSpendingTransactions || 0} spending transactions
+                </div>
+              </div>
+              <div className="bg-orange-50 p-4 rounded-lg border">
+                <div className="text-sm text-orange-600 font-medium">Avg Weekly Spending</div>
+                <div className="text-2xl font-bold text-orange-900">
+                  ${Math.round((overallAnalytics.avgWeeklySpending || 0) * 100) / 100}
+                </div>
+                <div className="text-xs text-orange-500 mt-1">
+                  Based on {Math.round(transactions[0]?.weeksOfHistoricalData || 0)} weeks of data
+                </div>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg border">
+                <div className="text-sm text-blue-600 font-medium">Avg Monthly Spending</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  ${Math.round((overallAnalytics.avgMonthlySpending || 0) * 100) / 100}
+                </div>
+                <div className="text-xs text-blue-500 mt-1">
+                  Based on {Math.round(transactions[0]?.monthsOfHistoricalData || 0)} months of data
+                </div>
+              </div>
+              <div className="bg-slate-50 p-4 rounded-lg border">
+                <div className="text-sm text-slate-600 font-medium">Data Timeframe</div>
+                <div className="text-2xl font-bold text-slate-900">
+                  {transactions[0]?.daysOfHistoricalData || 0} days
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {Math.round(transactions[0]?.monthsOfHistoricalData || 0)} months • {Math.round(transactions[0]?.weeksOfHistoricalData || 0)} weeks
+                </div>
               </div>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg border">
-              <div className="text-sm text-green-600 font-medium">Average per Month</div>
-              <div className="text-2xl font-bold text-green-900">
-                {Math.round(transactions[0]?.avgTransactionsMonthly || 0)}
+
+            {/* Transaction Count Analytics Row */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="bg-green-50 p-4 rounded-lg border">
+                <div className="text-sm text-green-600 font-medium">Total Transactions</div>
+                <div className="text-2xl font-bold text-green-900">
+                  {transactions[0]?.totalTransactionsAllTime.toLocaleString() || 0}
+                </div>
+              </div>
+              <div className="bg-emerald-50 p-4 rounded-lg border">
+                <div className="text-sm text-emerald-600 font-medium">Average per Month</div>
+                <div className="text-2xl font-bold text-emerald-900">
+                  {Math.round(transactions[0]?.avgTransactionsMonthly || 0)}
+                </div>
+              </div>
+              <div className="bg-purple-50 p-4 rounded-lg border">
+                <div className="text-sm text-purple-600 font-medium">Average per Week</div>
+                <div className="text-2xl font-bold text-purple-900">
+                  {Math.round(transactions[0]?.avgTransactionsWeekly || 0)}
+                </div>
+              </div>
+              <div className="bg-teal-50 p-4 rounded-lg border">
+                <div className="text-sm text-teal-600 font-medium">Spending Ratio</div>
+                <div className="text-2xl font-bold text-teal-900">
+                  {Math.round(((overallAnalytics.totalSpendingTransactions || 0) / (transactions[0]?.totalTransactionsAllTime || 1)) * 100)}%
+                </div>
+              </div>
+              <div className="bg-indigo-50 p-4 rounded-lg border">
+                <div className="text-sm text-indigo-600 font-medium">Income Transactions</div>
+                <div className="text-2xl font-bold text-indigo-900">
+                  {(transactions[0]?.totalTransactionsAllTime || 0) - (overallAnalytics.totalSpendingTransactions || 0)}
+                </div>
+              </div>
+              <div className="bg-violet-50 p-4 rounded-lg border">
+                <div className="text-sm text-violet-600 font-medium">Avg per Day</div>
+                <div className="text-2xl font-bold text-violet-900">
+                  {Math.round(((transactions[0]?.totalTransactionsAllTime || 0) / (transactions[0]?.daysOfHistoricalData || 1)) * 10) / 10}
+                </div>
               </div>
             </div>
-            <div className="bg-purple-50 p-4 rounded-lg border">
-              <div className="text-sm text-purple-600 font-medium">Average per Week</div>
-              <div className="text-2xl font-bold text-purple-900">
-                {Math.round(transactions[0]?.avgTransactionsWeekly || 0)}
-              </div>
-            </div>
-            <div className="bg-orange-50 p-4 rounded-lg border">
-              <div className="text-sm text-orange-600 font-medium">Days of Data</div>
-              <div className="text-2xl font-bold text-orange-900">
-                {transactions[0]?.daysOfHistoricalData || 0}
-              </div>
-            </div>
-            <div className="bg-teal-50 p-4 rounded-lg border">
-              <div className="text-sm text-teal-600 font-medium">Weeks of Data</div>
-              <div className="text-2xl font-bold text-teal-900">
-                {Math.round(transactions[0]?.weeksOfHistoricalData || 0)}
-              </div>
-            </div>
-            <div className="bg-indigo-50 p-4 rounded-lg border">
-              <div className="text-sm text-indigo-600 font-medium">Months of Data</div>
-              <div className="text-2xl font-bold text-indigo-900">
-                {Math.round(transactions[0]?.monthsOfHistoricalData || 0)}
-              </div>
-            </div>
-          </div>
+          </>
         )}
 
         {/* Global Search */}
