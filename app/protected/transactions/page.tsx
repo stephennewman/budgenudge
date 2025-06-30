@@ -147,6 +147,31 @@ export default function TransactionsPage() {
         
         setTransactions(enhancedTransactions);
         
+        // DEBUG: Analyze transaction amounts to verify spending vs income categorization
+        const positiveAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount > 0);
+        const negativeAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount < 0);
+        const zeroAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount === 0);
+        
+        console.log('=== TRANSACTION AMOUNT ANALYSIS ===');
+        console.log('Total transactions:', enhancedTransactions.length);
+        console.log('Positive amounts (spending):', positiveAmounts.length);
+        console.log('Negative amounts (income):', negativeAmounts.length);
+        console.log('Zero amounts:', zeroAmounts.length);
+        
+        if (positiveAmounts.length > 0) {
+          console.log('Sample positive amounts (spending):');
+          positiveAmounts.slice(0, 3).forEach((t: TransactionWithAnalytics) => 
+            console.log(`  $${t.amount} - ${t.name} (${t.merchant_name || 'no merchant'})`)
+          );
+        }
+        
+        if (negativeAmounts.length > 0) {
+          console.log('Sample negative amounts (income):');
+          negativeAmounts.slice(0, 3).forEach((t: TransactionWithAnalytics) => 
+            console.log(`  $${t.amount} - ${t.name} (${t.merchant_name || 'no merchant'})`)
+          );
+        }
+        
         // Use summary from cached analytics
         setOverallAnalytics({
           totalSpendingTransactions: analyticsData.summary?.totalSpendingTransactions || 0,
@@ -331,6 +356,40 @@ export default function TransactionsPage() {
           </div>
         </div>
 
+        {/* DEBUG: Transaction Amount Breakdown */}
+        {transactions.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="text-sm font-medium text-yellow-800 mb-2">🐛 Debug: Transaction Amount Analysis</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <div className="font-medium text-gray-700">Total Transactions</div>
+                <div className="text-lg font-bold">{transactions.length}</div>
+              </div>
+              <div>
+                <div className="font-medium text-red-600">Positive Amounts (Spending)</div>
+                <div className="text-lg font-bold text-red-700">
+                  {transactions.filter((t: TransactionWithAnalytics) => t.amount > 0).length}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-green-600">Negative Amounts (Income)</div>
+                <div className="text-lg font-bold text-green-700">
+                  {transactions.filter((t: TransactionWithAnalytics) => t.amount < 0).length}
+                </div>
+              </div>
+              <div>
+                <div className="font-medium text-gray-600">Zero Amounts</div>
+                <div className="text-lg font-bold text-gray-700">
+                  {transactions.filter((t: TransactionWithAnalytics) => t.amount === 0).length}
+                </div>
+              </div>
+            </div>
+            <div className="text-xs text-yellow-600 mt-2">
+              In Plaid&apos;s system: Positive = money out (spending), Negative = money in (income/deposits)
+            </div>
+          </div>
+        )}
+
         {/* Macro Stats Summary */}
         {transactions.length > 0 && (
           <>
@@ -404,6 +463,9 @@ export default function TransactionsPage() {
                 <div className="text-sm text-indigo-600 font-medium">Income Transactions</div>
                 <div className="text-2xl font-bold text-indigo-900">
                   {(transactions[0]?.totalTransactionsAllTime || 0) - (overallAnalytics.totalSpendingTransactions || 0)}
+                </div>
+                <div className="text-xs text-indigo-500 mt-1">
+                  Deposits, salary, refunds, transfers in
                 </div>
               </div>
               <div className="bg-violet-50 p-4 rounded-lg border">

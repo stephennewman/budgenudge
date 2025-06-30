@@ -19,6 +19,8 @@ interface MerchantData {
   total_spending: number;
   avg_weekly_spending: number;
   avg_monthly_spending: number;
+  avg_weekly_transactions: number;
+  avg_monthly_transactions: number;
   spending_transactions: number;
 }
 
@@ -27,6 +29,9 @@ interface MerchantAnalytics {
   totalTransactions: number;
   totalSpending: number;
   weeklySpending: number;
+  weeklyTransactions: number;
+  monthlySpending: number;
+  monthlyTransactions: number;
   rank: number;
 }
 
@@ -81,6 +86,9 @@ export default function AnalysisPage() {
             totalTransactions: merchant.total_transactions,
             totalSpending: merchant.total_spending,
             weeklySpending: merchant.avg_weekly_spending,
+            weeklyTransactions: merchant.avg_weekly_transactions || 0,
+            monthlySpending: merchant.avg_monthly_spending || 0,
+            monthlyTransactions: merchant.avg_monthly_transactions || 0,
             rank: index + 1
           }));
           
@@ -156,11 +164,11 @@ export default function AnalysisPage() {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="font-medium text-xs">
-                  ${merchant.weeklySpending.toFixed(0)}/wk
+                <div className="font-bold text-lg text-blue-700">
+                  {merchant.weeklyTransactions.toFixed(1)}/wk
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  ${merchant.totalSpending.toFixed(0)}
+                  {merchant.totalTransactions} total
                 </div>
               </div>
             </div>
@@ -217,16 +225,16 @@ export default function AnalysisPage() {
                     {merchant.merchant}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    ${merchant.totalSpending.toFixed(0)} spent
+                    {merchant.totalTransactions} txns
                   </div>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="font-medium text-xs text-green-700">
-                  ${merchant.weeklySpending.toFixed(0)}/wk
+                <div className="font-bold text-lg text-green-700">
+                  ${merchant.monthlySpending.toFixed(0)}/mo
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {merchant.totalTransactions} txns
+                  ${merchant.totalSpending.toFixed(0)} total
                 </div>
               </div>
             </div>
