@@ -43,6 +43,9 @@ interface TransactionWithAnalytics extends Transaction {
   avgTransactionsMonthly: number;
   avgTransactionsWeekly: number;
   daysSinceFirstTransaction: number;
+  daysOfHistoricalData: number;
+  weeksOfHistoricalData: number;
+  monthsOfHistoricalData: number;
   merchantTransactionCount: number;
   merchantTransactionsPerWeek: number;
   merchantTransactionsPerMonth: number;
@@ -71,8 +74,12 @@ export default function TransactionsPage() {
     const lastDate = dates[dates.length - 1];
     const daysBetween = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)));
     
-    const avgTransactionsMonthly = totalTransactions / Math.max(1, daysBetween / 30.44);
-    const avgTransactionsWeekly = totalTransactions / Math.max(1, daysBetween / 7);
+    // Calculate historical data spans
+    const weeksOfHistoricalData = Math.max(1, daysBetween / 7);
+    const monthsOfHistoricalData = Math.max(1, daysBetween / 30.44); // Average days per month
+    
+    const avgTransactionsMonthly = totalTransactions / monthsOfHistoricalData;
+    const avgTransactionsWeekly = totalTransactions / weeksOfHistoricalData;
 
     // Group by merchant for advanced analytics
     const merchantData = transactions.reduce((acc, t) => {
@@ -85,7 +92,7 @@ export default function TransactionsPage() {
     }, {} as Record<string, Date[]>);
 
     // Calculate merchant frequency analytics based on total dataset timespan
-    const totalWeeksOfData = Math.max(1, daysBetween / 7);
+    const totalWeeksOfData = weeksOfHistoricalData;
     
     const merchantAnalytics = Object.entries(merchantData).reduce((acc, [merchant, dates]) => {
       const transactionCount = dates.length;
@@ -110,7 +117,10 @@ export default function TransactionsPage() {
         totalTransactionsAllTime: totalTransactions,
         avgTransactionsMonthly: Math.round(avgTransactionsMonthly * 100) / 100,
         avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
-        daysSinceFirstTransaction: Math.ceil((new Date().getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)),
+        daysSinceFirstTransaction: daysBetween,
+        daysOfHistoricalData: daysBetween,
+        weeksOfHistoricalData: Math.round(weeksOfHistoricalData * 10) / 10,
+        monthsOfHistoricalData: Math.round(monthsOfHistoricalData * 10) / 10,
         merchantTransactionCount: analytics?.count || 0,
         merchantTransactionsPerWeek: analytics?.transactionsPerWeek || 0,
         merchantTransactionsPerMonth: analytics?.transactionsPerMonth || 0,
@@ -278,7 +288,7 @@ export default function TransactionsPage() {
 
         {/* Macro Stats Summary */}
         {transactions.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg border">
               <div className="text-sm text-blue-600 font-medium">Total Transactions</div>
               <div className="text-2xl font-bold text-blue-900">
@@ -295,6 +305,24 @@ export default function TransactionsPage() {
               <div className="text-sm text-purple-600 font-medium">Average per Week</div>
               <div className="text-2xl font-bold text-purple-900">
                 {transactions[0]?.avgTransactionsWeekly.toFixed(1) || '0.0'}
+              </div>
+            </div>
+            <div className="bg-orange-50 p-4 rounded-lg border">
+              <div className="text-sm text-orange-600 font-medium">Days of Data</div>
+              <div className="text-2xl font-bold text-orange-900">
+                {transactions[0]?.daysOfHistoricalData || 0}
+              </div>
+            </div>
+            <div className="bg-teal-50 p-4 rounded-lg border">
+              <div className="text-sm text-teal-600 font-medium">Weeks of Data</div>
+              <div className="text-2xl font-bold text-teal-900">
+                {transactions[0]?.weeksOfHistoricalData.toFixed(1) || '0.0'}
+              </div>
+            </div>
+            <div className="bg-indigo-50 p-4 rounded-lg border">
+              <div className="text-sm text-indigo-600 font-medium">Months of Data</div>
+              <div className="text-2xl font-bold text-indigo-900">
+                {transactions[0]?.monthsOfHistoricalData.toFixed(1) || '0.0'}
               </div>
             </div>
           </div>
