@@ -44,6 +44,9 @@ interface TransactionWithAnalytics extends Transaction {
   avgTransactionsWeekly: number;
   daysSinceFirstTransaction: number;
   merchantTransactionCount: number;
+  merchantTransactionsPerWeek: number;
+  merchantTransactionsPerMonth: number;
+  merchantWeeksOfData: number;
 }
 
 export default function TransactionsPage() {
@@ -72,22 +75,54 @@ export default function TransactionsPage() {
     const avgTransactionsMonthly = totalTransactions / Math.max(1, daysBetween / 30.44);
     const avgTransactionsWeekly = totalTransactions / Math.max(1, daysBetween / 7);
 
-    // Group by merchant and category for analytics
-    const merchantCounts = transactions.reduce((acc, t) => {
+    // Group by merchant for advanced analytics
+    const merchantData = transactions.reduce((acc, t) => {
       const merchant = t.merchant_name || t.name;
-      acc[merchant] = (acc[merchant] || 0) + 1;
+      if (!acc[merchant]) {
+        acc[merchant] = [];
+      }
+      acc[merchant].push(new Date(t.date));
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as Record<string, Date[]>);
 
-    return transactions.map(transaction => ({
-      ...transaction,
-      id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(), // Ensure ID exists
-      totalTransactionsAllTime: totalTransactions,
-      avgTransactionsMonthly: Math.round(avgTransactionsMonthly * 100) / 100,
-      avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
-      daysSinceFirstTransaction: Math.ceil((new Date().getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)),
-      merchantTransactionCount: merchantCounts[transaction.merchant_name || transaction.name] || 0,
-    }));
+    // Calculate merchant frequency analytics
+    const merchantAnalytics = Object.entries(merchantData).reduce((acc, [merchant, dates]) => {
+      const sortedDates = dates.sort();
+      const firstDate = sortedDates[0];
+      const lastDate = sortedDates[sortedDates.length - 1];
+      const daysBetween = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const weeksOfData = Math.max(1, daysBetween / 7);
+      
+      const transactionCount = dates.length;
+      const transactionsPerWeek = transactionCount / weeksOfData;
+      const transactionsPerMonth = (transactionsPerWeek * 52) / 12;
+
+      acc[merchant] = {
+        count: transactionCount,
+        transactionsPerWeek: Math.round(transactionsPerWeek * 100) / 100,
+        transactionsPerMonth: Math.round(transactionsPerMonth * 100) / 100,
+        weeksOfData: Math.round(weeksOfData * 10) / 10,
+      };
+      return acc;
+    }, {} as Record<string, { count: number; transactionsPerWeek: number; transactionsPerMonth: number; weeksOfData: number }>);
+
+    return transactions.map(transaction => {
+      const merchant = transaction.merchant_name || transaction.name;
+      const analytics = merchantAnalytics[merchant];
+      
+      return {
+        ...transaction,
+        id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
+        totalTransactionsAllTime: totalTransactions,
+        avgTransactionsMonthly: Math.round(avgTransactionsMonthly * 100) / 100,
+        avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
+        daysSinceFirstTransaction: Math.ceil((new Date().getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)),
+        merchantTransactionCount: analytics?.count || 0,
+        merchantTransactionsPerWeek: analytics?.transactionsPerWeek || 0,
+        merchantTransactionsPerMonth: analytics?.transactionsPerMonth || 0,
+        merchantWeeksOfData: analytics?.weeksOfData || 0,
+      };
+    });
   };
 
   // Fetch transactions from API
@@ -176,8 +211,23 @@ export default function TransactionsPage() {
     },
     {
       accessorKey: 'merchantTransactionCount',
-      header: 'Merchant Count',
+      header: 'Merchant Total',
       cell: ({ getValue }: { getValue: () => number }) => getValue(),
+    },
+    {
+      accessorKey: 'merchantTransactionsPerWeek',
+      header: 'Per Week',
+      cell: ({ getValue }: { getValue: () => number }) => getValue().toFixed(2),
+    },
+    {
+      accessorKey: 'merchantTransactionsPerMonth',
+      header: 'Per Month',
+      cell: ({ getValue }: { getValue: () => number }) => getValue().toFixed(2),
+    },
+    {
+      accessorKey: 'merchantWeeksOfData',
+      header: 'Weeks Data',
+      cell: ({ getValue }: { getValue: () => number }) => getValue().toFixed(1),
     },
     {
       accessorKey: 'plaid_transaction_id',
