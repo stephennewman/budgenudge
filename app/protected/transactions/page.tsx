@@ -46,6 +46,8 @@ interface MerchantAnalyticsData {
   avg_monthly_spending: number;
   avg_weekly_transactions: number;
   avg_monthly_transactions: number;
+  is_recurring: boolean;
+  recurring_reason: string;
 }
 
 // Extended interface with calculated analytics
@@ -65,7 +67,7 @@ interface TransactionWithAnalytics extends Transaction {
   totalHistoricalSpending: number;
   avgWeeklySpending: number;
   avgMonthlySpending: number;
-  totalSpendingTransactions: number;
+  totalMerchantTransactions: number;
 }
 
 export default function TransactionsPage() {
@@ -83,6 +85,59 @@ export default function TransactionsPage() {
   const [globalFilter, setGlobalFilter] = useState('');
   
   const supabase = createSupabaseClient();
+
+  // Frontend normalization function (matches backend normalize_merchant_name)
+  function normalizeTransactionMerchantName(rawName: string): string {
+    if (!rawName || rawName.trim() === '') {
+      return 'Unknown Merchant';
+    }
+    
+    let normalized = rawName.trim();
+    
+    // Apply same normalization patterns as backend
+    if (normalized.match(/^JPM CHASE PAYMENT \d+/i)) {
+      normalized = 'JPM Chase Payment';
+    } else if (normalized.match(/^CHASE CREDIT CRD AUTOPAY/i)) {
+      normalized = 'Chase Credit Card Autopay';
+    } else if (normalized.match(/^BANK OF AMERICA/i)) {
+      normalized = 'Bank of America';
+    } else if (normalized.match(/^CERTIPAY PAYROLL PAYROLL \d+/i)) {
+      normalized = 'Certipay Payroll';
+    } else if (normalized.match(/^GCA PAY \d+ \d+/i)) {
+      normalized = 'GCA Pay';
+    } else if (normalized.match(/^Check Paid #\d+/i)) {
+      normalized = 'Check Payment';
+    } else if (normalized.match(/^Funds Transfer.*-\d+/i)) {
+      normalized = 'Funds Transfer to Brokerage';
+    } else if (normalized.match(/^Amazon Prime Video/i)) {
+      normalized = 'Amazon Prime';
+    } else if (normalized.match(/^Amazon Prime/i)) {
+      normalized = 'Amazon Prime';
+    } else if (normalized.match(/^Cursor Usage Mid/i)) {
+      normalized = 'Cursor Usage';
+    } else if (normalized.match(/\d{6}/)) {
+      // Remove 6-digit date codes (YYMMDD format)
+      normalized = normalized.replace(/\d{6}/g, '').trim();
+      normalized = normalized.replace(/\s+/g, ' '); // Clean extra spaces
+    } else if (normalized.match(/#\d+/)) {
+      // Remove transaction IDs like #1234
+      normalized = normalized.replace(/#\d+/g, '').trim();
+      normalized = normalized.replace(/\s+/g, ' '); // Clean extra spaces
+    }
+    
+    // Final cleanup: ensure proper capitalization and remove extra spaces
+    normalized = normalized.replace(/\s+/g, ' ').trim();
+    
+    // Convert to title case for consistency
+    normalized = normalized.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    
+    // If normalization resulted in empty string, use original
+    if (normalized === '' || normalized === 'Unknown Merchant') {
+      normalized = rawName;
+    }
+    
+    return normalized;
+  }
 
   // Analytics are now fetched from cached merchant_analytics table for performance
 
@@ -135,22 +190,48 @@ export default function TransactionsPage() {
         const avgTransactionsMonthly = totalTransactions / monthsOfData;
         const avgTransactionsWeekly = totalTransactions / weeksOfData;
 
+        // Calculate transaction counts and amounts per merchant from actual visible transactions
+        const merchantTransactionCounts = transactionsData.transactions.reduce((acc: Record<string, number>, transaction: Transaction) => {
+          const merchantKey = transaction.merchant_name || transaction.name;
+          acc[merchantKey] = (acc[merchantKey] || 0) + 1;
+          return acc;
+        }, {});
+
+        const merchantTransactionAmounts = transactionsData.transactions.reduce((acc: Record<string, number>, transaction: Transaction) => {
+          const merchantKey = transaction.merchant_name || transaction.name;
+          acc[merchantKey] = (acc[merchantKey] || 0) + Math.abs(transaction.amount); // Use absolute value so income shows as positive
+          return acc;
+        }, {});
+
         // Enhance transactions with cached analytics and proper time calculations
         const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => {
-          const merchantKey = transaction.merchant_name || transaction.name;
-          const merchantData = merchantLookup[merchantKey] || {};
+          const rawMerchantKey = transaction.merchant_name || transaction.name;
+          const normalizedMerchantKey = normalizeTransactionMerchantName(rawMerchantKey);
+          const merchantData = merchantLookup[normalizedMerchantKey] || {};
+          
+          // DEBUG: Log lookup failures for key merchants
+          if (rawMerchantKey.includes('CAPTAINS') || rawMerchantKey.includes('BBQ')) {
+            console.log(`🔍 CAPTAINS BBQ LOOKUP:`, {
+              raw: rawMerchantKey,
+              normalized: normalizedMerchantKey,
+              foundInCache: !!merchantData.merchant_name,
+              cachedSpending: merchantData.total_spending,
+              transactionAmount: transaction.amount
+            });
+          }
           
           return {
             ...transaction,
             id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
-            // Use cached analytics instead of calculating
+            // Use cached analytics for spending-specific metrics
             merchantTransactionCount: merchantData.total_transactions || 0,
             merchantTransactionsPerWeek: merchantData.avg_weekly_transactions || 0,
             merchantTransactionsPerMonth: merchantData.avg_monthly_transactions || 0,
             totalHistoricalSpending: merchantData.total_spending || 0,
             avgWeeklySpending: merchantData.avg_weekly_spending || 0,
             avgMonthlySpending: merchantData.avg_monthly_spending || 0,
-            totalSpendingTransactions: merchantData.spending_transactions || 0,
+            // FIX: Use actual count of transactions being displayed, not just spending transactions
+            totalMerchantTransactions: merchantTransactionCounts[rawMerchantKey] || 1,
             // Calculated time-based analytics (same for all transactions)
             totalTransactionsAllTime: totalTransactions,
             avgTransactionsMonthly: avgTransactionsMonthly,
@@ -163,6 +244,34 @@ export default function TransactionsPage() {
         });
         
         setTransactions(enhancedTransactions);
+        
+        // DEBUG: Check merchant lookup success rate
+        const lookupSuccesses = enhancedTransactions.filter(t => {
+          const rawKey = t.merchant_name || t.name;
+          const normalizedKey = normalizeTransactionMerchantName(rawKey);
+          return merchantLookup[normalizedKey]?.merchant_name;
+        }).length;
+        
+        console.log('=== MERCHANT LOOKUP ANALYSIS ===');
+        console.log('Total transactions:', enhancedTransactions.length);
+        console.log('Successful merchant lookups:', lookupSuccesses);
+        console.log('Failed lookups:', enhancedTransactions.length - lookupSuccesses);
+        console.log('Success rate:', ((lookupSuccesses / enhancedTransactions.length) * 100).toFixed(1) + '%');
+        
+        // Show examples of successful vs failed lookups
+        const exampleSuccess = enhancedTransactions.find(t => {
+          const normalizedKey = normalizeTransactionMerchantName(t.merchant_name || t.name);
+          return merchantLookup[normalizedKey]?.total_spending > 0;
+        });
+        if (exampleSuccess) {
+          const rawKey = exampleSuccess.merchant_name || exampleSuccess.name;
+          const normalizedKey = normalizeTransactionMerchantName(rawKey);
+          console.log('✅ Example successful lookup:', {
+            raw: rawKey,
+            normalized: normalizedKey,
+            cachedSpending: merchantLookup[normalizedKey]?.total_spending
+          });
+        }
         
         // DEBUG: Analyze transaction amounts to verify spending vs income categorization
         const positiveAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount > 0);
@@ -330,8 +439,8 @@ export default function TransactionsPage() {
       ),
     },
     {
-      accessorKey: 'totalSpendingTransactions',
-      header: 'Merchant Spending Count',
+      accessorKey: 'totalMerchantTransactions',
+      header: 'Merchant Transaction Count',
       cell: ({ getValue }: { getValue: () => number }) => (
         <span className="text-gray-600">
           {getValue().toLocaleString()}
@@ -389,7 +498,7 @@ export default function TransactionsPage() {
           <div>
             <h1 className="text-2xl font-bold">Transaction & Spending Analytics</h1>
             <p className="text-muted-foreground">
-              Transaction data with cached merchant analytics for fast performance
+              All transactions with merchant analytics showing actual visible counts
             </p>
           </div>
           <div className="text-sm text-muted-foreground">

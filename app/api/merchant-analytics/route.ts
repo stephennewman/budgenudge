@@ -36,7 +36,8 @@ export async function GET(request: Request) {
       'avg_weekly_spending', 
       'avg_monthly_spending',
       'merchant_name',
-      'last_transaction_date'
+      'last_transaction_date',
+      'is_recurring'
     ];
     
     if (!validSortFields.includes(sortBy)) {

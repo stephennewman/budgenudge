@@ -22,6 +22,8 @@ interface MerchantData {
   avg_weekly_transactions: number;
   avg_monthly_transactions: number;
   spending_transactions: number;
+  is_recurring: boolean;
+  recurring_reason: string;
 }
 
 interface MerchantAnalytics {
@@ -33,6 +35,7 @@ interface MerchantAnalytics {
   monthlySpending: number;
   monthlyTransactions: number;
   rank: number;
+  isRecurring?: boolean;
 }
 
 export default function AnalysisPage() {
@@ -40,6 +43,9 @@ export default function AnalysisPage() {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const supabase = createSupabaseClient();
+
+  // Recurring detection is now handled in the database
+  // No need for frontend calculation - using stored is_recurring field
 
   // Fetch cached merchant analytics
   const fetchMerchantAnalytics = async () => {
@@ -81,17 +87,37 @@ export default function AnalysisPage() {
             console.log('Analysis - Sample cached merchant:', data.merchants[0]);
           }
           
-          // Convert cached data to the format expected by the component
-          const formattedAnalytics = data.merchants.map((merchant: MerchantData, index: number) => ({
-            merchant: merchant.merchant_name,
-            totalTransactions: merchant.total_transactions,
-            totalSpending: merchant.total_spending,
-            weeklySpending: merchant.avg_weekly_spending,
-            weeklyTransactions: merchant.avg_weekly_transactions || 0,
-            monthlySpending: merchant.avg_monthly_spending || 0,
-            monthlyTransactions: merchant.avg_monthly_transactions || 0,
-            rank: index + 1
-          }));
+          // Convert cached data - recurring detection now stored in database
+          const formattedAnalytics = data.merchants.map((merchant: MerchantData, index: number) => {
+            // Use stored recurring flag from database
+            const isRecurringMonthly = merchant.is_recurring || false;
+            
+            // For recurring bills, calculate true monthly amount instead of diluted average
+            let adjustedMonthlySpending = merchant.avg_monthly_spending || 0;
+            if (isRecurringMonthly) {
+              // For recurring bills: total_spending / months_with_transactions (not total months)
+              const monthsWithTransactions = Math.max(1, merchant.total_transactions);
+              adjustedMonthlySpending = merchant.total_spending / monthsWithTransactions;
+              
+              console.log(`📅 Recurring bill (DB): ${merchant.merchant_name}`);
+              console.log(`  Reason: ${merchant.recurring_reason || 'Unknown'}`);
+              console.log(`  Original monthly avg: $${(merchant.avg_monthly_spending || 0).toFixed(2)}`);
+              console.log(`  Adjusted monthly avg: $${adjustedMonthlySpending.toFixed(2)}`);
+              console.log(`  Total: $${merchant.total_spending} ÷ ${monthsWithTransactions} months with transactions`);
+            }
+            
+            return {
+              merchant: merchant.merchant_name,
+              totalTransactions: merchant.total_transactions,
+              totalSpending: merchant.total_spending,
+              weeklySpending: merchant.avg_weekly_spending,
+              weeklyTransactions: merchant.avg_weekly_transactions || 0,
+              monthlySpending: adjustedMonthlySpending,
+              monthlyTransactions: merchant.avg_monthly_transactions || 0,
+              rank: index + 1,
+              isRecurring: isRecurringMonthly
+            };
+          });
           
           console.log('Analysis - Formatted analytics:', formattedAnalytics);
           
@@ -200,7 +226,7 @@ export default function AnalysisPage() {
                   {merchant.rank}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium text-xs truncate max-w-[100px]">
+                  <div className="font-medium text-xs truncate max-w-[140px]">
                     {merchant.merchant}
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -244,9 +270,9 @@ export default function AnalysisPage() {
       );
     }
 
-    // Sort by total spending instead of transaction count
+    // Sort by monthly spending average instead of total spending
     const spendingAnalytics = [...merchantAnalytics]
-      .sort((a, b) => b.totalSpending - a.totalSpending)
+      .sort((a, b) => b.monthlySpending - a.monthlySpending)
       .slice(0, 10)
       .map((item, index) => ({ ...item, rank: index + 1 }));
 
@@ -266,11 +292,12 @@ export default function AnalysisPage() {
                   {merchant.rank}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium text-xs truncate max-w-[100px]">
+                  <div className="font-medium text-xs truncate max-w-[140px]">
                     {merchant.merchant}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {merchant.totalTransactions} txns
+                    {merchant.isRecurring && <span className="text-xs mr-1">🔄</span>}
+                    {merchant.totalTransactions} txns{merchant.isRecurring ? ' • recurring' : ''}
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
+import SmsButton from "@/components/sms-button";
 
 
 export default async function ProtectedPage() {
@@ -22,6 +23,21 @@ export default async function ProtectedPage() {
         <p className="text-muted-foreground mt-2">
           Track your spending automatically with Plaid webhooks
         </p>
+      </div>
+
+      {/* SMS Test Button */}
+      <div className="border rounded-lg p-6 space-y-4">
+        <h2 className="font-medium">📱 SMS Notifications</h2>
+        <p className="text-sm text-muted-foreground">
+          Test your SMS notifications by clicking the button below. This will send a test message to your phone.
+        </p>
+        <SmsButton 
+          buttonText="📱 Send Test SMS"
+          message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
+          variant="outline"
+          userId={user?.id}
+          allowScheduling={true}
+        />
       </div>
 
       {/* Plaid Transaction Dashboard */}
