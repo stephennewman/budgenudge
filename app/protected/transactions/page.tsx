@@ -298,13 +298,13 @@ export default function TransactionsPage() {
             <div className="bg-green-50 p-4 rounded-lg border">
               <div className="text-sm text-green-600 font-medium">Average per Month</div>
               <div className="text-2xl font-bold text-green-900">
-                {transactions[0]?.avgTransactionsMonthly.toFixed(1) || '0.0'}
+                {Math.round(transactions[0]?.avgTransactionsMonthly || 0)}
               </div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg border">
               <div className="text-sm text-purple-600 font-medium">Average per Week</div>
               <div className="text-2xl font-bold text-purple-900">
-                {transactions[0]?.avgTransactionsWeekly.toFixed(1) || '0.0'}
+                {Math.round(transactions[0]?.avgTransactionsWeekly || 0)}
               </div>
             </div>
             <div className="bg-orange-50 p-4 rounded-lg border">
@@ -316,13 +316,13 @@ export default function TransactionsPage() {
             <div className="bg-teal-50 p-4 rounded-lg border">
               <div className="text-sm text-teal-600 font-medium">Weeks of Data</div>
               <div className="text-2xl font-bold text-teal-900">
-                {transactions[0]?.weeksOfHistoricalData.toFixed(1) || '0.0'}
+                {Math.round(transactions[0]?.weeksOfHistoricalData || 0)}
               </div>
             </div>
             <div className="bg-indigo-50 p-4 rounded-lg border">
               <div className="text-sm text-indigo-600 font-medium">Months of Data</div>
               <div className="text-2xl font-bold text-indigo-900">
-                {transactions[0]?.monthsOfHistoricalData.toFixed(1) || '0.0'}
+                {Math.round(transactions[0]?.monthsOfHistoricalData || 0)}
               </div>
             </div>
           </div>
