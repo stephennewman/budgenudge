@@ -118,7 +118,24 @@ export default function TransactionsPage() {
           return acc;
         }, {});
         
-        // Enhance transactions with cached analytics
+        // Calculate overall timeframe analytics from transaction dates
+        const allDates = transactionsData.transactions.map((t: Transaction) => new Date(t.date));
+        const earliestDate = allDates.length > 0 ? new Date(Math.min(...allDates.map((d: Date) => d.getTime()))) : new Date();
+        const latestDate = allDates.length > 0 ? new Date(Math.max(...allDates.map((d: Date) => d.getTime()))) : new Date();
+        const today = new Date();
+        
+        // Calculate time ranges
+        const daysSinceFirst = Math.max(1, Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const daysOfData = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const weeksOfData = Math.max(1, daysOfData / 7);
+        const monthsOfData = Math.max(1, daysOfData / 30.44);
+        
+        // Calculate averages
+        const totalTransactions = transactionsData.transactions.length;
+        const avgTransactionsMonthly = totalTransactions / monthsOfData;
+        const avgTransactionsWeekly = totalTransactions / weeksOfData;
+
+        // Enhance transactions with cached analytics and proper time calculations
         const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => {
           const merchantKey = transaction.merchant_name || transaction.name;
           const merchantData = merchantLookup[merchantKey] || {};
@@ -134,14 +151,14 @@ export default function TransactionsPage() {
             avgWeeklySpending: merchantData.avg_weekly_spending || 0,
             avgMonthlySpending: merchantData.avg_monthly_spending || 0,
             totalSpendingTransactions: merchantData.spending_transactions || 0,
-            // Keep these for backward compatibility (calculated from overall data)
-            totalTransactionsAllTime: transactionsData.transactions.length,
-            avgTransactionsMonthly: 0, // Could calculate from overall if needed
-            avgTransactionsWeekly: 0,  // Could calculate from overall if needed
-            daysSinceFirstTransaction: 0,
-            daysOfHistoricalData: 0,
-            weeksOfHistoricalData: 0,
-            monthsOfHistoricalData: 0,
+            // Calculated time-based analytics (same for all transactions)
+            totalTransactionsAllTime: totalTransactions,
+            avgTransactionsMonthly: avgTransactionsMonthly,
+            avgTransactionsWeekly: avgTransactionsWeekly,
+            daysSinceFirstTransaction: daysSinceFirst,
+            daysOfHistoricalData: daysOfData,
+            weeksOfHistoricalData: weeksOfData,
+            monthsOfHistoricalData: monthsOfData,
           };
         });
         
@@ -157,6 +174,15 @@ export default function TransactionsPage() {
         console.log('Positive amounts (spending):', positiveAmounts.length);
         console.log('Negative amounts (income):', negativeAmounts.length);
         console.log('Zero amounts:', zeroAmounts.length);
+        
+        console.log('=== DATE RANGE ANALYSIS ===');
+        console.log('Earliest transaction date:', earliestDate.toLocaleDateString());
+        console.log('Latest transaction date:', latestDate.toLocaleDateString());
+        console.log('Days of historical data:', daysOfData);
+        console.log('Weeks of historical data:', weeksOfData.toFixed(1));
+        console.log('Months of historical data:', monthsOfData.toFixed(1));
+        console.log('Avg transactions per week:', avgTransactionsWeekly.toFixed(1));
+        console.log('Avg transactions per month:', avgTransactionsMonthly.toFixed(1));
         
         if (positiveAmounts.length > 0) {
           console.log('Sample positive amounts (spending):');
@@ -387,6 +413,29 @@ export default function TransactionsPage() {
             <div className="text-xs text-yellow-600 mt-2">
               In Plaid&apos;s system: Positive = money out (spending), Negative = money in (income/deposits)
             </div>
+            {transactions.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-yellow-200">
+                <div className="text-sm font-medium text-yellow-800 mb-2">📅 Date Range Analysis</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <span className="font-medium">First Transaction:</span><br/>
+                    {transactions[0]?.daysOfHistoricalData > 0 ? 
+                      new Date(Date.now() - (transactions[0].daysSinceFirstTransaction * 24 * 60 * 60 * 1000)).toLocaleDateString() : 
+                      'Unknown'
+                    }
+                  </div>
+                  <div>
+                    <span className="font-medium">Data Timespan:</span><br/>
+                    {transactions[0]?.daysOfHistoricalData || 0} days 
+                    ({(transactions[0]?.weeksOfHistoricalData || 0).toFixed(1)} weeks, {(transactions[0]?.monthsOfHistoricalData || 0).toFixed(1)} months)
+                  </div>
+                  <div>
+                    <span className="font-medium">Transaction Rate:</span><br/>
+                    {(transactions[0]?.avgTransactionsWeekly || 0).toFixed(1)}/week, {(transactions[0]?.avgTransactionsMonthly || 0).toFixed(1)}/month
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
