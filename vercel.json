@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/scheduled-sms",
-      "schedule": "* * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 } 
