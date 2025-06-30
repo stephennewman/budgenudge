@@ -287,8 +287,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   // Monthly budgets
   const publixBudget = 400;
   const amazonBudget = 300;
-  const publixBudgetRemaining = publixBudget - publixThisMonth;
-  const amazonBudgetRemaining = amazonBudget - amazonThisMonth;
+  const publixBudgetRemaining = Math.max(0, publixBudget - publixThisMonth);
+  const amazonBudgetRemaining = Math.max(0, amazonBudget - amazonThisMonth);
   
   // AI Recommendation based on monthly metrics
   let recommendation = '';

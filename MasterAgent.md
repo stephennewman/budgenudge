@@ -157,32 +157,72 @@ Integrate with Plaid's financial API and get webhooks working properly for autom
 
 ---
 
-## 🚀 LATEST DEPLOYMENT - June 26, 2025
+## 🚀 LATEST DEPLOYMENT - December 30, 2024
 
-### 📅 UPCOMING BILLS PREDICTION TABLE ✅ DEPLOYED
-**Deployment:** `budgenudge-gekrmeo4a-krezzo.vercel.app`  
-**Status:** ● Ready (47s build time)  
-**Deploy Time:** 8:15 AM EDT, June 26, 2025
+### 🔥 ENHANCED SMS WITH BALANCE TRACKING & DUAL MERCHANT SUPPORT ✅ DEPLOYED
+**Deployment:** `budgenudge-dmft1e32z-krezzo.vercel.app`  
+**Status:** ● Ready (44s build time)  
+**Deploy Time:** 4:20 PM EST, December 30, 2024
 
-**🔥 NEW FEATURE:**
-- ✅ **Clean table view** for bill predictions at `/protected/calendar`
-- ✅ **4-column table** with Merchant, Date Prediction, Amount Prediction, and Confidence
-- ✅ **Sorted by soonest date** (earliest upcoming bills first)
-- ✅ **Confidence percentage** based on payment regularity using coefficient of variation
-- ✅ **Same prediction logic** as SMS template for consistency
-- ✅ **Professional styling** with clear headers and responsive design
+**🎯 MAJOR ENHANCEMENTS:**
 
-**Table Features:**
+#### 💰 Real-Time Balance Integration
+- ✅ **Live account balances** in every SMS notification
+- ✅ **Auto-refresh on webhooks** - balances updated with every transaction
+- ✅ **New balance API** endpoint for manual refresh
+- ✅ **Database schema enhanced** with balance fields and timestamps
+
+#### 📅 Extended Prediction Window
+- ✅ **30-day predictions** (expanded from 7 days) showing up to 8 upcoming transactions
+- ✅ **Better planning horizon** for monthly financial management
+- ✅ **Comprehensive bill forecasting** with improved accuracy
+
+#### 🛒 Dual Merchant Tracking
+- ✅ **Amazon spending tracking** added alongside Publix
+- ✅ **Separate monthly budgets** ($400 Publix, $300 Amazon)
+- ✅ **Individual pacing analysis** for both merchants
+- ✅ **Smart recommendations** based on dual-merchant performance
+
+#### 📱 Streamlined Recent Activity
+- ✅ **3-day transaction focus** (reduced from 7 days) for immediate relevance
+- ✅ **Cleaner SMS format** with better information hierarchy
+- ✅ **Monthly-only pacing** (removed weekly tracking for simplicity)
+
+**New SMS Format:**
 ```
-Merchant         | Date Prediction | Amount Prediction | Confidence
-Netflix          | 6/30 (Mon)      | $15.99           | 95%
-Phone            | 7/1 (Tue)       | $120.00          | 88%
-Electric         | 7/5 (Fri)       | ~$85.00          | 72%
+💳 PREDICTED TRANSACTIONS (NEXT 30 DAYS):
+1/3 (Fri): Netflix $15.99
+1/5 (Sun): Phone $120.00
+1/8 (Wed): Electric $89.50
+[...up to 8 predictions]
+
+💰 AVAILABLE BALANCE: $2,847.33
+
+🏪 PUBLIX SPENDING:
+PACED MONTHLY - $156.89 vs $193.33 expected ($36.44 under pace)
+MONTHLY BUDGET REMAINING - $243.11
+
+📦 AMAZON SPENDING:
+PACED MONTHLY - $127.45 vs $150.00 expected ($22.55 under pace)
+MONTHLY BUDGET REMAINING - $172.55
+
+RECOMMENDATION - Great pacing! Keep up the mindful spending
+
+📋 RECENT TRANSACTIONS:
+1/2 (Thu): Starbucks $5.99
+1/1 (Wed): Amazon $24.99
+12/31 (Tue): Publix $34.22
 ```
 
-**Previous Deployment:** `budgenudge-9fsm0yv25-krezzo.vercel.app` - Advanced SMS Template  
-**Impact:** Added visual calendar interface to complement SMS financial insights
-**User Experience:** Simple table replaces complex calendar for better bill management
+**Technical Improvements:**
+- ✅ **Balance API endpoints** (`/api/plaid/balances`) for GET/POST operations
+- ✅ **Enhanced webhook processing** with automatic balance refresh
+- ✅ **TypeScript improvements** with proper type definitions
+- ✅ **Database optimization** with balance tracking infrastructure
+
+**Previous Deployment:** `budgenudge-gekrmeo4a-krezzo.vercel.app` - Bills Prediction Table  
+**Impact:** Transformed SMS from simple transaction alerts to comprehensive financial intelligence
+**User Experience:** Real-time balance awareness with actionable spending insights across multiple merchants
 
 ---
 
@@ -501,6 +541,14 @@ With solid foundation established and enhanced analytics proven, BudgeNudge is p
 ---
 
 ## LATEST DEPLOYMENT - 2025-06-22
+
+### 🔧 BUG FIX: Budget Remaining Calculation
+**Time**: 1:30 PM EDT  
+**Status**: ✅ FIXED  
+**Issue**: Monthly budget remaining showed negative values when overspent  
+**Solution**: Updated calculation to use `Math.max(0, budget - spent)` ensuring $0 minimum  
+**Files Modified**: `app/api/plaid/webhook/route.ts` (lines 289-290)  
+**Impact**: SMS notifications now correctly show $0.00 when budget is exceeded instead of negative amounts
 
 ### 🚀 MAJOR FEATURE RELEASE: Monthly Pacing Analysis
 **Deployment ID**: budgenudge-n11i55ayf-krezzo.vercel.app  
