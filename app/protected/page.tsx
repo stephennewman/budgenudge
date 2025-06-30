@@ -2,6 +2,7 @@ import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import SmsButton from "@/components/sms-button";
+import RecurringSmsButton from "@/components/recurring-sms-button";
 
 
 export default async function ProtectedPage() {
@@ -29,15 +30,24 @@ export default async function ProtectedPage() {
       <div className="border rounded-lg p-6 space-y-4">
         <h2 className="font-medium">📱 SMS Notifications</h2>
         <p className="text-sm text-muted-foreground">
-          Test your SMS notifications by clicking the button below. This will send a test message to your phone.
+          Test your SMS notifications and get summaries of your spending patterns.
         </p>
-        <SmsButton 
-          buttonText="📱 Send Test SMS"
-          message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
-          variant="outline"
-          userId={user?.id}
-          allowScheduling={true}
-        />
+        
+        <div className="grid gap-4 md:grid-cols-2">
+          <SmsButton 
+            buttonText="📱 Send Test SMS"
+            message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
+            variant="outline"
+            userId={user?.id}
+            allowScheduling={true}
+          />
+          
+          <RecurringSmsButton 
+            userId={user?.id}
+            buttonText="📊 Text My Recurring Bills"
+            variant="outline"
+          />
+        </div>
       </div>
 
       {/* Plaid Transaction Dashboard */}
