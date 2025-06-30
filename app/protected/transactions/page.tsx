@@ -68,11 +68,11 @@ export default function TransactionsPage() {
     
     const totalTransactions = transactions.length;
     
-    // Calculate date range
-    const dates = transactions.map(t => new Date(t.date)).sort();
-    const firstDate = dates[0];
-    const lastDate = dates[dates.length - 1];
-    const daysBetween = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)));
+    // Calculate date range (oldest to newest transaction)
+    const dates = transactions.map(t => new Date(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    const oldestDate = dates[0]; // First transaction chronologically
+    const newestDate = dates[dates.length - 1]; // Last transaction chronologically
+    const daysBetween = Math.max(1, Math.ceil((newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24)));
     
     // Calculate historical data spans
     const weeksOfHistoricalData = Math.max(1, daysBetween / 7);
