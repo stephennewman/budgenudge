@@ -78,7 +78,7 @@ Generated: ${new Date().toLocaleString('en-US', {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'noreply@budgenudge.com',
+          from: 'BudgeNudge <noreply@krezzo.com>',
           to: [targetPhoneNumber],
           subject: 'BudgeNudge Alert',
           text: noRecurringMessage,
@@ -160,7 +160,7 @@ Generated: ${new Date().toLocaleString('en-US', {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'noreply@budgenudge.com',
+        from: 'BudgeNudge <noreply@krezzo.com>',
         to: [targetPhoneNumber],
         subject: 'BudgeNudge Alert',
         text: smsMessage,
