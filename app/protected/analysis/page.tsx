@@ -132,35 +132,35 @@ export default function AnalysisPage() {
     }
 
     return (
-      <div className="space-y-4">
-        <div className="text-xs text-muted-foreground mb-2">
+      <div className="h-full flex flex-col">
+        <div className="text-xs text-muted-foreground mb-2 flex-shrink-0">
           Top merchants by transaction volume
         </div>
-        <div className="space-y-2">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {merchantAnalytics.map((merchant) => (
             <div
               key={merchant.merchant}
-              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between p-2 bg-gray-50 rounded-lg flex-shrink-0"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+              <div className="flex items-center space-x-2 min-w-0">
+                <div className="w-5 h-5 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
                   {merchant.rank}
                 </div>
-                <div>
-                  <div className="font-medium text-sm truncate max-w-[120px]">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs truncate max-w-[100px]">
                     {merchant.merchant}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {merchant.totalTransactions} transactions
+                    {merchant.totalTransactions} txns
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-medium text-sm">
+              <div className="text-right flex-shrink-0">
+                <div className="font-medium text-xs">
                   ${merchant.weeklySpending.toFixed(0)}/wk
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  ${merchant.totalSpending.toFixed(0)} total
+                  ${merchant.totalSpending.toFixed(0)}
                 </div>
               </div>
             </div>
@@ -198,35 +198,35 @@ export default function AnalysisPage() {
       .map((item, index) => ({ ...item, rank: index + 1 }));
 
     return (
-      <div className="space-y-4">
-        <div className="text-xs text-muted-foreground mb-2">
+      <div className="h-full flex flex-col">
+        <div className="text-xs text-muted-foreground mb-2 flex-shrink-0">
           Top merchants by total spending amount
         </div>
-        <div className="space-y-2">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {spendingAnalytics.map((merchant) => (
             <div
               key={merchant.merchant}
-              className="flex items-center justify-between p-3 bg-green-50 rounded-lg"
+              className="flex items-center justify-between p-2 bg-green-50 rounded-lg flex-shrink-0"
             >
-              <div className="flex items-center space-x-3">
-                <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+              <div className="flex items-center space-x-2 min-w-0">
+                <div className="w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
                   {merchant.rank}
                 </div>
-                <div>
-                  <div className="font-medium text-sm truncate max-w-[120px]">
+                <div className="min-w-0">
+                  <div className="font-medium text-xs truncate max-w-[100px]">
                     {merchant.merchant}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    ${merchant.totalSpending.toFixed(0)} total spent
+                    ${merchant.totalSpending.toFixed(0)} spent
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-medium text-sm text-green-700">
+              <div className="text-right flex-shrink-0">
+                <div className="font-medium text-xs text-green-700">
                   ${merchant.weeklySpending.toFixed(0)}/wk
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {merchant.totalTransactions} transactions
+                  {merchant.totalTransactions} txns
                 </div>
               </div>
             </div>
@@ -416,7 +416,7 @@ export default function AnalysisPage() {
             }}
           >
             <Card
-              className={`h-full cursor-move hover:shadow-lg transition-all duration-200 relative ${
+              className={`h-full cursor-move hover:shadow-lg transition-all duration-200 relative flex flex-col ${
                 draggedCard === card.id ? 'opacity-50' : ''
               }`}
               draggable
@@ -432,7 +432,7 @@ export default function AnalysisPage() {
                 </div>
               </CardHeader>
               
-              <CardContent className="flex-1 relative">
+              <CardContent className="flex-1 relative overflow-hidden p-4">
                 {getCardContent(card.id)}
               </CardContent>
 
