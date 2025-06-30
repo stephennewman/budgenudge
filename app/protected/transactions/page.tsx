@@ -238,7 +238,7 @@ export default function TransactionsPage() {
     getSortedRowModel: getSortedRowModel(),
     initialState: {
       pagination: {
-        pageSize: 25,
+        pageSize: 1000,
       },
     },
   });
@@ -262,7 +262,7 @@ export default function TransactionsPage() {
             </p>
           </div>
           <div className="text-sm text-muted-foreground">
-            {transactions.length} total transactions
+            {transactions.length} total transactions loaded
           </div>
         </div>
 
@@ -355,8 +355,22 @@ export default function TransactionsPage() {
                 table.getFilteredRowModel().rows.length
               )}{' '}
               of {table.getFilteredRowModel().rows.length} entries
+              {table.getFilteredRowModel().rows.length !== transactions.length && (
+                <span className="ml-2 text-blue-600">(filtered from {transactions.length} total)</span>
+              )}
             </div>
-            <div className="space-x-2">
+            <div className="flex items-center space-x-2">
+              <div className="text-sm text-muted-foreground">
+                Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+              >
+                First
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -372,6 +386,14 @@ export default function TransactionsPage() {
                 disabled={!table.getCanNextPage()}
               >
                 Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+              >
+                Last
               </Button>
             </div>
           </div>
