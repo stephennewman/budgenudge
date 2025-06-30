@@ -20,8 +20,8 @@ export default function InPageSidebar({
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col justify-between min-w-[250px] mr-[8px] h-full">
-      <div className="flex flex-col gap-[4px] px-2">
+    <div className="flex flex-col justify-between min-w-[250px] mr-1 h-full">
+      <div className="flex flex-col gap-[4px] px-4">
         {items.map((item, index) => {
           const { label, href, disabled = false } = item;
           const fullHref = `${basePath}${href}`;
