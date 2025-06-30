@@ -198,12 +198,27 @@ export default function TransactionsPage() {
           );
         }
         
-        // Use summary from cached analytics
+        // Calculate REAL analytics from actual transaction data instead of using stale cached summary
+        const realSpendingTransactions = positiveAmounts.length;
+        const realIncomeTransactions = negativeAmounts.length;
+        const realTotalSpending = positiveAmounts.reduce((sum: number, t: TransactionWithAnalytics) => sum + t.amount, 0);
+        const realAvgWeeklySpending = realTotalSpending / weeksOfData;
+        const realAvgMonthlySpending = realTotalSpending / monthsOfData;
+        
+        console.log('=== REAL VS CACHED ANALYTICS COMPARISON ===');
+        console.log('Real spending transactions:', realSpendingTransactions);
+        console.log('Cached spending transactions:', analyticsData.summary?.totalSpendingTransactions || 0);
+        console.log('Real total spending:', realTotalSpending.toFixed(2));
+        console.log('Cached total spending:', analyticsData.summary?.totalSpending || 0);
+        console.log('Real income transactions:', realIncomeTransactions);
+        console.log('Calculated income transactions (total - cached spending):', totalTransactions - (analyticsData.summary?.totalSpendingTransactions || 0));
+        
+        // Use REAL calculated analytics instead of stale cached summary
         setOverallAnalytics({
-          totalSpendingTransactions: analyticsData.summary?.totalSpendingTransactions || 0,
-          totalHistoricalSpending: analyticsData.summary?.totalSpending || 0,
-          avgWeeklySpending: analyticsData.summary?.avgWeeklySpending || 0,
-          avgMonthlySpending: analyticsData.summary?.avgMonthlySpending || 0,
+          totalSpendingTransactions: realSpendingTransactions,
+          totalHistoricalSpending: realTotalSpending,
+          avgWeeklySpending: realAvgWeeklySpending,
+          avgMonthlySpending: realAvgMonthlySpending,
         });
         
       } else {
@@ -436,6 +451,17 @@ export default function TransactionsPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* CORRECTED DATA NOTICE */}
+        {transactions.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="text-sm font-medium text-green-800 mb-1">✅ Using Real Transaction Data</div>
+            <div className="text-xs text-green-600">
+              Analytics below now use live calculations from your actual transactions instead of stale cached data.
+              Real: {transactions.filter((t: TransactionWithAnalytics) => t.amount > 0).length} spending + {transactions.filter((t: TransactionWithAnalytics) => t.amount < 0).length} income = {transactions.length} total
+            </div>
           </div>
         )}
 
