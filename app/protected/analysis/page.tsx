@@ -18,6 +18,8 @@ interface MerchantData {
   total_transactions: number;
   total_spending: number;
   avg_weekly_spending: number;
+  avg_monthly_spending: number;
+  spending_transactions: number;
 }
 
 interface MerchantAnalytics {
@@ -168,6 +170,72 @@ export default function AnalysisPage() {
     );
   };
 
+  const TopMerchantSpending = () => {
+    if (isLoadingTransactions) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <div className="animate-pulse">Loading spending data...</div>
+          <div className="text-xs mt-2">Fetching cached analytics from database</div>
+        </div>
+      );
+    }
+
+    if (merchantAnalytics.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <div>No spending data available</div>
+          <div className="text-xs mt-2">
+            Check console for debugging info or ensure transactions are stored in database
+          </div>
+        </div>
+      );
+    }
+
+    // Sort by total spending instead of transaction count
+    const spendingAnalytics = [...merchantAnalytics]
+      .sort((a, b) => b.totalSpending - a.totalSpending)
+      .slice(0, 10)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    return (
+      <div className="space-y-4">
+        <div className="text-xs text-muted-foreground mb-2">
+          Top merchants by total spending amount
+        </div>
+        <div className="space-y-2">
+          {spendingAnalytics.map((merchant) => (
+            <div
+              key={merchant.merchant}
+              className="flex items-center justify-between p-3 bg-green-50 rounded-lg"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-medium">
+                  {merchant.rank}
+                </div>
+                <div>
+                  <div className="font-medium text-sm truncate max-w-[120px]">
+                    {merchant.merchant}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ${merchant.totalSpending.toFixed(0)} total spent
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-medium text-sm text-green-700">
+                  ${merchant.weeklySpending.toFixed(0)}/wk
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {merchant.totalTransactions} transactions
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const [cards, setCards] = useState<AnalysisCard[]>([
     {
       id: 'card-1',
@@ -179,19 +247,27 @@ export default function AnalysisPage() {
     },
     {
       id: 'card-2', 
+      title: 'Top 10 Monthly Spending',
+      content: null, // Will be rendered dynamically
+      width: 2,
+      height: 2,
+      position: { x: 2, y: 0 }
+    },
+    {
+      id: 'card-3', 
       title: 'Category Breakdown',
       content: <div className="text-center py-8 text-muted-foreground">Pie chart placeholder</div>,
       width: 1,
       height: 1,
-      position: { x: 2, y: 0 }
+      position: { x: 4, y: 0 }
     },
     {
-      id: 'card-3',
+      id: 'card-4',
       title: 'Monthly Trends',
       content: <div className="text-center py-8 text-muted-foreground">Line chart placeholder</div>,
       width: 3,
       height: 2,
-      position: { x: 0, y: 1 }
+      position: { x: 0, y: 2 }
     }
   ]);
 
@@ -200,6 +276,8 @@ export default function AnalysisPage() {
     switch (cardId) {
       case 'card-1':
         return <TopMerchantActivity />;
+      case 'card-2':
+        return <TopMerchantSpending />;
       default:
         return cards.find(c => c.id === cardId)?.content;
     }
