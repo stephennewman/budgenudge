@@ -38,11 +38,11 @@ interface MerchantAnalytics {
 export default function AnalysisPage() {
   const [merchantAnalytics, setMerchantAnalytics] = useState<MerchantAnalytics[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const supabase = createSupabaseClient();
 
   // Fetch cached merchant analytics
-  useEffect(() => {
-    async function fetchMerchantAnalytics() {
+  const fetchMerchantAnalytics = async () => {
       try {
         setIsLoadingTransactions(true);
         const { data: { session } } = await supabase.auth.getSession();
@@ -55,7 +55,8 @@ export default function AnalysisPage() {
         console.log('Analysis - Fetching cached merchant analytics...');
         console.log('Analysis - Auth token preview:', session.access_token?.substring(0, 20) + '...');
         
-        const response = await fetch('/api/merchant-analytics?limit=10&sortBy=total_transactions', {
+        // Fetch more merchants to ensure we capture both high-transaction and high-spending merchants
+        const response = await fetch('/api/merchant-analytics?limit=50&sortBy=total_transactions', {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           }
@@ -93,6 +94,16 @@ export default function AnalysisPage() {
           }));
           
           console.log('Analysis - Formatted analytics:', formattedAnalytics);
+          
+          // DEBUG: Look for Lakeview specifically
+          const lakeviewData = formattedAnalytics.find((m: MerchantAnalytics) => m.merchant.toLowerCase().includes('lakeview'));
+          if (lakeviewData) {
+            console.log('Analysis - 🏠 FOUND LAKEVIEW:', lakeviewData);
+          } else {
+            console.log('Analysis - ❌ Lakeview NOT found in merchant analytics');
+            console.log('Analysis - Available merchants:', formattedAnalytics.map((m: MerchantAnalytics) => m.merchant).join(', '));
+          }
+          
           setMerchantAnalytics(formattedAnalytics);
           
         } else if (!response.ok) {
@@ -111,10 +122,44 @@ export default function AnalysisPage() {
       } finally {
         setIsLoadingTransactions(false);
       }
-    }
+    };
 
+  useEffect(() => {
     fetchMerchantAnalytics();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manual refresh function to update merchant analytics cache
+  const refreshMerchantAnalytics = async () => {
+    try {
+      setIsRefreshing(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      console.log('Analysis - Manually refreshing merchant analytics cache...');
+      
+      // Trigger cache refresh
+      const refreshResponse = await fetch('/api/merchant-analytics', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      
+      const refreshResult = await refreshResponse.json();
+      console.log('Analysis - Refresh result:', refreshResult);
+      
+      if (refreshResponse.ok) {
+        // Wait a moment for the cache to update, then refetch
+        setTimeout(() => {
+          fetchMerchantAnalytics();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Analysis - Error refreshing merchant analytics:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // No longer needed - using cached analytics from database
 
@@ -375,8 +420,17 @@ export default function AnalysisPage() {
               Drag and resize cards to customize your analysis view
             </p>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {cards.length} analysis cards
+          <div className="flex items-center gap-3">
+            <button
+              onClick={refreshMerchantAnalytics}
+              disabled={isRefreshing}
+              className="px-3 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md transition-colors disabled:opacity-50"
+            >
+              {isRefreshing ? '🔄 Refreshing...' : '🔄 Refresh Data'}
+            </button>
+            <div className="text-sm text-muted-foreground">
+              {cards.length} analysis cards
+            </div>
           </div>
         </div>
       </div>
