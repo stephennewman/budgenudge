@@ -10,7 +10,7 @@ export default async function ProtectedSidebar() {
       basePath="/protected"
       items={[
         {
-          label: "Account",
+          label: "Dashboard",
           href: "/",
         },
         {

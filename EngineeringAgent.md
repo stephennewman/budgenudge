@@ -1,8 +1,40 @@
 # 🧭 ENGINEERING AGENT - BudgeNudge
 
-**Last Updated:** June 22, 2025 12:55 PM EDT
+**Last Updated:** June 22, 2025 1:30 PM EDT
 **Project Status:** ✅ **PRODUCTION OPERATIONAL + ENHANCED**
 **Codebase Status:** ✅ **FULLY INDEXED & DOCUMENTED**
+
+---
+
+## 🔧 LATEST BUG FIX & DEPLOYMENT
+
+### ✅ Budget Remaining Calculation Fix (June 22, 2025)
+**Deployment ID:** budgenudge-khmz0bcrv-krezzo.vercel.app  
+**Status:** 🟢 **LIVE IN PRODUCTION**  
+**Commit:** df127c8  
+
+**Issue Resolved:**
+- **Problem**: SMS notifications showed negative budget remaining values when overspent
+- **Root Cause**: Simple subtraction `budget - spent` allowed negative results
+- **Fix Applied**: Updated to `Math.max(0, budget - spent)` ensuring $0 minimum
+
+**Technical Details:**
+- **File Modified**: `app/api/plaid/webhook/route.ts` (lines 289-290)
+- **Function**: `buildAdvancedSMSMessage()` budget calculation logic
+- **Impact**: Both Publix and Amazon budget tracking now correctly show $0.00 when exceeded
+- **Build Time**: 44 seconds (clean build, no compilation errors)
+- **Validation**: ✅ Site responding, webhook endpoint operational
+
+**Code Change:**
+```typescript
+// Before
+const publixBudgetRemaining = publixBudget - publixThisMonth;
+const amazonBudgetRemaining = amazonBudget - amazonThisMonth;
+
+// After  
+const publixBudgetRemaining = Math.max(0, publixBudget - publixThisMonth);
+const amazonBudgetRemaining = Math.max(0, amazonBudget - amazonThisMonth);
+```
 
 ---
 

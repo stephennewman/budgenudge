@@ -17,14 +17,11 @@ export default async function ProtectedPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col">
-          <h1 className="text-2xl font-medium">BudgeNudge Dashboard</h1>
-          <p className="text-muted-foreground mt-2">
-            Track your spending automatically with Plaid webhooks
-          </p>
-        </div>
-        <AuthPageSignOutButton />
+      <div className="flex flex-col">
+        <h1 className="text-2xl font-medium">BudgeNudge Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Track your spending automatically with Plaid webhooks
+        </p>
       </div>
 
       {/* Plaid Transaction Dashboard */}
@@ -71,6 +68,9 @@ export default async function ProtectedPage() {
                   .join(", ") || "Email"}
               </div>
             </div>
+          </div>
+          <div className="pt-4 border-t">
+            <AuthPageSignOutButton />
           </div>
         </div>
       </div>
