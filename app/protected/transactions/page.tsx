@@ -44,7 +44,6 @@ interface TransactionWithAnalytics extends Transaction {
   avgTransactionsWeekly: number;
   daysSinceFirstTransaction: number;
   merchantTransactionCount: number;
-  categorySpending: number;
 }
 
 export default function TransactionsPage() {
@@ -80,12 +79,6 @@ export default function TransactionsPage() {
       return acc;
     }, {} as Record<string, number>);
 
-    const categorySpending = transactions.reduce((acc, t) => {
-      const category = t.category?.[0] || 'Other';
-      acc[category] = (acc[category] || 0) + Math.abs(t.amount);
-      return acc;
-    }, {} as Record<string, number>);
-
     return transactions.map(transaction => ({
       ...transaction,
       id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(), // Ensure ID exists
@@ -94,7 +87,6 @@ export default function TransactionsPage() {
       avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
       daysSinceFirstTransaction: Math.ceil((new Date().getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)),
       merchantTransactionCount: merchantCounts[transaction.merchant_name || transaction.name] || 0,
-      categorySpending: Math.round((categorySpending[transaction.category?.[0] || 'Other'] || 0) * 100) / 100,
     }));
   };
 
@@ -183,29 +175,9 @@ export default function TransactionsPage() {
       ),
     },
     {
-      accessorKey: 'totalTransactionsAllTime',
-      header: 'Total Txns',
-      cell: ({ getValue }: { getValue: () => number }) => getValue().toLocaleString(),
-    },
-    {
-      accessorKey: 'avgTransactionsMonthly',
-      header: 'Avg/Month',
-      cell: ({ getValue }: { getValue: () => number }) => getValue().toFixed(1),
-    },
-    {
-      accessorKey: 'avgTransactionsWeekly',
-      header: 'Avg/Week', 
-      cell: ({ getValue }: { getValue: () => number }) => getValue().toFixed(1),
-    },
-    {
       accessorKey: 'merchantTransactionCount',
       header: 'Merchant Count',
       cell: ({ getValue }: { getValue: () => number }) => getValue(),
-    },
-    {
-      accessorKey: 'categorySpending',
-      header: 'Category Total',
-      cell: ({ getValue }: { getValue: () => number }) => `$${getValue().toFixed(2)}`,
     },
     {
       accessorKey: 'plaid_transaction_id',
@@ -265,6 +237,30 @@ export default function TransactionsPage() {
             {transactions.length} total transactions loaded
           </div>
         </div>
+
+        {/* Macro Stats Summary */}
+        {transactions.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg border">
+              <div className="text-sm text-blue-600 font-medium">Total Transactions</div>
+              <div className="text-2xl font-bold text-blue-900">
+                {transactions[0]?.totalTransactionsAllTime.toLocaleString() || 0}
+              </div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg border">
+              <div className="text-sm text-green-600 font-medium">Average per Month</div>
+              <div className="text-2xl font-bold text-green-900">
+                {transactions[0]?.avgTransactionsMonthly.toFixed(1) || '0.0'}
+              </div>
+            </div>
+            <div className="bg-purple-50 p-4 rounded-lg border">
+              <div className="text-sm text-purple-600 font-medium">Average per Week</div>
+              <div className="text-2xl font-bold text-purple-900">
+                {transactions[0]?.avgTransactionsWeekly.toFixed(1) || '0.0'}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Global Search */}
         <div className="flex items-center space-x-2">
