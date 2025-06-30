@@ -46,17 +46,25 @@ export default function AnalysisPage() {
         }
 
         console.log('Analysis - Fetching cached merchant analytics...');
+        console.log('Analysis - Auth token preview:', session.access_token?.substring(0, 20) + '...');
+        
         const response = await fetch('/api/merchant-analytics?limit=10&sortBy=total_transactions', {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           }
         });
         
+        console.log('Analysis - Response status:', response.status);
+        console.log('Analysis - Response headers:', Object.fromEntries(response.headers.entries()));
+        
         const data = await response.json();
         console.log('Analysis - Merchant Analytics Response:', { 
           ok: response.ok, 
+          status: response.status,
+          dataKeys: Object.keys(data),
           merchantCount: data.merchants?.length,
-          summary: data.summary 
+          summary: data.summary,
+          error: data.error
         });
         
         if (response.ok && data.merchants) {
@@ -64,6 +72,7 @@ export default function AnalysisPage() {
           if (data.merchants.length > 0) {
             console.log('Analysis - Sample cached merchant:', data.merchants[0]);
           }
+          
           // Convert cached data to the format expected by the component
           const formattedAnalytics = data.merchants.map((merchant: MerchantData, index: number) => ({
             merchant: merchant.merchant_name,
@@ -72,9 +81,20 @@ export default function AnalysisPage() {
             weeklySpending: merchant.avg_weekly_spending,
             rank: index + 1
           }));
+          
+          console.log('Analysis - Formatted analytics:', formattedAnalytics);
           setMerchantAnalytics(formattedAnalytics);
+          
+        } else if (!response.ok) {
+          console.error('Analysis - API HTTP Error:', {
+            status: response.status,
+            statusText: response.statusText,
+            responseData: data
+          });
+        } else if (!data.merchants) {
+          console.error('Analysis - No merchants in response:', data);
         } else {
-          console.error('Analysis - Merchant Analytics API Error:', data);
+          console.error('Analysis - Unknown error:', data);
         }
       } catch (error) {
         console.error('Analysis - Error fetching merchant analytics:', error);
@@ -152,7 +172,7 @@ export default function AnalysisPage() {
     {
       id: 'card-1',
       title: 'Top 10 Weekly Merchant Activity',
-      content: <TopMerchantActivity />,
+      content: null, // Will be rendered dynamically
       width: 2,
       height: 2,
       position: { x: 0, y: 0 }
@@ -174,6 +194,16 @@ export default function AnalysisPage() {
       position: { x: 0, y: 1 }
     }
   ]);
+
+  // Helper function to get card content dynamically
+  const getCardContent = (cardId: string) => {
+    switch (cardId) {
+      case 'card-1':
+        return <TopMerchantActivity />;
+      default:
+        return cards.find(c => c.id === cardId)?.content;
+    }
+  };
 
   const GRID_COLS = 6; // Number of grid columns
   const GRID_ROWS = 8; // Number of grid rows
@@ -325,7 +355,7 @@ export default function AnalysisPage() {
               </CardHeader>
               
               <CardContent className="flex-1 relative">
-                {card.content}
+                {getCardContent(card.id)}
               </CardContent>
 
               {/* Corner resize handles */}
