@@ -96,6 +96,9 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
 
           for (const account of accountsResponse.data.accounts) {
             const balance = account.balances;
+            
+            console.log(`💰 Updating balance for ${account.name}: Current=$${balance.current}, Available=$${balance.available}`);
+            
             await supabaseService
               .from('accounts')
               .update({
@@ -107,7 +110,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
               })
               .eq('plaid_account_id', account.account_id);
           }
-          console.log(`💰 Updated balances for ${accountsResponse.data.accounts.length} accounts`);
+          console.log(`💰 ✅ Successfully updated balances for ${accountsResponse.data.accounts.length} accounts`);
         } catch (error) {
           console.error('❌ Error updating balances:', error);
         }
@@ -222,6 +225,10 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
         if (accounts && accounts.length > 0) {
           const totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
           balanceSection = `\n💰 AVAILABLE BALANCE: $${totalAvailable.toFixed(2)}\n`;
+          
+          console.log(`📱 Including balance in SMS: $${totalAvailable.toFixed(2)} from ${accounts.length} accounts`);
+        } else {
+          console.log(`📱 No accounts found for balance inclusion in SMS`);
         }
       }
     } catch (error) {

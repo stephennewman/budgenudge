@@ -160,8 +160,10 @@ Integrate with Plaid's financial API and get webhooks working properly for autom
 ## 🚀 LATEST DEPLOYMENT - December 30, 2024
 
 ### 📱 SMS FUNCTIONALITY SIMPLIFICATION ✅ DEPLOYED  
+**Deployment:** `budgenudge-6rftdi3x1-krezzo.vercel.app`  
+**Status:** ● Ready (51s build time)  
 **Deploy Time:** 7:45 PM EST, December 30, 2024  
-**Status:** ✅ **READY FOR DEPLOYMENT**
+**Commit:** 9ea8ee4
 
 **🎯 RECURRING SMS IMPROVEMENTS:**
 
