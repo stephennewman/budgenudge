@@ -197,11 +197,7 @@ export default function TransactionsPage() {
           return acc;
         }, {});
 
-        const merchantTransactionAmounts = transactionsData.transactions.reduce((acc: Record<string, number>, transaction: Transaction) => {
-          const merchantKey = transaction.merchant_name || transaction.name;
-          acc[merchantKey] = (acc[merchantKey] || 0) + Math.abs(transaction.amount); // Use absolute value so income shows as positive
-          return acc;
-        }, {});
+
 
         // Enhance transactions with cached analytics and proper time calculations
         const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => {
@@ -246,7 +242,7 @@ export default function TransactionsPage() {
         setTransactions(enhancedTransactions);
         
         // DEBUG: Check merchant lookup success rate
-        const lookupSuccesses = enhancedTransactions.filter(t => {
+        const lookupSuccesses = enhancedTransactions.filter((t: TransactionWithAnalytics) => {
           const rawKey = t.merchant_name || t.name;
           const normalizedKey = normalizeTransactionMerchantName(rawKey);
           return merchantLookup[normalizedKey]?.merchant_name;
@@ -259,7 +255,7 @@ export default function TransactionsPage() {
         console.log('Success rate:', ((lookupSuccesses / enhancedTransactions.length) * 100).toFixed(1) + '%');
         
         // Show examples of successful vs failed lookups
-        const exampleSuccess = enhancedTransactions.find(t => {
+        const exampleSuccess = enhancedTransactions.find((t: TransactionWithAnalytics) => {
           const normalizedKey = normalizeTransactionMerchantName(t.merchant_name || t.name);
           return merchantLookup[normalizedKey]?.total_spending > 0;
         });

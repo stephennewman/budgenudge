@@ -63,7 +63,13 @@ export default function SmsButton({
     setStatus('');
 
     try {
-      const payload: any = {
+      const payload: {
+        message?: string;
+        phoneNumber?: string;
+        scheduledTime?: string;
+        userId?: string;
+        userTimezone?: string;
+      } = {
         message: message,
         phoneNumber: phoneNumber,
       };
@@ -95,7 +101,6 @@ export default function SmsButton({
       if (result.success) {
         if (isScheduled && scheduledTime) {
           const scheduledDate = new Date(scheduledTime);
-          const timezoneName = getUserTimezone();
           const tzAbbr = scheduledDate.toLocaleString('en-US', { timeZoneName: 'short' }).split(' ').pop();
           setStatus(`📅 SMS scheduled for ${scheduledDate.toLocaleString()} ${tzAbbr}`);
           setScheduledTime(''); // Reset the time picker
