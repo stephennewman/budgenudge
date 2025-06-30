@@ -17,12 +17,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-// Complete Transaction interface based on database schema
+// Transaction interface - using flexible approach to handle API response
 interface Transaction {
-  id: number;
-  plaid_transaction_id: string;
-  plaid_item_id: string;
-  account_id: string;
+  id: string | number;
+  plaid_transaction_id?: string;
+  plaid_item_id?: string;
+  account_id?: string;
   amount: number;
   date: string;
   name: string;
@@ -32,12 +32,13 @@ interface Transaction {
   transaction_type?: string;
   pending: boolean;
   account_owner?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // Extended interface with calculated analytics
 interface TransactionWithAnalytics extends Transaction {
+  id: string | number;
   totalTransactionsAllTime: number;
   avgTransactionsMonthly: number;
   avgTransactionsWeekly: number;
@@ -57,6 +58,10 @@ export default function TransactionsPage() {
 
   // Calculate analytics for each transaction
   const calculateAnalytics = (transactions: Transaction[]): TransactionWithAnalytics[] => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    
     const totalTransactions = transactions.length;
     
     // Calculate date range
@@ -83,6 +88,7 @@ export default function TransactionsPage() {
 
     return transactions.map(transaction => ({
       ...transaction,
+      id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(), // Ensure ID exists
       totalTransactionsAllTime: totalTransactions,
       avgTransactionsMonthly: Math.round(avgTransactionsMonthly * 100) / 100,
       avgTransactionsWeekly: Math.round(avgTransactionsWeekly * 100) / 100,
@@ -108,8 +114,11 @@ export default function TransactionsPage() {
       const data = await response.json();
       
       if (response.ok && data.transactions) {
+        console.log('Raw transaction data:', data.transactions[0]); // Debug log
         const analyticsData = calculateAnalytics(data.transactions);
         setTransactions(analyticsData);
+      } else {
+        console.error('API Response:', data);
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -201,11 +210,14 @@ export default function TransactionsPage() {
     {
       accessorKey: 'plaid_transaction_id',
       header: 'Transaction ID',
-      cell: ({ getValue }: { getValue: () => string }) => (
-        <code className="text-xs bg-gray-100 px-1 rounded max-w-[100px] truncate block">
-          {getValue()}
-        </code>
-      ),
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const value = getValue();
+        return value ? (
+          <code className="text-xs bg-gray-100 px-1 rounded max-w-[100px] truncate block">
+            {value}
+          </code>
+        ) : '-';
+      },
     },
   ], []);
 
@@ -321,8 +333,11 @@ export default function TransactionsPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={columns.length} className="h-24 text-center">
-                        No transactions found.
+                      <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                        {transactions.length === 0 ? 
+                          "No transactions found. Connect your bank account to see data!" : 
+                          "No transactions match your search criteria."
+                        }
                       </td>
                     </tr>
                   )}
