@@ -14,13 +14,6 @@ interface RecurringTransaction {
   avg_monthly_spending: number;
   recurring_reason?: string;
   is_recurring: boolean;
-  first_transaction_date: string;
-  last_transaction_date: string;
-}
-
-interface RecurringTransactionWithNextDate extends RecurringTransaction {
-  next_predicted_date: Date;
-  days_until_next: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -39,13 +32,14 @@ export async function POST(request: NextRequest) {
     
     console.log('🔄 Fetching recurring transactions for user:', userId);
     
-    // Fetch recurring merchants from the database with date information
+    // Fetch recurring merchants from the database
     const { data: recurringMerchants, error: dbError } = await supabase
       .from('merchant_analytics')
-      .select('merchant_name, total_transactions, total_spending, avg_monthly_spending, recurring_reason, is_recurring, first_transaction_date, last_transaction_date')
+      .select('*')
       .eq('user_id', userId)
       .eq('is_recurring', true)
-      .limit(20); // Get more to sort by date, then take top 12
+      .order('avg_monthly_spending', { ascending: false })
+      .limit(15); // Limit to top 15 to keep SMS readable
 
     if (dbError) {
       console.error('Database error:', dbError);
@@ -102,42 +96,15 @@ Generated: ${new Date().toLocaleString('en-US', {
       });
     }
 
-    // Calculate predicted next payment dates
-    const today = new Date();
-    const recurringWithDates: RecurringTransactionWithNextDate[] = recurringMerchants
-      .filter(merchant => merchant.first_transaction_date && merchant.last_transaction_date)
-      .map((merchant: RecurringTransaction) => {
-        const firstDate = new Date(merchant.first_transaction_date);
-        const lastDate = new Date(merchant.last_transaction_date);
-        
-        // Calculate average interval between transactions
-        const daysBetween = Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24));
-        const avgInterval = merchant.total_transactions > 1 
-          ? Math.max(7, daysBetween / (merchant.total_transactions - 1)) // Minimum 7 days
-          : 30; // Default to monthly if only one transaction
-        
-        // Predict next payment date
-        const nextDate = new Date(lastDate.getTime() + (avgInterval * 24 * 60 * 60 * 1000));
-        const daysUntil = Math.ceil((nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        
-        return {
-          ...merchant,
-          next_predicted_date: nextDate,
-          days_until_next: daysUntil
-        };
-      })
-      .sort((a, b) => a.days_until_next - b.days_until_next); // Sort by soonest first
-
     // Format recurring transactions for SMS
     let smsMessage = `📊 BudgeNudge Recurring Bills
-(Sorted by next payment due)
 
 `;
     
     let totalMonthlyRecurring = 0;
     const messageLines: string[] = [];
     
-    recurringWithDates.slice(0, 12).forEach((merchant: RecurringTransactionWithNextDate, index: number) => {
+    recurringMerchants.forEach((merchant: RecurringTransaction, index: number) => {
       const monthlyAmount = merchant.avg_monthly_spending || 0;
       totalMonthlyRecurring += monthlyAmount;
       
@@ -147,25 +114,8 @@ Generated: ${new Date().toLocaleString('en-US', {
         merchantName = merchantName.substring(0, 15) + '...';
       }
       
-      // Format next payment date
-      let dateStr = '';
-      if (merchant.days_until_next <= 0) {
-        dateStr = 'DUE NOW! 🚨';
-      } else if (merchant.days_until_next === 1) {
-        dateStr = 'Tomorrow';
-      } else if (merchant.days_until_next <= 7) {
-        dateStr = `${merchant.days_until_next}d`;
-      } else {
-        const nextDate = merchant.next_predicted_date;
-        dateStr = nextDate.toLocaleDateString('en-US', { 
-          timeZone: 'America/New_York',
-          month: 'short', 
-          day: 'numeric' 
-        });
-      }
-      
       messageLines.push(`${index + 1}. ${merchantName}
-   $${monthlyAmount.toFixed(0)}/mo • ${dateStr}`);
+   $${monthlyAmount.toFixed(0)}/mo • ${merchant.total_transactions} transactions`);
     });
     
     smsMessage += messageLines.join('\n\n');
@@ -175,10 +125,10 @@ Generated: ${new Date().toLocaleString('en-US', {
 
 💰 TOTAL RECURRING: $${totalMonthlyRecurring.toFixed(0)}/month`;
     
-    if (recurringWithDates.length > 12) {
+    if (recurringMerchants.length > 12) {
       smsMessage += `
 
-📝 Showing 12 of ${recurringWithDates.length} recurring bills`;
+📝 Showing 12 of ${recurringMerchants.length} recurring bills`;
     }
     
     // Add generation timestamp
@@ -194,10 +144,9 @@ Generated: ${new Date().toLocaleString('en-US', {
     })} EST`;
     
     console.log('📱 Sending recurring transactions SMS:', {
-      merchantCount: recurringWithDates.length,
+      merchantCount: recurringMerchants.length,
       totalMonthly: totalMonthlyRecurring.toFixed(2),
-      messageLength: smsMessage.length,
-      soonestPayment: recurringWithDates[0]?.days_until_next
+      messageLength: smsMessage.length
     });
     
     // Send SMS via Resend API
@@ -231,10 +180,9 @@ Generated: ${new Date().toLocaleString('en-US', {
     return NextResponse.json({ 
       success: true, 
       message: 'Recurring transactions SMS sent successfully',
-      recurringCount: recurringWithDates.length,
+      recurringCount: recurringMerchants.length,
       totalMonthly: totalMonthlyRecurring.toFixed(2),
-      smsId: smsResult.id,
-      soonestDays: recurringWithDates[0]?.days_until_next
+      smsId: smsResult.id
     });
     
   } catch (error) {
