@@ -122,18 +122,27 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         if (response.data.transactions.length > 0) {
           console.log(`📱 NEW TRANSACTIONS FOUND: Sending SMS for ${response.data.transactions.length} transactions`);
           try {
-            // Get all historical transactions for analysis
-            const { data: allTransactions } = await supabase
-              .from('transactions')
-              .select('*')
-              .order('date', { ascending: false });
-
-            // Get user ID from item
+            // Get user ID from item first
             const { data: itemData } = await supabase
               .from('items')
               .select('user_id')
               .eq('plaid_item_id', item_id)
               .single();
+            
+            // Get all user's items for filtering
+            const { data: userItems } = await supabase
+              .from('items')
+              .select('plaid_item_id')
+              .eq('user_id', itemData?.user_id);
+              
+            const userItemIds = userItems?.map(item => item.plaid_item_id) || [];
+            
+            // Get ONLY this user's transactions for analysis
+            const { data: allTransactions } = await supabase
+              .from('transactions')
+              .select('*')
+              .in('plaid_item_id', userItemIds)
+              .order('date', { ascending: false });
             
             const message = await buildAdvancedSMSMessage(allTransactions || [], itemData?.user_id);
             

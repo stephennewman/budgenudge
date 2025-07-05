@@ -24,6 +24,7 @@ export const signInAction = async (formData: FormData) => {
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const phone = formData.get("phone") as string;
   const client = await createSupabaseClient();
 
   const url = process.env.VERCEL_URL
@@ -35,6 +36,9 @@ export const signUpAction = async (formData: FormData) => {
     password,
     options: {
       emailRedirectTo: url,
+      data: {
+        phone: phone,
+      },
     },
   });
 
