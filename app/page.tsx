@@ -39,7 +39,7 @@ export default function Home() {
             </div>
             <div className="flex items-start gap-2">
               <span className="text-red-500 mt-1">📅</span>
-              <span><strong>Bills hit unexpectedly</strong> because there's no early warning system</span>
+              <span><strong>Bills hit unexpectedly</strong> because there&apos;s no early warning system</span>
             </div>
           </div>
         </div>
@@ -59,7 +59,7 @@ export default function Home() {
             <div className="text-4xl mb-4">🔮</div>
             <h3 className="font-semibold mb-3 text-lg">Predicted Transactions</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              See your upcoming bills and recurring expenses before they hit. Our AI analyzes your spending patterns to predict what's coming next, so you're never caught off guard.
+              See your upcoming bills and recurring expenses before they hit. Our AI analyzes your spending patterns to predict what&apos;s coming next, so you&apos;re never caught off guard.
             </p>
           </div>
           
@@ -67,7 +67,7 @@ export default function Home() {
             <div className="text-4xl mb-4">📊</div>
             <h3 className="font-semibold mb-3 text-lg">Merchant Pacing</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Track your spending velocity with your top 3 merchants. Know if you're on pace to overspend at Amazon, grocery stores, or coffee shops before you blow your budget.
+              Track your spending velocity with your top 3 merchants. Know if you&apos;re on pace to overspend at Amazon, grocery stores, or coffee shops before you blow your budget.
             </p>
           </div>
           
@@ -245,7 +245,7 @@ export default function Home() {
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl p-8">
           <h2 className="text-3xl font-bold mb-4">Ready to Break the Paycheck-to-Paycheck Cycle?</h2>
           <p className="text-lg mb-6 opacity-90">
-            Join the users who've transformed their financial awareness with intelligent budget analysis and predictive insights. No more financial surprises.
+            Join the users who&apos;ve transformed their financial awareness with intelligent budget analysis and predictive insights. No more financial surprises.
           </p>
           <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-4">
             <Link href="/sign-up">Get Started - $20 One-Time</Link>
