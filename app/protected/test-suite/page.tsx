@@ -40,14 +40,14 @@ export default function TestSuitePage() {
           <div>
             <h4 className="font-medium text-blue-800 mb-1">4. User Data Isolation Test</h4>
             <p className="text-blue-700">
-              • Check calendar page → Should only show YOUR transactions, not other users'
+              • Check calendar page → Should only show YOUR transactions, not other users&apos;
             </p>
           </div>
           
           <div>
             <h4 className="font-medium text-blue-800 mb-1">5. SMS System Test</h4>
             <p className="text-blue-700">
-              • Use "Test SMS" button → Should send to YOUR phone number, not hardcoded 617-347-2721
+              • Use &quot;Test SMS&quot; button → Should send to YOUR phone number, not hardcoded 617-347-2721
             </p>
           </div>
           

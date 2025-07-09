@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createSupabaseClient } from '@/utils/supabase/server';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
-import { detectCarrierGateway } from '@/utils/sms/carrier-detection';
+import { formatPhoneForSms } from '@/utils/sms/carrier-detection';
 
 interface TestResult {
   name: string;
@@ -39,8 +39,8 @@ async function runTest(name: string, testFn: () => Promise<void>): Promise<TestR
   }
 }
 
-export async function POST(request: Request) {
-  const supabase = await createClient();
+export async function POST() {
+  const supabase = await createSupabaseClient();
   const results: TestResult[] = [];
   const startTime = Date.now();
 
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
   // Test 1: Database Connection
   results.push(await runTest('Database Connection', async () => {
-    const { data, error } = await supabase.from('accounts').select('count').limit(1);
+    const { error } = await supabase.from('accounts').select('count').limit(1);
     if (error) throw new Error(`Database connection failed: ${error.message}`);
   }));
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     ];
 
     for (const test of tests) {
-      const gateway = detectCarrierGateway(test.phone);
+      const gateway = formatPhoneForSms(test.phone);
       if (!gateway.includes('@')) {
         throw new Error(`Invalid gateway format: ${gateway}`);
       }
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
 
   // Test 6: Database Schema Validation
   results.push(await runTest('Database Schema - Accounts Table', async () => {
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('accounts')
       .select('current_balance, available_balance, iso_currency_code, balance_last_updated')
       .limit(1);
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
     // Test that queries properly filter by user
     const { data: user } = await supabase.auth.getUser();
     if (user.user) {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('transactions')
         .select('user_id')
         .eq('user_id', user.user.id)
