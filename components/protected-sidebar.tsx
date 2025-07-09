@@ -42,6 +42,10 @@ export default async function ProtectedSidebar() {
           href: "/paid-content",
           disabled: data != null && !data.hasAccess,
         },
+        {
+          label: "🧪 Test Suite",
+          href: "/test-suite",
+        },
       ]}
     />
   );
