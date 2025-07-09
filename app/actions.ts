@@ -28,8 +28,8 @@ export const signUpAction = async (formData: FormData) => {
   const client = await createSupabaseClient();
 
   const url = process.env.VERCEL_URL
-    ? `${process.env.VERCEL_URL}/protected`
-    : "http://localhost:3000/protected";
+    ? `${process.env.VERCEL_URL}/auth/callback`
+    : "http://localhost:3000/auth/callback";
 
   const { error } = await client.auth.signUp({
     email,
@@ -46,7 +46,7 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-up", error.message);
   }
 
-  return redirect("/protected");
+  return redirect("/check-email");
 };
 
 export const signOutAction = async () => {

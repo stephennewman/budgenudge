@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -11,8 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     const { message, phoneNumber, scheduledTime, userId, userTimezone } = await request.json();
     
-    // Default phone number (the one already configured)
-    const targetPhoneNumber = phoneNumber || '6173472721@tmomail.net';
+    // Get user's SMS gateway (with fallback to default)
+    const targetPhoneNumber = phoneNumber || await getSmsGatewayWithFallback(userId);
     
     // Default message if none provided
     const smsMessage = message || `🔔 Manual BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;

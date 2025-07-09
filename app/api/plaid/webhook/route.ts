@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/utils/plaid/client';
 import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/server';
 import { createClient } from '@supabase/supabase-js';
+import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -146,6 +147,10 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
             
             const message = await buildAdvancedSMSMessage(allTransactions || [], itemData?.user_id);
             
+            // Get user's SMS gateway (with fallback to default)
+            const smsGateway = await getSmsGatewayWithFallback(itemData?.user_id);
+            console.log(`📱 Sending SMS to: ${smsGateway}`);
+            
             const smsResponse = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
@@ -154,7 +159,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
               },
               body: JSON.stringify({
                 from: 'BudgeNudge <noreply@krezzo.com>',
-                to: ['6173472721@tmomail.net'],
+                to: [smsGateway],
                 subject: 'BudgeNudge Alert!',
                 text: message
               }),

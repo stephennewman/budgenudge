@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server';
+import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    // Try to get userId from request body, if provided
+    let userId: string | undefined;
+    try {
+      const body = await request.json();
+      userId = body.userId;
+    } catch {
+      // No body or invalid JSON - use fallback
+    }
+
     const testMessage = `🧪 BudgeNudge Test SMS
     
 ✅ Webhook system operational
@@ -17,6 +27,10 @@ export async function POST() {
 
 If you're reading this, everything is working! 🎯`;
 
+    // Get user's SMS gateway (with fallback to default)
+    const smsGateway = await getSmsGatewayWithFallback(userId);
+    console.log(`📱 Test SMS sending to: ${smsGateway}`);
+
     const smsResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -25,7 +39,7 @@ If you're reading this, everything is working! 🎯`;
       },
       body: JSON.stringify({
         from: 'BudgeNudge <noreply@krezzo.com>',
-        to: ['6173472721@tmomail.net'],
+        to: [smsGateway],
         subject: 'BudgeNudge Test',
         text: testMessage,
       }),

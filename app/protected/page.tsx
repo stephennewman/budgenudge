@@ -17,6 +17,54 @@ export default async function ProtectedPage() {
     );
   }
 
+  // Check if user has connected a Plaid account
+  const { data: items } = await client
+    .from('items')
+    .select('*')
+    .eq('user_id', user.id);
+
+  const hasConnectedAccount = !!(items && items.length > 0);
+
+  // If no connected account, show onboarding flow
+  if (!hasConnectedAccount) {
+    return (
+      <div className="space-y-8">
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-medium">Welcome to BudgeNudge!</h1>
+          <p className="text-muted-foreground mt-2">
+            Connect your bank account to start receiving real-time transaction alerts
+          </p>
+        </div>
+
+        <div className="border rounded-lg p-8 text-center space-y-6">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100">
+            <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
+          
+          <div>
+            <h2 className="text-xl font-medium mb-2">Connect Your Bank Account</h2>
+            <p className="text-muted-foreground mb-6">
+              Securely link your bank account to get instant SMS notifications for every transaction. 
+              We use Plaid&apos;s bank-grade security to protect your information.
+            </p>
+          </div>
+
+          <TransactionDashboard />
+
+          <div className="pt-4 border-t">
+            <p className="text-xs text-muted-foreground mb-4">
+              Your account is authenticated, but you need to connect a bank account to access BudgeNudge features.
+            </p>
+            <AuthPageSignOutButton />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full dashboard for connected users
   return (
     <div className="space-y-8">
       <div className="flex flex-col">

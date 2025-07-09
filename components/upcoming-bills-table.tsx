@@ -106,16 +106,20 @@ export default function UpcomingBillsTable() {
 
   async function loadPredictions() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
 
-      const { data: transactions } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false });
-
-      if (transactions) {
-        const billPredictions = findUpcomingBills(transactions);
+      // Use the transactions API route which properly filters by user
+      const response = await fetch('/api/plaid/transactions', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.transactions) {
+        const billPredictions = findUpcomingBills(data.transactions);
         setPredictions(billPredictions);
       }
     } catch (error) {
