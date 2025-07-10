@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { storeTransactions } from '@/utils/plaid/server';
 import { createClient } from '@supabase/supabase-js';
-import { PlaidApi, Configuration, PlaidEnvironments } from 'plaid';
+import { plaidClient } from '@/utils/plaid/client';
 
 // Manual refresh endpoint - replicates webhook functionality
 export async function POST(request: Request) {
@@ -14,22 +14,10 @@ export async function POST(request: Request) {
 
     const token = authHeader.replace('Bearer ', '');
     
-    // Initialize clients
+    // Initialize Supabase client
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
-    const plaidClient = new PlaidApi(
-      new Configuration({
-        basePath: PlaidEnvironments.sandbox,
-        baseOptions: {
-          headers: {
-            'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
-            'PLAID-SECRET': process.env.PLAID_SECRET,
-          },
-        },
-      })
     );
     
     // Get authenticated user with token
