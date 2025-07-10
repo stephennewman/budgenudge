@@ -62,10 +62,10 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
     case 'DEFAULT_UPDATE':
       console.log(`🔄 Processing ${webhook_code} for item ${item_id}`);
       
-      // Get access token for this item
+      // Get access token for this item and verify it exists
       const { data: item } = await supabase
         .from('items')
-        .select('plaid_access_token')
+        .select('plaid_access_token, plaid_item_id')
         .eq('plaid_item_id', item_id)
         .single();
 
@@ -82,8 +82,8 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
           end_date: new Date().toISOString().split('T')[0],
         });
 
-        // Store transactions in database
-        await storeTransactions(response.data.transactions, item_id);
+        // Store transactions in database using the verified database plaid_item_id
+        await storeTransactions(response.data.transactions, item.plaid_item_id);
         
         // Update account balances
         try {

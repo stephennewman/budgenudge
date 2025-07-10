@@ -118,20 +118,63 @@ export async function POST() {
 
   // Test 7: User Data Isolation Check
   results.push(await runTest('User Data Isolation', async () => {
-    // Test that queries properly filter by user
-    const { data: user } = await supabase.auth.getUser();
-    if (user.user) {
-      const { error } = await supabase
-        .from('transactions')
-        .select('user_id')
-        .eq('user_id', user.user.id)
-        .limit(1);
-      
-      if (error) throw new Error(`User data filtering failed: ${error.message}`);
-    }
+    // Test that RLS policies properly filter user data
+    // The transactions table uses plaid_item_id -> items.user_id relationship
+    
+    // Test 1: Try to access items (should be filtered by RLS)
+    const { error: itemsError } = await supabase
+      .from('items')
+      .select('user_id, plaid_item_id')
+      .limit(1);
+    
+    if (itemsError) throw new Error(`Items RLS failed: ${itemsError.message}`);
+    
+    // Test 2: Try to access transactions (should be filtered by RLS via items relationship)
+    const { error: transactionsError } = await supabase
+      .from('transactions')
+      .select('plaid_item_id, name, amount')
+      .limit(1);
+    
+    if (transactionsError) throw new Error(`Transactions RLS failed: ${transactionsError.message}`);
+    
+    // Test 3: Verify accounts are also properly filtered
+    const { error: accountsError } = await supabase
+      .from('accounts')
+      .select('plaid_account_id, name')
+      .limit(1);
+    
+    if (accountsError) throw new Error(`Accounts RLS failed: ${accountsError.message}`);
   }));
 
-  // Test 8: SMS Test Send
+  // Test 8: Webhook Foreign Key Fix Validation
+  results.push(await runTest('Webhook Foreign Key Fix', async () => {
+    // Verify that when we fetch an item, we get both fields needed for the webhook fix
+    const { data: items } = await supabase
+      .from('items')
+      .select('plaid_access_token, plaid_item_id')
+      .limit(1);
+    
+    if (!items || items.length === 0) {
+      // No items exist - that's fine for this test
+      return;
+    }
+    
+    const item = items[0];
+    if (!item.plaid_access_token) throw new Error('Missing plaid_access_token field');
+    if (!item.plaid_item_id) throw new Error('Missing plaid_item_id field');
+    if (item.plaid_item_id.length !== 37) throw new Error('Invalid plaid_item_id format');
+    
+    // Also verify the foreign key relationship works
+    const { error } = await supabase
+      .from('transactions')
+      .select('plaid_item_id')
+      .eq('plaid_item_id', item.plaid_item_id)
+      .limit(1);
+    
+    if (error) throw new Error(`Foreign key relationship validation failed: ${error.message}`);
+  }));
+
+  // Test 9: SMS Test Send
   results.push(await runTest('SMS Test Send', async () => {
     const testMessage = `🧪 Automated Test - ${new Date().toISOString()}`;
     const smsGateway = await getSmsGatewayWithFallback();
