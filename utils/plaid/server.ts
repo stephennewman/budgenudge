@@ -58,30 +58,45 @@ export async function storeTransactions(transactions: any[], itemId: string) {
     account_owner: tx.account_owner,
   }));
 
-  // Batch transactions to prevent database timeouts
-  const BATCH_SIZE = 100;
+  // Very conservative batching with delays to prevent database timeouts
+  const BATCH_SIZE = 5;
+  const BATCH_DELAY_MS = 100; // Small delay between batches
   const allResults = [];
   
-  console.log(`💾 Storing ${formattedTransactions.length} transactions in batches of ${BATCH_SIZE}`);
+  console.log(`💾 Storing ${formattedTransactions.length} transactions in micro-batches of ${BATCH_SIZE} with ${BATCH_DELAY_MS}ms delays`);
   
   for (let i = 0; i < formattedTransactions.length; i += BATCH_SIZE) {
     const batch = formattedTransactions.slice(i, i + BATCH_SIZE);
     console.log(`💾 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(formattedTransactions.length/BATCH_SIZE)}: ${batch.length} transactions`);
     
-    const { data, error } = await supabase
-      .from('transactions')
-      .upsert(batch, { 
-        onConflict: 'plaid_transaction_id' 
-      })
-      .select();
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .upsert(batch, { 
+          onConflict: 'plaid_transaction_id' 
+        })
+        .select();
 
-    if (error) {
-      console.error(`❌ Error in batch ${Math.floor(i/BATCH_SIZE) + 1}:`, error);
-      throw error;
+      if (error) {
+        console.error(`❌ Database Error in batch ${Math.floor(i/BATCH_SIZE) + 1}:`, error);
+        console.error(`❌ Error code: ${error.code}, Message: ${error.message}`);
+        console.error(`❌ Error details:`, error.details);
+        console.error(`❌ Sample transaction from failed batch:`, JSON.stringify(batch[0], null, 2));
+        throw error;
+      }
+      
+      if (data) {
+        allResults.push(...data);
+      }
+    } catch (batchError) {
+      console.error(`❌ Unexpected error in batch ${Math.floor(i/BATCH_SIZE) + 1}:`, batchError);
+      console.error(`❌ Batch size: ${batch.length}, Sample transaction:`, JSON.stringify(batch[0], null, 2));
+      throw batchError;
     }
     
-    if (data) {
-      allResults.push(...data);
+    // Add delay between batches to reduce database load
+    if (i + BATCH_SIZE < formattedTransactions.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
   
