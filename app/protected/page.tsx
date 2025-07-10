@@ -108,9 +108,7 @@ export default async function ProtectedPage() {
             Manually refresh your transaction data to get the latest updates from your bank.
           </p>
           
-          <ManualRefreshButton 
-            variant="outline"
-          />
+          <ManualRefreshButton />
         </div>
       </div>
 

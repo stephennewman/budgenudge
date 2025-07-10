@@ -503,9 +503,7 @@ export default function TransactionsPage() {
               {transactions.length} total transactions loaded
             </div>
             <ManualRefreshButton 
-              onRefreshComplete={() => fetchData()}
-              variant="outline"
-              size="sm"
+              onRefresh={() => fetchData()}
             />
           </div>
         </div>
