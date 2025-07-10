@@ -76,6 +76,20 @@ Complete PostgreSQL schema with 5 core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 10, 2025 - RECURRING BILLS PAST DATES ISSUE RESOLVED 📅 FIXED
+- **4:30 PM EDT**: Identified and fixed why newly starred merchants (like T-Mobile) weren't appearing on recurring bills page
+- **Problem Investigation**: Created debug endpoint `/api/debug-merchant` to analyze T-Mobile starring issue
+- **Root Cause Discovery**: T-Mobile WAS already properly starred and active, but had past prediction date (2025-05-09)
+- **Filtering Logic Issue**: Recurring bills page filters out merchants with `next_predicted_date < now`, hiding past dates
+- **Debug Results**: T-Mobile had 7 transactions, 100% confidence, monthly frequency, but old prediction date
+- **Solution Implemented**:
+  - Created `/api/fix-past-dates` endpoint to update all merchants with past prediction dates
+  - Automatically calculates new future dates based on frequency (weekly/monthly/quarterly)
+  - Updates all affected merchants to make them visible again
+- **Fix Ready**: Visit `/api/fix-past-dates` (POST) to update all past-dated merchants and restore visibility
+- **Git Commits**: 3a10030 (debug endpoint), 769ee66 (fix endpoint) - 3 files, 164 insertions
+- **Status**: ✅ SOLUTION DEPLOYED - Ready to fix T-Mobile and other merchants with past dates
+
 ### 🗓️ July 10, 2025 - STAR COLUMN ADDED TO ANALYTICS TRANSACTIONS TABLE ⭐ DEPLOYED
 - **4:00 PM EDT**: Star column successfully added to analytics transactions page at `/protected/transactions`
 - **Problem Identified**: User couldn't see star column - was only in TransactionDashboard component, not the analytics page

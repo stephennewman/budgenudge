@@ -12,37 +12,35 @@ export async function POST() {
     }
 
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // Find all tagged merchants with past prediction dates
-    const { data: pastMerchants, error: fetchError } = await supabase
+    // Get all active tagged merchants
+    const { data: merchants, error: fetchError } = await supabase
       .from('tagged_merchants')
       .select('*')
       .eq('user_id', user.id)
-      .eq('is_active', true)
-      .lt('next_predicted_date', now.toISOString().split('T')[0]);
+      .eq('is_active', true);
 
     if (fetchError) {
-      console.error('Error fetching past merchants:', fetchError);
+      console.error('Error fetching merchants:', fetchError);
       return NextResponse.json({ error: 'Failed to fetch merchants' }, { status: 500 });
     }
 
-    if (!pastMerchants || pastMerchants.length === 0) {
+    if (!merchants || merchants.length === 0) {
       return NextResponse.json({ 
         success: true, 
-        message: 'No merchants with past dates found',
+        message: 'No active merchants found',
         updated_count: 0
       });
     }
 
     const updates = [];
 
-    // Update each merchant's next predicted date based on their frequency and LAST TRANSACTION DATE
-    for (const merchant of pastMerchants) {
+    // Update each merchant's prediction based on their most recent transaction
+    for (const merchant of merchants) {
       // Find the most recent transaction for this merchant
       const { data: recentTransactions } = await supabase
         .from('transactions')
-        .select('date')
+        .select('date, amount')
         .or(`merchant_name.ilike.%${merchant.merchant_name}%,name.ilike.%${merchant.merchant_name}%`)
         .order('date', { ascending: false })
         .limit(1);
@@ -53,6 +51,9 @@ export async function POST() {
       }
 
       const lastTransactionDate = new Date(recentTransactions[0].date);
+      const lastAmount = Math.abs(recentTransactions[0].amount);
+      
+      // Calculate the next predicted date based on last transaction + frequency
       let nextDate: Date;
       
       switch (merchant.prediction_frequency) {
@@ -86,11 +87,13 @@ export async function POST() {
         }
       }
 
+      // Update the merchant with new prediction and last transaction info
       const { error: updateError } = await supabase
         .from('tagged_merchants')
         .update({
-          next_predicted_date: nextDate.toISOString().split('T')[0],
           last_transaction_date: lastTransactionDate.toISOString().split('T')[0],
+          next_predicted_date: nextDate.toISOString().split('T')[0],
+          expected_amount: lastAmount, // Update expected amount based on most recent transaction
           updated_at: new Date().toISOString()
         })
         .eq('id', merchant.id);
@@ -100,23 +103,29 @@ export async function POST() {
       } else {
         updates.push({
           merchant_name: merchant.merchant_name,
-          old_date: merchant.next_predicted_date,
-          new_date: nextDate.toISOString().split('T')[0],
+          old_next_date: merchant.next_predicted_date,
+          new_next_date: nextDate.toISOString().split('T')[0],
           last_transaction_date: lastTransactionDate.toISOString().split('T')[0],
-          frequency: merchant.prediction_frequency
+          frequency: merchant.prediction_frequency,
+          expected_amount: lastAmount,
+          days_until_next: Math.ceil((nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
         });
       }
     }
 
+    // Sort updates by next date (soonest first)
+    updates.sort((a, b) => new Date(a.new_next_date).getTime() - new Date(b.new_next_date).getTime());
+
     return NextResponse.json({
       success: true,
-      message: `Updated ${updates.length} merchants with past prediction dates`,
+      message: `Updated predictions for ${updates.length} merchants based on most recent transactions`,
       updated_count: updates.length,
-      updates: updates
+      updates: updates,
+      summary: updates.map(u => `${u.merchant_name}: ${u.last_transaction_date} + ${u.frequency} = ${u.new_next_date} (${u.days_until_next} days)`).join('\n')
     });
 
   } catch (error) {
-    console.error('Fix past dates error:', error);
+    console.error('Update predictions error:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error' 
