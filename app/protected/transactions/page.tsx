@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import ManualRefreshButton from '@/components/manual-refresh-button';
 
 // Transaction interface - using flexible approach to handle API response
 interface Transaction {
@@ -497,8 +498,15 @@ export default function TransactionsPage() {
               All transactions with merchant analytics showing actual visible counts
             </p>
           </div>
-          <div className="text-sm text-muted-foreground">
-            {transactions.length} total transactions loaded
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-muted-foreground">
+              {transactions.length} total transactions loaded
+            </div>
+            <ManualRefreshButton 
+              onRefreshComplete={() => fetchData()}
+              variant="outline"
+              size="sm"
+            />
           </div>
         </div>
 

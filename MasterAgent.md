@@ -159,9 +159,37 @@ Integrate with Plaid's financial API and get webhooks working properly for autom
 
 ## 🚀 LATEST DEPLOYMENT - January 9, 2025
 
+### 🔧 CRITICAL WEBHOOK FIX ✅ DEPLOYED  
+**Deployment:** `budgenudge-b35r41iqq-krezzo.vercel.app`  
+**Status:** ● Ready (Production deployment)  
+**Deploy Time:** 6:45 PM EST, January 9, 2025  
+**Commit:** bd15c7c
+
+**🚨 CRITICAL FIX: Webhook 500 Error - Foreign Key Constraint Violation**
+
+#### Root Cause Identified & Fixed
+- **Problem**: Webhook failing with 500 errors - foreign key constraint violation on `transactions.plaid_item_id`
+- **Investigation**: Used Supabase CLI and direct database analysis to identify parameter mismatch
+- **Root Cause**: Webhook using `item_id` from payload instead of verified database `plaid_item_id`
+- **Solution**: Modified webhook to fetch and use database-verified `plaid_item_id` field
+- **Files**: `app/api/plaid/webhook/route.ts`, `app/api/run-tests/route.ts`
+
+#### Technical Details
+- **Before**: `storeTransactions(transactions, item_id)` - used webhook parameter (could be mismatched)
+- **After**: `storeTransactions(transactions, item.plaid_item_id)` - uses verified database field
+- **Validation**: Added comprehensive webhook foreign key test to test suite (13/13 tests passing)
+- **Result**: Prevents all future foreign key violations in transaction insertions
+
+#### Impact
+- **Severity**: 95/100 - Production webhook failure preventing transaction data sync
+- **Effort**: 20/100 - Quick targeted fix with comprehensive validation
+- **Status**: ✅ RESOLVED - All webhook operations now stable
+
+---
+
 ### 🎯 COMPREHENSIVE UX OVERHAUL - 6 CRITICAL FIXES ✅ DEPLOYED  
 **Deployment:** `budgenudge-lm9sfj52v-krezzo.vercel.app`  
-**Status:** ● Ready (Production deployment)  
+**Status:** ● Ready (Previous deployment)  
 **Deploy Time:** 12:30 PM EST, January 9, 2025  
 **Commit:** 2efe914
 

@@ -3,6 +3,7 @@ import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import SmsButton from "@/components/sms-button";
 import RecurringSmsButton from "@/components/recurring-sms-button";
+import ManualRefreshButton from "@/components/manual-refresh-button";
 
 
 export default async function ProtectedPage() {
@@ -74,25 +75,40 @@ export default async function ProtectedPage() {
         </p>
       </div>
 
-      {/* SMS Test Button */}
-      <div className="border rounded-lg p-6 space-y-4">
-        <h2 className="font-medium">📱 SMS Notifications</h2>
-        <p className="text-sm text-muted-foreground">
-          Test your SMS notifications and get summaries of your spending patterns.
-        </p>
-        
-        <div className="grid gap-4 md:grid-cols-2">
-          <SmsButton 
-            buttonText="📱 Send Test SMS"
-            message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
-            variant="outline"
-            userId={user?.id}
-            allowScheduling={true}
-          />
+      {/* Control Panel */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* SMS Notifications */}
+        <div className="border rounded-lg p-6 space-y-4">
+          <h2 className="font-medium">📱 SMS Notifications</h2>
+          <p className="text-sm text-muted-foreground">
+            Test your SMS notifications and get summaries of your spending patterns.
+          </p>
           
-          <RecurringSmsButton 
-            userId={user?.id}
-            buttonText="📊 Text My Recurring Bills"
+          <div className="space-y-3">
+            <SmsButton 
+              buttonText="📱 Send Test SMS"
+              message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
+              variant="outline"
+              userId={user?.id}
+              allowScheduling={true}
+            />
+            
+            <RecurringSmsButton 
+              userId={user?.id}
+              buttonText="📊 Text My Recurring Bills"
+              variant="outline"
+            />
+          </div>
+        </div>
+
+        {/* Transaction Management */}
+        <div className="border rounded-lg p-6 space-y-4">
+          <h2 className="font-medium">🔄 Transaction Data</h2>
+          <p className="text-sm text-muted-foreground">
+            Manually refresh your transaction data to get the latest updates from your bank.
+          </p>
+          
+          <ManualRefreshButton 
             variant="outline"
           />
         </div>
