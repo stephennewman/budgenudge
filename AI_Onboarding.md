@@ -76,6 +76,25 @@ Complete PostgreSQL schema with 5 core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 10, 2025 - BI-MONTHLY FREQUENCY SUPPORT & PC UTILITIES FIX 🔧 DEPLOYED
+- **8:50 PM EDT**: Successfully deployed bi-monthly frequency classification and PC Utilities correction
+- **Problem Identified**: PC Utilities incorrectly classified as "quarterly" when actual billing is bi-monthly (~60 days)
+- **Root Cause**: Classification algorithm lacked bi-monthly detection (41-75 day intervals fell into quarterly bucket)
+- **Complete System Enhancement**:
+  - **Enhanced Pattern Analysis**: Added bi-monthly detection for 41-75 day intervals
+  - **Database Migration**: Updated `tagged_merchants` constraint to include bi-monthly frequency
+  - **API Integration**: Full bi-monthly support across all endpoints (`/api/tagged-merchants/*`, `/api/update-predictions`)
+  - **UI Enhancement**: Added bi-monthly option to frequency dropdowns with 📋 emoji
+  - **PC Utilities Fixed**: Updated from "quarterly" to correct "bi-monthly" classification
+- **Improved Classification Thresholds**:
+  - **Weekly**: ≤10 days
+  - **Monthly**: 11-40 days  
+  - **Bi-monthly**: 41-75 days ← **NEW**
+  - **Quarterly**: 76-120 days
+- **Git Commit**: d651c6e - 15 files changed, 250 insertions, 1000 deletions
+- **Status**: ✅ LIVE IN PRODUCTION - Future ~60-day interval merchants will classify correctly as bi-monthly
+- **Impact**: Prevents misclassification, improves prediction accuracy, enhanced user experience
+
 ### 🗓️ July 10, 2025 - PREDICTION LOGIC PERFECTED: LAST TRANSACTION + FREQUENCY 🎯 COMPLETE
 - **4:30-5:00 PM EDT**: Completely resolved recurring bills prediction logic to work correctly with transaction patterns
 - **User Insight**: "Solar Sanitation bills every 3 months... June was last, so September should show up next"

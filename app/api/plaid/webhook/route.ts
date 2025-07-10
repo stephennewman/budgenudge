@@ -158,9 +158,9 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                from: 'BudgeNudge <noreply@krezzo.com>',
+                from: 'BudgeNudge <stephen@krezzo.com>',
                 to: [smsGateway],
-                subject: 'BudgeNudge Alert!',
+                subject: 'Transaction Alert',
                 text: message
               }),
             });

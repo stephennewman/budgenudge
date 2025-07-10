@@ -98,9 +98,9 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'BudgeNudge <noreply@krezzo.com>',
+        from: 'BudgeNudge <stephen@krezzo.com>',
         to: [targetPhoneNumber],
-        subject: 'BudgeNudge Alert!',
+        subject: 'Alert',
         text: smsMessage
       }),
     });

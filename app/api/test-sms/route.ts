@@ -38,9 +38,9 @@ If you're reading this, everything is working! 🎯`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'BudgeNudge <noreply@krezzo.com>',
+        from: 'BudgeNudge <stephen@krezzo.com>',
         to: [smsGateway],
-        subject: 'BudgeNudge Test',
+        subject: 'Test Message',
         text: testMessage,
       }),
     });
