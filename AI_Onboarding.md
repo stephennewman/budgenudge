@@ -76,6 +76,21 @@ Complete PostgreSQL schema with 5 core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 10, 2025 - STAR COLUMN ADDED TO ANALYTICS TRANSACTIONS TABLE ⭐ DEPLOYED
+- **4:00 PM EDT**: Star column successfully added to analytics transactions page at `/protected/transactions`
+- **Problem Identified**: User couldn't see star column - was only in TransactionDashboard component, not the analytics page
+- **Root Cause**: Navigation links to `/protected/transactions` which uses TanStack table analytics, not the simple dashboard with stars
+- **Implementation**:
+  - Added `taggedMerchants` and `starringMerchant` state management to analytics page
+  - Implemented `fetchTaggedMerchants()`, `handleStarMerchant()`, and `handleUnstarMerchant()` functions
+  - Created interactive star column with ⭐/☆ buttons and hover effects
+  - Fixed TypeScript errors and React Hook dependencies with useCallback
+  - Added proper TypeScript interfaces for TanStack table row types
+- **Features**: Click ☆ to analyze and add merchants to recurring bills, ⭐ to remove them
+- **Git Commit**: 059a0e1 - 2 files changed, 147 insertions
+- **Status**: ✅ DEPLOYED TO PRODUCTION - Star column now visible on main transactions table
+- **User Experience**: Full star functionality available in comprehensive analytics transactions table
+
 ### 🗓️ July 10, 2025 - WEBPACK RUNTIME ERROR RESOLUTION ✅ FIXED
 - **3:45 PM EDT**: Critical webpack runtime error resolved - "Cannot read properties of undefined (reading 'call')"
 - **Root Cause**: Next.js build cache corruption causing middleware module resolution failure
