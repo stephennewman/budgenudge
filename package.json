@@ -16,6 +16,7 @@
     "@tailwindcss/postcss": "^4.0.13",
     "@tanstack/react-table": "^8.21.3",
     "@updatedev/js": "^0.4.1",
+    "bandwidth-sdk": "^5.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.5.0",

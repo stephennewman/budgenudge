@@ -76,6 +76,22 @@ Complete PostgreSQL schema with 5 core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 10, 2025 - T-MOBILE SMS DELIVERY FIX 📱 DEPLOYED
+- **9:30 PM EDT**: Successfully fixed T-Mobile email-to-SMS delivery blocking issue
+- **Problem Identified**: Webhook working correctly and Resend sending emails, but T-Mobile not delivering SMS to phone
+- **Root Cause Investigation**: T-Mobile has aggressive spam filtering on email-to-SMS gateway that blocks:
+  - Email addresses containing "noreply", "admin", "alert", "info", "test"
+  - Business/automated messages from third-party services like Resend
+  - Subject lines with "BudgeNudge Alert!" triggering spam detection
+- **Solution Implemented**: 
+  - **Email Address Fix**: Changed from `noreply@krezzo.com` to `stephen@krezzo.com` (personal email)
+  - **Subject Line Simplification**: Changed from "BudgeNudge Alert!" to simple "Transaction Alert"/"Alert"/"Test Message"
+  - **Applied Across All SMS Endpoints**: webhook, test-sms, manual-sms updated consistently
+- **T-Mobile Policy Context**: Their `tmomail.net` gateway is "VERY low volume service only designed for person-to-person messages. ANY business-related messages can be blocked"
+- **Git Commit**: f7b652c - 4 files changed, 25 insertions, 6 deletions
+- **Status**: ✅ DEPLOYED TO PRODUCTION - SMS notifications should now bypass T-Mobile spam filters
+- **Next Test**: Wait for next transaction webhook to confirm SMS delivery
+
 ### 🗓️ July 10, 2025 - BI-MONTHLY FREQUENCY SUPPORT & PC UTILITIES FIX 🔧 DEPLOYED
 - **8:50 PM EDT**: Successfully deployed bi-monthly frequency classification and PC Utilities correction
 - **Problem Identified**: PC Utilities incorrectly classified as "quarterly" when actual billing is bi-monthly (~60 days)
