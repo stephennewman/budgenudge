@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import {
   useReactTable,
@@ -84,6 +84,8 @@ export default function TransactionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
+  const [taggedMerchants, setTaggedMerchants] = useState<Set<string>>(new Set());
+  const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   
   const supabase = createSupabaseClient();
 
@@ -139,6 +141,88 @@ export default function TransactionsPage() {
     
     return normalized;
   }
+
+  // Fetch tagged merchants
+  async function fetchTaggedMerchants() {
+    try {
+      const response = await fetch('/api/tagged-merchants');
+      const data = await response.json();
+      
+      if (data.success && data.taggedMerchants) {
+        const merchantNames = new Set<string>(
+          data.taggedMerchants
+            .filter((m: { is_active: boolean }) => m.is_active)
+            .map((m: { merchant_name: string }) => m.merchant_name.toLowerCase())
+        );
+        setTaggedMerchants(merchantNames);
+      }
+    } catch (error) {
+      console.error('Error fetching tagged merchants:', error);
+    }
+  }
+
+  // Handle starring a merchant
+  const handleStarMerchant = useCallback(async (merchantName: string) => {
+    setStarringMerchant(merchantName);
+    
+    try {
+      const response = await fetch('/api/tagged-merchants/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merchant_name: merchantName })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        await fetchTaggedMerchants();
+      } else {
+        alert('Failed to analyze merchant: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error starring merchant:', error);
+      alert('Error starring merchant');
+    } finally {
+      setStarringMerchant(null);
+    }
+  }, []);
+
+  // Handle unstarring a merchant
+  const handleUnstarMerchant = useCallback(async (merchantName: string) => {
+    if (!confirm(`Remove ${merchantName} from recurring bills?`)) return;
+    
+    setStarringMerchant(merchantName);
+    
+    try {
+      const response = await fetch('/api/tagged-merchants');
+      const data = await response.json();
+      
+      if (data.success) {
+        const merchant = data.taggedMerchants.find((m: { merchant_name: string; id: number }) => 
+          m.merchant_name.toLowerCase() === merchantName.toLowerCase()
+        );
+        
+        if (merchant) {
+          const deleteResponse = await fetch(`/api/tagged-merchants/${merchant.id}`, {
+            method: 'DELETE'
+          });
+          
+          const deleteData = await deleteResponse.json();
+          
+          if (deleteData.success) {
+            await fetchTaggedMerchants();
+          } else {
+            alert('Failed to remove merchant: ' + deleteData.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error unstarring merchant:', error);
+      alert('Error unstarring merchant');
+    } finally {
+      setStarringMerchant(null);
+    }
+  }, []);
 
   // Analytics are now fetched from cached merchant_analytics table for performance
 
@@ -242,6 +326,9 @@ export default function TransactionsPage() {
         
         setTransactions(enhancedTransactions);
         
+        // Fetch tagged merchants
+        await fetchTaggedMerchants();
+        
         // DEBUG: Check merchant lookup success rate
         const lookupSuccesses = enhancedTransactions.filter((t: TransactionWithAnalytics) => {
           const rawKey = t.merchant_name || t.name;
@@ -343,6 +430,33 @@ export default function TransactionsPage() {
 
   // Column definitions
   const columns = useMemo(() => [
+    {
+      id: 'star',
+      header: '⭐',
+      cell: ({ row }: { row: { original: TransactionWithAnalytics } }) => {
+        const transaction = row.original;
+        const merchantName = transaction.merchant_name || transaction.name;
+        const isTagged = taggedMerchants.has(merchantName.toLowerCase());
+        const isStarring = starringMerchant === merchantName;
+        
+        return (
+          <button
+            onClick={() => isTagged ? handleUnstarMerchant(merchantName) : handleStarMerchant(merchantName)}
+            disabled={isStarring}
+            className={`text-lg transition-all duration-200 ${
+              isTagged 
+                ? 'text-yellow-500 hover:text-yellow-600' 
+                : 'text-gray-300 hover:text-yellow-400'
+            } ${isStarring ? 'opacity-50' : ''}`}
+            title={isTagged ? 'Remove from recurring bills' : 'Add to recurring bills'}
+          >
+            {isStarring ? '⏳' : isTagged ? '⭐' : '☆'}
+          </button>
+        );
+      },
+      enableSorting: false,
+      size: 60,
+    },
     {
       accessorKey: 'date',
       header: 'Date',
@@ -456,7 +570,7 @@ export default function TransactionsPage() {
         ) : '-';
       },
     },
-  ], []);
+  ], [taggedMerchants, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
   const table = useReactTable({
     data: transactions,
