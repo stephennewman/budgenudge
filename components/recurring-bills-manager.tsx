@@ -195,7 +195,12 @@ export default function RecurringBillsManager() {
     );
   }
 
-  const activeMerchants = taggedMerchants.filter(m => m.is_active);
+  // Filter and sort active merchants by upcoming date (soonest first, future dates only)
+  const now = new Date();
+  const activeMerchants = taggedMerchants
+    .filter(m => m.is_active && new Date(m.next_predicted_date) > now)
+    .sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
+  
   const inactiveMerchants = taggedMerchants.filter(m => !m.is_active);
 
   return (

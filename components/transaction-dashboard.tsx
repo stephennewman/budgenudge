@@ -9,6 +9,7 @@ import PlaidLinkButton from './plaid-link-button';
 interface Transaction {
   id: string;
   name: string;
+  merchant_name?: string;
   amount: number;
   date: string;
   category: string[];
@@ -26,7 +27,9 @@ export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [taggedMerchants, setTaggedMerchants] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   const supabase = createSupabaseClient();
 
   async function checkConnection() {
@@ -44,11 +47,30 @@ export default function TransactionDashboard() {
       
       if (items && items.length > 0) {
         await fetchTransactions();
+        await fetchTaggedMerchants();
       }
     } catch (error) {
       console.error('Error checking connection:', error);
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function fetchTaggedMerchants() {
+    try {
+      const response = await fetch('/api/tagged-merchants');
+      const data = await response.json();
+      
+      if (data.success && data.taggedMerchants) {
+        const merchantNames = new Set<string>(
+          data.taggedMerchants
+            .filter((m: { is_active: boolean }) => m.is_active)
+            .map((m: { merchant_name: string }) => m.merchant_name.toLowerCase())
+        );
+        setTaggedMerchants(merchantNames);
+      }
+    } catch (error) {
+      console.error('Error fetching tagged merchants:', error);
     }
   }
 
@@ -81,6 +103,71 @@ export default function TransactionDashboard() {
   const handleConnectionSuccess = () => {
     setIsConnected(true);
     fetchTransactions();
+    fetchTaggedMerchants();
+  };
+
+  const handleStarMerchant = async (merchantName: string) => {
+    setStarringMerchant(merchantName);
+    
+    try {
+      const response = await fetch('/api/tagged-merchants/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ merchant_name: merchantName })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Refresh tagged merchants
+        await fetchTaggedMerchants();
+      } else {
+        alert('Failed to analyze merchant: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error starring merchant:', error);
+      alert('Error starring merchant');
+    } finally {
+      setStarringMerchant(null);
+    }
+  };
+
+  const handleUnstarMerchant = async (merchantName: string) => {
+    if (!confirm(`Remove ${merchantName} from recurring bills?`)) return;
+    
+    setStarringMerchant(merchantName);
+    
+    try {
+      // Find the tagged merchant to get its ID
+      const response = await fetch('/api/tagged-merchants');
+      const data = await response.json();
+      
+      if (data.success) {
+        const merchant = data.taggedMerchants.find((m: { merchant_name: string; id: number }) => 
+          m.merchant_name.toLowerCase() === merchantName.toLowerCase()
+        );
+        
+        if (merchant) {
+          const deleteResponse = await fetch(`/api/tagged-merchants/${merchant.id}`, {
+            method: 'DELETE'
+          });
+          
+          const deleteData = await deleteResponse.json();
+          
+          if (deleteData.success) {
+            // Refresh tagged merchants
+            await fetchTaggedMerchants();
+          } else {
+            alert('Failed to remove merchant: ' + deleteData.error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error unstarring merchant:', error);
+      alert('Error unstarring merchant');
+    } finally {
+      setStarringMerchant(null);
+    }
   };
 
   if (isLoading) {
@@ -150,20 +237,46 @@ export default function TransactionDashboard() {
             </div>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {transactions.map((transaction) => (
-                <div key={transaction.id} className="flex justify-between items-center p-3 border rounded">
-                  <div>
-                    <div className="font-medium">{transaction.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {transaction.date} • {transaction.category?.[0]}
-                      {transaction.pending && <span className="ml-2 text-yellow-600">Pending</span>}
+              {transactions.map((transaction) => {
+                const merchantName = transaction.merchant_name || transaction.name;
+                const isTagged = taggedMerchants.has(merchantName.toLowerCase());
+                const isStarring = starringMerchant === merchantName;
+                
+                return (
+                  <div key={transaction.id} className="flex justify-between items-center p-3 border rounded hover:bg-gray-50">
+                    <div className="flex items-center gap-3 flex-1">
+                      {/* Star Column */}
+                      <button
+                        onClick={() => isTagged ? handleUnstarMerchant(merchantName) : handleStarMerchant(merchantName)}
+                        disabled={isStarring}
+                        className={`text-lg transition-all duration-200 ${
+                          isTagged 
+                            ? 'text-yellow-500 hover:text-yellow-600' 
+                            : 'text-gray-300 hover:text-yellow-400'
+                        } ${isStarring ? 'opacity-50' : ''}`}
+                        title={isTagged ? 'Remove from recurring bills' : 'Add to recurring bills'}
+                      >
+                        {isStarring ? '⏳' : isTagged ? '⭐' : '☆'}
+                      </button>
+                      
+                      {/* Transaction Info */}
+                      <div className="flex-1">
+                        <div className="font-medium">{transaction.name}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {transaction.date} • {transaction.category?.[0]}
+                          {transaction.pending && <span className="ml-2 text-yellow-600">Pending</span>}
+                          {isTagged && <span className="ml-2 text-blue-600">🏷️ Tracked</span>}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Amount */}
+                    <div className={`font-medium ${transaction.amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      ${Math.abs(transaction.amount).toFixed(2)}
                     </div>
                   </div>
-                  <div className={`font-medium ${transaction.amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    ${Math.abs(transaction.amount).toFixed(2)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
