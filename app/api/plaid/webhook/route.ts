@@ -254,8 +254,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     }
   }
   
-  // 1. PREDICTED TRANSACTIONS - Next 30 days
-  const upcomingBills = findUpcomingBills(allTransactions);
+  // 1. PREDICTED TRANSACTIONS - Next 30 days (Combine tagged merchants + historical analysis)
+  const upcomingBills = await findUpcomingBillsEnhanced(allTransactions, userId);
   const thirtyDaysFromNow = new Date(now);
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   
@@ -267,7 +267,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
       const date = new Date(bill.predictedDate);
       const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
       const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
-      billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount}\n`;
+      const confidenceIcon = bill.confidence === 'tagged' ? '🏷️' : bill.confidence === 'monthly' ? '🗓️' : '📊';
+      billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount} ${confidenceIcon}\n`;
     });
   
   // 2. MERCHANT SPENDING - Monthly focus (Publix + Amazon)
@@ -375,6 +376,61 @@ interface Bill {
   amount: string;
   predictedDate: Date;
   confidence: string;
+}
+
+async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: string): Promise<Bill[]> {
+  const bills: Bill[] = [];
+  
+  // 1. Get predictions from tagged merchants table (highest priority)
+  if (userId) {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      
+      const { data: taggedMerchants } = await supabase
+        .from('tagged_merchants')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('confidence_score', { ascending: false });
+      
+      if (taggedMerchants) {
+        taggedMerchants.forEach(merchant => {
+          const predictedDate = new Date(merchant.next_predicted_date);
+          
+          // Only include future dates
+          if (predictedDate > new Date()) {
+            bills.push({
+              merchant: merchant.merchant_name,
+              amount: `$${merchant.expected_amount.toFixed(2)}`,
+              predictedDate: predictedDate,
+              confidence: 'tagged' // Highest confidence from user-tagged merchants
+            });
+          }
+        });
+        
+        console.log(`📊 Added ${taggedMerchants.length} predictions from tagged merchants`);
+      }
+    } catch (error) {
+      console.error('Error fetching tagged merchants for predictions:', error);
+    }
+  }
+  
+  // 2. Add predictions from historical transaction analysis
+  const historicalBills = findUpcomingBills(transactions);
+  
+  // Only add historical predictions for merchants not already tagged
+  const taggedMerchantNames = bills.map(b => b.merchant.toLowerCase());
+  historicalBills.forEach(bill => {
+    if (!taggedMerchantNames.includes(bill.merchant.toLowerCase())) {
+      bills.push(bill);
+    }
+  });
+  
+  // Sort by predicted date
+  return bills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
 function findUpcomingBills(transactions: Transaction[]): Bill[] {

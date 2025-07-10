@@ -30,6 +30,10 @@ export default async function ProtectedSidebar() {
           href: "/calendar",
         },
         {
+          label: "🏷️ Recurring Bills",
+          href: "/recurring-bills",
+        },
+        {
           label: "Pricing",
           href: "/pricing",
         },
