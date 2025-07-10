@@ -63,6 +63,9 @@ export async function POST() {
         case 'monthly':
           nextDate = new Date(lastTransactionDate.getFullYear(), lastTransactionDate.getMonth() + 1, lastTransactionDate.getDate());
           break;
+        case 'bi-monthly':
+          nextDate = new Date(lastTransactionDate.getFullYear(), lastTransactionDate.getMonth() + 2, lastTransactionDate.getDate());
+          break;
         case 'quarterly':
           nextDate = new Date(lastTransactionDate.getFullYear(), lastTransactionDate.getMonth() + 3, lastTransactionDate.getDate());
           break;
@@ -78,6 +81,9 @@ export async function POST() {
             break;
           case 'monthly':
             nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, nextDate.getDate());
+            break;
+          case 'bi-monthly':
+            nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 2, nextDate.getDate());
             break;
           case 'quarterly':
             nextDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 3, nextDate.getDate());

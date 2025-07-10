@@ -168,6 +168,7 @@ export default function RecurringBillsManager() {
     switch (frequency) {
       case 'weekly': return '📅';
       case 'monthly': return '🗓️';
+      case 'bi-monthly': return '📋';
       case 'quarterly': return '📆';
       default: return '⏰';
     }
@@ -208,9 +209,9 @@ export default function RecurringBillsManager() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">🏷️ Recurring Bills & Subscriptions</h2>
+          <h2 className="text-2xl font-bold">🏷️ Recurring Bills</h2>
           <p className="text-gray-600 mt-1">
-            {activeMerchants.length} active predictions • Auto-detected from your transaction patterns
+            {activeMerchants.length} active predictions
           </p>
         </div>
         <Button 
@@ -245,6 +246,7 @@ export default function RecurringBillsManager() {
             >
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
+              <option value="bi-monthly">Bi-monthly</option>
               <option value="quarterly">Quarterly</option>
             </select>
             <div className="flex gap-2">
@@ -257,7 +259,6 @@ export default function RecurringBillsManager() {
 
       {/* Active Merchants */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">✅ Active Predictions ({activeMerchants.length})</h3>
         {activeMerchants.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
             No active recurring bills found. Add some above to start tracking predictions!
@@ -284,6 +285,7 @@ export default function RecurringBillsManager() {
                     >
                       <option value="weekly">Weekly</option>
                       <option value="monthly">Monthly</option>
+                      <option value="bi-monthly">Bi-monthly</option>
                       <option value="quarterly">Quarterly</option>
                     </select>
                     <div className="flex gap-1">
@@ -342,7 +344,6 @@ export default function RecurringBillsManager() {
       {/* Inactive Merchants */}
       {inactiveMerchants.length > 0 && (
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">⏸️ Disabled Predictions ({inactiveMerchants.length})</h3>
           <div className="space-y-2">
             {inactiveMerchants.map((merchant) => (
               <div key={merchant.id} className="flex items-center justify-between p-3 bg-gray-100 rounded-lg opacity-60">

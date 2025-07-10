@@ -68,6 +68,9 @@ export async function POST(request: Request) {
       case 'monthly':
         nextPredictedDate = new Date(lastTransaction.getFullYear(), lastTransaction.getMonth() + 1, lastTransaction.getDate());
         break;
+      case 'bi-monthly':
+        nextPredictedDate = new Date(lastTransaction.getFullYear(), lastTransaction.getMonth() + 2, lastTransaction.getDate());
+        break;
       case 'quarterly':
         nextPredictedDate = new Date(lastTransaction.getFullYear(), lastTransaction.getMonth() + 3, lastTransaction.getDate());
         break;
@@ -122,7 +125,7 @@ export async function POST(request: Request) {
 }
 
 interface TransactionAnalysis {
-  frequency: 'weekly' | 'monthly' | 'quarterly';
+  frequency: 'weekly' | 'monthly' | 'bi-monthly' | 'quarterly';
   expected_amount: number;
   confidence_score: number;
 }
@@ -158,11 +161,13 @@ function analyzeTransactionPattern(transactions: Transaction[]): TransactionAnal
   const amountStdDev = Math.sqrt(amountVariance);
   
   // Determine frequency based on average interval
-  let frequency: 'weekly' | 'monthly' | 'quarterly';
+  let frequency: 'weekly' | 'monthly' | 'bi-monthly' | 'quarterly';
   if (avgInterval <= 10) {
     frequency = 'weekly';
   } else if (avgInterval <= 40) {
     frequency = 'monthly';
+  } else if (avgInterval <= 75) {
+    frequency = 'bi-monthly'; // Every 2 months (~60 days)
   } else if (avgInterval <= 120) {
     frequency = 'quarterly';
   } else {

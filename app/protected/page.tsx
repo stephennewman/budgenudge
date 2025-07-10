@@ -1,9 +1,10 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
-import SmsButton from "@/components/sms-button";
-import RecurringSmsButton from "@/components/recurring-sms-button";
-import ManualRefreshButton from "@/components/manual-refresh-button";
+// REMOVED: SMS and refresh components for cleaner dashboard
+// import SmsButton from "@/components/sms-button";
+// import RecurringSmsButton from "@/components/recurring-sms-button";
+// import ManualRefreshButton from "@/components/manual-refresh-button";
 
 
 export default async function ProtectedPage() {
@@ -69,15 +70,14 @@ export default async function ProtectedPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col">
-        <h1 className="text-2xl font-medium">BudgeNudge Dashboard</h1>
+        <h1 className="text-2xl font-medium">🏠 Dashboard</h1>
         <p className="text-muted-foreground mt-2">
-          Track your spending automatically with Plaid webhooks
+          Real-time financial monitoring with automated transaction alerts
         </p>
       </div>
 
-      {/* Control Panel */}
+      {/* REMOVED: Control Panel with SMS and Transaction Data cards
       <div className="grid gap-6 md:grid-cols-2">
-        {/* SMS Notifications */}
         <div className="border rounded-lg p-6 space-y-4">
           <h2 className="font-medium">📱 SMS Notifications</h2>
           <p className="text-sm text-muted-foreground">
@@ -101,7 +101,6 @@ export default async function ProtectedPage() {
           </div>
         </div>
 
-        {/* Transaction Management */}
         <div className="border rounded-lg p-6 space-y-4">
           <h2 className="font-medium">🔄 Transaction Data</h2>
           <p className="text-sm text-muted-foreground">
@@ -111,6 +110,7 @@ export default async function ProtectedPage() {
           <ManualRefreshButton />
         </div>
       </div>
+      */}
 
       {/* Plaid Transaction Dashboard */}
       <TransactionDashboard />

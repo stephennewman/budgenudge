@@ -42,6 +42,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         case 'monthly':
           next_predicted_date = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
           break;
+        case 'bi-monthly':
+          next_predicted_date = new Date(now.getFullYear(), now.getMonth() + 2, now.getDate());
+          break;
         case 'quarterly':
           next_predicted_date = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
           break;

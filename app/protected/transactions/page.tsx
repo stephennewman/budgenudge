@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
 } from '@tanstack/react-table';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import ManualRefreshButton from '@/components/manual-refresh-button';
@@ -73,13 +73,7 @@ interface TransactionWithAnalytics extends Transaction {
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionWithAnalytics[]>([]);
-  // Removed merchantAnalytics state - data is now used directly in fetchData
-  const [overallAnalytics, setOverallAnalytics] = useState({
-    totalSpendingTransactions: 0,
-    totalHistoricalSpending: 0,
-    avgWeeklySpending: 0,
-    avgMonthlySpending: 0,
-  });
+  // Removed merchantAnalytics state and overallAnalytics state - data is now used directly in fetchData
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -395,8 +389,6 @@ export default function TransactionsPage() {
         const realSpendingTransactions = positiveAmounts.length;
         const realIncomeTransactions = negativeAmounts.length;
         const realTotalSpending = positiveAmounts.reduce((sum: number, t: TransactionWithAnalytics) => sum + t.amount, 0);
-        const realAvgWeeklySpending = realTotalSpending / weeksOfData;
-        const realAvgMonthlySpending = realTotalSpending / monthsOfData;
         
         console.log('=== REAL VS CACHED ANALYTICS COMPARISON ===');
         console.log('Real spending transactions:', realSpendingTransactions);
@@ -406,13 +398,7 @@ export default function TransactionsPage() {
         console.log('Real income transactions:', realIncomeTransactions);
         console.log('Calculated income transactions (total - cached spending):', totalTransactions - (analyticsData.summary?.totalSpendingTransactions || 0));
         
-        // Use REAL calculated analytics instead of stale cached summary
-        setOverallAnalytics({
-          totalSpendingTransactions: realSpendingTransactions,
-          totalHistoricalSpending: realTotalSpending,
-          avgWeeklySpending: realAvgWeeklySpending,
-          avgMonthlySpending: realAvgMonthlySpending,
-        });
+        // Analytics calculated but not stored (was used for overall summary cards)
         
       } else {
         console.error('API Responses:', { transactions: transactionsData, analytics: analyticsData });
@@ -460,7 +446,12 @@ export default function TransactionsPage() {
     {
       accessorKey: 'date',
       header: 'Date',
-      cell: ({ getValue }: { getValue: () => string }) => new Date(getValue()).toLocaleDateString(),
+      cell: ({ getValue }: { getValue: () => string }) => {
+        // Parse date as local time to avoid timezone offset issues
+        const dateStr = getValue();
+        const date = new Date(dateStr + 'T00:00:00');
+        return date.toLocaleDateString();
+      },
       sortDescFirst: true,
     },
     {
@@ -507,49 +498,6 @@ export default function TransactionsPage() {
       ),
     },
     {
-      accessorKey: 'merchantTransactionCount',
-      header: 'Merchant Total',
-      cell: ({ getValue }: { getValue: () => number }) => getValue(),
-    },
-    {
-      accessorKey: 'merchantTransactionsPerWeek',
-      header: 'Per Week',
-      cell: ({ getValue }: { getValue: () => number }) => Math.round(getValue()),
-    },
-    {
-      accessorKey: 'merchantTransactionsPerMonth',
-      header: 'Per Month',
-      cell: ({ getValue }: { getValue: () => number }) => Math.round(getValue()),
-    },
-    // NEW: Merchant-Specific Spending Analytics Columns
-    {
-      accessorKey: 'totalHistoricalSpending',
-      header: 'Merchant Total Spending',
-      cell: ({ getValue }: { getValue: () => number }) => (
-        <span className="font-medium text-red-600">
-          ${getValue().toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'avgWeeklySpending',
-      header: 'Merchant Weekly Avg',
-      cell: ({ getValue }: { getValue: () => number }) => (
-        <span className="font-medium text-orange-600">
-          ${getValue().toLocaleString()}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'avgMonthlySpending',
-      header: 'Merchant Monthly Avg', 
-      cell: ({ getValue }: { getValue: () => number }) => (
-        <span className="font-medium text-blue-600">
-          ${getValue().toLocaleString()}
-        </span>
-      ),
-    },
-    {
       accessorKey: 'totalMerchantTransactions',
       header: 'Merchant Transaction Count',
       cell: ({ getValue }: { getValue: () => number }) => (
@@ -557,18 +505,6 @@ export default function TransactionsPage() {
           {getValue().toLocaleString()}
         </span>
       ),
-    },
-    {
-      accessorKey: 'plaid_transaction_id',
-      header: 'Transaction ID',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
-        const value = getValue();
-        return value ? (
-          <code className="text-xs bg-gray-100 px-1 rounded max-w-[100px] truncate block">
-            {value}
-          </code>
-        ) : '-';
-      },
     },
   ], [taggedMerchants, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
@@ -607,203 +543,44 @@ export default function TransactionsPage() {
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Transaction & Spending Analytics</h1>
-            <p className="text-muted-foreground">
-              All transactions with merchant analytics showing actual visible counts
+            <h1 className="text-2xl font-bold">💳 Transactions</h1>
+            <p className="text-gray-600 mt-1">
+              {transactions.length} total transactions
             </p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-muted-foreground">
-              {transactions.length} total transactions loaded
-            </div>
-            <ManualRefreshButton 
-              onRefresh={() => fetchData()}
-            />
-          </div>
-        </div>
-
-        {/* DEBUG: Transaction Amount Breakdown */}
-        {transactions.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="text-sm font-medium text-yellow-800 mb-2">🐛 Debug: Transaction Amount Analysis</div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div>
-                <div className="font-medium text-gray-700">Total Transactions</div>
-                <div className="text-lg font-bold">{transactions.length}</div>
-              </div>
-              <div>
-                <div className="font-medium text-red-600">Positive Amounts (Spending)</div>
-                <div className="text-lg font-bold text-red-700">
-                  {transactions.filter((t: TransactionWithAnalytics) => t.amount > 0).length}
-                </div>
-              </div>
-              <div>
-                <div className="font-medium text-green-600">Negative Amounts (Income)</div>
-                <div className="text-lg font-bold text-green-700">
-                  {transactions.filter((t: TransactionWithAnalytics) => t.amount < 0).length}
-                </div>
-              </div>
-              <div>
-                <div className="font-medium text-gray-600">Zero Amounts</div>
-                <div className="text-lg font-bold text-gray-700">
-                  {transactions.filter((t: TransactionWithAnalytics) => t.amount === 0).length}
-                </div>
-              </div>
-            </div>
-            <div className="text-xs text-yellow-600 mt-2">
-              In Plaid&apos;s system: Positive = money out (spending), Negative = money in (income/deposits)
-            </div>
-            {transactions.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-yellow-200">
-                <div className="text-sm font-medium text-yellow-800 mb-2">📅 Date Range Analysis</div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <span className="font-medium">First Transaction:</span><br/>
-                    {transactions[0]?.daysOfHistoricalData > 0 ? 
-                      new Date(Date.now() - (transactions[0].daysSinceFirstTransaction * 24 * 60 * 60 * 1000)).toLocaleDateString() : 
-                      'Unknown'
-                    }
-                  </div>
-                  <div>
-                    <span className="font-medium">Data Timespan:</span><br/>
-                    {transactions[0]?.daysOfHistoricalData || 0} days 
-                    ({(transactions[0]?.weeksOfHistoricalData || 0).toFixed(1)} weeks, {(transactions[0]?.monthsOfHistoricalData || 0).toFixed(1)} months)
-                  </div>
-                  <div>
-                    <span className="font-medium">Transaction Rate:</span><br/>
-                    {(transactions[0]?.avgTransactionsWeekly || 0).toFixed(1)}/week, {(transactions[0]?.avgTransactionsMonthly || 0).toFixed(1)}/month
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* CORRECTED DATA NOTICE */}
-        {transactions.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <div className="text-sm font-medium text-green-800 mb-1">✅ Using Real Transaction Data</div>
-            <div className="text-xs text-green-600">
-              Analytics below now use live calculations from your actual transactions instead of stale cached data.
-              Real: {transactions.filter((t: TransactionWithAnalytics) => t.amount > 0).length} spending + {transactions.filter((t: TransactionWithAnalytics) => t.amount < 0).length} income = {transactions.length} total
-            </div>
-          </div>
-        )}
-
-        {/* Macro Stats Summary */}
-        {transactions.length > 0 && (
-          <>
-            {/* Spending Analytics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-red-50 p-4 rounded-lg border">
-                <div className="text-sm text-red-600 font-medium">Total Historical Spending</div>
-                <div className="text-2xl font-bold text-red-900">
-                  ${Math.round((overallAnalytics.totalHistoricalSpending || 0) * 100) / 100}
-                </div>
-                <div className="text-xs text-red-500 mt-1">
-                  {overallAnalytics.totalSpendingTransactions || 0} spending transactions
-                </div>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg border">
-                <div className="text-sm text-orange-600 font-medium">Avg Weekly Spending</div>
-                <div className="text-2xl font-bold text-orange-900">
-                  ${Math.round((overallAnalytics.avgWeeklySpending || 0) * 100) / 100}
-                </div>
-                <div className="text-xs text-orange-500 mt-1">
-                  Based on {Math.round(transactions[0]?.weeksOfHistoricalData || 0)} weeks of data
-                </div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-lg border">
-                <div className="text-sm text-blue-600 font-medium">Avg Monthly Spending</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  ${Math.round((overallAnalytics.avgMonthlySpending || 0) * 100) / 100}
-                </div>
-                <div className="text-xs text-blue-500 mt-1">
-                  Based on {Math.round(transactions[0]?.monthsOfHistoricalData || 0)} months of data
-                </div>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-lg border">
-                <div className="text-sm text-slate-600 font-medium">Data Timeframe</div>
-                <div className="text-2xl font-bold text-slate-900">
-                  {transactions[0]?.daysOfHistoricalData || 0} days
-                </div>
-                <div className="text-xs text-slate-500 mt-1">
-                  {Math.round(transactions[0]?.monthsOfHistoricalData || 0)} months • {Math.round(transactions[0]?.weeksOfHistoricalData || 0)} weeks
-                </div>
-              </div>
-            </div>
-
-            {/* Transaction Count Analytics Row */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-green-50 p-4 rounded-lg border">
-                <div className="text-sm text-green-600 font-medium">Total Transactions</div>
-                <div className="text-2xl font-bold text-green-900">
-                  {transactions[0]?.totalTransactionsAllTime.toLocaleString() || 0}
-                </div>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-lg border">
-                <div className="text-sm text-emerald-600 font-medium">Average per Month</div>
-                <div className="text-2xl font-bold text-emerald-900">
-                  {Math.round(transactions[0]?.avgTransactionsMonthly || 0)}
-                </div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg border">
-                <div className="text-sm text-purple-600 font-medium">Average per Week</div>
-                <div className="text-2xl font-bold text-purple-900">
-                  {Math.round(transactions[0]?.avgTransactionsWeekly || 0)}
-                </div>
-              </div>
-              <div className="bg-teal-50 p-4 rounded-lg border">
-                <div className="text-sm text-teal-600 font-medium">Spending Ratio</div>
-                <div className="text-2xl font-bold text-teal-900">
-                  {Math.round(((overallAnalytics.totalSpendingTransactions || 0) / (transactions[0]?.totalTransactionsAllTime || 1)) * 100)}%
-                </div>
-              </div>
-              <div className="bg-indigo-50 p-4 rounded-lg border">
-                <div className="text-sm text-indigo-600 font-medium">Income Transactions</div>
-                <div className="text-2xl font-bold text-indigo-900">
-                  {(transactions[0]?.totalTransactionsAllTime || 0) - (overallAnalytics.totalSpendingTransactions || 0)}
-                </div>
-                <div className="text-xs text-indigo-500 mt-1">
-                  Deposits, salary, refunds, transfers in
-                </div>
-              </div>
-              <div className="bg-violet-50 p-4 rounded-lg border">
-                <div className="text-sm text-violet-600 font-medium">Avg per Day</div>
-                <div className="text-2xl font-bold text-violet-900">
-                  {Math.round(((transactions[0]?.totalTransactionsAllTime || 0) / (transactions[0]?.daysOfHistoricalData || 1)) * 10) / 10}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Global Search */}
-        <div className="flex items-center space-x-2">
-          <Input
-            placeholder="Search transactions..."
-            value={globalFilter ?? ''}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            className="max-w-sm"
+          <ManualRefreshButton 
+            onRefresh={() => fetchData()}
           />
-          <Button
-            variant="outline"
-            onClick={() => {
-              setGlobalFilter('');
-              setColumnFilters([]);
-              setSorting([]);
-            }}
-          >
-            Clear Filters
-          </Button>
         </div>
+
+
+
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Transactions Table</CardTitle>
-        </CardHeader>
         <CardContent>
+          {/* Search and Controls */}
+          <div className="flex items-center justify-between space-x-2 mb-4">
+            <div className="flex items-center space-x-2">
+              <Input
+                placeholder="Search transactions..."
+                value={globalFilter ?? ''}
+                onChange={(e) => setGlobalFilter(e.target.value)}
+                className="max-w-sm"
+              />
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setGlobalFilter('');
+                  setColumnFilters([]);
+                  setSorting([]);
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+
+          </div>
           <div className="rounded-md border">
             <div className="overflow-x-auto">
               <table className="w-full caption-bottom text-sm">
