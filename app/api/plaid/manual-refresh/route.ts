@@ -63,11 +63,36 @@ export async function POST(request: Request) {
         console.log(`📅 Fetching transactions from ${startDate} to ${endDate}`);
 
         // Fetch transactions for the last 90 days (same as webhook)
-        const transactionsResponse = await plaidClient.transactionsGet({
-          access_token: item.plaid_access_token,
-          start_date: startDate,
-          end_date: endDate,
-        });
+        console.log(`🔑 Access token check: ${item.plaid_access_token ? 'Present' : 'Missing'}`);
+        console.log(`📋 Request params: start_date=${startDate}, end_date=${endDate}`);
+        
+        let transactionsResponse;
+        try {
+          transactionsResponse = await plaidClient.transactionsGet({
+            access_token: item.plaid_access_token,
+            start_date: startDate,
+            end_date: endDate,
+          });
+        } catch (plaidError: unknown) {
+          console.error(`❌ Plaid API Error for item ${item.plaid_item_id}:`, plaidError);
+          
+          // Log specific error details
+          if (plaidError && typeof plaidError === 'object' && 'response' in plaidError) {
+            const error = plaidError as { response?: { data?: { error_code?: string }; status?: number } };
+            if (error.response) {
+              console.error('Plaid Error Response:', error.response.data);
+              console.error('Plaid Error Status:', error.response.status);
+              
+              // Check if it's an access token issue
+              if (error.response.data?.error_code === 'INVALID_ACCESS_TOKEN' || 
+                  error.response.data?.error_code === 'ACCESS_TOKEN_EXPIRED') {
+                throw new Error(`Access token invalid or expired for Charles Schwab account. Please reconnect your bank account.`);
+              }
+            }
+          }
+          
+          throw plaidError;
+        }
 
         console.log(`📊 Plaid returned ${transactionsResponse.data.transactions.length} total transactions`);
         

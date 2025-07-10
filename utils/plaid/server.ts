@@ -58,13 +58,33 @@ export async function storeTransactions(transactions: any[], itemId: string) {
     account_owner: tx.account_owner,
   }));
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .upsert(formattedTransactions, { 
-      onConflict: 'plaid_transaction_id' 
-    })
-    .select();
+  // Batch transactions to prevent database timeouts
+  const BATCH_SIZE = 100;
+  const allResults = [];
+  
+  console.log(`💾 Storing ${formattedTransactions.length} transactions in batches of ${BATCH_SIZE}`);
+  
+  for (let i = 0; i < formattedTransactions.length; i += BATCH_SIZE) {
+    const batch = formattedTransactions.slice(i, i + BATCH_SIZE);
+    console.log(`💾 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(formattedTransactions.length/BATCH_SIZE)}: ${batch.length} transactions`);
+    
+    const { data, error } = await supabase
+      .from('transactions')
+      .upsert(batch, { 
+        onConflict: 'plaid_transaction_id' 
+      })
+      .select();
 
-  if (error) throw error;
-  return data;
+    if (error) {
+      console.error(`❌ Error in batch ${Math.floor(i/BATCH_SIZE) + 1}:`, error);
+      throw error;
+    }
+    
+    if (data) {
+      allResults.push(...data);
+    }
+  }
+  
+  console.log(`💾 ✅ Successfully stored ${allResults.length} transactions in ${Math.ceil(formattedTransactions.length/BATCH_SIZE)} batches`);
+  return allResults;
 } 
