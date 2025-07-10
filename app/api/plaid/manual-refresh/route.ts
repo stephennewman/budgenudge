@@ -57,12 +57,28 @@ export async function POST(request: Request) {
       try {
         console.log(`🏦 Processing item: ${item.plaid_item_id}`);
 
+        // Calculate date range
+        const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const endDate = new Date().toISOString().split('T')[0];
+        console.log(`📅 Fetching transactions from ${startDate} to ${endDate}`);
+
         // Fetch transactions for the last 90 days (same as webhook)
         const transactionsResponse = await plaidClient.transactionsGet({
           access_token: item.plaid_access_token,
-          start_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          end_date: new Date().toISOString().split('T')[0],
+          start_date: startDate,
+          end_date: endDate,
         });
+
+        console.log(`📊 Plaid returned ${transactionsResponse.data.transactions.length} total transactions`);
+        
+        // Log recent transactions (last 10 days)
+        const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const recentTransactions = transactionsResponse.data.transactions.filter(t => t.date >= tenDaysAgo);
+        console.log(`📊 ${recentTransactions.length} transactions from last 10 days (since ${tenDaysAgo})`);
+        
+        if (recentTransactions.length > 0) {
+          console.log(`📊 Recent transaction dates: ${recentTransactions.map(t => t.date).slice(0, 5).join(', ')}${recentTransactions.length > 5 ? '...' : ''}`);
+        }
 
         // Store transactions in database (using verified database plaid_item_id)
         const storedTransactions = await storeTransactions(
@@ -70,6 +86,7 @@ export async function POST(request: Request) {
           item.plaid_item_id
         );
 
+        console.log(`💾 Stored ${storedTransactions?.length || 0} new/updated transactions in database`);
         totalNewTransactions += storedTransactions?.length || 0;
 
         // Update account balances (same as webhook)
