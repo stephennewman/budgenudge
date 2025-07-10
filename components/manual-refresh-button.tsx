@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { createSupabaseClient } from '@/utils/supabase/client';
 
 interface RefreshResult {
   newTransactions: number;
@@ -16,12 +17,22 @@ export default function ManualRefreshButton({
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<string | null>(null);
+  const supabase = createSupabaseClient();
 
   const handleRefresh = async () => {
     setIsLoading(true);
     try {
+      // Get session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch('/api/plaid/manual-refresh', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       });
 
       if (!response.ok) {
@@ -39,7 +50,11 @@ export default function ManualRefreshButton({
       alert(`✅ Refresh complete!\nNew: ${result.newTransactions}\nUpdated: ${result.updatedTransactions}`);
     } catch (error) {
       console.error('Refresh failed:', error);
-      alert('❌ Failed to refresh transactions. Please try again.');
+      if (error instanceof Error && error.message === 'Not authenticated') {
+        alert('❌ Authentication required. Please refresh the page and try again.');
+      } else {
+        alert('❌ Failed to refresh transactions. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -4,8 +4,16 @@ import { createClient } from '@supabase/supabase-js';
 import { PlaidApi, Configuration, PlaidEnvironments } from 'plaid';
 
 // Manual refresh endpoint - replicates webhook functionality
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    // Get the authorization header
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized - Missing token' }, { status: 401 });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    
     // Initialize clients
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,8 +32,8 @@ export async function POST() {
       })
     );
     
-    // Get authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get authenticated user with token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
