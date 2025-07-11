@@ -26,12 +26,12 @@ export async function GET() {
           : 'Ready to test unified SMS sending'
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Unified SMS config test failed:', error);
     
     return NextResponse.json({
       success: false,
-      error: error.message || 'Configuration test failed'
+      error: error instanceof Error ? error.message : 'Configuration test failed'
     }, { status: 500 });
   }
 }
@@ -104,12 +104,12 @@ export async function POST(request: NextRequest) {
         }
       }, { status: 400 });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Unified SMS test failed:', error);
     
     return NextResponse.json({
       success: false,
-      error: error.message || 'Unified SMS test failed',
+      error: error instanceof Error ? error.message : 'Unified SMS test failed',
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }

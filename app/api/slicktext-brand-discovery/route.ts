@@ -135,12 +135,12 @@ export async function GET() {
       nextStep: 'Once you have the Brand ID, add it as SLICKTEXT_BRAND_ID environment variable'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Brand discovery error:', error);
     
     return NextResponse.json({
       success: false,
-      error: error.message || 'Brand discovery failed',
+      error: error instanceof Error ? error.message : 'Brand discovery failed',
       troubleshooting: {
         possibleCauses: [
           'Invalid API key format',

@@ -109,12 +109,12 @@ export async function GET() {
         'No working endpoints found. The API structure might be different than expected.'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ SlickText exploration error:', error);
     
     return NextResponse.json({
       success: false,
-      error: error.message || 'Exploration failed'
+      error: error instanceof Error ? error.message : 'Exploration failed'
     }, { status: 500 });
   }
 } 

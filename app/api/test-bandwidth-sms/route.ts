@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
         : `SMS failed: ${result.error}`
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Test SMS endpoint error:', error);
     
     return NextResponse.json({
       success: false,
-      error: error.message || 'Unknown error',
+      error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }

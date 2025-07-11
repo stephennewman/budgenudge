@@ -85,13 +85,13 @@ This message was sent via SlickText API! 🎯`;
       throw new Error(result.error || 'SlickText SMS send failed');
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ SlickText test endpoint error:', error);
     
     return NextResponse.json({
       success: false,
       method: 'slicktext',
-      error: error.message || 'SlickText test failed',
+      error: error instanceof Error ? error.message : 'SlickText test failed',
       timestamp: new Date().toISOString(),
       troubleshooting: {
         checklist: [
@@ -127,14 +127,14 @@ export async function GET() {
       throw new Error(brandInfo.error || 'Brand info fetch failed');
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ SlickText status check failed:', error);
     
     return NextResponse.json({
       success: false,
       method: 'slicktext',
       status: 'error',
-      error: error.message || 'SlickText status check failed',
+      error: error instanceof Error ? error.message : 'SlickText status check failed',
       timestamp: new Date().toISOString(),
       troubleshooting: {
         possibleCauses: [
