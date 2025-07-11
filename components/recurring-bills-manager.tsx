@@ -156,7 +156,8 @@ export default function RecurringBillsManager() {
   };
 
   const formatNextDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // Parse as local noon to avoid timezone issues (same as SMS)
+    const date = new Date(dateString + 'T12:00:00');
     return date.toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric',
@@ -199,8 +200,8 @@ export default function RecurringBillsManager() {
   // Filter and sort active merchants by upcoming date (soonest first, future dates only)
   const now = new Date();
   const activeMerchants = taggedMerchants
-    .filter(m => m.is_active && new Date(m.next_predicted_date) > now)
-    .sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
+    .filter(m => m.is_active && new Date(m.next_predicted_date + 'T12:00:00') > now)
+    .sort((a, b) => new Date(a.next_predicted_date + 'T12:00:00').getTime() - new Date(b.next_predicted_date + 'T12:00:00').getTime());
   
   const inactiveMerchants = taggedMerchants.filter(m => !m.is_active);
 
