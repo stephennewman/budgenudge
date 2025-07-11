@@ -181,7 +181,7 @@ async function buildRealFinancialSMS(
   // Real Publix spending this month
   const publixThisMonth = allTransactions
     .filter(t => {
-      const transDate = new Date(t.date);
+      const transDate = new Date(t.date + 'T12:00:00');
       return (t.merchant_name || t.name || '').toLowerCase().includes('publix') && 
              transDate >= monthStart && transDate <= monthEnd;
     })
@@ -190,7 +190,7 @@ async function buildRealFinancialSMS(
   // Real Amazon spending this month
   const amazonThisMonth = allTransactions
     .filter(t => {
-      const transDate = new Date(t.date);
+      const transDate = new Date(t.date + 'T12:00:00');
       return (t.merchant_name || t.name || '').toLowerCase().includes('amazon') && 
              transDate >= monthStart && transDate <= monthEnd;
     })
@@ -236,10 +236,11 @@ async function buildRealFinancialSMS(
   
   let recentSection = '\n📋 REAL RECENT TRANSACTIONS:\n';
   allTransactions
-    .filter(t => new Date(t.date) >= fiveDaysAgo)
+    .filter(t => new Date(t.date + 'T12:00:00') >= fiveDaysAgo)
     .slice(0, 8)
     .forEach(t => {
-      const transDate = new Date(t.date);
+      // Parse date as local noon to avoid timezone issues
+      const transDate = new Date(t.date + 'T12:00:00');
       const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
       const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
       recentSection += `${dateStr}: ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
@@ -325,7 +326,7 @@ function calculateRealAverageWeekly(transactions: Transaction[], merchantKeyword
   twelveWeeksAgo.setDate(now.getDate() - (12 * 7));
   
   const merchantTransactions = transactions.filter(t => {
-    const transDate = new Date(t.date);
+    const transDate = new Date(t.date + 'T12:00:00');
     return (t.merchant_name || t.name || '').toLowerCase().includes(merchantKeyword.toLowerCase()) &&
            transDate >= twelveWeeksAgo;
   });

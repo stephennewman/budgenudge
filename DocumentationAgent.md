@@ -1,8 +1,53 @@
 # 📘 DOCUMENTATION AGENT - BudgeNudge
 
-**Last Updated:** June 21, 2025 6:31 AM EDT
+**Last Updated:** July 11, 2025 2:52 PM EDT
 **Documentation Status:** ✅ **COMPREHENSIVE & CURRENT**
 **Maintenance Schedule:** Real-time updates with deployments
+
+---
+
+## 🚨 LATEST DOCUMENTATION UPDATE
+
+### ✅ Two-Way SMS System Documentation (July 11, 2025)
+**Status:** 🟢 **FULLY OPERATIONAL AFTER WEBHOOK FIX**
+
+**Critical Update**: SlickText webhook 404 errors resolved - two-way SMS now 100% functional
+
+#### Updated API Endpoints
+**SlickText Integration:**
+- **POST** `/api/slicktext-webhook` - ✅ **FIXED** - Now handles correct payload format
+- **POST** `/api/test-slicktext-webhook` - Debug endpoint for webhook testing
+- **POST** `/api/test-ai-response` - AI response generation testing
+
+**Webhook Payload Format Fixed:**
+```typescript
+// SlickText sends this format:
+{
+  "data": {
+    "_contact_id": 37910017,
+    "last_message": "How much did i spend at publix last week?",
+    "last_message_direction": "incoming",
+    "_brand_id": 11489,
+    "status": "open"
+  }
+}
+
+// Webhook now correctly extracts:
+const {
+  _contact_id: contactId,
+  last_message: message,
+  last_message_direction: direction
+} = webhookData.data;
+```
+
+#### Two-Way SMS Commands Available
+- **BALANCE** - Check account information (redirects to dashboard)
+- **HELP** - Show available commands and BudgeNudge info
+- **STOP/UNSUBSCRIBE** - Opt out of notifications
+- **START/SUBSCRIBE** - Re-enable notifications
+- **Questions** - AI-powered responses via OpenAI GPT-3.5-turbo
+
+**User Experience**: Users can text 844-790-6613 with spending questions and receive intelligent AI responses or use command shortcuts.
 
 ---
 
@@ -17,6 +62,12 @@
 - ✅ **MarketingAgent.md** - Product positioning and messaging
 - ✅ **ProductAgent.md** - Strategic roadmap and prioritization
 
+### Specialized Documentation ✅ ADDED
+- ✅ **SLICKTEXT_INTEGRATION.md** - Complete SlickText API setup guide
+- ✅ **TWO_WAY_SMS_SETUP_GUIDE.md** - *(Recently deleted - needs recreation)*
+- ✅ **GRADUAL_SMS_MIGRATION.md** - Migration strategy documentation
+- ✅ **TESTING_GUIDE.md** - Comprehensive testing procedures
+
 ### Code Documentation ✅ INLINE
 - ✅ TypeScript interfaces and types
 - ✅ Component documentation via JSDoc
@@ -28,8 +79,7 @@
 
 ## 🚀 API DOCUMENTATION REQUIREMENTS
 
-### Missing Critical Documentation 🚨 **HIGH PRIORITY**
-**API.md needs immediate creation with:**
+### Updated API Endpoints ✅ OPERATIONAL
 
 #### Plaid Integration Endpoints
 - **POST** `/api/plaid/create-link-token`
@@ -37,16 +87,23 @@
 - **POST** `/api/plaid/webhook` (Core system)
 - **GET** `/api/plaid/transactions`
 
+#### SlickText SMS Endpoints ✅ **NEWLY OPERATIONAL**
+- **POST** `/api/slicktext-webhook` - ✅ **FIXED** Two-way SMS processing
+- **POST** `/api/test-slicktext-webhook` - Debug and testing
+- **POST** `/api/test-ai-response` - AI response testing
+- **POST** `/api/manual-sms` - Manual SMS sending
+- **GET** `/api/slicktext-contacts` - Contact management
+
 #### Authentication Endpoints
 - Supabase Auth integration
 - Protected route middleware
 - User session management
 
-#### Webhook Documentation
-- Webhook URL configuration
-- Event types handled
-- Security verification
-- Error handling responses
+#### Webhook Documentation ✅ **CRITICAL UPDATE**
+- **Webhook URL**: `https://budgenudge.vercel.app/api/slicktext-webhook`
+- **Event Types**: `inbox_message_received` 
+- **Security**: Bearer token authentication
+- **Error Handling**: 404 errors resolved, robust fallback responses
 
 ---
 
