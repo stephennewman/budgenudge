@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/utils/plaid/client';
 import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/server';
 import { createClient } from '@supabase/supabase-js';
-import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
+import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,28 +147,29 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
             
             const message = await buildAdvancedSMSMessage(allTransactions || [], itemData?.user_id);
             
-            // Get user's SMS gateway (with fallback to default)
-            const smsGateway = await getSmsGatewayWithFallback(itemData?.user_id);
-            console.log(`📱 Sending SMS to: ${smsGateway}`);
+            // Get user's email for SlickText contact lookup
+            // Note: Using service role client to access auth data
+            const supabaseService = createClient(
+              process.env.NEXT_PUBLIC_SUPABASE_URL!,
+              process.env.SUPABASE_SERVICE_ROLE_KEY!
+            );
             
-            const smsResponse = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                from: 'BudgeNudge <stephen@krezzo.com>',
-                to: [smsGateway],
-                subject: 'Transaction Alert',
-                text: message
-              }),
-            });
+            const { data: userData } = await supabaseService.auth.admin.getUserById(itemData?.user_id);
             
-            if (smsResponse.ok) {
-              console.log('📱 SMS notification sent successfully');
+            console.log(`📱 Sending SMS via SlickText to: 6173472721`);
+            
+                         // Send SMS via SlickText
+             const smsResult = await sendEnhancedSlickTextSMS({
+               phoneNumber: '6173472721', // Your phone number
+               message: message,
+               userId: itemData?.user_id,
+               userEmail: userData?.user?.email || 'stephen@krezzo.com'
+             });
+            
+            if (smsResult.success) {
+              console.log('📱 SlickText SMS notification sent successfully:', smsResult.messageId);
             } else {
-              console.log('📱 SMS notification failed:', await smsResponse.text());
+              console.log('📱 SlickText SMS notification failed:', smsResult.error);
             }
           } catch (error) {
             console.log('📱 SMS notification error:', error);
