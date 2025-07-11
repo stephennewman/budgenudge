@@ -211,7 +211,12 @@ export class SlickTextClient {
 
         // Method 2: Try sending via messages endpoint (most likely for individual SMS)
         try {
-          const messagePayload = {
+          const messagePayload: {
+            body: string;
+            contact_id: number | null;
+            send_immediately: boolean;
+            scheduled_at?: string;
+          } = {
             body: message.content,  // Changed from 'message' to 'body'
             contact_id: contactId,
             send_immediately: !message.scheduled_at
@@ -242,7 +247,14 @@ export class SlickTextClient {
 
           // Method 3: Try creating a campaign for the message
           try {
-            const campaignPayload = {
+            const campaignPayload: {
+              name: string;
+              body: string;
+              contact_ids?: number[];
+              phone_numbers?: string[];
+              send_immediately: boolean;
+              scheduled_at?: string;
+            } = {
               name: `BudgeNudge Alert ${Date.now()}`,
               body: message.content,  // Changed from 'message' to 'body'
               contact_ids: contactId ? [contactId] : undefined,
