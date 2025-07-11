@@ -33,7 +33,7 @@ export default async function ProtectedSidebar() {
         //   href: "/calendar",
         // },
         {
-          label: "🏷️ Recurring Bills",
+          label: "⭐ Recurring Bills",
           href: "/recurring-bills",
         },
         // REMOVED FOR PERFORMANCE: Subscription/paid features

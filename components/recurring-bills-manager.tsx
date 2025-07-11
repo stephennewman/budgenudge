@@ -209,7 +209,7 @@ export default function RecurringBillsManager() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">🏷️ Recurring Bills</h2>
+          <h2 className="text-2xl font-bold">⭐ Recurring Bills</h2>
           <p className="text-gray-600 mt-1">
             {activeMerchants.length} active predictions
           </p>

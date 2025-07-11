@@ -418,7 +418,7 @@ export default function TransactionsPage() {
   const columns = useMemo(() => [
     {
       id: 'star',
-      header: '⭐',
+      header: '⭐ Recurring',
       cell: ({ row }: { row: { original: TransactionWithAnalytics } }) => {
         const transaction = row.original;
         const merchantName = transaction.merchant_name || transaction.name;
