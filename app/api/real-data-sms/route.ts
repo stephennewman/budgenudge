@@ -270,20 +270,27 @@ async function findRealUpcomingBills(transactions: Transaction[], userId: string
     predictedDate: Date;
   }> = [];
   
-  // Get predictions from tagged merchants table
+  // Get REAL predictions from tagged merchants table (same source as recurring bills page)
   try {
-    const { data: taggedMerchants } = await supabase
+    const { data: taggedMerchants, error } = await supabase
       .from('tagged_merchants')
       .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .order('confidence_score', { ascending: false });
+      .order('next_predicted_date', { ascending: true });
     
-    if (taggedMerchants) {
+    if (error) {
+      console.error('Error fetching tagged merchants for SMS:', error);
+      return bills;
+    }
+    
+    if (taggedMerchants && taggedMerchants.length > 0) {
+      const now = new Date();
       taggedMerchants.forEach(merchant => {
-        const predictedDate = new Date(merchant.next_predicted_date);
+        const predictedDate = new Date(merchant.next_predicted_date + 'T12:00:00');
         
-        if (predictedDate > new Date()) {
+        // Only include future bills (same logic as recurring bills page)
+        if (predictedDate > now) {
           bills.push({
             merchant: merchant.merchant_name,
             amount: `$${merchant.expected_amount.toFixed(2)}`,
@@ -293,29 +300,13 @@ async function findRealUpcomingBills(transactions: Transaction[], userId: string
       });
     }
   } catch (error) {
-    console.log('Tagged merchants fetch failed, using historical analysis');
+    console.error('Tagged merchants fetch failed for SMS:', error);
   }
   
-  // Add some historical analysis for common bills
-  const now = new Date();
-  const commonBills = [
-    { name: 'Spotify', amount: 15.99, dayOfMonth: 15 },
-    { name: 'Netflix', amount: 17.99, dayOfMonth: 8 },
-    { name: 'Phone Bill', amount: 85.00, dayOfMonth: 25 }
-  ];
-  
-  commonBills.forEach(bill => {
-    const nextDate = new Date(now.getFullYear(), now.getMonth(), bill.dayOfMonth);
-    if (nextDate <= now) {
-      nextDate.setMonth(nextDate.getMonth() + 1);
-    }
-    
-    bills.push({
-      merchant: bill.name,
-      amount: `$${bill.amount.toFixed(2)}`,
-      predictedDate: nextDate
-    });
-  });
+  // If no tagged merchants found, show a helpful message
+  if (bills.length === 0) {
+    console.log('No active recurring bills found in tagged_merchants table');
+  }
   
   return bills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
