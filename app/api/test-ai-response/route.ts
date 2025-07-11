@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     console.log(`🤖 Generating AI response for: "${userMessage}"`);
     
     // Test AI response generation
-    const aiResponse = await generateAIResponse(userMessage, phoneNumber);
+    const aiResponse = await generateAIResponse(userMessage);
     
     return NextResponse.json({
       success: true,
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 /**
  * Generate AI response for testing
  */
-async function generateAIResponse(message: string, phoneNumber: string): Promise<{
+async function generateAIResponse(message: string): Promise<{
   success: boolean;
   response?: string;
   tokensUsed?: number;

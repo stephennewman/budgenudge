@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
       throw new Error(`SlickText API error: ${response.status} - ${responseText}`);
     }
     
-    let responseData: any = {};
+    let responseData: Record<string, unknown> = {};
     try {
       responseData = JSON.parse(responseText);
     } catch {

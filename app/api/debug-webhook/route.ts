@@ -11,12 +11,9 @@ export async function POST(request: NextRequest) {
     console.log('📋 DEBUG: Webhook payload:', webhookData);
     
     const {
-      message_id,
       contact_id,
       phone_number,
-      message,
-      received_at,
-      brand_id
+      message
     } = webhookData;
     
     if (!message || !phone_number) {
@@ -60,7 +57,7 @@ export async function POST(request: NextRequest) {
         // Generate AI response for non-commands
         console.log('🤖 DEBUG: Non-command detected, generating AI response...');
         responseType = 'ai-response';
-        responseMessage = await generateAIResponseDebug(message, cleanPhone);
+        responseMessage = await generateAIResponseDebug(message);
         break;
     }
     
@@ -75,7 +72,7 @@ export async function POST(request: NextRequest) {
       console.log(`📤 DEBUG: Message length: ${responseMessage.length} characters`);
       
       // Just log what we would send, don't actually send
-      sendResult = { success: true, error: null };
+      sendResult = { success: true, error: '' };
     }
     
     return NextResponse.json({
@@ -113,7 +110,7 @@ export async function POST(request: NextRequest) {
 /**
  * Debug version of AI response generation
  */
-async function generateAIResponseDebug(message: string, phoneNumber: string): Promise<string> {
+async function generateAIResponseDebug(message: string): Promise<string> {
   try {
     console.log('🤖 DEBUG: Checking AI configuration...');
     console.log('🤖 DEBUG: SMS_AI_RESPONSES_ENABLED =', process.env.SMS_AI_RESPONSES_ENABLED);

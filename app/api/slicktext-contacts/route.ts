@@ -5,8 +5,6 @@ export async function GET() {
   try {
     console.log('🔍 Fetching SlickText contacts...');
     
-    const client = createSlickTextClient();
-    
     // Use a direct API call since we need to access the contacts endpoint
     const apiKey = process.env.SLICKTEXT_API_KEY;
     const brandId = process.env.SLICKTEXT_BRAND_ID;
@@ -28,7 +26,7 @@ export async function GET() {
       throw new Error(`SlickText API error: ${response.status} - ${responseText}`);
     }
     
-    let contactsData: any = {};
+    let contactsData: Record<string, unknown> = {};
     try {
       contactsData = JSON.parse(responseText);
     } catch {
@@ -41,7 +39,7 @@ export async function GET() {
     console.log(`✅ Found ${contacts.length} contacts in SlickText`);
     
     // Format contact information for easier reading
-    const formattedContacts = contacts.map((contact: any) => ({
+    const formattedContacts = contacts.map((contact: Record<string, unknown>) => ({
       contact_id: contact.contact_id || contact.id,
       first_name: contact.first_name,
       last_name: contact.last_name,

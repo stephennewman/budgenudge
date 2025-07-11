@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '../../../utils/sms/slicktext-client';
 
@@ -23,12 +23,12 @@ interface Account {
   available_balance: number | null;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     console.log('📊 Generating real data SMS for Stephen Newman...');
     
     // Get Stephen Newman's user ID by email (assuming he's the main user)
-    const { data: userData, error: userError } = await supabase.auth.admin.listUsers();
+    const { data: userData } = await supabase.auth.admin.listUsers();
     
     let stephenUserId: string | null = null;
     
@@ -99,6 +99,10 @@ export async function POST(request: NextRequest) {
     
     console.log(`📊 Found ${transactions.length} transactions and ${accounts.length} accounts`);
     
+    if (!stephenUserId) {
+      throw new Error('User ID not found');
+    }
+    
     // Build real SMS message using actual data
     const realSmsMessage = await buildRealFinancialSMS(
       transactions as Transaction[], 
@@ -110,7 +114,7 @@ export async function POST(request: NextRequest) {
     const result = await sendEnhancedSlickTextSMS({
       phoneNumber: '+16173472721', // Stephen's phone
       message: realSmsMessage,
-      userId: stephenUserId,
+      userId: stephenUserId, // Already validated above
       userEmail: 'stephen@krezzo.com'
     });
     
@@ -156,7 +160,7 @@ async function buildRealFinancialSMS(
     0
   );
   
-  let balanceSection = `💰 REAL BALANCE: $${totalAvailable.toFixed(2)}\n`;
+  const balanceSection = `💰 REAL BALANCE: $${totalAvailable.toFixed(2)}\n`;
   
   // 1. REAL PREDICTED TRANSACTIONS - Next 30 days
   const upcomingBills = await findRealUpcomingBills(allTransactions, userId);
