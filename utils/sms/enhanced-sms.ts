@@ -30,12 +30,12 @@ export async function sendEnhancedSMS({
   
   try {
     // Use the unified SMS system (SlickText + Resend fallback)
-    const result = await sendUnifiedSMS({
-      phoneNumber,
-      message,
-      userId,
-      source: 'enhanced-sms'
-    });
+         const result = await sendUnifiedSMS({
+       phoneNumber,
+       message,
+       userId,
+       context: 'enhanced-sms'
+     });
     
     if (result.success) {
       return {
