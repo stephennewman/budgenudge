@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
+import { sendUnifiedSMS } from '@/utils/sms/unified-sms';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -90,41 +91,43 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Otherwise, send immediately
-    const smsResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'BudgeNudge <stephen@krezzo.com>',
-        to: [targetPhoneNumber],
-        subject: 'Alert',
-        text: smsMessage
-      }),
+    // Send immediately using unified SMS service
+    console.log('📱 Sending manual SMS via unified service...');
+    
+    const smsResult = await sendUnifiedSMS({
+      phoneNumber: targetPhoneNumber,
+      message: smsMessage,
+      userId: userId,
+      context: 'manual-sms'
     });
 
-    if (smsResponse.ok) {
-      console.log('📱 Manual SMS sent successfully');
+    if (smsResult.success) {
+      console.log(`📱 Manual SMS sent successfully via ${smsResult.provider}${smsResult.fallbackUsed ? ' (fallback)' : ''} in ${smsResult.deliveryTime}ms`);
+      
       return NextResponse.json({ 
         success: true, 
-        message: 'SMS sent successfully!' 
+        message: 'SMS sent successfully!',
+        provider: smsResult.provider,
+        messageId: smsResult.messageId,
+        deliveryTime: smsResult.deliveryTime,
+        fallbackUsed: smsResult.fallbackUsed || false
       });
     } else {
-      const errorText = await smsResponse.text();
-      console.log('📱 Manual SMS failed:', errorText);
+      console.log('📱 Manual SMS failed:', smsResult.error);
       return NextResponse.json({ 
         success: false, 
         error: 'Failed to send SMS',
-        details: errorText 
+        provider: smsResult.provider,
+        details: smsResult.error,
+        fallbackUsed: smsResult.fallbackUsed || false
       }, { status: 500 });
     }
   } catch (error) {
     console.error('📱 Manual SMS error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error' 
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 } 
