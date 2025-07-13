@@ -333,3 +333,19 @@ Real-time transaction data → AI analysis → Professional SMS alerts
 **🎯 SUMMARY**: BudgeNudge is a **technically excellent, production-ready financial monitoring platform** with **professional-grade SMS capabilities**. The SlickText integration represents the final piece for **enterprise-level SMS delivery**. Ready for immediate production deployment upon account upgrade.
 
 **Next Review**: July 12, 2025 (Post SlickText account upgrade) 
+
+## 📋 DEPLOYMENT LOG
+
+### 🗓️ July 13, 2025 - SMS NEXT BILLS SECTION FIX ✅ DEPLOYED
+- **11:19 AM EST**: Modified SMS generation to only show recurring bills from tagged merchants
+- **Problem**: "Next bills" section was showing both tagged merchants (🏷️) and historical predictions (🗓️)
+- **User Request**: Only show actual recurring bills, not predicted transactions
+- **Solution**: 
+  - Modified `buildAdvancedSMSMessage` in both test-sms and cron/scheduled-sms routes
+  - Changed from `findUpcomingBillsEnhanced` to `findUpcomingRecurringBills`
+  - Now only queries `tagged_merchants` table for active recurring bills
+  - Eliminates historical predictions from next bills section
+- **Result**: SMS now shows only tagged merchants (🏷️) - actual recurring bills
+- **Test Verification**: 607 characters with 6 recurring bills displayed correctly
+- **Git Commit**: dbed9e3 - 2 files changed, 51 insertions, 38 deletions
+- **Status**: ✅ LIVE IN PRODUCTION - Both test SMS and daily cron job updated 

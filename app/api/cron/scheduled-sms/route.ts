@@ -271,15 +271,15 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
       const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
       const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
       const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
-      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
+      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.round(Math.abs(t.amount))}\n`;
     });
   
   // Build optimized message for SlickText (under 918 characters)
   const optimizedMessage = `${billsSection}
-💰 BALANCE: $${totalAvailable.toFixed(2)}
+💰 BALANCE: $${Math.round(totalAvailable)}
 
-🏪 PUBLIX: $${publixThisMonth.toFixed(2)} vs $${publixPacedTarget.toFixed(2)} expected
-📦 AMAZON: $${amazonThisMonth.toFixed(2)} vs $${amazonPacedTarget.toFixed(2)} expected
+🏪 PUBLIX: $${Math.round(publixThisMonth)} vs $${Math.round(publixPacedTarget)} expected pace against $${Math.round(avgPublixMonthly)} avg monthly spend
+📦 AMAZON: $${Math.round(amazonThisMonth)} vs $${Math.round(amazonPacedTarget)} expected pace against $${Math.round(avgAmazonMonthly)} avg monthly spend
 💡 ${recommendation}${recentSection}`;
   
   console.log(`📱 Optimized SMS generated: ${optimizedMessage.length} characters (SlickText limit: 918)`);
