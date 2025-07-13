@@ -163,10 +163,9 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
   // Fetch current account balances
-  let balanceSection = '';
+  let totalAvailable = 0;
   if (userId) {
     try {
-      // Get the user's item IDs
       const { data: userItems } = await supabase
         .from('items')
         .select('id')
@@ -177,23 +176,12 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
         
         const { data: accounts } = await supabase
           .from('accounts')
-          .select(`
-            name,
-            type,
-            current_balance,
-            available_balance,
-            balance_last_updated
-          `)
+          .select('available_balance')
           .in('item_id', itemIds)
-          .eq('type', 'depository'); // Focus on checking/savings accounts
+          .eq('type', 'depository');
         
         if (accounts && accounts.length > 0) {
-          const totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
-          balanceSection = `\n💰 AVAILABLE BALANCE: $${totalAvailable.toFixed(2)}\n`;
-          
-          console.log(`📱 Including balance in SMS: $${totalAvailable.toFixed(2)} from ${accounts.length} accounts`);
-        } else {
-          console.log(`📱 No accounts found for balance inclusion in SMS`);
+          totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
         }
       }
     } catch (error) {
@@ -201,28 +189,25 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     }
   }
   
-  // 1. PREDICTED TRANSACTIONS - Next 30 days
+  // Get next 3 most important bills
   const upcomingBills = await findUpcomingBillsEnhanced(allTransactions, userId);
   const thirtyDaysFromNow = new Date(now);
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   
-  let billsSection = '💳 PREDICTED TRANSACTIONS (NEXT 30 DAYS):\n';
+  let billsSection = '💳 NEXT BILLS:\n';
   upcomingBills
     .filter(bill => bill.predictedDate <= thirtyDaysFromNow)
-    .slice(0, 8)
+    .slice(0, 3)
     .forEach(bill => {
       const date = new Date(bill.predictedDate);
       const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-      const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
-      const confidenceIcon = bill.confidence === 'tagged' ? '🏷️' : bill.confidence === 'monthly' ? '🗓️' : '📊';
-      billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount} ${confidenceIcon}\n`;
+      billsSection += `${dateStr}: ${bill.merchant} ${bill.amount}\n`;
     });
   
-  // 2. MERCHANT SPENDING - Monthly focus (Publix + Amazon)
+  // Calculate monthly spending
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   
-  // Monthly Publix spending
   const publixThisMonth = allTransactions
     .filter(t => {
       const transDate = new Date(t.date);
@@ -231,7 +216,6 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     })
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  // Monthly Amazon spending
   const amazonThisMonth = allTransactions
     .filter(t => {
       const transDate = new Date(t.date);
@@ -240,82 +224,36 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     })
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  // Calculate average monthly spending from historical data
-  const avgPublixWeekly = calculateAverageWeeklyPublix(allTransactions);
-  const avgPublixMonthly = avgPublixWeekly * 4.33; // Average weeks per month
-  
-  const avgAmazonWeekly = calculateAverageWeeklyAmazon(allTransactions);
-  const avgAmazonMonthly = avgAmazonWeekly * 4.33; // Average weeks per month
-  
-  // Monthly paced projection for Publix
-  const daysInMonth = monthEnd.getDate();
-  const monthDaysElapsed = today.getDate();
-  const publixPacedTarget = (avgPublixMonthly / daysInMonth) * monthDaysElapsed;
-  const publixPacedDiff = publixThisMonth - publixPacedTarget;
-  
-  // Monthly paced projection for Amazon
-  const amazonPacedTarget = (avgAmazonMonthly / daysInMonth) * monthDaysElapsed;
-  const amazonPacedDiff = amazonThisMonth - amazonPacedTarget;
-  
   // Monthly budgets
   const publixBudget = 400;
   const amazonBudget = 300;
-  const publixBudgetRemaining = Math.max(0, publixBudget - publixThisMonth);
-  const amazonBudgetRemaining = Math.max(0, amazonBudget - amazonThisMonth);
+  const publixRemaining = Math.max(0, publixBudget - publixThisMonth);
+  const amazonRemaining = Math.max(0, amazonBudget - amazonThisMonth);
   
-  // AI Recommendation based on monthly metrics
-  let recommendation = '';
-  if (publixPacedDiff > 50 || amazonPacedDiff > 50) {
-    recommendation = 'Consider reducing impulse purchases this month';
-  } else if (publixBudgetRemaining < 50 || amazonBudgetRemaining < 50) {
-    recommendation = 'Budget running low - focus on essentials only';
-  } else if (publixPacedDiff < -20 && amazonPacedDiff < -20) {
-    recommendation = 'Great pacing! Keep up the mindful spending';
-  } else {
-    recommendation = 'Steady spending - you\'re on track';
-  }
+  // Recent transactions (last 2 days, top 3)
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(now.getDate() - 2);
   
-  let publixSection = `\n🏪 PUBLIX SPENDING:\n`;
-  publixSection += `PACED MONTHLY - $${publixThisMonth.toFixed(2)} vs $${publixPacedTarget.toFixed(2)} expected`;
-  if (publixPacedDiff > 0) {
-    publixSection += ` (+$${publixPacedDiff.toFixed(2)} over pace)\n`;
-  } else if (publixPacedDiff < 0) {
-    publixSection += ` ($${Math.abs(publixPacedDiff).toFixed(2)} under pace)\n`;
-  } else {
-    publixSection += ` (on pace)\n`;
-  }
-  publixSection += `MONTHLY BUDGET REMAINING - $${publixBudgetRemaining.toFixed(2)}\n`;
-  
-  publixSection += `\n📦 AMAZON SPENDING:\n`;
-  publixSection += `PACED MONTHLY - $${amazonThisMonth.toFixed(2)} vs $${amazonPacedTarget.toFixed(2)} expected`;
-  if (amazonPacedDiff > 0) {
-    publixSection += ` (+$${amazonPacedDiff.toFixed(2)} over pace)\n`;
-  } else if (amazonPacedDiff < 0) {
-    publixSection += ` ($${Math.abs(amazonPacedDiff).toFixed(2)} under pace)\n`;
-  } else {
-    publixSection += ` (on pace)\n`;
-  }
-  publixSection += `MONTHLY BUDGET REMAINING - $${amazonBudgetRemaining.toFixed(2)}\n`;
-  
-  publixSection += `\nRECOMMENDATION - ${recommendation}`;
-  
-  // 3. RECENT TRANSACTIONS - Last 3 days
-  const threeDaysAgo = new Date(now);
-  threeDaysAgo.setDate(now.getDate() - 3);
-  
-  let recentSection = '\n\n📋 RECENT TRANSACTIONS:\n';
+  let recentSection = '\n📋 RECENT:\n';
   allTransactions
-    .filter(t => new Date(t.date) >= threeDaysAgo)
-    .slice(0, 10)
+    .filter(t => new Date(t.date) >= twoDaysAgo)
+    .slice(0, 3)
     .forEach(t => {
       const transDate = new Date(t.date);
       const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
-      const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
-      const merchant = t.merchant_name || t.name || 'Unknown';
-      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
+      const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 15);
+      recentSection += `${dateStr}: ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
     });
   
-  return billsSection + balanceSection + publixSection + recentSection;
+  // Build compact message
+  const compactMessage = `${billsSection}
+💰 BALANCE: $${totalAvailable.toFixed(2)}
+
+🏪 PUBLIX: $${publixThisMonth.toFixed(2)} ($${publixRemaining.toFixed(2)} left)
+📦 AMAZON: $${amazonThisMonth.toFixed(2)} ($${amazonRemaining.toFixed(2)} left)${recentSection}`;
+  
+  console.log(`📱 Compact SMS generated: ${compactMessage.length} characters`);
+  return compactMessage;
 }
 
 // Copy helper functions from webhook
