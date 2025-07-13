@@ -336,6 +336,22 @@ Real-time transaction data → AI analysis → Professional SMS alerts
 
 ## 📋 DEPLOYMENT LOG
 
+### 🗓️ July 13, 2025 - SMS FORMAT UPDATE WITH AVERAGE MONTHLY SPEND ✅ DEPLOYED
+- **11:31 AM EST**: Enhanced SMS format to include average monthly spend and use whole numbers
+- **User Request**: Add average monthly spend context and format all amounts as whole numbers
+- **Changes Made**:
+  - **Publix Format**: `$723 vs $685 expected pace against $1633 avg monthly spend`
+  - **Amazon Format**: `$193 vs $211 expected pace against $503 avg monthly spend`
+  - **Balance**: `$361` (whole number)
+  - **Recent Transactions**: All amounts as whole numbers ($17, $56, $31, $70, $5, $29)
+- **Technical Implementation**:
+  - Modified `buildAdvancedSMSMessage` in both test-sms and cron/scheduled-sms routes
+  - Used `Math.round()` for all currency amounts instead of `.toFixed(2)`
+  - Added `avgPublixMonthly` and `avgAmazonMonthly` to spending context
+- **Result**: Message length reduced from 665 to 647 characters (271 remaining)
+- **Git Commit**: c5f5e9d - 3 files changed, 25 insertions, 9 deletions
+- **Status**: ✅ LIVE IN PRODUCTION - Both test SMS and daily cron job updated
+
 ### 🗓️ July 13, 2025 - SMS NEXT BILLS SECTION FIX ✅ DEPLOYED
 - **11:19 AM EST**: Modified SMS generation to only show recurring bills from tagged merchants
 - **Problem**: "Next bills" section was showing both tagged merchants (🏷️) and historical predictions (🗓️)

@@ -271,7 +271,7 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
       const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
       const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
       const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
-      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.round(Math.abs(t.amount))}\n`;
+      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
     });
   
   // Build optimized message for SlickText (under 918 characters)

@@ -160,7 +160,7 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
   // Fetch current account balances
-  let balanceSection = '';
+  let totalAvailable = 0;
   if (userId) {
     try {
       const { data: userItems } = await supabase
@@ -173,19 +173,12 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
         
         const { data: accounts } = await supabase
           .from('accounts')
-          .select(`
-            name,
-            type,
-            current_balance,
-            available_balance,
-            balance_last_updated
-          `)
+          .select('available_balance')
           .in('item_id', itemIds)
           .eq('type', 'depository');
         
         if (accounts && accounts.length > 0) {
-          const totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
-          balanceSection = `\n💰 AVAILABLE BALANCE: $${totalAvailable.toFixed(2)}\n`;
+          totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
         }
       }
     } catch (error) {
@@ -193,15 +186,15 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     }
   }
   
-  // 1. PREDICTED TRANSACTIONS - Next 30 days
-  const upcomingBills = await findUpcomingBillsEnhanced(allTransactions, userId);
+  // Get next 6 most important bills - ONLY from tagged merchants (recurring bills)
+  const upcomingBills = await findUpcomingRecurringBills(userId);
   const thirtyDaysFromNow = new Date(now);
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   
-  let billsSection = '💳 PREDICTED TRANSACTIONS (NEXT 30 DAYS):\n';
+  let billsSection = '💳 NEXT BILLS:\n';
   upcomingBills
     .filter(bill => bill.predictedDate <= thirtyDaysFromNow)
-    .slice(0, 8)
+    .slice(0, 6)
     .forEach(bill => {
       const date = new Date(bill.predictedDate);
       const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
@@ -210,11 +203,10 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
       billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount} ${confidenceIcon}\n`;
     });
   
-  // 2. MERCHANT SPENDING - Monthly focus (Publix + Amazon)
+  // Monthly calculations
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   
-  // Monthly Publix spending
   const publixThisMonth = allTransactions
     .filter(t => {
       const transDate = new Date(t.date);
@@ -223,7 +215,6 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     })
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  // Monthly Amazon spending
   const amazonThisMonth = allTransactions
     .filter(t => {
       const transDate = new Date(t.date);
@@ -232,34 +223,25 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     })
     .reduce((sum, t) => sum + Math.abs(t.amount), 0);
   
-  // Calculate average monthly spending from historical data
+  // Calculate paced spending
   const avgPublixWeekly = calculateAverageWeeklyPublix(allTransactions);
   const avgPublixMonthly = avgPublixWeekly * 4.33;
-  
   const avgAmazonWeekly = calculateAverageWeeklyAmazon(allTransactions);
   const avgAmazonMonthly = avgAmazonWeekly * 4.33;
   
-  // Monthly paced projection for Publix
   const daysInMonth = monthEnd.getDate();
   const monthDaysElapsed = today.getDate();
   const publixPacedTarget = (avgPublixMonthly / daysInMonth) * monthDaysElapsed;
-  const publixPacedDiff = publixThisMonth - publixPacedTarget;
-  
-  // Monthly paced projection for Amazon
   const amazonPacedTarget = (avgAmazonMonthly / daysInMonth) * monthDaysElapsed;
+  
+  const publixPacedDiff = publixThisMonth - publixPacedTarget;
   const amazonPacedDiff = amazonThisMonth - amazonPacedTarget;
   
-  // Monthly budgets
-  const publixBudget = 400;
-  const amazonBudget = 300;
-  const publixBudgetRemaining = Math.max(0, publixBudget - publixThisMonth);
-  const amazonBudgetRemaining = Math.max(0, amazonBudget - amazonThisMonth);
-  
-  // AI Recommendation based on monthly metrics
+  // AI Recommendation
   let recommendation = '';
   if (publixPacedDiff > 50 || amazonPacedDiff > 50) {
     recommendation = 'Consider reducing impulse purchases this month';
-  } else if (publixBudgetRemaining < 50 || amazonBudgetRemaining < 50) {
+  } else if (publixThisMonth > 400 || amazonThisMonth > 300) {
     recommendation = 'Budget running low - focus on essentials only';
   } else if (publixPacedDiff < -20 && amazonPacedDiff < -20) {
     recommendation = 'Great pacing! Keep up the mindful spending';
@@ -267,77 +249,68 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     recommendation = 'Steady spending - you\'re on track';
   }
   
-  let publixSection = `\n🏪 PUBLIX SPENDING:\n`;
-  publixSection += `PACED MONTHLY - $${publixThisMonth.toFixed(2)} vs $${publixPacedTarget.toFixed(2)} expected`;
-  if (publixPacedDiff > 0) {
-    publixSection += ` (+$${publixPacedDiff.toFixed(2)} over pace)\n`;
-  } else if (publixPacedDiff < 0) {
-    publixSection += ` ($${Math.abs(publixPacedDiff).toFixed(2)} under pace)\n`;
-  } else {
-    publixSection += ` (on pace)\n`;
-  }
-  publixSection += `MONTHLY BUDGET REMAINING - $${publixBudgetRemaining.toFixed(2)}\n`;
-  
-  publixSection += `\n📦 AMAZON SPENDING:\n`;
-  publixSection += `PACED MONTHLY - $${amazonThisMonth.toFixed(2)} vs $${amazonPacedTarget.toFixed(2)} expected`;
-  if (amazonPacedDiff > 0) {
-    publixSection += ` (+$${amazonPacedDiff.toFixed(2)} over pace)\n`;
-  } else if (amazonPacedDiff < 0) {
-    publixSection += ` ($${Math.abs(amazonPacedDiff).toFixed(2)} under pace)\n`;
-  } else {
-    publixSection += ` (on pace)\n`;
-  }
-  publixSection += `MONTHLY BUDGET REMAINING - $${amazonBudgetRemaining.toFixed(2)}\n`;
-  
-  publixSection += `\nRECOMMENDATION - ${recommendation}`;
-  
-  // 3. RECENT TRANSACTIONS - Last 3 days
+  // Recent transactions (last 3 days, top 6)
   const threeDaysAgo = new Date(now);
   threeDaysAgo.setDate(now.getDate() - 3);
   
-  let recentSection = '\n\n📋 RECENT TRANSACTIONS:\n';
+  let recentSection = '\n📋 RECENT:\n';
   allTransactions
     .filter(t => new Date(t.date) >= threeDaysAgo)
-    .slice(0, 10)
+    .slice(0, 6)
     .forEach(t => {
       const transDate = new Date(t.date);
       const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
       const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
-      const merchant = t.merchant_name || t.name || 'Unknown';
+      const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
       recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
     });
   
-  return billsSection + balanceSection + publixSection + recentSection;
+  // Build optimized message for SlickText (under 918 characters)
+  const optimizedMessage = `${billsSection}
+💰 BALANCE: $${Math.round(totalAvailable)}
+
+🏪 PUBLIX: $${Math.round(publixThisMonth)} vs $${Math.round(publixPacedTarget)} expected pace against $${Math.round(avgPublixMonthly)} avg monthly spend
+📦 AMAZON: $${Math.round(amazonThisMonth)} vs $${Math.round(amazonPacedTarget)} expected pace against $${Math.round(avgAmazonMonthly)} avg monthly spend
+💡 ${recommendation}${recentSection}`;
+  
+  console.log(`📱 Optimized SMS generated: ${optimizedMessage.length} characters (SlickText limit: 918)`);
+  return optimizedMessage;
 }
 
 // Helper functions
-async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: string): Promise<Bill[]> {
+async function findUpcomingRecurringBills(userId: string): Promise<Array<{
+  merchant: string;
+  amount: string;
+  predictedDate: Date;
+  confidence: string;
+}>> {
   const { data: taggedMerchants } = await supabase
     .from('tagged_merchants')
-    .select('*')
-    .eq('user_id', userId);
+    .select('merchant_name, expected_amount, next_predicted_date')
+    .eq('user_id', userId)
+    .eq('is_active', true);
   
-  const upcomingBills: Bill[] = [];
-  const now = new Date();
+  let upcomingBills: Array<{
+    merchant: string;
+    amount: string;
+    predictedDate: Date;
+    confidence: string;
+  }> = [];
   
-  if (taggedMerchants) {
-    for (const merchant of taggedMerchants) {
-      const lastTransaction = transactions.find(t => 
-        (t.merchant_name || t.name || '').toLowerCase().includes(merchant.name.toLowerCase())
-      );
-      
-      if (lastTransaction) {
-        const nextDate = new Date(merchant.next_expected_date);
-        if (nextDate > now) {
-          upcomingBills.push({
-            merchant: merchant.name,
-            amount: `$${merchant.predicted_amount.toFixed(2)}`,
-            predictedDate: nextDate,
-            confidence: 'tagged'
-          });
-        }
+  if (taggedMerchants && taggedMerchants.length > 0) {
+    const now = new Date();
+    taggedMerchants.forEach(tm => {
+      const predictedDate = new Date(tm.next_predicted_date);
+      // Only include future bills
+      if (predictedDate > now) {
+        upcomingBills.push({
+          merchant: tm.merchant_name,
+          amount: `$${tm.expected_amount.toFixed(2)}`,
+          predictedDate: predictedDate,
+          confidence: 'tagged'
+        });
       }
-    }
+    });
   }
   
   return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
@@ -350,16 +323,13 @@ function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
   
   if (publixTransactions.length === 0) return 0;
   
-  const weeklyTotals = new Map<string, number>();
+  const totalSpent = publixTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const oldestDate = new Date(publixTransactions[publixTransactions.length - 1].date);
+  const newestDate = new Date(publixTransactions[0].date);
+  const daysDiff = Math.max(1, (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
+  const weeksDiff = daysDiff / 7;
   
-  publixTransactions.forEach(t => {
-    const date = new Date(t.date);
-    const yearWeek = `${date.getFullYear()}-${Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))}`;
-    weeklyTotals.set(yearWeek, (weeklyTotals.get(yearWeek) || 0) + Math.abs(t.amount));
-  });
-  
-  const totals = Array.from(weeklyTotals.values());
-  return totals.reduce((sum, total) => sum + total, 0) / totals.length;
+  return totalSpent / weeksDiff;
 }
 
 function calculateAverageWeeklyAmazon(transactions: Transaction[]): number {
@@ -369,14 +339,11 @@ function calculateAverageWeeklyAmazon(transactions: Transaction[]): number {
   
   if (amazonTransactions.length === 0) return 0;
   
-  const weeklyTotals = new Map<string, number>();
+  const totalSpent = amazonTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const oldestDate = new Date(amazonTransactions[amazonTransactions.length - 1].date);
+  const newestDate = new Date(amazonTransactions[0].date);
+  const daysDiff = Math.max(1, (newestDate.getTime() - oldestDate.getTime()) / (1000 * 60 * 60 * 24));
+  const weeksDiff = daysDiff / 7;
   
-  amazonTransactions.forEach(t => {
-    const date = new Date(t.date);
-    const yearWeek = `${date.getFullYear()}-${Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))}`;
-    weeklyTotals.set(yearWeek, (weeklyTotals.get(yearWeek) || 0) + Math.abs(t.amount));
-  });
-  
-  const totals = Array.from(weeklyTotals.values());
-  return totals.reduce((sum, total) => sum + total, 0) / totals.length;
+  return totalSpent / weeksDiff;
 } 
