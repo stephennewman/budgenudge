@@ -152,13 +152,25 @@ export async function buildSpendingSMS(allTransactions: Transaction[], userId: s
 export async function buildActivitySMS(allTransactions: Transaction[]): Promise<string> {
   try {
     const now = new Date();
-    const threeDaysAgo = new Date(now);
-    threeDaysAgo.setDate(now.getDate() - 3);
+    const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+    
+    console.log(`🔍 Activity SMS Debug:
+      - Current time: ${now.toISOString()}
+      - Three days ago: ${threeDaysAgo.toISOString()}
+      - Total transactions: ${allTransactions.length}
+    `);
     
     let recentSection = '📋 RECENT (Last 3 days):\n';
     const recentTransactions = allTransactions
-      .filter(t => new Date(t.date) >= threeDaysAgo)
+      .filter(t => {
+        const transDate = new Date(t.date);
+        const isRecent = transDate >= threeDaysAgo;
+        console.log(`  📅 Transaction: ${t.date} (${transDate.toISOString()}) vs ${threeDaysAgo.toISOString()} = ${isRecent} - ${t.name}`);
+        return isRecent;
+      })
       .slice(0, 6);
+    
+    console.log(`📊 Recent transactions found: ${recentTransactions.length}`);
     
     if (recentTransactions.length === 0) {
       recentSection += 'No recent transactions in last 3 days\n';
