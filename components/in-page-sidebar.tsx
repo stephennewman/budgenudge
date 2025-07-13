@@ -31,7 +31,7 @@ export default function InPageSidebar({
               : pathname === fullHref;
           return (
             <SidebarLink
-              key={index}
+              key={`sidebar-item-${item.href}-${index}`}
               href={fullHref}
               label={label}
               isActive={isActive}

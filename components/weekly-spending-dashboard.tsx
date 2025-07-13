@@ -760,7 +760,7 @@ export default function WeeklySpendingDashboard() {
             ) : (
               <div className="space-y-6">
                 {weeklyAnalysis.merchants.map((merchant, index) => (
-                  <div key={merchant.merchant} className="border rounded-lg p-6 space-y-4">
+                  <div key={`merchant-${merchant.merchant}-${index}`} className="border rounded-lg p-4 bg-white">
                     {/* Merchant Header */}
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-4">
@@ -869,7 +869,7 @@ export default function WeeklySpendingDashboard() {
                                 />
                                 {/* Points */}
                                 {points.map((point, pointIndex) => (
-                                  <g key={pointIndex}>
+                                  <g key={`point-${merchant.merchant}-${pointIndex}`}>
                                     <circle 
                                       cx={point.x} 
                                       cy={point.y} 
@@ -929,7 +929,7 @@ export default function WeeklySpendingDashboard() {
                           .sort((a, b) => new Date(b.weekStart).getTime() - new Date(a.weekStart).getTime())
                           .slice(0, 8) // Show most recent 8 active weeks
                           .map((week) => (
-                            <div key={week.weekStart} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
+                            <div key={`week-${merchant.merchant}-${week.weekStart}`} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
                               <span className="text-muted-foreground">
                                 {formatDateRange(week.weekStart, week.weekEnd)}
                               </span>
@@ -990,7 +990,7 @@ export default function WeeklySpendingDashboard() {
             ) : (
               <div className="space-y-6">
                 {monthlyAnalysis.merchants.map((merchant, index) => (
-                  <div key={merchant.merchant} className="border rounded-lg p-6 space-y-4">
+                  <div key={`monthly-merchant-${merchant.merchant}-${index}`} className="border rounded-lg p-4 bg-white">
                     {/* Merchant Header with Pacing Status */}
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-4">
@@ -1106,7 +1106,7 @@ export default function WeeklySpendingDashboard() {
                           .filter(month => month.amount > 0)
                           .slice(0, 6) // Show most recent 6 months
                           .map((month) => (
-                            <div key={month.month} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
+                            <div key={`month-${merchant.merchant}-${month.month}`} className="flex justify-between items-center text-sm py-1 px-2 hover:bg-white dark:hover:bg-gray-700 rounded">
                               <span className="text-muted-foreground">
                                 {month.monthName}
                               </span>

@@ -137,24 +137,20 @@ export default function TestRunner() {
           <div className="space-y-2">
             <h4 className="font-semibold">Test Results</h4>
             {results.summary.results.map((result, index) => (
-              <Card key={index} className="p-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3">
-                    <span className="text-lg">{getStatusIcon(result.status)}</span>
-                    <div>
-                      <div className={`font-medium ${getStatusColor(result.status)}`}>
-                        {result.name}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {result.message}
-                      </div>
-                    </div>
+              <div key={`test-result-${index}`} className="flex items-center gap-2 p-2 border rounded">
+                <span className="text-lg">{getStatusIcon(result.status)}</span>
+                <div>
+                  <div className={`font-medium ${getStatusColor(result.status)}`}>
+                    {result.name}
                   </div>
-                  <span className="text-xs text-gray-400">
-                    {result.duration}ms
-                  </span>
+                  <div className="text-sm text-gray-600 mt-1">
+                    {result.message}
+                  </div>
                 </div>
-              </Card>
+                <span className="text-xs text-gray-400">
+                  {result.duration}ms
+                </span>
+              </div>
             ))}
           </div>
         </div>

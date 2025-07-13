@@ -161,7 +161,7 @@ export default function UpcomingBillsTable() {
             </tr>
           ) : (
             predictions.map((prediction, index) => (
-              <tr key={index} className="hover:bg-gray-50">
+              <tr key={`prediction-${prediction.merchant_name}-${index}`} className="border-b">
                 <td className="border border-gray-300 px-4 py-2">{prediction.merchant}</td>
                 <td className="border border-gray-300 px-4 py-2">{prediction.datePrection}</td>
                 <td className="border border-gray-300 px-4 py-2">{prediction.amountPrediction}</td>
