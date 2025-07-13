@@ -21,7 +21,7 @@ interface Bill {
   confidence: string;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const startTime = new Date();
   console.log(`🧪 TEST SMS: Starting at ${startTime.toISOString()}`);
   
