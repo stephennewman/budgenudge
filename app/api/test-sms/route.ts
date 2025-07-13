@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 
@@ -21,7 +21,7 @@ interface Bill {
   confidence: string;
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const startTime = new Date();
   console.log(`🧪 TEST SMS: Starting at ${startTime.toISOString()}`);
   
