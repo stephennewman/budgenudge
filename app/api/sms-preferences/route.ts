@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update each preference
-    const updatePromises = preferences.map(async (pref: any) => {
+    const updatePromises = preferences.map(async (pref: { sms_type: string; enabled: boolean; frequency: string; phone_number?: string }) => {
       const { data, error } = await supabase
         .from('user_sms_preferences')
         .upsert({

@@ -9,14 +9,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Transaction interface
-interface Transaction {
-  date: string;
-  merchant_name?: string;
-  name: string;
-  amount: number;
-}
-
 // SMS Preference interface
 interface SMSPreference {
   user_id: string;

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { createSupabaseClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -51,7 +51,7 @@ export default function SMSPreferencesPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userId, setUserId] = useState<string>('');
 
-  const supabase = createClient();
+  const supabase = createSupabaseClient();
 
   useEffect(() => {
     loadUserAndPreferences();
@@ -88,7 +88,7 @@ export default function SMSPreferencesPage() {
     }
   };
 
-  const handlePreferenceChange = (smsType: string, field: keyof SMSPreference, value: any) => {
+  const handlePreferenceChange = (smsType: string, field: keyof SMSPreference, value: string | boolean) => {
     setPreferences(prev => 
       prev.map(pref => 
         pref.sms_type === smsType 
@@ -251,7 +251,7 @@ export default function SMSPreferencesPage() {
           <li>• Each SMS type can be enabled/disabled independently</li>
           <li>• Set different frequencies for each SMS type (30min, hourly, daily, weekly)</li>
           <li>• Optionally override phone numbers for specific SMS types</li>
-          <li>• SMS messages are only sent when there's meaningful data to report</li>
+          <li>• SMS messages are only sent when there&apos;s meaningful data to report</li>
           <li>• All messages are labeled with their type (📅 BILLS SMS, 📅 SPENDING SMS, etc.)</li>
         </ul>
       </div>
