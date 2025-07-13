@@ -36,6 +36,10 @@ export default async function ProtectedSidebar() {
           label: "⭐ Recurring Bills",
           href: "/recurring-bills",
         },
+        {
+          label: "📱 SMS Preferences",
+          href: "/sms-preferences",
+        },
         // REMOVED FOR PERFORMANCE: Subscription/paid features
         // {
         //   label: "Pricing",

@@ -76,6 +76,22 @@ Complete PostgreSQL schema with 5 core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 13, 2025 - MAJOR FEATURE: SMS TEMPLATE SPLIT SYSTEM ✅ COMPLETE
+- **2:15 PM EDT**: Successfully implemented SMS template split with user preferences
+- **Git Commit**: `3de93df` - Implement SMS template split with user preferences
+- **🎯 BREAKTHROUGH FEATURE**: Users can now subscribe to specific SMS types instead of receiving one overwhelming message
+- **3 New SMS Templates**:
+  - 📅 **BILLS SMS**: Upcoming bills and payments (from tagged merchants)
+  - 📅 **SPENDING SMS**: Budget analysis, balance, and AI recommendations
+  - 📅 **ACTIVITY SMS**: Recent transactions (last 3 days)
+- **Database Schema**: Added `user_sms_preferences` table with full RLS policies
+- **Template Functions**: Created `utils/sms/templates.ts` with modular SMS generation
+- **Smart Filtering**: Each SMS type only sends if meaningful data exists
+- **Frequency Control**: Each SMS type can have different frequencies (30min, hourly, daily, weekly)
+- **Phone Override**: Users can set different phone numbers for each SMS type
+- **Default Setup**: All existing users automatically get all 3 SMS types enabled with daily frequency
+- **Production Ready**: Full error handling, logging, and preference validation
+
 ### 🗓️ July 13, 2025 - URGENT BUG FIX: DUPLICATE SMS MESSAGES ✅ RESOLVED
 - **1:35 PM EDT**: Fixed critical bug causing duplicate/blank SMS messages
 - **Issue**: Scheduled SMS endpoint was processing all users but sending blank messages for users with no transaction data
