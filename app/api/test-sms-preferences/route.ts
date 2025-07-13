@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Create a Supabase client for server-side operations
@@ -7,12 +7,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('🧪 Testing SMS preferences system...');
     
     // Test 1: Check if table exists and is accessible
-    const { data: tableTest, error: tableError } = await supabase
+    const { error: tableError } = await supabase
       .from('user_sms_preferences')
       .select('*')
       .limit(1);
