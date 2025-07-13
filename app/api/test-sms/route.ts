@@ -214,8 +214,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     }
   }
   
-  // Get next 6 most important bills
-  const upcomingBills = await findUpcomingBillsEnhanced(allTransactions, userId);
+  // Get next 6 most important bills - ONLY from tagged merchants (recurring bills)
+  const upcomingBills = await findUpcomingRecurringBills(userId);
   const thirtyDaysFromNow = new Date(now);
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   
@@ -338,6 +338,34 @@ async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: st
   upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
   
   return upcomingBills;
+}
+
+async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
+  const { data: taggedMerchants } = await supabase
+    .from('tagged_merchants')
+    .select('merchant_name, expected_amount, next_predicted_date')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+  
+  let upcomingBills: Bill[] = [];
+  
+  if (taggedMerchants && taggedMerchants.length > 0) {
+    const now = new Date();
+    taggedMerchants.forEach(tm => {
+      const predictedDate = new Date(tm.next_predicted_date);
+      // Only include future bills
+      if (predictedDate > now) {
+        upcomingBills.push({
+          merchant: tm.merchant_name,
+          amount: `$${tm.expected_amount.toFixed(2)}`,
+          predictedDate: predictedDate,
+          confidence: 'tagged'
+        });
+      }
+    });
+  }
+  
+  return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
 function findUpcomingBills(transactions: Transaction[]): Bill[] {

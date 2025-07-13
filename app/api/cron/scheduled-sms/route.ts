@@ -189,8 +189,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
     }
   }
   
-  // Get next 6 most important bills
-  const upcomingBills = await findUpcomingBillsEnhanced(allTransactions, userId);
+  // Get next 6 most important bills - ONLY from tagged merchants (recurring bills)
+  const upcomingBills = await findUpcomingRecurringBills(userId);
   const thirtyDaysFromNow = new Date(now);
   thirtyDaysFromNow.setDate(now.getDate() + 30);
   
@@ -287,47 +287,32 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
 }
 
 // Copy helper functions from webhook
-async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: string): Promise<Bill[]> {
-  // Get tagged merchants first
+async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
   const { data: taggedMerchants } = await supabase
     .from('tagged_merchants')
-    .select('*')
-    .eq('user_id', userId);
+    .select('merchant_name, expected_amount, next_predicted_date')
+    .eq('user_id', userId)
+    .eq('is_active', true);
   
-  const upcomingBills: Bill[] = [];
-  const now = new Date();
+  let upcomingBills: Bill[] = [];
   
-  // Process tagged merchants
-  if (taggedMerchants) {
-    for (const merchant of taggedMerchants) {
-      const lastTransaction = transactions.find(t => 
-        (t.merchant_name || t.name || '').toLowerCase().includes(merchant.name.toLowerCase())
-      );
-      
-      if (lastTransaction) {
-        const nextDate = new Date(merchant.next_expected_date);
-        if (nextDate > now) {
-          upcomingBills.push({
-            merchant: merchant.name,
-            amount: `$${merchant.predicted_amount.toFixed(2)}`,
-            predictedDate: nextDate,
-            confidence: 'tagged'
-          });
-        }
+  if (taggedMerchants && taggedMerchants.length > 0) {
+    const now = new Date();
+    taggedMerchants.forEach(tm => {
+      const predictedDate = new Date(tm.next_predicted_date);
+      // Only include future bills
+      if (predictedDate > now) {
+        upcomingBills.push({
+          merchant: tm.merchant_name,
+          amount: `$${tm.expected_amount.toFixed(2)}`,
+          predictedDate: predictedDate,
+          confidence: 'tagged'
+        });
       }
-    }
+    });
   }
   
-  // Add historical analysis
-  const historicalBills = findUpcomingBills(transactions);
-  upcomingBills.push(...historicalBills);
-  
-  // Remove duplicates and sort by date
-  const uniqueBills = upcomingBills.filter((bill, index, self) => 
-    index === self.findIndex(b => b.merchant === bill.merchant)
-  );
-  
-  return uniqueBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
+  return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
 function findUpcomingBills(transactions: Transaction[]): Bill[] {
