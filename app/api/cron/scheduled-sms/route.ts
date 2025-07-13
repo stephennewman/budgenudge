@@ -108,12 +108,24 @@ export async function GET(request: NextRequest) {
         }
 
         if (!allTransactions || allTransactions.length === 0) {
-          console.log(`📭 No recent transactions found for user ${userId}`);
+          console.log(`📭 No recent transactions found for user ${userId} - skipping SMS`);
           continue;
         }
 
         // Generate advanced SMS message using existing logic
         const smsMessage = await buildAdvancedSMSMessage(allTransactions, userId);
+        
+        // Only send SMS if there's meaningful content (not just empty/default values)
+        if (!smsMessage || smsMessage.trim().length < 50) {
+          console.log(`📭 SMS message too short/empty for user ${userId} - skipping`);
+          continue;
+        }
+        
+        // Skip if SMS contains only zero values (indicates empty user data)
+        if (smsMessage.includes('💰 BALANCE: $0') && smsMessage.includes('vs $0 expected pace against $0 avg monthly spend')) {
+          console.log(`📭 SMS contains only zero values for user ${userId} - skipping empty data`);
+          continue;
+        }
         
         console.log(`📱 Generated SMS for user ${userId}: ${smsMessage.substring(0, 100)}...`);
 
