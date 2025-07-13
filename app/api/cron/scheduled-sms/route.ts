@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
     let successCount = 0;
     let failureCount = 0;
 
+    // Deduplication tracking: track what SMS types have been sent to each user
+    const sentTracker = new Map<string, Set<string>>();
+
     // Group preferences by user_id
     const userPreferences: Record<string, SMSPreference[]> = {};
     smsPreferences.forEach(pref => {
@@ -106,6 +109,12 @@ export async function GET(request: NextRequest) {
     for (const userId of Object.keys(userPreferences)) {
       try {
         const userPrefs = userPreferences[userId];
+        
+        // Initialize tracking for this user
+        if (!sentTracker.has(userId)) {
+          sentTracker.set(userId, new Set());
+        }
+        const userSentTypes = sentTracker.get(userId)!;
         
         // Find the user's item
         const userItem = itemsWithUsers.find(item => item.user_id === userId);
@@ -138,6 +147,12 @@ export async function GET(request: NextRequest) {
         // Process each enabled SMS type for this user
         for (const pref of userPrefs) {
           try {
+            // Check if we've already sent this SMS type to this user in this cycle
+            if (userSentTypes.has(pref.sms_type)) {
+              console.log(`🔄 Skipping duplicate ${pref.sms_type} SMS for user ${userId} - already sent in this cycle`);
+              continue;
+            }
+
             let smsMessage = '';
             let smsLabel = '';
 
@@ -177,15 +192,22 @@ export async function GET(request: NextRequest) {
             
             console.log(`📱 Sending ${pref.sms_type} SMS to user ${userId}: ${smsMessage.substring(0, 100)}...`);
 
+            // Clean message formatting without extra labels
+            const cleanMessage = `📅 ${pref.sms_type.toUpperCase()} SMS - BUDGENUDGE
+
+${smsMessage}`;
+
             // Send SMS using SlickText
             const smsResult = await sendEnhancedSlickTextSMS({
               phoneNumber: phoneNumber,
-              message: `${smsLabel} - BUDGENUDGE INSIGHT\n\n${smsMessage}`,
+              message: cleanMessage,
               userId: userId
             });
 
             if (smsResult.success) {
               console.log(`✅ ${pref.sms_type} SMS sent successfully to user: ${userId}`);
+              // Mark this SMS type as sent for this user
+              userSentTypes.add(pref.sms_type);
               successCount++;
             } else {
               console.log(`❌ ${pref.sms_type} SMS failed for user ${userId}: ${smsResult.error}`);
@@ -204,14 +226,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`📊 Template-based SMS processing complete: ${successCount} sent, ${failureCount} failed`);
+    console.log(`✅ SMS PROCESSING COMPLETE: ${successCount} sent, ${failureCount} failed`);
+    
+    // Generate deduplication summary
+    const deduplicationSummary = Array.from(sentTracker.entries()).map(([userId, sentTypes]) => ({
+      userId,
+      sentTypes: Array.from(sentTypes),
+      count: sentTypes.size
+    }));
 
-    return NextResponse.json({ 
-      success: true, 
-      processed: Object.keys(userPreferences).length,
-      sent: successCount,
-      failed: failureCount,
-      message: `Processed template-based SMS for ${Object.keys(userPreferences).length} users`
+    return NextResponse.json({
+      success: true,
+      processed: successCount + failureCount,
+      successCount,
+      failureCount,
+      deduplication: {
+        totalUsersProcessed: sentTracker.size,
+        totalUniqueMessagesSent: successCount,
+        duplicatesSkipped: smsPreferences.length - successCount - failureCount,
+        userSummary: deduplicationSummary
+      },
+      timestamp: new Date().toISOString()
     });
 
   } catch (error) {
