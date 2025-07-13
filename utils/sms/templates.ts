@@ -1,4 +1,4 @@
-import { supabase } from '@/utils/supabase/server';
+import { createSupabaseClient } from '@/utils/supabase/server';
 
 interface Transaction {
   date: string;
@@ -19,6 +19,8 @@ export type SMSTemplateType = 'bills' | 'spending' | 'activity';
 // Template 1: Bills & Payments
 export async function buildBillsSMS(userId: string): Promise<string> {
   try {
+    const supabase = await createSupabaseClient();
+    
     // For now, get recent large transactions as "upcoming bills"
     const { data: recentTransactions } = await supabase
       .from('transactions')

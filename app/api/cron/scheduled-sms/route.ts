@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
     for (const [userId, smsTypes] of userSMSMap) {
       try {
         // Find the user's bank connection
-        const userItem = itemsWithUsers.find((item: any) => item.user_id === userId);
+        const userItem = itemsWithUsers.find((item: { user_id: string; plaid_item_id: string }) => item.user_id === userId);
         if (!userItem) {
           console.log(`❌ No bank connection found for user ${userId}`);
           continue;
