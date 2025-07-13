@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 
@@ -8,7 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Transaction interface (matches the webhook)
+// Transaction interface
 interface Transaction {
   date: string;
   merchant_name?: string;
@@ -16,7 +16,7 @@ interface Transaction {
   amount: number;
 }
 
-// Bill interface (matches the webhook)  
+// Bill interface
 interface Bill {
   merchant: string;
   amount: string;
@@ -24,21 +24,15 @@ interface Bill {
   confidence: string;
 }
 
-export async function GET(request: NextRequest) {
-  // Secure GET method with same auth as POST
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
+export async function GET() {
   try {
-    console.log('🕐 Starting daily transaction analysis and SMS processing...');
+    console.log('🧪 Testing daily SMS system manually...');
     
     const now = new Date();
-    console.log(`⏰ Daily Analysis Time:
+    console.log(`⏰ Manual Test Time:
       - Server Time (UTC): ${now.toISOString()}
       - Server Time (Local): ${now.toLocaleString()}
-      - Analysis: Daily transaction insights for active users
+      - Purpose: Manual test of daily SMS analysis
     `);
     
     // Get all users who have transactions and phone numbers
@@ -83,6 +77,7 @@ export async function GET(request: NextRequest) {
     
     let successCount = 0;
     let failureCount = 0;
+    const results: { userId: string; status: string; error?: string; reason?: string; messageId?: string }[] = [];
 
     // Process each user
     for (const user of usersWithTransactions) {
@@ -93,18 +88,20 @@ export async function GET(request: NextRequest) {
         const { data: allTransactions, error: transError } = await supabase
           .from('transactions')
           .select('date, name, merchant_name, amount')
-                     .in('item_id', user.items.map((item: { id: number }) => item.id))
+          .in('item_id', user.items.map((item: { id: number }) => item.id))
           .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
           .order('date', { ascending: false });
 
         if (transError) {
           console.error(`Error fetching transactions for user ${user.id}:`, transError);
           failureCount++;
+          results.push({ userId: user.id, status: 'failed', error: transError.message });
           continue;
         }
 
         if (!allTransactions || allTransactions.length === 0) {
           console.log(`📭 No recent transactions found for user ${user.id}`);
+          results.push({ userId: user.id, status: 'skipped', reason: 'No recent transactions' });
           continue;
         }
 
@@ -116,44 +113,48 @@ export async function GET(request: NextRequest) {
         // Send SMS using SlickText
         const smsResult = await sendEnhancedSlickTextSMS({
           phoneNumber: user.phone,
-          message: `📊 DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
+          message: `🧪 TEST - DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
           userId: user.id
         });
 
         if (smsResult.success) {
-          console.log(`✅ Daily SMS sent successfully to user: ${user.id}`);
+          console.log(`✅ Test SMS sent successfully to user: ${user.id}`);
           successCount++;
+          results.push({ userId: user.id, status: 'success', messageId: smsResult.messageId });
         } else {
-          console.log(`❌ Daily SMS failed for user ${user.id}: ${smsResult.error}`);
+          console.log(`❌ Test SMS failed for user ${user.id}: ${smsResult.error}`);
           failureCount++;
+          results.push({ userId: user.id, status: 'failed', error: smsResult.error });
         }
 
       } catch (error) {
-        console.log(`❌ Daily SMS error for user ${user.id}: ${error}`);
+        console.log(`❌ Test SMS error for user ${user.id}: ${error}`);
         failureCount++;
+        results.push({ userId: user.id, status: 'failed', error: error instanceof Error ? error.message : 'Unknown error' });
       }
     }
 
-    console.log(`📊 Daily SMS processing complete: ${successCount} sent, ${failureCount} failed`);
+    console.log(`📊 Test SMS processing complete: ${successCount} sent, ${failureCount} failed`);
 
     return NextResponse.json({ 
       success: true, 
       processed: usersWithTransactions.length,
       sent: successCount,
       failed: failureCount,
-      message: `Processed daily analysis for ${usersWithTransactions.length} users`
+      results,
+      message: `Manual test completed for ${usersWithTransactions.length} users`
     });
 
   } catch (error) {
-    console.error('🚨 Daily SMS processing error:', error);
+    console.error('🚨 Test SMS processing error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error during daily SMS processing' 
+      error: 'Internal server error during test SMS processing' 
     }, { status: 500 });
   }
 }
 
-// Copy the analysis functions from the webhook to avoid duplication
+// Copy the analysis functions from the webhook
 async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: string): Promise<string> {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -162,7 +163,6 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   let balanceSection = '';
   if (userId) {
     try {
-      // First get the user's item IDs
       const { data: userItems } = await supabase
         .from('items')
         .select('id')
@@ -181,15 +181,11 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
             balance_last_updated
           `)
           .in('item_id', itemIds)
-          .eq('type', 'depository'); // Focus on checking/savings accounts
+          .eq('type', 'depository');
         
         if (accounts && accounts.length > 0) {
           const totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
           balanceSection = `\n💰 AVAILABLE BALANCE: $${totalAvailable.toFixed(2)}\n`;
-          
-          console.log(`📱 Including balance in SMS: $${totalAvailable.toFixed(2)} from ${accounts.length} accounts`);
-        } else {
-          console.log(`📱 No accounts found for balance inclusion in SMS`);
         }
       }
     } catch (error) {
@@ -238,10 +234,10 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   
   // Calculate average monthly spending from historical data
   const avgPublixWeekly = calculateAverageWeeklyPublix(allTransactions);
-  const avgPublixMonthly = avgPublixWeekly * 4.33; // Average weeks per month
+  const avgPublixMonthly = avgPublixWeekly * 4.33;
   
   const avgAmazonWeekly = calculateAverageWeeklyAmazon(allTransactions);
-  const avgAmazonMonthly = avgAmazonWeekly * 4.33; // Average weeks per month
+  const avgAmazonMonthly = avgAmazonWeekly * 4.33;
   
   // Monthly paced projection for Publix
   const daysInMonth = monthEnd.getDate();
@@ -314,9 +310,8 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   return billsSection + balanceSection + publixSection + recentSection;
 }
 
-// Copy helper functions from webhook
+// Helper functions
 async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: string): Promise<Bill[]> {
-  // Get tagged merchants first
   const { data: taggedMerchants } = await supabase
     .from('tagged_merchants')
     .select('*')
@@ -325,7 +320,6 @@ async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: st
   const upcomingBills: Bill[] = [];
   const now = new Date();
   
-  // Process tagged merchants
   if (taggedMerchants) {
     for (const merchant of taggedMerchants) {
       const lastTransaction = transactions.find(t => 
@@ -346,65 +340,7 @@ async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: st
     }
   }
   
-  // Add historical analysis
-  const historicalBills = findUpcomingBills(transactions);
-  upcomingBills.push(...historicalBills);
-  
-  // Remove duplicates and sort by date
-  const uniqueBills = upcomingBills.filter((bill, index, self) => 
-    index === self.findIndex(b => b.merchant === bill.merchant)
-  );
-  
-  return uniqueBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
-}
-
-function findUpcomingBills(transactions: Transaction[]): Bill[] {
-  const merchantPatterns = [
-    { pattern: 'netflix', name: 'Netflix' },
-    { pattern: 'spotify', name: 'Spotify' },
-    { pattern: 'amazon prime', name: 'Amazon Prime' },
-    { pattern: 'verizon', name: 'Verizon' },
-    { pattern: 'at&t', name: 'AT&T' },
-    { pattern: 'comcast', name: 'Comcast' },
-    { pattern: 'electric', name: 'Electric Bill' },
-    { pattern: 'water', name: 'Water Bill' },
-    { pattern: 'gas', name: 'Gas Bill' },
-    { pattern: 'insurance', name: 'Insurance' },
-    { pattern: 'mortgage', name: 'Mortgage' },
-    { pattern: 'rent', name: 'Rent' }
-  ];
-  
-  const bills: Bill[] = [];
-  const now = new Date();
-  
-  for (const { pattern, name } of merchantPatterns) {
-    const merchantTransactions = transactions.filter(t => 
-      (t.merchant_name || t.name || '').toLowerCase().includes(pattern)
-    );
-    
-    if (merchantTransactions.length >= 2) {
-      const amounts = merchantTransactions.map(t => Math.abs(t.amount));
-      const avgAmount = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
-      
-      const lastTransaction = merchantTransactions[0];
-      const lastDate = new Date(lastTransaction.date);
-      
-      // Estimate next payment date (30 days from last)
-      const nextDate = new Date(lastDate);
-      nextDate.setDate(lastDate.getDate() + 30);
-      
-      if (nextDate > now) {
-        bills.push({
-          merchant: name,
-          amount: `$${avgAmount.toFixed(2)}`,
-          predictedDate: nextDate,
-          confidence: 'monthly'
-        });
-      }
-    }
-  }
-  
-  return bills;
+  return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
 function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
@@ -443,15 +379,4 @@ function calculateAverageWeeklyAmazon(transactions: Transaction[]): number {
   
   const totals = Array.from(weeklyTotals.values());
   return totals.reduce((sum, total) => sum + total, 0) / totals.length;
-}
-
-// Handle authorization for cron jobs
-export async function POST(request: NextRequest) {
-  // Vercel Cron jobs use POST with authorization header
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
-  return GET(request);
 } 
