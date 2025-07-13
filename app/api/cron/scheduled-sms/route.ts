@@ -154,21 +154,17 @@ export async function GET(request: NextRequest) {
             }
 
             let smsMessage = '';
-            let smsLabel = '';
 
             // Generate message based on SMS type
             switch (pref.sms_type) {
               case 'bills':
                 smsMessage = await buildBillsSMS(userId);
-                smsLabel = '📅 BILLS SMS';
                 break;
               case 'spending':
                 smsMessage = await buildSpendingSMS(allTransactions, userId);
-                smsLabel = '📅 SPENDING SMS';
                 break;
               case 'activity':
                 smsMessage = await buildActivitySMS(allTransactions);
-                smsLabel = '📅 ACTIVITY SMS';
                 break;
               default:
                 console.log(`⚠️ Unknown SMS type: ${pref.sms_type}`);
