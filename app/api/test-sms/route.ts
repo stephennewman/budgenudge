@@ -311,34 +311,7 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   return optimizedMessage;
 }
 
-// Copy helper functions from cron route
-async function findUpcomingBillsEnhanced(transactions: Transaction[], userId: string): Promise<Bill[]> {
-  const { data: taggedMerchants } = await supabase
-    .from('tagged_merchants')
-    .select('merchant_name, predicted_amount, predicted_date')
-    .eq('user_id', userId)
-    .eq('is_recurring', true);
-  
-  let upcomingBills: Bill[] = [];
-  
-  if (taggedMerchants && taggedMerchants.length > 0) {
-    taggedMerchants.forEach(tm => {
-      upcomingBills.push({
-        merchant: tm.merchant_name,
-        amount: `$${tm.predicted_amount.toFixed(2)}`,
-        predictedDate: new Date(tm.predicted_date),
-        confidence: 'tagged'
-      });
-    });
-  }
-  
-  const patternBills = findUpcomingBills(transactions);
-  upcomingBills = upcomingBills.concat(patternBills);
-  
-  upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
-  
-  return upcomingBills;
-}
+
 
 async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
   const { data: taggedMerchants } = await supabase
@@ -347,7 +320,7 @@ async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
     .eq('user_id', userId)
     .eq('is_active', true);
   
-  let upcomingBills: Bill[] = [];
+  const upcomingBills: Bill[] = [];
   
   if (taggedMerchants && taggedMerchants.length > 0) {
     const now = new Date();
@@ -368,55 +341,7 @@ async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
   return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
-function findUpcomingBills(transactions: Transaction[]): Bill[] {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  
-  const merchantMap = new Map<string, Transaction[]>();
-  
-  transactions.forEach(transaction => {
-    const merchant = transaction.merchant_name || transaction.name || 'Unknown';
-    const normalizedMerchant = merchant.toLowerCase().trim();
-    
-    if (!merchantMap.has(normalizedMerchant)) {
-      merchantMap.set(normalizedMerchant, []);
-    }
-    merchantMap.get(normalizedMerchant)!.push(transaction);
-  });
-  
-  const upcomingBills: Bill[] = [];
-  
-  merchantMap.forEach((merchantTransactions, merchant) => {
-    if (merchantTransactions.length < 2) return;
-    
-    merchantTransactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    
-    const monthlyTransactions = merchantTransactions.filter(t => {
-      const transDate = new Date(t.date);
-      return transDate.getMonth() === currentMonth - 1 && transDate.getFullYear() === currentYear;
-    });
-    
-    if (monthlyTransactions.length > 0) {
-      const lastTransaction = monthlyTransactions[monthlyTransactions.length - 1];
-      const lastDate = new Date(lastTransaction.date);
-      const predictedDate = new Date(currentYear, currentMonth, lastDate.getDate());
-      
-      if (predictedDate < now) {
-        predictedDate.setMonth(predictedDate.getMonth() + 1);
-      }
-      
-      upcomingBills.push({
-        merchant: merchant,
-        amount: `$${Math.abs(lastTransaction.amount).toFixed(2)}`,
-        predictedDate: predictedDate,
-        confidence: 'monthly'
-      });
-    }
-  });
-  
-  return upcomingBills;
-}
+
 
 function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
   const publixTransactions = transactions.filter(t => 

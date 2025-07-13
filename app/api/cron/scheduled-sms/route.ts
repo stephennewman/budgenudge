@@ -294,7 +294,7 @@ async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
     .eq('user_id', userId)
     .eq('is_active', true);
   
-  let upcomingBills: Bill[] = [];
+  const upcomingBills: Bill[] = [];
   
   if (taggedMerchants && taggedMerchants.length > 0) {
     const now = new Date();
@@ -315,54 +315,6 @@ async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
   return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
 }
 
-function findUpcomingBills(transactions: Transaction[]): Bill[] {
-  const merchantPatterns = [
-    { pattern: 'netflix', name: 'Netflix' },
-    { pattern: 'spotify', name: 'Spotify' },
-    { pattern: 'amazon prime', name: 'Amazon Prime' },
-    { pattern: 'verizon', name: 'Verizon' },
-    { pattern: 'at&t', name: 'AT&T' },
-    { pattern: 'comcast', name: 'Comcast' },
-    { pattern: 'electric', name: 'Electric Bill' },
-    { pattern: 'water', name: 'Water Bill' },
-    { pattern: 'gas', name: 'Gas Bill' },
-    { pattern: 'insurance', name: 'Insurance' },
-    { pattern: 'mortgage', name: 'Mortgage' },
-    { pattern: 'rent', name: 'Rent' }
-  ];
-  
-  const bills: Bill[] = [];
-  const now = new Date();
-  
-  for (const { pattern, name } of merchantPatterns) {
-    const merchantTransactions = transactions.filter(t => 
-      (t.merchant_name || t.name || '').toLowerCase().includes(pattern)
-    );
-    
-    if (merchantTransactions.length >= 2) {
-      const amounts = merchantTransactions.map(t => Math.abs(t.amount));
-      const avgAmount = amounts.reduce((sum, amount) => sum + amount, 0) / amounts.length;
-      
-      const lastTransaction = merchantTransactions[0];
-      const lastDate = new Date(lastTransaction.date);
-      
-      // Estimate next payment date (30 days from last)
-      const nextDate = new Date(lastDate);
-      nextDate.setDate(lastDate.getDate() + 30);
-      
-      if (nextDate > now) {
-        bills.push({
-          merchant: name,
-          amount: `$${avgAmount.toFixed(2)}`,
-          predictedDate: nextDate,
-          confidence: 'monthly'
-        });
-      }
-    }
-  }
-  
-  return bills;
-}
 
 function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
   const publixTransactions = transactions.filter(t => 

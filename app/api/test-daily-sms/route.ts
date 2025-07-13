@@ -16,13 +16,7 @@ interface Transaction {
   amount: number;
 }
 
-// Bill interface
-interface Bill {
-  merchant: string;
-  amount: string;
-  predictedDate: Date;
-  confidence: string;
-}
+
 
 export async function GET() {
   try {
@@ -290,7 +284,7 @@ async function findUpcomingRecurringBills(userId: string): Promise<Array<{
     .eq('user_id', userId)
     .eq('is_active', true);
   
-  let upcomingBills: Array<{
+  const upcomingBills: Array<{
     merchant: string;
     amount: string;
     predictedDate: Date;

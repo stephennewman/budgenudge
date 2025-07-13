@@ -355,7 +355,7 @@ async function findUpcomingRecurringBills(userId: string): Promise<Array<{
     .eq('user_id', userId)
     .eq('is_active', true);
   
-  let upcomingBills: Array<{
+  const upcomingBills: Array<{
     merchant: string;
     amount: string;
     predictedDate: Date;
