@@ -17,6 +17,15 @@ interface TaggedMerchant {
   created_at: string;
 }
 
+interface Transaction {
+  id: string;
+  date: string;
+  amount: number;
+  name: string;
+  merchant_name?: string;
+  category?: string[];
+}
+
 export default function RecurringBillsManager() {
   const [taggedMerchants, setTaggedMerchants] = useState<TaggedMerchant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +44,11 @@ export default function RecurringBillsManager() {
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
+  // Historical transactions state
+  const [expandedMerchant, setExpandedMerchant] = useState<number | null>(null);
+  const [merchantTransactions, setMerchantTransactions] = useState<{[key: number]: Transaction[]}>({});
+  const [loadingTransactions, setLoadingTransactions] = useState<{[key: number]: boolean}>({});
+
   useEffect(() => {
     fetchTaggedMerchants();
   }, []);
@@ -51,6 +65,42 @@ export default function RecurringBillsManager() {
       console.error('Error fetching tagged merchants:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMerchantTransactions = async (merchantId: number, merchantName: string) => {
+    if (merchantTransactions[merchantId]) {
+      // Already fetched, just toggle
+      setExpandedMerchant(expandedMerchant === merchantId ? null : merchantId);
+      return;
+    }
+
+    setLoadingTransactions(prev => ({ ...prev, [merchantId]: true }));
+    
+    try {
+      const response = await fetch('/api/plaid/transactions');
+      const data = await response.json();
+      
+      if (response.ok && data.transactions) {
+        // Filter transactions for this merchant (same logic as analyze endpoint)
+        const filtered = data.transactions.filter((t: Transaction) => {
+          const tName = (t.merchant_name || t.name || '').toLowerCase();
+          const searchName = merchantName.toLowerCase();
+          return tName.includes(searchName);
+        });
+        
+        // Sort by date (newest first) and limit to last 5 transactions
+        const sorted = filtered
+          .sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5);
+        
+        setMerchantTransactions(prev => ({ ...prev, [merchantId]: sorted }));
+        setExpandedMerchant(merchantId);
+      }
+    } catch (error) {
+      console.error('Error fetching merchant transactions:', error);
+    } finally {
+      setLoadingTransactions(prev => ({ ...prev, [merchantId]: false }));
     }
   };
 
@@ -267,74 +317,113 @@ export default function RecurringBillsManager() {
         ) : (
           <div className="space-y-3">
             {activeMerchants.map((merchant) => (
-              <div key={merchant.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                {editingId === merchant.id ? (
-                  // Edit mode
-                  <div className="flex items-center gap-3 flex-1">
-                    <span className="font-medium min-w-0 flex-1">{merchant.merchant_name}</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editForm.expected_amount}
-                      onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
-                      className="w-24"
-                    />
-                    <select 
-                      value={editForm.prediction_frequency}
-                      onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
-                      className="px-2 py-1 border rounded text-sm"
-                    >
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="bi-monthly">Bi-monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                    </select>
-                    <div className="flex gap-1">
-                      <Button size="sm" onClick={() => handleSaveEdit(merchant.id)}>Save</Button>
-                      <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+              <div key={merchant.id} className="bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between p-3">
+                  {editingId === merchant.id ? (
+                    // Edit mode
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className="font-medium min-w-0 flex-1">{merchant.merchant_name}</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editForm.expected_amount}
+                        onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
+                        className="w-24"
+                      />
+                      <select 
+                        value={editForm.prediction_frequency}
+                        onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
+                        className="px-2 py-1 border rounded text-sm"
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="bi-monthly">Bi-monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                      </select>
+                      <div className="flex gap-1">
+                        <Button size="sm" onClick={() => handleSaveEdit(merchant.id)}>Save</Button>
+                        <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // View mode
+                    <>
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium truncate">{merchant.merchant_name}</span>
+                            {merchant.auto_detected && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">🤖 Auto</span>}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Next: {formatNextDate(merchant.next_predicted_date)} • 
+                            <span className={getConfidenceColor(merchant.confidence_score)}> {merchant.confidence_score}% confidence</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">${merchant.expected_amount.toFixed(2)}</div>
+                          <div className="text-sm text-gray-600 flex items-center gap-1">
+                            {getFrequencyEmoji(merchant.prediction_frequency)}
+                            {merchant.prediction_frequency}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => fetchMerchantTransactions(merchant.id, merchant.merchant_name)}
+                          disabled={loadingTransactions[merchant.id]}
+                        >
+                          {loadingTransactions[merchant.id] ? '⏳' : expandedMerchant === merchant.id ? '📋' : '📋'}
+                          {expandedMerchant === merchant.id ? ' Hide' : ' History'}
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleToggleActive(merchant.id, merchant.is_active)}
+                        >
+                          Disable
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleDelete(merchant.id, merchant.merchant_name)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                {/* Historical Transactions */}
+                {expandedMerchant === merchant.id && (
+                  <div className="px-3 pb-3">
+                    <div className="bg-white border rounded-md p-3">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">📋 Recent Transactions (Spot Check)</h4>
+                      {loadingTransactions[merchant.id] ? (
+                        <div className="text-sm text-gray-500">Loading...</div>
+                      ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
+                        <div className="space-y-1">
+                          {merchantTransactions[merchant.id].map((transaction) => (
+                            <div key={transaction.id} className="flex justify-between items-center text-sm py-1">
+                              <div className="flex-1">
+                                <div className="font-medium">{transaction.merchant_name || transaction.name}</div>
+                                <div className="text-gray-500">{transaction.date} • {transaction.category?.[0]}</div>
+                              </div>
+                              <div className="font-medium text-red-600">
+                                ${Math.abs(transaction.amount).toFixed(2)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">No recent transactions found for this merchant.</div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  // View mode
-                  <>
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium truncate">{merchant.merchant_name}</span>
-                          {merchant.auto_detected && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">🤖 Auto</span>}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          Next: {formatNextDate(merchant.next_predicted_date)} • 
-                          <span className={getConfidenceColor(merchant.confidence_score)}> {merchant.confidence_score}% confidence</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">${merchant.expected_amount.toFixed(2)}</div>
-                        <div className="text-sm text-gray-600 flex items-center gap-1">
-                          {getFrequencyEmoji(merchant.prediction_frequency)}
-                          {merchant.prediction_frequency}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleToggleActive(merchant.id, merchant.is_active)}
-                      >
-                        Disable
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDelete(merchant.id, merchant.merchant_name)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </>
                 )}
               </div>
             ))}

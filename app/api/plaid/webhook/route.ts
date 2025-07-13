@@ -4,6 +4,9 @@ import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/ser
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 
+// Set timeout to 60 seconds for Hobby plan (prevents 503 errors)
+export const maxDuration = 60;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
