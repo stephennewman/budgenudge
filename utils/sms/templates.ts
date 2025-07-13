@@ -151,21 +151,27 @@ export async function buildSpendingSMS(allTransactions: Transaction[], userId: s
 // Template 3: Recent Activity
 export async function buildActivitySMS(allTransactions: Transaction[]): Promise<string> {
   try {
+    // Get current date in UTC
     const now = new Date();
-    const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
+    const currentDateUTC = new Date(now.toISOString().split('T')[0] + 'T00:00:00.000Z');
+    
+    // Calculate 3 days ago (inclusive)
+    const threeDaysAgoUTC = new Date(currentDateUTC.getTime() - (3 * 24 * 60 * 60 * 1000));
     
     console.log(`🔍 Activity SMS Debug:
-      - Current time: ${now.toISOString()}
-      - Three days ago: ${threeDaysAgo.toISOString()}
+      - Current UTC date: ${currentDateUTC.toISOString()}
+      - Three days ago UTC: ${threeDaysAgoUTC.toISOString()}
       - Total transactions: ${allTransactions.length}
     `);
     
     let recentSection = '📋 RECENT (Last 3 days):\n';
     const recentTransactions = allTransactions
       .filter(t => {
-        const transDate = new Date(t.date);
-        const isRecent = transDate >= threeDaysAgo;
-        console.log(`  📅 Transaction: ${t.date} (${transDate.toISOString()}) vs ${threeDaysAgo.toISOString()} = ${isRecent} - ${t.name}`);
+        // Parse transaction date as UTC date (since DB stores YYYY-MM-DD format)
+        const transactionDateUTC = new Date(t.date + 'T00:00:00.000Z');
+        const isRecent = transactionDateUTC >= threeDaysAgoUTC;
+        
+        console.log(`  📅 Transaction: ${t.date} (${transactionDateUTC.toISOString()}) >= ${threeDaysAgoUTC.toISOString()} = ${isRecent} - ${t.name}`);
         return isRecent;
       })
       .slice(0, 6);
@@ -176,9 +182,9 @@ export async function buildActivitySMS(allTransactions: Transaction[]): Promise<
       recentSection += 'No recent transactions in last 3 days\n';
     } else {
       recentTransactions.forEach(t => {
-        const transDate = new Date(t.date);
-        const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
-        const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
+        const transDate = new Date(t.date + 'T00:00:00.000Z');
+        const dateStr = `${transDate.getUTCMonth() + 1}/${transDate.getUTCDate()}`;
+        const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getUTCDay()];
         const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
         recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
       });
