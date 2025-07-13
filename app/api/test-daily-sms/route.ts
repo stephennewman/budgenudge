@@ -107,7 +107,7 @@ export async function GET() {
         // Send SMS using SlickText
         const smsResult = await sendEnhancedSlickTextSMS({
           phoneNumber: user.phone,
-          message: `🧪 TEST - DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
+          message: `🧪 TEST-DAILY-SMS - BudgeNudge Insight\n\n${smsMessage}`,
           userId: user.id
         });
 

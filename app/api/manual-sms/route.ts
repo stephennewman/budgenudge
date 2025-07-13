@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const targetPhoneNumber = phoneNumber || await getSmsGatewayWithFallback(userId);
     
     // Default message if none provided
-    const smsMessage = message || `🔔 Manual BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    const smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
     
     // If scheduled time is provided, store in database for later processing
     if (scheduledTime) {
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     
     const smsResult = await sendUnifiedSMS({
       phoneNumber: targetPhoneNumber,
-      message: smsMessage,
+      message: message ? `📝 MANUAL SMS\n\n${smsMessage}` : smsMessage,
       userId: userId,
       context: 'manual-sms'
     });

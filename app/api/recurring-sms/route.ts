@@ -97,13 +97,24 @@ Generated: ${new Date().toLocaleString('en-US', {
       });
     }
 
-    // Format recurring transactions for SMS
-    let smsMessage = `📊 BudgeNudge Recurring Bills
+    // Build the SMS message
+    let smsMessage = `🔄 RECURRING SMS - BudgeNudge Monthly Bills Analysis
+
+Generated: ${new Date().toLocaleString('en-US', { 
+      timeZone: 'America/New_York',
+      month: 'short', 
+      day: 'numeric', 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    })} EST
+
+📊 TOP 12 RECURRING BILLS:
 
 `;
-    
-    let totalMonthlyRecurring = 0;
+
     const messageLines: string[] = [];
+    let totalMonthlyRecurring = 0;
     
     recurringMerchants.forEach((merchant: RecurringTransaction, index: number) => {
       const monthlyAmount = merchant.avg_monthly_spending || 0;

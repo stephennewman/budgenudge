@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
         // Send SMS using SlickText with fallback phone number system
         const smsResult = await sendEnhancedSlickTextSMS({
           phoneNumber: '+16173472721', // Use your phone number directly for now
-          message: `📊 DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
+          message: `📅 SCHEDULED SMS - BUDGENUDGE INSIGHT\n\n${smsMessage}`,
           userId: userId
         });
 
