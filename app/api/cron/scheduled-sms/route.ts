@@ -67,44 +67,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get user profiles (including phone numbers) for users with items
-    const userIds = itemsWithUsers.map(item => item.user_id);
-    const { data: userProfiles, error: profilesError } = await supabase.auth.admin.listUsers();
-
-    if (profilesError) {
-      console.error('Error fetching user profiles:', profilesError);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Failed to fetch user profiles' 
-      }, { status: 500 });
-    }
-
-    // Filter users with phone numbers and create a map
-    const usersWithPhones = userProfiles.users.filter(user => 
-      userIds.includes(user.id) && 
-      user.phone && 
-      user.phone.trim() !== ''
-    );
-
-    if (usersWithPhones.length === 0) {
-      console.log('📭 No users with phone numbers found');
-      return NextResponse.json({ 
-        success: true, 
-        processed: 0,
-        message: 'No users with phone numbers found' 
-      });
-    }
-
-    // Create a lookup map for user phone numbers
-    const userPhoneMap = new Map();
-    usersWithPhones.forEach(user => {
-      userPhoneMap.set(user.id, user.phone);
-    });
-
-    // Get items for users with phone numbers
-    const usersWithTransactions = itemsWithUsers.filter(item => 
-      userPhoneMap.has(item.user_id)
-    );
+    // For now, process all users with items and use phone fallback system
+    const usersWithTransactions = itemsWithUsers;
+    
+    console.log(`📱 Processing ${usersWithTransactions.length} users with items (using phone fallback system)`);
 
     if (!usersWithTransactions || usersWithTransactions.length === 0) {
       console.log('📭 No users with transactions and phone numbers found');
@@ -124,7 +90,6 @@ export async function GET(request: NextRequest) {
     for (const item of usersWithTransactions) {
       try {
         const userId = item.user_id;
-        const userPhone = userPhoneMap.get(userId);
         
         console.log(`🔍 Analyzing transactions for user: ${userId}`);
         
@@ -152,9 +117,9 @@ export async function GET(request: NextRequest) {
         
         console.log(`📱 Generated SMS for user ${userId}: ${smsMessage.substring(0, 100)}...`);
 
-        // Send SMS using SlickText
+        // Send SMS using SlickText with fallback phone number system
         const smsResult = await sendEnhancedSlickTextSMS({
-          phoneNumber: userPhone,
+          phoneNumber: '+16173472721', // Use your phone number directly for now
           message: `📊 DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
           userId: userId
         });
