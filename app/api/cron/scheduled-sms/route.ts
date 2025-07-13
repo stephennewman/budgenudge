@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { buildBillsSMS, buildSpendingSMS, buildActivitySMS, SMSTemplateType } from '@/utils/sms/templates';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -8,7 +9,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Transaction interface (matches the webhook)
+// Transaction interface
 interface Transaction {
   date: string;
   merchant_name?: string;
@@ -16,12 +17,13 @@ interface Transaction {
   amount: number;
 }
 
-// Bill interface (matches the webhook)  
-interface Bill {
-  merchant: string;
-  amount: string;
-  predictedDate: Date;
-  confidence: string;
+// SMS Preference interface
+interface SMSPreference {
+  user_id: string;
+  sms_type: SMSTemplateType;
+  enabled: boolean;
+  frequency: string;
+  phone_number?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -32,16 +34,16 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    console.log('🕐 Starting daily transaction analysis and SMS processing...');
+    console.log('🕐 Starting SMS processing with template preferences...');
     
     const now = new Date();
-    console.log(`⏰ Daily Analysis Time:
+    console.log(`⏰ SMS Analysis Time:
       - Server Time (UTC): ${now.toISOString()}
       - Server Time (Local): ${now.toLocaleString()}
-      - Analysis: Daily transaction insights for active users
+      - Analysis: Template-based SMS for active users with preferences
     `);
     
-    // Get all users with items (bank connections) and phone numbers
+    // Get all users with items (bank connections) and their SMS preferences
     const { data: itemsWithUsers, error: itemsError } = await supabase
       .from('items')
       .select(`
@@ -67,37 +69,66 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For now, process all users with items and use phone fallback system
-    const usersWithTransactions = itemsWithUsers;
+    // Get current frequency (30min schedule)
+    const currentFrequency = '30min';
     
-    console.log(`📱 Processing ${usersWithTransactions.length} users with items (using phone fallback system)`);
+    // Get SMS preferences for all users with enabled preferences matching current frequency
+    const { data: smsPreferences, error: prefsError } = await supabase
+      .from('user_sms_preferences')
+      .select('user_id, sms_type, enabled, frequency, phone_number')
+      .eq('enabled', true)
+      .eq('frequency', currentFrequency);
 
-    if (!usersWithTransactions || usersWithTransactions.length === 0) {
-      console.log('📭 No users with transactions and phone numbers found');
+    if (prefsError) {
+      console.error('Error fetching SMS preferences:', prefsError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Failed to fetch SMS preferences' 
+      }, { status: 500 });
+    }
+
+    if (!smsPreferences || smsPreferences.length === 0) {
+      console.log('📭 No enabled SMS preferences found for current frequency');
       return NextResponse.json({ 
         success: true, 
         processed: 0,
-        message: 'No users with transactions to analyze' 
+        message: 'No enabled SMS preferences found' 
       });
     }
 
-    console.log(`📨 Found ${usersWithTransactions.length} users with transactions to analyze`);
+    console.log(`📨 Found ${smsPreferences.length} enabled SMS preferences to process`);
     
     let successCount = 0;
     let failureCount = 0;
 
-    // Process each user
-    for (const item of usersWithTransactions) {
+    // Group preferences by user_id
+    const userPreferences: Record<string, SMSPreference[]> = {};
+    smsPreferences.forEach(pref => {
+      if (!userPreferences[pref.user_id]) {
+        userPreferences[pref.user_id] = [];
+      }
+      userPreferences[pref.user_id].push(pref);
+    });
+
+    // Process each user's preferences
+    for (const userId of Object.keys(userPreferences)) {
       try {
-        const userId = item.user_id;
+        const userPrefs = userPreferences[userId];
         
-        console.log(`🔍 Analyzing transactions for user: ${userId}`);
+        // Find the user's item
+        const userItem = itemsWithUsers.find(item => item.user_id === userId);
+        if (!userItem) {
+          console.log(`⚠️ No item found for user ${userId} - skipping`);
+          continue;
+        }
+
+        console.log(`🔍 Processing ${userPrefs.length} SMS types for user: ${userId}`);
         
         // Get all transactions for this user (last 90 days for analysis)
         const { data: allTransactions, error: transError } = await supabase
           .from('transactions')
           .select('date, name, merchant_name, amount')
-          .eq('plaid_item_id', item.plaid_item_id)
+          .eq('plaid_item_id', userItem.plaid_item_id)
           .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
           .order('date', { ascending: false });
 
@@ -108,271 +139,98 @@ export async function GET(request: NextRequest) {
         }
 
         if (!allTransactions || allTransactions.length === 0) {
-          console.log(`📭 No recent transactions found for user ${userId} - skipping SMS`);
+          console.log(`📭 No recent transactions found for user ${userId} - skipping all SMS`);
           continue;
         }
 
-        // Generate advanced SMS message using existing logic
-        const smsMessage = await buildAdvancedSMSMessage(allTransactions, userId);
-        
-        // Only send SMS if there's meaningful content (not just empty/default values)
-        if (!smsMessage || smsMessage.trim().length < 50) {
-          console.log(`📭 SMS message too short/empty for user ${userId} - skipping`);
-          continue;
-        }
-        
-        // Skip if SMS contains only zero values (indicates empty user data)
-        if (smsMessage.includes('💰 BALANCE: $0') && smsMessage.includes('vs $0 expected pace against $0 avg monthly spend')) {
-          console.log(`📭 SMS contains only zero values for user ${userId} - skipping empty data`);
-          continue;
-        }
-        
-        console.log(`📱 Generated SMS for user ${userId}: ${smsMessage.substring(0, 100)}...`);
+        // Process each enabled SMS type for this user
+        for (const pref of userPrefs) {
+          try {
+            let smsMessage = '';
+            let smsLabel = '';
 
-        // Send SMS using SlickText with fallback phone number system
-        const smsResult = await sendEnhancedSlickTextSMS({
-          phoneNumber: '+16173472721', // Use your phone number directly for now
-          message: `📅 SCHEDULED SMS - BUDGENUDGE INSIGHT\n\n${smsMessage}`,
-          userId: userId
-        });
+            // Generate message based on SMS type
+            switch (pref.sms_type) {
+              case 'bills':
+                smsMessage = await buildBillsSMS(userId);
+                smsLabel = '📅 BILLS SMS';
+                break;
+              case 'spending':
+                smsMessage = await buildSpendingSMS(allTransactions, userId);
+                smsLabel = '📅 SPENDING SMS';
+                break;
+              case 'activity':
+                smsMessage = await buildActivitySMS(allTransactions);
+                smsLabel = '📅 ACTIVITY SMS';
+                break;
+              default:
+                console.log(`⚠️ Unknown SMS type: ${pref.sms_type}`);
+                continue;
+            }
 
-        if (smsResult.success) {
-          console.log(`✅ Daily SMS sent successfully to user: ${userId}`);
-          successCount++;
-        } else {
-          console.log(`❌ Daily SMS failed for user ${userId}: ${smsResult.error}`);
-          failureCount++;
+            // Skip if message is empty or too short
+            if (!smsMessage || smsMessage.trim().length < 20) {
+              console.log(`📭 ${pref.sms_type} SMS too short for user ${userId} - skipping`);
+              continue;
+            }
+
+            // Skip if SMS contains only zero/empty values
+            if (smsMessage.includes('💰 BALANCE: $0') && smsMessage.includes('vs $0 expected pace')) {
+              console.log(`📭 ${pref.sms_type} SMS contains only zero values for user ${userId} - skipping`);
+              continue;
+            }
+
+            // Use phone number from preference or default
+            const phoneNumber = pref.phone_number || '+16173472721';
+            
+            console.log(`📱 Sending ${pref.sms_type} SMS to user ${userId}: ${smsMessage.substring(0, 100)}...`);
+
+            // Send SMS using SlickText
+            const smsResult = await sendEnhancedSlickTextSMS({
+              phoneNumber: phoneNumber,
+              message: `${smsLabel} - BUDGENUDGE INSIGHT\\n\\n${smsMessage}`,
+              userId: userId
+            });
+
+            if (smsResult.success) {
+              console.log(`✅ ${pref.sms_type} SMS sent successfully to user: ${userId}`);
+              successCount++;
+            } else {
+              console.log(`❌ ${pref.sms_type} SMS failed for user ${userId}: ${smsResult.error}`);
+              failureCount++;
+            }
+
+          } catch (error) {
+            console.log(`❌ Error processing ${pref.sms_type} SMS for user ${userId}: ${error}`);
+            failureCount++;
+          }
         }
 
       } catch (error) {
-        console.log(`❌ Daily SMS error for user ${item.user_id}: ${error}`);
+        console.log(`❌ Error processing user ${userId}: ${error}`);
         failureCount++;
       }
     }
 
-    console.log(`📊 Daily SMS processing complete: ${successCount} sent, ${failureCount} failed`);
+    console.log(`📊 Template-based SMS processing complete: ${successCount} sent, ${failureCount} failed`);
 
     return NextResponse.json({ 
       success: true, 
-      processed: usersWithTransactions.length,
+      processed: Object.keys(userPreferences).length,
       sent: successCount,
       failed: failureCount,
-      message: `Processed daily analysis for ${usersWithTransactions.length} users`
+      message: `Processed template-based SMS for ${Object.keys(userPreferences).length} users`
     });
 
   } catch (error) {
-    console.error('🚨 Daily SMS processing error:', error);
+    console.error('🚨 Template-based SMS processing error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error during daily SMS processing' 
+      error: 'Internal server error during template-based SMS processing' 
     }, { status: 500 });
   }
 }
 
-// Copy the analysis functions from the webhook to avoid duplication
-async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: string): Promise<string> {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  
-  // Fetch current account balances
-  let totalAvailable = 0;
-  if (userId) {
-    try {
-      const { data: userItems } = await supabase
-        .from('items')
-        .select('id')
-        .eq('user_id', userId);
-      
-      if (userItems && userItems.length > 0) {
-        const itemIds = userItems.map((item: { id: number }) => item.id);
-        
-        const { data: accounts } = await supabase
-          .from('accounts')
-          .select('available_balance')
-          .in('item_id', itemIds)
-          .eq('type', 'depository');
-        
-        if (accounts && accounts.length > 0) {
-          totalAvailable = accounts.reduce((sum: number, acc: { available_balance: number | null }) => sum + (acc.available_balance || 0), 0);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching balances for SMS:', error);
-    }
-  }
-  
-  // Get next 6 most important bills - ONLY from tagged merchants (recurring bills)
-  const upcomingBills = await findUpcomingRecurringBills(userId);
-  const thirtyDaysFromNow = new Date(now);
-  thirtyDaysFromNow.setDate(now.getDate() + 30);
-  
-  let billsSection = '💳 NEXT BILLS:\n';
-  upcomingBills
-    .filter(bill => bill.predictedDate <= thirtyDaysFromNow)
-    .slice(0, 6)
-    .forEach(bill => {
-      const date = new Date(bill.predictedDate);
-      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-      const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
-      const confidenceIcon = bill.confidence === 'tagged' ? '🏷️' : bill.confidence === 'monthly' ? '🗓️' : '📊';
-      billsSection += `${dateStr} (${dayStr}): ${bill.merchant} ${bill.amount} ${confidenceIcon}\n`;
-    });
-  
-  // Calculate monthly spending with pacing
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  
-  const publixThisMonth = allTransactions
-    .filter(t => {
-      const transDate = new Date(t.date);
-      return (t.merchant_name || t.name || '').toLowerCase().includes('publix') && 
-             transDate >= monthStart && transDate <= monthEnd;
-    })
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  
-  const amazonThisMonth = allTransactions
-    .filter(t => {
-      const transDate = new Date(t.date);
-      return (t.merchant_name || t.name || '').toLowerCase().includes('amazon') && 
-             transDate >= monthStart && transDate <= monthEnd;
-    })
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-  
-  // Calculate paced spending
-  const avgPublixWeekly = calculateAverageWeeklyPublix(allTransactions);
-  const avgPublixMonthly = avgPublixWeekly * 4.33;
-  const avgAmazonWeekly = calculateAverageWeeklyAmazon(allTransactions);
-  const avgAmazonMonthly = avgAmazonWeekly * 4.33;
-  
-  const daysInMonth = monthEnd.getDate();
-  const monthDaysElapsed = today.getDate();
-  const publixPacedTarget = (avgPublixMonthly / daysInMonth) * monthDaysElapsed;
-  const amazonPacedTarget = (avgAmazonMonthly / daysInMonth) * monthDaysElapsed;
-  
-  const publixPacedDiff = publixThisMonth - publixPacedTarget;
-  const amazonPacedDiff = amazonThisMonth - amazonPacedTarget;
-  
-  // Monthly budgets
-  const publixBudget = 400;
-  const amazonBudget = 300;
-  const publixRemaining = Math.max(0, publixBudget - publixThisMonth);
-  const amazonRemaining = Math.max(0, amazonBudget - amazonThisMonth);
-  
-  // AI Recommendation
-  let recommendation = '';
-  if (publixPacedDiff > 50 || amazonPacedDiff > 50) {
-    recommendation = 'Consider reducing impulse purchases this month';
-  } else if (publixRemaining < 50 || amazonRemaining < 50) {
-    recommendation = 'Budget running low - focus on essentials only';
-  } else if (publixPacedDiff < -20 && amazonPacedDiff < -20) {
-    recommendation = 'Great pacing! Keep up the mindful spending';
-  } else {
-    recommendation = 'Steady spending - you\'re on track';
-  }
-  
-  // Recent transactions (last 3 days, top 6)
-  const threeDaysAgo = new Date(now);
-  threeDaysAgo.setDate(now.getDate() - 3);
-  
-  let recentSection = '\n📋 RECENT:\n';
-  allTransactions
-    .filter(t => new Date(t.date) >= threeDaysAgo)
-    .slice(0, 6)
-    .forEach(t => {
-      const transDate = new Date(t.date);
-      const dateStr = `${transDate.getMonth() + 1}/${transDate.getDate()}`;
-      const dayStr = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][transDate.getDay()];
-      const merchant = (t.merchant_name || t.name || 'Unknown').substring(0, 20);
-      recentSection += `${dateStr} (${dayStr}): ${merchant} $${Math.abs(t.amount).toFixed(2)}\n`;
-    });
-  
-  // Build optimized message for SlickText (under 918 characters)
-  const optimizedMessage = `${billsSection}
-💰 BALANCE: $${Math.round(totalAvailable)}
-
-🏪 PUBLIX: $${Math.round(publixThisMonth)} vs $${Math.round(publixPacedTarget)} expected pace against $${Math.round(avgPublixMonthly)} avg monthly spend
-📦 AMAZON: $${Math.round(amazonThisMonth)} vs $${Math.round(amazonPacedTarget)} expected pace against $${Math.round(avgAmazonMonthly)} avg monthly spend
-💡 ${recommendation}${recentSection}`;
-  
-  console.log(`📱 Optimized SMS generated: ${optimizedMessage.length} characters (SlickText limit: 918)`);
-  return optimizedMessage;
-}
-
-// Copy helper functions from webhook
-async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
-  const { data: taggedMerchants } = await supabase
-    .from('tagged_merchants')
-    .select('merchant_name, expected_amount, next_predicted_date')
-    .eq('user_id', userId)
-    .eq('is_active', true);
-  
-  const upcomingBills: Bill[] = [];
-  
-  if (taggedMerchants && taggedMerchants.length > 0) {
-    const now = new Date();
-    taggedMerchants.forEach(tm => {
-      const predictedDate = new Date(tm.next_predicted_date);
-      // Only include future bills
-      if (predictedDate > now) {
-        upcomingBills.push({
-          merchant: tm.merchant_name,
-          amount: `$${tm.expected_amount.toFixed(2)}`,
-          predictedDate: predictedDate,
-          confidence: 'tagged'
-        });
-      }
-    });
-  }
-  
-  return upcomingBills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());
-}
-
-
-function calculateAverageWeeklyPublix(transactions: Transaction[]): number {
-  const publixTransactions = transactions.filter(t => 
-    (t.merchant_name || t.name || '').toLowerCase().includes('publix')
-  );
-  
-  if (publixTransactions.length === 0) return 0;
-  
-  const weeklyTotals = new Map<string, number>();
-  
-  publixTransactions.forEach(t => {
-    const date = new Date(t.date);
-    const yearWeek = `${date.getFullYear()}-${Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))}`;
-    weeklyTotals.set(yearWeek, (weeklyTotals.get(yearWeek) || 0) + Math.abs(t.amount));
-  });
-  
-  const totals = Array.from(weeklyTotals.values());
-  return totals.reduce((sum, total) => sum + total, 0) / totals.length;
-}
-
-function calculateAverageWeeklyAmazon(transactions: Transaction[]): number {
-  const amazonTransactions = transactions.filter(t => 
-    (t.merchant_name || t.name || '').toLowerCase().includes('amazon')
-  );
-  
-  if (amazonTransactions.length === 0) return 0;
-  
-  const weeklyTotals = new Map<string, number>();
-  
-  amazonTransactions.forEach(t => {
-    const date = new Date(t.date);
-    const yearWeek = `${date.getFullYear()}-${Math.floor(date.getTime() / (7 * 24 * 60 * 60 * 1000))}`;
-    weeklyTotals.set(yearWeek, (weeklyTotals.get(yearWeek) || 0) + Math.abs(t.amount));
-  });
-  
-  const totals = Array.from(weeklyTotals.values());
-  return totals.reduce((sum, total) => sum + total, 0) / totals.length;
-}
-
-// Handle authorization for cron jobs
 export async function POST(request: NextRequest) {
-  // Vercel Cron jobs use POST with authorization header
-  const authHeader = request.headers.get('authorization');
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  
   return GET(request);
 } 
