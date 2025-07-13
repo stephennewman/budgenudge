@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
             // Send SMS using SlickText
             const smsResult = await sendEnhancedSlickTextSMS({
               phoneNumber: phoneNumber,
-              message: `${smsLabel} - BUDGENUDGE INSIGHT\\n\\n${smsMessage}`,
+              message: `${smsLabel} - BUDGENUDGE INSIGHT\n\n${smsMessage}`,
               userId: userId
             });
 
