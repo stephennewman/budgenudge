@@ -41,34 +41,70 @@ export async function GET(request: NextRequest) {
       - Analysis: Daily transaction insights for active users
     `);
     
-    // Get all users who have transactions and phone numbers
-    const { data: usersWithTransactions, error: usersError } = await supabase
-      .from('users')
+    // Get all users with items (bank connections) and phone numbers
+    const { data: itemsWithUsers, error: itemsError } = await supabase
+      .from('items')
       .select(`
         id,
-        phone,
-        email,
-        items!inner (
-          id,
-          transactions!inner (
-            id,
-            date,
-            name,
-            merchant_name,
-            amount
-          )
-        )
-      `)
-      .not('phone', 'is', null)
-      .not('phone', 'eq', '');
+        user_id,
+        plaid_item_id
+      `);
 
-    if (usersError) {
-      console.error('Error fetching users with transactions:', usersError);
+    if (itemsError) {
+      console.error('Error fetching items:', itemsError);
       return NextResponse.json({ 
         success: false, 
-        error: 'Failed to fetch users with transactions' 
+        error: 'Failed to fetch items' 
       }, { status: 500 });
     }
+
+    if (!itemsWithUsers || itemsWithUsers.length === 0) {
+      console.log('📭 No items (bank connections) found');
+      return NextResponse.json({ 
+        success: true, 
+        processed: 0,
+        message: 'No items found' 
+      });
+    }
+
+    // Get user profiles (including phone numbers) for users with items
+    const userIds = itemsWithUsers.map(item => item.user_id);
+    const { data: userProfiles, error: profilesError } = await supabase.auth.admin.listUsers();
+
+    if (profilesError) {
+      console.error('Error fetching user profiles:', profilesError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Failed to fetch user profiles' 
+      }, { status: 500 });
+    }
+
+    // Filter users with phone numbers and create a map
+    const usersWithPhones = userProfiles.users.filter(user => 
+      userIds.includes(user.id) && 
+      user.phone && 
+      user.phone.trim() !== ''
+    );
+
+    if (usersWithPhones.length === 0) {
+      console.log('📭 No users with phone numbers found');
+      return NextResponse.json({ 
+        success: true, 
+        processed: 0,
+        message: 'No users with phone numbers found' 
+      });
+    }
+
+    // Create a lookup map for user phone numbers
+    const userPhoneMap = new Map();
+    usersWithPhones.forEach(user => {
+      userPhoneMap.set(user.id, user.phone);
+    });
+
+    // Get items for users with phone numbers
+    const usersWithTransactions = itemsWithUsers.filter(item => 
+      userPhoneMap.has(item.user_id)
+    );
 
     if (!usersWithTransactions || usersWithTransactions.length === 0) {
       console.log('📭 No users with transactions and phone numbers found');
@@ -85,51 +121,54 @@ export async function GET(request: NextRequest) {
     let failureCount = 0;
 
     // Process each user
-    for (const user of usersWithTransactions) {
+    for (const item of usersWithTransactions) {
       try {
-        console.log(`🔍 Analyzing transactions for user: ${user.id}`);
+        const userId = item.user_id;
+        const userPhone = userPhoneMap.get(userId);
+        
+        console.log(`🔍 Analyzing transactions for user: ${userId}`);
         
         // Get all transactions for this user (last 90 days for analysis)
         const { data: allTransactions, error: transError } = await supabase
           .from('transactions')
           .select('date, name, merchant_name, amount')
-                     .in('item_id', user.items.map((item: { id: number }) => item.id))
+          .eq('plaid_item_id', item.plaid_item_id)
           .gte('date', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
           .order('date', { ascending: false });
 
         if (transError) {
-          console.error(`Error fetching transactions for user ${user.id}:`, transError);
+          console.error(`Error fetching transactions for user ${userId}:`, transError);
           failureCount++;
           continue;
         }
 
         if (!allTransactions || allTransactions.length === 0) {
-          console.log(`📭 No recent transactions found for user ${user.id}`);
+          console.log(`📭 No recent transactions found for user ${userId}`);
           continue;
         }
 
         // Generate advanced SMS message using existing logic
-        const smsMessage = await buildAdvancedSMSMessage(allTransactions, user.id);
+        const smsMessage = await buildAdvancedSMSMessage(allTransactions, userId);
         
-        console.log(`📱 Generated SMS for user ${user.id}: ${smsMessage.substring(0, 100)}...`);
+        console.log(`📱 Generated SMS for user ${userId}: ${smsMessage.substring(0, 100)}...`);
 
         // Send SMS using SlickText
         const smsResult = await sendEnhancedSlickTextSMS({
-          phoneNumber: user.phone,
+          phoneNumber: userPhone,
           message: `📊 DAILY BUDGENUDGE INSIGHT\n\n${smsMessage}`,
-          userId: user.id
+          userId: userId
         });
 
         if (smsResult.success) {
-          console.log(`✅ Daily SMS sent successfully to user: ${user.id}`);
+          console.log(`✅ Daily SMS sent successfully to user: ${userId}`);
           successCount++;
         } else {
-          console.log(`❌ Daily SMS failed for user ${user.id}: ${smsResult.error}`);
+          console.log(`❌ Daily SMS failed for user ${userId}: ${smsResult.error}`);
           failureCount++;
         }
 
       } catch (error) {
-        console.log(`❌ Daily SMS error for user ${user.id}: ${error}`);
+        console.log(`❌ Daily SMS error for user ${item.user_id}: ${error}`);
         failureCount++;
       }
     }
@@ -162,7 +201,7 @@ async function buildAdvancedSMSMessage(allTransactions: Transaction[], userId: s
   let balanceSection = '';
   if (userId) {
     try {
-      // First get the user's item IDs
+      // Get the user's item IDs
       const { data: userItems } = await supabase
         .from('items')
         .select('id')
