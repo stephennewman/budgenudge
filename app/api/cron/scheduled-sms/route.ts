@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
-import { buildBillsSMS, buildSpendingSMS, buildActivitySMS, SMSTemplateType } from '@/utils/sms/templates';
+import { generateSMSMessage } from '@/utils/sms/templates';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { DateTime } from 'luxon';
 
-interface SMSPreference {
-  user_id: string;
-  sms_type: SMSTemplateType;
-  enabled: boolean;
-  frequency: string;
-  phone_number?: string;
-}
+type NewSMSTemplateType = 'recurring' | 'recent' | 'pacing';
 
 export async function GET(request: NextRequest) {
   // Check authorization
@@ -19,7 +14,7 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    console.log('🕐 Starting simplified SMS processing...');
+    console.log('🕐 Starting NEW SMS template processing...');
     
     const supabase = await createSupabaseClient();
     
@@ -37,156 +32,117 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get enabled SMS preferences for 30min frequency
-    const { data: smsPreferences, error: prefsError } = await supabase
-      .from('user_sms_preferences')
-      .select('user_id, sms_type, enabled, frequency, phone_number')
-      .eq('enabled', true)
-      .eq('frequency', '30min');
+    console.log(`👥 Found ${itemsWithUsers.length} users with bank connections`);
 
-    if (prefsError || !smsPreferences || smsPreferences.length === 0) {
-      console.log('📭 No enabled SMS preferences found');
-      return NextResponse.json({ 
-        success: true, 
-        processed: 0,
-        message: 'No enabled SMS preferences found' 
-      });
-    }
-
-    console.log(`📨 Found ${smsPreferences.length} enabled SMS preferences`);
+    // For now, send all 3 templates to all users (simplified approach)
+    // Later this can be controlled by user preferences
+    const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'pacing'];
     
     let successCount = 0;
     let failureCount = 0;
+    let processedUsers = 0;
 
-    // Group by user_id and get unique SMS types per user
-    const userSMSMap = new Map<string, Set<SMSTemplateType>>();
-    
-    smsPreferences.forEach((pref: SMSPreference) => {
-      if (!userSMSMap.has(pref.user_id)) {
-        userSMSMap.set(pref.user_id, new Set());
-      }
-      userSMSMap.get(pref.user_id)!.add(pref.sms_type);
-    });
+    // Get current time in EST
+    const nowEST = DateTime.now().setZone('America/New_York');
+    const nowMinutes = nowEST.hour * 60 + nowEST.minute;
 
     // Process each user
-    for (const [userId, smsTypes] of userSMSMap) {
+    for (const userItem of itemsWithUsers) {
       try {
-        // Find the user's bank connection
-        const userItem = itemsWithUsers.find((item: { user_id: string; plaid_item_id: string }) => item.user_id === userId);
-        if (!userItem) {
-          console.log(`❌ No bank connection found for user ${userId}`);
+        const userId = userItem.user_id;
+        processedUsers++;
+
+        // Fetch user's preferred send_time from user_sms_settings
+        let sendTime = '18:00'; // Default to 6:00 PM
+        const { data: settings } = await supabase
+          .from('user_sms_settings')
+          .select('send_time')
+          .eq('user_id', userId)
+          .single();
+        if (settings && settings.send_time) {
+          sendTime = settings.send_time;
+        }
+        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+        const sendMinutes = sendHour * 60 + sendMinute;
+        // Only send if current time is within 10 minutes of send_time
+        if (Math.abs(nowMinutes - sendMinutes) > 10) {
+          console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST)`);
           continue;
         }
 
-        // Get transactions for this user (last 30 days)
-        const { data: allTransactions, error: transError } = await supabase
-          .from('transactions')
-          .select('date, name, merchant_name, amount')
-          .eq('plaid_item_id', userItem.plaid_item_id)
-          .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-          .order('date', { ascending: false });
+        console.log(`📱 Processing user ${userId} (${processedUsers}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
-        if (transError || !allTransactions) {
-          console.log(`❌ Failed to fetch transactions for user ${userId}`);
-          failureCount++;
-          continue;
-        }
-
-        console.log(`📊 User ${userId}: ${allTransactions.length} transactions, SMS types: ${Array.from(smsTypes).join(', ')}`);
-
-        // Get user's phone number (use first preference found)
-        const userPref = smsPreferences.find((p: SMSPreference) => p.user_id === userId);
-        const phoneNumber = userPref?.phone_number || '+16173472721';
-
-        // Send one SMS per type
-        for (const smsType of smsTypes) {
+        // Send each template type
+        for (const templateType of templatesToSend) {
           try {
-            let smsMessage = '';
+            console.log(`📝 Generating ${templateType} SMS for user ${userId}`);
+            
+            // Generate message using new template system
+            const smsMessage = await generateSMSMessage(userId, templateType);
 
-            // Generate message based on SMS type
-            switch (smsType) {
-              case 'bills':
-                smsMessage = await buildBillsSMS(userId);
-                break;
-              case 'spending':
-                smsMessage = await buildSpendingSMS(allTransactions, userId);
-                break;
-              case 'activity':
-                smsMessage = await buildActivitySMS(allTransactions);
-                break;
-              default:
-                console.log(`⚠️ Unknown SMS type: ${smsType}`);
-                continue;
-            }
-
-            // Skip if message is too short
-            if (!smsMessage || smsMessage.trim().length < 10) {
-              console.log(`📭 ${smsType} SMS too short for user ${userId} - skipping`);
+            // Skip if message is too short or indicates an error
+            if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
+              console.log(`📭 ${templateType} SMS too short or error for user ${userId} - skipping`);
+              failureCount++;
               continue;
             }
 
-            // Format the final SMS
-            const cleanMessage = `📅 ${smsType.toUpperCase()} SMS - BUDGENUDGE
+            console.log(`📱 Sending ${templateType} SMS to user ${userId}`);
+            console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
-${smsMessage}`;
-
-            console.log(`📱 Sending ${smsType} SMS to user ${userId}`);
-
-            // Send SMS
+            // Send SMS using primary phone number (no overrides)
             const smsResult = await sendEnhancedSlickTextSMS({
-              phoneNumber: phoneNumber,
-              message: cleanMessage,
+              phoneNumber: '+16173472721', // Default for now - will use user's primary later
+              message: smsMessage,
               userId: userId
             });
 
             if (smsResult.success) {
               successCount++;
-              console.log(`✅ ${smsType} SMS sent successfully to user ${userId}`);
+              console.log(`✅ ${templateType} SMS sent successfully to user ${userId}`);
             } else {
               failureCount++;
-              console.log(`❌ Failed to send ${smsType} SMS to user ${userId}:`, smsResult.error);
+              console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
             }
+
+            // Add small delay between SMS sends to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
 
           } catch (smsError) {
             failureCount++;
-            console.error(`❌ Error sending ${smsType} SMS to user ${userId}:`, smsError);
+            console.error(`❌ Error processing ${templateType} SMS for user ${userId}:`, smsError);
           }
         }
 
       } catch (userError) {
         failureCount++;
-        console.error(`❌ Error processing user ${userId}:`, userError);
+        console.error(`❌ Error processing user ${userItem.user_id}:`, userError);
       }
     }
 
-    const totalProcessed = successCount + failureCount;
-    
-    console.log(`📊 SMS Processing Complete:
-      - Users processed: ${userSMSMap.size}
-      - SMS sent successfully: ${successCount}
-      - SMS failed: ${failureCount}
-      - Total processed: ${totalProcessed}
-    `);
-
-    return NextResponse.json({
+    const result = {
       success: true,
-      processed: totalProcessed,
+      processed: successCount + failureCount,
       successCount,
       failureCount,
-      usersProcessed: userSMSMap.size,
-      message: `Processed ${totalProcessed} SMS for ${userSMSMap.size} users`
-    });
+      usersProcessed: processedUsers,
+      message: `Processed ${successCount + failureCount} SMS for ${processedUsers} users`
+    };
+
+    console.log('📊 SMS Processing Complete:', result);
+    return NextResponse.json(result);
 
   } catch (error) {
-    console.error('❌ Error in SMS cron job:', error);
+    console.error('❌ Cron job error:', error);
     return NextResponse.json({ 
       success: false, 
-      error: 'SMS processing failed',
+      error: 'Internal server error',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 });
   }
 }
 
+// Keep POST for manual testing
 export async function POST(request: NextRequest) {
   return GET(request);
 } 

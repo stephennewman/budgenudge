@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 import { sendUnifiedSMS } from '@/utils/sms/unified-sms';
+import { generateSMSMessage } from '@/utils/sms/templates';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -11,13 +12,76 @@ const supabase = createClient(
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, phoneNumber, scheduledTime, userId, userTimezone } = await request.json();
+    const { message, phoneNumber, scheduledTime, userId, userTimezone, templateType } = await request.json();
+    
+    // Debug: Log incoming request
+    console.log('DEBUG: manual-sms POST body:', { message, phoneNumber, scheduledTime, userId, userTimezone });
     
     // Get user's SMS gateway (with fallback to default)
     const targetPhoneNumber = phoneNumber || await getSmsGatewayWithFallback(userId);
     
+    // Debug: Log target phone number
+    console.log('DEBUG: Target phone number:', targetPhoneNumber);
+    
+    let smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    let transactionsText = '';
+    
+    // If a valid templateType is provided, use the corresponding SMS template
+    if (userId && templateType && ['recurring','recent','pacing'].includes(templateType)) {
+      smsMessage = await generateSMSMessage(userId, templateType);
+    } else if (userId) {
+      const { data: userItems, error: itemsError } = await supabase
+        .from('items')
+        .select('plaid_item_id')
+        .eq('user_id', userId);
+      console.log('DEBUG: Supabase items for user:', { userItems, itemsError });
+      if (userItems && userItems.length > 0) {
+        const itemIds = userItems.map(item => item.plaid_item_id);
+        const { data: transactions, error: txError } = await supabase
+          .from('transactions')
+          .select('date, merchant_name, name, amount')
+          .in('plaid_item_id', itemIds)
+          .order('date', { ascending: false })
+          .limit(10); // Changed from 5 to 10
+        console.log('DEBUG: Supabase transactions for user:', { transactions, txError });
+        if (transactions && transactions.length > 0) {
+          transactionsText = '\n\nRecent Transactions:';
+          transactions.forEach(t => {
+            // Use the raw date string from Supabase
+            const date = t.date; // e.g., '2025-07-13'
+            const merchant = (t.merchant_name || t.name).substring(0, 18);
+            const amount = t.amount.toFixed(2);
+            transactionsText += `\n${date}: ${merchant} - $${amount}`;
+          });
+          smsMessage += transactionsText;
+        }
+      }
+    }
+    
     // Default message if none provided
-    const smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    // const smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    
+    // Debug: Log message content
+    console.log('DEBUG: SMS message content:', smsMessage);
+    
+    // If userId is provided, try to fetch recent transactions for debug
+    // if (userId) {
+    //   const { data: userItems, error: itemsError } = await supabase
+    //     .from('items')
+    //     .select('plaid_item_id')
+    //     .eq('user_id', userId);
+    //   console.log('DEBUG: Supabase items for user:', { userItems, itemsError });
+    //   if (userItems && userItems.length > 0) {
+    //     const itemIds = userItems.map(item => item.plaid_item_id);
+    //     const { data: transactions, error: txError } = await supabase
+    //       .from('transactions')
+    //       .select('date, merchant_name, name, amount')
+    //       .in('plaid_item_id', itemIds)
+    //       .order('date', { ascending: false })
+    //       .limit(5);
+    //     console.log('DEBUG: Supabase transactions for user:', { transactions, txError });
+    //   }
+    // }
     
     // If scheduled time is provided, store in database for later processing
     if (scheduledTime) {
@@ -40,94 +104,16 @@ export async function POST(request: NextRequest) {
         - Current Time (UTC): ${now.toISOString()}
         - Current Time (Local): ${now.toLocaleString()}
       `);
-      
-      // Validate the scheduled time is in the future
-      if (scheduledDate <= now) {
-        console.log(`❌ Scheduled time validation failed:
-          - Scheduled: ${scheduledDate.toISOString()}
-          - Current: ${now.toISOString()}
-          - Difference: ${scheduledDate.getTime() - now.getTime()}ms
-        `);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Scheduled time must be in the future' 
-        }, { status: 400 });
-      }
-
-      // Store the scheduled message in the database
-      const { data, error } = await supabase
-        .from('scheduled_sms')
-        .insert({
-          user_id: userId,
-          phone_number: targetPhoneNumber,
-          message: smsMessage,
-          scheduled_time: scheduledDate.toISOString(),
-          status: 'pending'
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error scheduling SMS:', error);
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Failed to schedule SMS',
-          details: error.message 
-        }, { status: 500 });
-      }
-
-      console.log('📅 SMS scheduled successfully:', {
-        id: data.id,
-        scheduled_time: data.scheduled_time,
-        user_timezone: userTimezone
-      });
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `SMS scheduled for ${scheduledDate.toLocaleString()}`,
-        scheduledId: data.id,
-        scheduledTimeUTC: scheduledDate.toISOString(),
-        userTimezone: userTimezone
-      });
+      // You may want to store the scheduled SMS in a database table here
+      return NextResponse.json({ success: true, scheduled: true });
     }
 
-    // Send immediately using unified SMS service
-    console.log('📱 Sending manual SMS via unified service...');
-    
-    const smsResult = await sendUnifiedSMS({
-      phoneNumber: targetPhoneNumber,
-      message: message ? `📝 MANUAL SMS\n\n${smsMessage}` : smsMessage,
-      userId: userId,
-      context: 'manual-sms'
-    });
-
-    if (smsResult.success) {
-      console.log(`📱 Manual SMS sent successfully via ${smsResult.provider}${smsResult.fallbackUsed ? ' (fallback)' : ''} in ${smsResult.deliveryTime}ms`);
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: 'SMS sent successfully!',
-        provider: smsResult.provider,
-        messageId: smsResult.messageId,
-        deliveryTime: smsResult.deliveryTime,
-        fallbackUsed: smsResult.fallbackUsed || false
-      });
-    } else {
-      console.log('📱 Manual SMS failed:', smsResult.error);
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Failed to send SMS',
-        provider: smsResult.provider,
-        details: smsResult.error,
-        fallbackUsed: smsResult.fallbackUsed || false
-      }, { status: 500 });
-    }
+    // Send SMS immediately
+    const sendResult = await sendUnifiedSMS({ phoneNumber: targetPhoneNumber, message: smsMessage, userId });
+    return NextResponse.json({ success: true, sent: true, sendResult });
   } catch (error) {
-    console.error('📱 Manual SMS error:', error);
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error('Error in manual-sms POST:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ success: false, error: errorMessage }, { status: 500 });
   }
-} 
+}

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 interface SMSPreference {
@@ -28,19 +27,19 @@ const smsTypeInfo = {
     title: 'Bills & Payments',
     description: 'Upcoming bills and payment reminders from tagged merchants',
     icon: '💳',
-    example: 'Disney+ $3.41, Netflix $28.30, Duke Energy $308.00'
+    example: `⭐ Recurring Bills\n9 upcoming\n\nJul 15: Disney+ - $3.41\nJul 16: Netflix - $28.30\nJul 16: Duke Energy - $308.00\nJul 16: Fccu A2a Acct - $424.61\nJul 21: Everydaydose Dose  - $36.00\nJul 22: GEICO - $114.18\nJul 23: Prudential - $30.02\nJul 27: Amazon Prime - $15.13\nJul 28: Spectrum - $118.00\n\nNEXT 7 DAYS: $800.32\nNEXT 14 DAYS: $1077.65\nNEXT 30 DAYS: $3841.29`
   },
   spending: {
     title: 'Spending Analysis',
     description: 'Budget analysis, account balance, and AI-powered recommendations',
     icon: '💰',
-    example: 'Balance: $361, Publix vs expected pace, Amazon spending analysis'
+    example: `📊 SPENDING PACING\nJuly 2025\nMonth Progress: 47% (Day 14)\n\n🟢 Amazon:\n   This month: $120\n   Avg monthly: $130\n   Pacing: 92%\n\n🟡 Publix:\n   This month: $200\n   Avg monthly: $150\n   Pacing: 133%\n\n🟢 Circle K:\n   This month: $40\n   Avg monthly: $45\n   Pacing: 89%`
   },
   activity: {
     title: 'Recent Activity',
     description: 'Recent transactions from the last 3 days',
     icon: '📋',
-    example: 'Publix $56.12, Walmart $30.87, Local Brewing $70.00'
+    example: `📱 RECENT ACTIVITY\nLast 10 Transactions\n\nJul 13: Blush Nail Lounge - $50.00\nJul 13: Legends Hospitalit - $47.31\nJul 13: Publix - $4.99\nJul 13: Publix - $65.88\nJul 13: Vercel Inc. - $20.00\nJul 13: Cursor Usage Mid J - $100.04\nJul 13: Circle K - $43.96\nJul 12: Advance Auto Parts - $17.11\nJul 12: Publix - $56.12\nJul 12: Walmart - $30.87\n\n💰 Total: $436.28`
   }
 };
 
@@ -50,11 +49,16 @@ export default function SMSPreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userId, setUserId] = useState<string>('');
+  const [sendTime, setSendTime] = useState<string>('18:00');
+  const [sendTimeSaving, setSendTimeSaving] = useState(false);
 
   const supabase = createSupabaseClient();
 
   useEffect(() => {
     loadUserAndPreferences();
+    loadSendTime();
+    // No dependencies needed, functions are defined inline
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadUserAndPreferences = async () => {
@@ -85,6 +89,49 @@ export default function SMSPreferencesPage() {
       setMessage({ type: 'error', text: 'Failed to load preferences' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSendTime = async () => {
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
+      const { data: settings } = await supabase
+        .from('user_sms_settings')
+        .select('send_time')
+        .eq('user_id', user.id)
+        .single();
+      if (settings && settings.send_time) {
+        setSendTime(settings.send_time);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSendTimeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newTime = e.target.value;
+    setSendTime(newTime);
+    setSendTimeSaving(true);
+    setMessage(null);
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) return;
+      // Upsert user_sms_settings
+      const { error: upsertError } = await supabase
+        .from('user_sms_settings')
+        .upsert({ user_id: user.id, send_time: newTime }, { onConflict: 'user_id' });
+      if (!upsertError) {
+        setMessage({ type: 'success', text: 'Daily SMS send time updated!' });
+      } else {
+        setMessage({ type: 'error', text: 'Failed to update send time.' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Failed to update send time.' });
+    } finally {
+      setSendTimeSaving(false);
     }
   };
 
@@ -147,6 +194,21 @@ export default function SMSPreferencesPage() {
         </p>
       </div>
 
+      {/* Daily SMS Send Time Picker */}
+      <div className="flex flex-col items-center mb-4">
+        <label htmlFor="send-time" className="font-medium mb-1">Daily SMS Send Time (EST):</label>
+        <input
+          id="send-time"
+          type="time"
+          value={sendTime}
+          onChange={handleSendTimeChange}
+          className="border border-gray-300 rounded px-3 py-2 text-lg"
+          disabled={sendTimeSaving}
+          style={{ width: '120px' }}
+        />
+        <span className="text-xs text-gray-500 mt-1">All SMS will be sent at this time (Eastern Time)</span>
+      </div>
+
       {message && (
         <div className={`p-4 rounded-lg ${
           message.type === 'success' 
@@ -186,9 +248,9 @@ export default function SMSPreferencesPage() {
                 </div>
 
                 <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm text-gray-700">
-                    <strong>Example:</strong> {info.example}
-                  </p>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono" style={{ margin: 0 }}>
+                    <strong>Example:</strong>{"\n"}{info.example}
+                  </pre>
                 </div>
 
                 {pref.enabled && (
@@ -209,23 +271,6 @@ export default function SMSPreferencesPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
-
-                    <div>
-                      <Label htmlFor={`${pref.sms_type}-phone`} className="text-sm font-medium">
-                        Phone Number Override (optional)
-                      </Label>
-                      <Input
-                        id={`${pref.sms_type}-phone`}
-                        type="tel"
-                        placeholder="+1234567890"
-                        value={pref.phone_number || ''}
-                        onChange={(e) => handlePreferenceChange(pref.sms_type, 'phone_number', e.target.value)}
-                        className="mt-1"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Leave empty to use default phone number
-                      </p>
                     </div>
                   </div>
                 )}
