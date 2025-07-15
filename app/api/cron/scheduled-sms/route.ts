@@ -143,6 +143,11 @@ export async function GET(request: NextRequest) {
 }
 
 // Keep POST for manual testing
-export async function POST(request: NextRequest) {
-  return GET(request);
+export async function POST(req: NextRequest) {
+  const isVercelCron = req.headers.get('x-vercel-cron');
+  const authHeader = req.headers.get('authorization');
+  if (!isVercelCron && authHeader !== 'Bearer cron_secret_2024') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  return GET(req);
 } 
