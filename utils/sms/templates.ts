@@ -152,99 +152,86 @@ export async function generatePacingAnalysisMessage(userId: string): Promise<str
     }
 
     const itemIds = userItems.map(item => item.plaid_item_id);
-    const targetMerchants = ['Amazon', 'Publix', 'Circle K'];
+    const targetMerchants = ['Amazon', 'Publix', 'Walmart'];
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     const dayOfMonth = now.getDate();
-    
-    // Calculate how far we are into the month (percentage)
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const monthProgress = (dayOfMonth / daysInMonth) * 100;
 
-    const pacingResults: MerchantPacing[] = [];
+    let pacingResults: MerchantPacing[] = [];
 
     for (const targetMerchant of targetMerchants) {
-      // Get this month's spending
-      const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
-      const { data: currentMonthTxns } = await supabase
-        .from('transactions')
-        .select('amount')
-        .in('plaid_item_id', itemIds)
-        .or(`merchant_name.ilike.%${targetMerchant}%,name.ilike.%${targetMerchant}%`)
-        .gte('date', firstDayOfMonth.toISOString().split('T')[0])
-        .gt('amount', 0);
-
-      const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
-
-      // Get historical data (last 6 months for average)
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      
-      const { data: historicalTxns } = await supabase
+      // Get all historical transactions for this merchant
+      const { data: allTxns } = await supabase
         .from('transactions')
         .select('amount, date')
         .in('plaid_item_id', itemIds)
         .or(`merchant_name.ilike.%${targetMerchant}%,name.ilike.%${targetMerchant}%`)
-        .gte('date', sixMonthsAgo.toISOString().split('T')[0])
-        .lt('date', firstDayOfMonth.toISOString().split('T')[0])
         .gt('amount', 0);
 
-      if (historicalTxns && historicalTxns.length > 0) {
-        // Calculate monthly averages
-        const monthlySpending: { [key: string]: number } = {};
-        
-        historicalTxns.forEach(txn => {
-          const txnDate = new Date(txn.date);
-          const monthKey = `${txnDate.getFullYear()}-${txnDate.getMonth() + 1}`;
-          monthlySpending[monthKey] = (monthlySpending[monthKey] || 0) + txn.amount;
+      if (allTxns && allTxns.length > 0) {
+        // Calculate total spend and total days of data
+        const totalSpend = allTxns.reduce((sum, t) => sum + t.amount, 0);
+        const dates = allTxns.map(t => new Date(t.date));
+        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        // Add 1 to include both endpoints
+        const totalDays = Math.max(1, Math.floor((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const avgDailySpend = totalSpend / totalDays;
+        const avgMonthlySpend = avgDailySpend * 30;
+
+        // Get this month's spending
+        const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+        const { data: currentMonthTxns } = await supabase
+          .from('transactions')
+          .select('amount')
+          .in('plaid_item_id', itemIds)
+          .or(`merchant_name.ilike.%${targetMerchant}%,name.ilike.%${targetMerchant}%`)
+          .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+          .gt('amount', 0);
+        const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
+
+        // Calculate expected spend to date
+        const expectedSpendToDate = avgMonthlySpend * (dayOfMonth / 30);
+        const pacingPercentage = expectedSpendToDate > 0 ? (currentMonthSpend / expectedSpendToDate) * 100 : 0;
+
+        pacingResults.push({
+          merchant: targetMerchant,
+          currentMonthSpend,
+          avgMonthlySpend,
+          pacingPercentage,
+          daysIntoMonth: dayOfMonth,
+          expectedSpendToDate
         });
-
-        const monthlyAmounts = Object.values(monthlySpending);
-        const avgMonthlySpend = monthlyAmounts.length > 0 
-          ? monthlyAmounts.reduce((sum, amt) => sum + amt, 0) / monthlyAmounts.length 
-          : 0;
-
-        if (avgMonthlySpend > 0) {
-          const expectedSpendToDate = (avgMonthlySpend * monthProgress) / 100;
-          const pacingPercentage = avgMonthlySpend > 0 ? (currentMonthSpend / avgMonthlySpend) * 100 : 0;
-
-          pacingResults.push({
-            merchant: targetMerchant,
-            currentMonthSpend,
-            avgMonthlySpend,
-            pacingPercentage,
-            daysIntoMonth: dayOfMonth,
-            expectedSpendToDate
-          });
-        }
       }
     }
 
     if (pacingResults.length === 0) {
-      return "📊 SPENDING PACING\nJuly 2025\n\nNo spending data found for Amazon, Publix, or Circle K.";
+      return "📊 SPENDING PACING\nJuly " + currentYear + "\n\nNo spending data found for Amazon, Publix, or Walmart.";
     }
 
     let message = `📊 SPENDING PACING\nJuly ${currentYear}\nMonth Progress: ${monthProgress.toFixed(0)}% (Day ${dayOfMonth})\n\n`;
 
     pacingResults.forEach(pacing => {
-      const budgetSpent = (pacing.currentMonthSpend / pacing.avgMonthlySpend) * 100;
       let status = '';
       let icon = '';
-      if (budgetSpent < monthProgress) {
+      if (pacing.pacingPercentage < 90) {
         status = 'Ahead of pace';
         icon = '🟢';
-      } else if (budgetSpent <= monthProgress + 10) {
+      } else if (pacing.pacingPercentage <= 110) {
         status = 'On track';
         icon = '🟡';
       } else {
-        status = 'Slow down!';
+        status = 'Overspending';
         icon = '🔴';
       }
       message += `${icon} ${pacing.merchant}:\n`;
-      message += `   Month to date: $${pacing.currentMonthSpend.toFixed(0)}\n`;
-      message += `   Avg monthly: $${pacing.avgMonthlySpend.toFixed(0)}\n`;
-      message += `   Budget spent: ${budgetSpent.toFixed(0)}%\n`;
+      message += `   Month to date: $${pacing.currentMonthSpend.toFixed(2)}\n`;
+      message += `   Expected by now: $${pacing.expectedSpendToDate.toFixed(2)}\n`;
+      message += `   Avg monthly: $${pacing.avgMonthlySpend.toFixed(2)}\n`;
+      message += `   Pacing: ${pacing.pacingPercentage.toFixed(0)}%\n`;
       message += `   Status: ${status}\n\n`;
     });
 
