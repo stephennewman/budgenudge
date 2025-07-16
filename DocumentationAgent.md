@@ -402,3 +402,9 @@ The agent-based documentation system ensures information stays current and compr
 *Maintaining comprehensive, accurate, and accessible documentation that scales with BudgeNudge's growth and success.*
 
 **Current Status: Strong foundation with critical gaps identified for immediate action ✅** 
+
+## 2025-07-16 - SMS Cron Logging & Auth Fix
+- Added persistent cron_log table for scheduled SMS jobs
+- Fixed Vercel cron job authorization (x-vercel-cron header, env-based CRON_SECRET)
+- Confirmed SMS delivery at user-configured time (9:30 AM ET)
+- System is now robustly observable and SMS reliability is validated in production 

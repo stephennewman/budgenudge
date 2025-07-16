@@ -323,11 +323,13 @@ async function findUpcomingRecurringBills(userId: string): Promise<Bill[]> {
   const upcomingBills: Bill[] = [];
   
   if (taggedMerchants && taggedMerchants.length > 0) {
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of day
     taggedMerchants.forEach(tm => {
       const predictedDate = new Date(tm.next_predicted_date);
-      // Only include future bills
-      if (predictedDate > now) {
+      predictedDate.setHours(0, 0, 0, 0); // Set to start of day
+      // Include bills for today or future
+      if (predictedDate >= today) {
         upcomingBills.push({
           merchant: tm.merchant_name,
           amount: `$${tm.expected_amount.toFixed(2)}`,

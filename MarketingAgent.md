@@ -1,5 +1,10 @@
 # ✍️ MARKETING AGENT - BudgeNudge
 
+## 2025-07-16 - SMS Cron Logging & Auth Fix
+- Persistent cron_log table and Vercel cron job auth fix deployed
+- SMS delivery is now robustly observable and confirmed in production
+- Messaging: "BudgeNudge now offers highly reliable, scheduled SMS notifications with full auditability and delivery confirmation."
+
 **Last Updated:** July 13, 2025 12:10 PM EDT
 **Product Status:** ✅ **AI-POWERED CONVERSATIONAL SMS BREAKTHROUGH**
 **Marketing Phase:** Production-Ready Scaling

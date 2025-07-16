@@ -10,78 +10,30 @@
 ---
 
 ## 📊 Current Status: **OPERATIONAL** ✅
-- **Live URL**: https://budgenudge-hjve5x32n-krezzo.vercel.app (Ready - 45s deployment)
+- **Live URL**: https://budgenudge.vercel.app (Production)
 - **Database**: Supabase project `oexkzqvoepdeywlyfsdj` - Operational
-- **SMS System**: SlickText integration - Operational with 3-template system
-- **Plaid Integration**: Webhook processing - 100% success rate
-- **Cron Jobs**: 30-minute scheduled SMS - Verified working
+- **SMS System**: SlickText integration - Operational, persistent logging enabled
+- **Cron Jobs**: 30-minute scheduled SMS - Verified working, logs in cron_log
+- **Last Updated**: 2025-07-16 09:30 ET
 
 ---
 
 ## 🚀 Recent Deployments
 
-### 2025-07-13 23:41 UTC - MAJOR SMS SYSTEM OVERHAUL (Build: hjve5x32n)
-**Problem**: Multiple critical SMS issues
-- No recent transactions showing despite data being available
-- Multiple duplicate SMS messages per user
-- Date filtering logic completely broken
-- Complex, unreliable SMS template functions
+### 2025-07-16 09:30 ET - SMS Cron Logging & Auth Fix (Build: b58183e)
+**Problem**: Cron jobs were returning 401 Unauthorized, and SMS delivery timing was hard to debug.
 
-**Solution**: Complete rewrite of SMS system
-- **Simplified SMS Templates**: Rewrote all 3 templates with basic, reliable logic
-  - Bills SMS: Shows largest recent transactions as upcoming bills
-  - Spending SMS: Simple daily/weekly spending totals with transaction counts
-  - Activity SMS: Lists 4 most recent transactions from last 5 days (simplified from complex 3-day UTC logic)
-- **Fixed Date Logic**: Replaced complex UTC date parsing with simple string comparisons
-- **Better Deduplication**: Improved cron job to use Map-based deduplication per user
-- **Streamlined Cron Job**: Simplified processing logic to ensure only 1 SMS per type per user per cycle
-- **Fixed Imports**: Corrected Supabase client imports and TypeScript errors
+**Solution**: 
+- Fixed cron job authorization to allow Vercel scheduled jobs (using x-vercel-cron header and env-based CRON_SECRET for manual tests)
+- Added persistent cron_log table for robust, queryable logging of every scheduled SMS run
+- Confirmed SMS delivery at correct user-configured time (9:30 AM ET)
+- All linter/type errors resolved, production deployment successful
 
-**Technical Changes**:
-- Completely rewrote `utils/sms/templates.ts` (310 → 144 lines)
-- Simplified `app/api/cron/scheduled-sms/route.ts` with better error handling
-- Fixed all TypeScript/ESLint errors preventing builds
-- Removed complex pacing calculations and date math that was breaking
-
-**Expected Results**: 
-- Activity SMS will now show actual recent transactions (Cursor, Publix, Circle K, etc.)
-- No more duplicate SMS messages
-- Clean, readable message format with real data
-- Maximum 3 SMS per user per 30-minute cycle (Bills, Spending, Activity)
-
-### 2025-07-13 22:00 UTC - SMS Preferences & Templates (Build: 5khvs5dwd)
-**Added**: 3-template SMS system with user subscriptions
-- Database: Created `user_sms_preferences` table with RLS policies
-- Templates: Bills & Payments, Spending Analysis, Recent Activity
-- User Control: SMS preferences page for subscription management
-- Fixed: React key prop warnings and TypeScript errors
-- Cron Frequency: Updated user preferences from "daily" to "30min" for active processing
-
-### 2025-07-13 17:17 UTC - Plaid Webhook Processing (Build: md028590p)
-**Status**: 7 new transactions processed successfully via DEFAULT_UPDATE webhook
-- Item: 10xbBNDxYJURRZdqE1DQC3YDmpaZ1nTmq533d
-- Processing: Real-time transaction ingestion working perfectly
-
-## [2025-07-14 17:48 ET] Production Deploy
-- Fixed manual SMS API (syntax, type, and error handling)
-- Resolved all lint and type errors
-- Successful build and deployment to Vercel
-- Production URL: https://budgenudge-9utfo1wod-krezzo.vercel.app
-- All pre- and post-deploy checks passed
+**Result**: System is now robustly observable, with full audit trail of cron runs and SMS delivery. No more 401 errors. SMS delivery confirmed in production.
 
 ---
 
-## 🏗️ System Architecture
-- **Frontend**: Next.js 15.2.4 with TypeScript
-- **Backend**: Supabase (PostgreSQL + Auth + RLS)
-- **SMS Provider**: SlickText API with enhanced client
-- **Payments**: Plaid webhook integration
-- **Deployment**: Vercel with 30-minute cron jobs
-- **Monitoring**: Console logging + manual testing
-
----
-
-## 📋 Current Features
+## 📊 Current Features
 ✅ **Plaid Integration**: Real-time transaction webhooks  
 ✅ **SMS Notifications**: 3-template system (Bills, Spending, Activity)  
 ✅ **User Preferences**: Subscription control for SMS types  

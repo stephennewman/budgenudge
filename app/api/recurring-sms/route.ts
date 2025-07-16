@@ -39,8 +39,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('user_id', userId)
       .eq('is_recurring', true)
-      .order('avg_monthly_spending', { ascending: false })
-      .limit(15); // Limit to top 15 to keep SMS readable
+      .order('avg_monthly_spending', { ascending: false }); // Removed .limit(15)
 
     if (dbError) {
       console.error('Database error:', dbError);

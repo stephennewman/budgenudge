@@ -249,8 +249,9 @@ export default function RecurringBillsManager() {
 
   // Filter and sort active merchants by upcoming date (soonest first, future dates only)
   const now = new Date();
+  now.setHours(0, 0, 0, 0); // Set to start of today
   const activeMerchants = taggedMerchants
-    .filter(m => m.is_active && new Date(m.next_predicted_date + 'T12:00:00') > now)
+    .filter(m => m.is_active && new Date(m.next_predicted_date + 'T12:00:00').setHours(0,0,0,0) >= now.getTime())
     .sort((a, b) => new Date(a.next_predicted_date + 'T12:00:00').getTime() - new Date(b.next_predicted_date + 'T12:00:00').getTime());
   
   const inactiveMerchants = taggedMerchants.filter(m => !m.is_active);

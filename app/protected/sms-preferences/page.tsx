@@ -15,12 +15,12 @@ interface SMSPreference {
   phone_number?: string;
 }
 
-const frequencyOptions = [
-  { value: '30min', label: 'Every 30 minutes' },
-  { value: 'hourly', label: 'Every hour' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' }
-];
+// const frequencyOptions = [
+//   { value: '30min', label: 'Every 30 minutes' },
+//   { value: 'hourly', label: 'Every hour' },
+//   { value: 'daily', label: 'Daily' },
+//   { value: 'weekly', label: 'Weekly' }
+// ];
 
 const smsTypeInfo = {
   bills: {
@@ -49,8 +49,8 @@ export default function SMSPreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [userId, setUserId] = useState<string>('');
-  const [sendTime, setSendTime] = useState<string>('18:00');
-  const [sendTimeSaving, setSendTimeSaving] = useState(false);
+  // const [sendTime, setSendTime] = useState<string>('18:00');
+  // const [sendTimeSaving, setSendTimeSaving] = useState(false);
 
   const supabase = createSupabaseClient();
 
@@ -103,37 +103,37 @@ export default function SMSPreferencesPage() {
         .eq('user_id', user.id)
         .single();
       if (settings && settings.send_time) {
-        setSendTime(settings.send_time);
+        // setSendTime(settings.send_time);
       }
     } catch {
       // ignore
     }
   };
 
-  const handleSendTimeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newTime = e.target.value;
-    setSendTime(newTime);
-    setSendTimeSaving(true);
-    setMessage(null);
-    try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) return;
-      // Upsert user_sms_settings
-      const { error: upsertError } = await supabase
-        .from('user_sms_settings')
-        .upsert({ user_id: user.id, send_time: newTime }, { onConflict: 'user_id' });
-      if (!upsertError) {
-        setMessage({ type: 'success', text: 'Daily SMS send time updated!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to update send time.' });
-      }
-    } catch {
-      setMessage({ type: 'error', text: 'Failed to update send time.' });
-    } finally {
-      setSendTimeSaving(false);
-    }
-  };
+  // const handleSendTimeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const newTime = e.target.value;
+  //   // setSendTime(newTime);
+  //   // setSendTimeSaving(true);
+  //   setMessage(null);
+  //   try {
+  //     // Get current user
+  //     const { data: { user }, error: userError } = await supabase.auth.getUser();
+  //     if (userError || !user) return;
+  //     // Upsert user_sms_settings
+  //     const { error: upsertError } = await supabase
+  //       .from('user_sms_settings')
+  //       .upsert({ user_id: user.id, send_time: newTime }, { onConflict: 'user_id' });
+  //     if (!upsertError) {
+  //       setMessage({ type: 'success', text: 'Daily SMS send time updated!' });
+  //     } else {
+  //       setMessage({ type: 'error', text: 'Failed to update send time.' });
+  //     }
+  //   } catch {
+  //     setMessage({ type: 'error', text: 'Failed to update send time.' });
+  //   } finally {
+  //     // setSendTimeSaving(false);
+  //   }
+  // };
 
   const handlePreferenceChange = (smsType: string, field: keyof SMSPreference, value: string | boolean) => {
     setPreferences(prev => 
@@ -190,11 +190,12 @@ export default function SMSPreferencesPage() {
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">SMS Preferences</h1>
         <p className="text-gray-600">
-          Customize your BudgeNudge SMS notifications. Choose which types of messages you want to receive and how often.
+          All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
         </p>
       </div>
 
-      {/* Daily SMS Send Time Picker */}
+      {/* Daily SMS Send Time Picker (hidden) */}
+      {/*
       <div className="flex flex-col items-center mb-4">
         <label htmlFor="send-time" className="font-medium mb-1">Daily SMS Send Time (EST):</label>
         <input
@@ -208,6 +209,7 @@ export default function SMSPreferencesPage() {
         />
         <span className="text-xs text-gray-500 mt-1">All SMS will be sent at this time (Eastern Time)</span>
       </div>
+      */}
 
       {message && (
         <div className={`p-4 rounded-lg ${
@@ -253,6 +255,8 @@ export default function SMSPreferencesPage() {
                   </pre>
                 </div>
 
+                {/* Frequency dropdown (hidden) */}
+                {/*
                 {pref.enabled && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -274,6 +278,7 @@ export default function SMSPreferencesPage() {
                     </div>
                   </div>
                 )}
+                */}
               </div>
             </Card>
           );
@@ -294,7 +299,7 @@ export default function SMSPreferencesPage() {
         <h3 className="font-semibold text-blue-900 mb-2">How it works:</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Each SMS type can be enabled/disabled independently</li>
-          <li>• Set different frequencies for each SMS type (30min, hourly, daily, weekly)</li>
+          <li>• All SMS will be sent daily at 7:00 AM EST</li>
           <li>• Optionally override phone numbers for specific SMS types</li>
           <li>• SMS messages are only sent when there&apos;s meaningful data to report</li>
           <li>• All messages are labeled with their type (📅 BILLS SMS, 📅 SPENDING SMS, etc.)</li>
