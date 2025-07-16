@@ -3,20 +3,55 @@ import { createSupabaseClient } from '@/utils/supabase/server';
 import { generateSMSMessage } from '@/utils/sms/templates';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 type NewSMSTemplateType = 'recurring' | 'recent' | 'pacing';
 
+function hasMessage(obj: unknown): obj is { message: string } {
+  return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
+}
+
 export async function GET(request: NextRequest) {
-  // Check authorization
+  // Check authorization: allow Vercel cron or correct secret
+  const isVercelCron = request.headers.get('x-vercel-cron');
   const authHeader = request.headers.get('authorization');
-  if (authHeader !== 'Bearer cron_secret_2024') {
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (!isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   
+  // --- Persistent cron logging ---
+  const cronJobName = 'scheduled-sms';
+  const cronStart = new Date();
+  let cronLogId: number | null = null;
+  let usersProcessed = 0;
+  let smsAttempted = 0;
+  let smsSent = 0;
+  let smsFailed = 0;
+  const logDetails: Array<Record<string, unknown>> = [];
+
+  // Initialize supabase client at the top
+  const supabase: SupabaseClient = await createSupabaseClient();
+
+  try {
+    // Insert cron_log row (status: started)
+    const { data: logInsert } = await supabase
+      .from('cron_log')
+      .insert({
+        job_name: cronJobName,
+        started_at: cronStart.toISOString(),
+        status: 'started',
+      })
+      .select('id')
+      .single();
+    if (logInsert && logInsert.id) cronLogId = logInsert.id;
+  } catch (e) {
+    // If logging fails, continue anyway
+    console.warn('⚠️ Could not insert cron_log row:', e);
+  }
+
   try {
     console.log('🕐 Starting NEW SMS template processing...');
-    
-    const supabase = await createSupabaseClient();
     
     // Get all users with bank connections
     const { data: itemsWithUsers, error: itemsError } = await supabase
@@ -25,6 +60,18 @@ export async function GET(request: NextRequest) {
 
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
       console.log('📭 No bank connections found');
+      // Update cron_log as success (no users)
+      if (cronLogId) {
+        await supabase.from('cron_log').update({
+          finished_at: new Date().toISOString(),
+          status: 'success',
+          users_processed: 0,
+          sms_attempted: 0,
+          sms_sent: 0,
+          sms_failed: 0,
+          log_details: [{ message: 'No bank connections found' }]
+        }).eq('id', cronLogId);
+      }
       return NextResponse.json({ 
         success: true, 
         processed: 0,
@@ -38,9 +85,9 @@ export async function GET(request: NextRequest) {
     // Later this can be controlled by user preferences
     const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'pacing'];
     
-    let successCount = 0;
-    let failureCount = 0;
-    let processedUsers = 0;
+    // let successCount = 0;
+    // let failureCount = 0;
+    // let processedUsers = 0;
 
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');
@@ -50,7 +97,7 @@ export async function GET(request: NextRequest) {
     for (const userItem of itemsWithUsers) {
       try {
         const userId = userItem.user_id;
-        processedUsers++;
+        usersProcessed++;
 
         // Fetch user's preferred send_time from user_sms_settings
         let sendTime = '18:00'; // Default to 6:00 PM
@@ -66,11 +113,12 @@ export async function GET(request: NextRequest) {
         const sendMinutes = sendHour * 60 + sendMinute;
         // Only send if current time is within 10 minutes of send_time
         if (Math.abs(nowMinutes - sendMinutes) > 10) {
+          logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST` });
           console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST)`);
           continue;
         }
 
-        console.log(`📱 Processing user ${userId} (${processedUsers}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
+        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
         // Send each template type
         for (const templateType of templatesToSend) {
@@ -82,10 +130,12 @@ export async function GET(request: NextRequest) {
 
             // Skip if message is too short or indicates an error
             if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
+              logDetails.push({ userId, templateType, skipped: true, reason: 'Too short or error', preview: smsMessage });
               console.log(`📭 ${templateType} SMS too short or error for user ${userId} - skipping`);
-              failureCount++;
+              smsFailed++;
               continue;
             }
+            smsAttempted++;
 
             console.log(`📱 Sending ${templateType} SMS to user ${userId}`);
             console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
@@ -98,10 +148,12 @@ export async function GET(request: NextRequest) {
             });
 
             if (smsResult.success) {
-              successCount++;
+              smsSent++;
+              logDetails.push({ userId, templateType, sent: true, preview: smsMessage.substring(0, 100) });
               console.log(`✅ ${templateType} SMS sent successfully to user ${userId}`);
             } else {
-              failureCount++;
+              smsFailed++;
+              logDetails.push({ userId, templateType, sent: false, error: smsResult.error });
               console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
             }
 
@@ -109,30 +161,73 @@ export async function GET(request: NextRequest) {
             await new Promise(resolve => setTimeout(resolve, 500));
 
           } catch (smsError) {
-            failureCount++;
+            smsFailed++;
+            let errorMsg = '';
+            if (smsError instanceof Error) {
+              errorMsg = smsError.message;
+            } else if (hasMessage(smsError)) {
+              errorMsg = smsError.message;
+            } else {
+              errorMsg = String(smsError);
+            }
+            logDetails.push({ userId, templateType, error: errorMsg });
             console.error(`❌ Error processing ${templateType} SMS for user ${userId}:`, smsError);
           }
         }
 
       } catch (userError) {
-        failureCount++;
+        let errorMsg = '';
+        if (userError instanceof Error) {
+          errorMsg = userError.message;
+        } else if (hasMessage(userError)) {
+          errorMsg = userError.message;
+        } else {
+          errorMsg = String(userError);
+        }
+        logDetails.push({ userId: userItem.user_id, error: errorMsg });
         console.error(`❌ Error processing user ${userItem.user_id}:`, userError);
       }
     }
 
+    // --- Update cron_log as success ---
+    if (cronLogId) {
+      await supabase.from('cron_log').update({
+        finished_at: new Date().toISOString(),
+        status: 'success',
+        users_processed: usersProcessed,
+        sms_attempted: smsAttempted,
+        sms_sent: smsSent,
+        sms_failed: smsFailed,
+        log_details: logDetails
+      }).eq('id', cronLogId);
+    }
+
     const result = {
       success: true,
-      processed: successCount + failureCount,
-      successCount,
-      failureCount,
-      usersProcessed: processedUsers,
-      message: `Processed ${successCount + failureCount} SMS for ${processedUsers} users`
+      processed: smsSent + smsFailed,
+      smsSent,
+      smsFailed,
+      usersProcessed,
+      message: `Processed ${smsSent + smsFailed} SMS for ${usersProcessed} users`
     };
 
     console.log('📊 SMS Processing Complete:', result);
     return NextResponse.json(result);
 
   } catch (error) {
+    // --- Update cron_log as error ---
+    if (cronLogId && supabase) {
+      await supabase.from('cron_log').update({
+        finished_at: new Date().toISOString(),
+        status: 'error',
+        error_message: error instanceof Error ? error.message : String(error),
+        users_processed: usersProcessed,
+        sms_attempted: smsAttempted,
+        sms_sent: smsSent,
+        sms_failed: smsFailed,
+        log_details: logDetails
+      }).eq('id', cronLogId);
+    }
     console.error('❌ Cron job error:', error);
     return NextResponse.json({ 
       success: false, 
