@@ -39,7 +39,7 @@ const smsTypeInfo = {
     title: 'Recent Activity',
     description: 'Recent transactions from the last 3 days',
     icon: '📋',
-    example: `📱 RECENT ACTIVITY\nLast 10 Transactions\n\nJul 13: Blush Nail Lounge - $50.00\nJul 13: Legends Hospitalit - $47.31\nJul 13: Publix - $4.99\nJul 13: Publix - $65.88\nJul 13: Vercel Inc. - $20.00\nJul 13: Cursor Usage Mid J - $100.04\nJul 13: Circle K - $43.96\nJul 12: Advance Auto Parts - $17.11\nJul 12: Publix - $56.12\nJul 12: Walmart - $30.87\n\n💰 Total: $436.28`
+    example: `📱 RECENT ACTIVITY\nLast 20 Transactions\n\nJul 13: Blush Nail Lounge - $50.00\nJul 13: Legends Hospitalit - $47.31\nJul 13: Publix - $4.99\nJul 13: Publix - $65.88\nJul 13: Vercel Inc. - $20.00\nJul 13: Cursor Usage Mid J - $100.04\nJul 13: Circle K - $43.96\nJul 12: Advance Auto Parts - $17.11\nJul 12: Publix - $56.12\nJul 12: Walmart - $30.87\nJul 12: Amazon - $25.99\nJul 12: Target - $45.67\nJul 11: Starbucks - $8.50\nJul 11: Gas Station - $35.00\nJul 11: Restaurant - $67.89\nJul 10: Grocery Store - $89.45\nJul 10: Pharmacy - $12.99\nJul 10: Coffee Shop - $4.75\nJul 9: Hardware Store - $23.45\nJul 9: Bookstore - $15.99\n\n💰 Total: $678.90`
   }
 };
 

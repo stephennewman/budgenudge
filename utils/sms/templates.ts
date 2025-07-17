@@ -99,20 +99,20 @@ export async function generateRecentTransactionsMessage(userId: string): Promise
 
     const itemIds = userItems.map(item => item.plaid_item_id);
 
-    // Get 10 most recent transactions
+    // Get 20 most recent transactions
     const { data: recentTransactions } = await supabase
       .from('transactions')
       .select('date, merchant_name, name, amount')
       .in('plaid_item_id', itemIds)
       .gt('amount', 0) // Only spending transactions
       .order('date', { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (!recentTransactions || recentTransactions.length === 0) {
       return "📱 RECENT ACTIVITY\n\nNo recent transactions found.";
     }
 
-    let message = "📱 RECENT ACTIVITY\nLast 10 Transactions\n\n";
+    let message = "📱 RECENT ACTIVITY\nLast 20 Transactions\n\n";
 
     recentTransactions.forEach(transaction => {
       // Format date as 'Jul 15' for consistency
