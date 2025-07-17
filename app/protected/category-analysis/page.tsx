@@ -44,8 +44,8 @@ export default function CategoryAnalysisPage() {
       }
       const allDates = allTx.map(t => t.date).sort();
       // Use the user's true first and last transaction date for all subcategories
-      const globalFirstDateStr = allDates[allDates.length - 1];
-      const globalLastDateStr = allDates[0];
+      const globalFirstDateStr = allDates[0];  // oldest (first element after sort)
+      const globalLastDateStr = allDates[allDates.length - 1];  // newest (last element after sort)
       const globalFirstDate = new Date(globalFirstDateStr);
       const globalLastDate = new Date(globalLastDateStr);
       const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
