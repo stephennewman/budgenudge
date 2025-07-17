@@ -31,13 +31,13 @@ export default function CategoryAnalysisPage() {
       setLoading(true);
       setError(null);
 
-      // Get user's transactions with category data
+      // Get user's transactions with subcategory data
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select(`
           amount,
           date,
-          category,
+          subcategory,
           plaid_item_id
         `)
         .gte('amount', 0) // Only spending transactions (positive amounts)
@@ -53,51 +53,53 @@ export default function CategoryAnalysisPage() {
         return;
       }
 
-      // Process transactions to calculate category spending
+      // Calculate the user's full transaction history period
+      const allDates = transactions.map(t => t.date).sort();
+      const firstDate = new Date(allDates[allDates.length - 1]); // oldest
+      const lastDate = new Date(allDates[0]); // newest
+      const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+      // Process transactions to calculate subcategory spending
       const categoryMap = new Map<string, {
         totalSpending: number;
         transactionCount: number;
-        dates: Set<string>;
         amounts: number[];
+        firstTransactionDate: string;
+        lastTransactionDate: string;
       }>();
 
       transactions.forEach(transaction => {
-        // Handle category array - use first category or 'Other' if none
-        const category = transaction.category?.[0] || 'Other';
-        
-        if (!categoryMap.has(category)) {
-          categoryMap.set(category, {
+        // Handle subcategory - use subcategory or 'Other' if none
+        const subcategory = transaction.subcategory || 'Other';
+        if (!categoryMap.has(subcategory)) {
+          categoryMap.set(subcategory, {
             totalSpending: 0,
             transactionCount: 0,
-            dates: new Set(),
-            amounts: []
+            amounts: [],
+            firstTransactionDate: transaction.date,
+            lastTransactionDate: transaction.date,
           });
         }
-
-        const categoryData = categoryMap.get(category)!;
+        const categoryData = categoryMap.get(subcategory)!;
         categoryData.totalSpending += transaction.amount;
         categoryData.transactionCount += 1;
-        categoryData.dates.add(transaction.date);
         categoryData.amounts.push(transaction.amount);
+        // Update first/last transaction date for this subcategory
+        if (transaction.date < categoryData.firstTransactionDate) categoryData.firstTransactionDate = transaction.date;
+        if (transaction.date > categoryData.lastTransactionDate) categoryData.lastTransactionDate = transaction.date;
       });
 
       // Convert to array and calculate averages
-      const processedData: CategorySpendingData[] = Array.from(categoryMap.entries()).map(([category, data]) => {
-        const dates = Array.from(data.dates).sort();
-        const firstDate = new Date(dates[0]);
-        const lastDate = new Date(dates[dates.length - 1]);
-        const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-        
+      const processedData: CategorySpendingData[] = Array.from(categoryMap.entries()).map(([subcategory, data]) => {
         const avgDailySpending = data.totalSpending / daysOfData;
         const avgMonthlySpending = avgDailySpending * 30; // Approximate month
         const avgTransactionAmount = data.totalSpending / data.transactionCount;
-
         return {
-          category,
+          category: subcategory,
           total_spending: data.totalSpending,
           transaction_count: data.transactionCount,
-          first_transaction_date: dates[0],
-          last_transaction_date: dates[dates.length - 1],
+          first_transaction_date: data.firstTransactionDate,
+          last_transaction_date: data.lastTransactionDate,
           days_of_data: daysOfData,
           avg_daily_spending: avgDailySpending,
           avg_monthly_spending: avgMonthlySpending,
@@ -135,7 +137,7 @@ export default function CategoryAnalysisPage() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (subcategory: string) => {
     const icons: { [key: string]: string } = {
       'Food and Drink': '🍽️',
       'Restaurants': '🍽️',
@@ -158,7 +160,7 @@ export default function CategoryAnalysisPage() {
       'Charity': '❤️',
       'Other': '📊'
     };
-    return icons[category] || '💰';
+    return icons[subcategory] || '💰';
   };
 
   if (loading) {
@@ -166,7 +168,7 @@ export default function CategoryAnalysisPage() {
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading category analysis...</p>
+          <p className="mt-4 text-gray-600">Loading subcategory analysis...</p>
         </div>
       </div>
     );
@@ -191,9 +193,9 @@ export default function CategoryAnalysisPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Category Spending Analysis</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Subcategory Spending Analysis</h1>
           <p className="text-gray-600">
-            Historical spending by category, ranked by average monthly spend
+            Historical spending by subcategory, ranked by average monthly spend
           </p>
         </div>
         <ManualRefreshButton onRefresh={fetchCategoryData} />
@@ -208,7 +210,7 @@ export default function CategoryAnalysisPage() {
       {categoryData.length === 0 ? (
         <Card>
           <CardContent className="text-center py-8">
-            <p className="text-gray-600">No spending data found. Connect your bank account to see category analysis.</p>
+            <p className="text-gray-600">No spending data found. Connect your bank account to see subcategory analysis.</p>
           </CardContent>
         </Card>
       ) : (
@@ -277,7 +279,7 @@ export default function CategoryAnalysisPage() {
       <div className="mt-8 text-center text-sm text-gray-500">
         <p>
           💡 <strong>How it works:</strong> We calculate your average monthly spending by adding up all transactions 
-          for each category, then dividing by the number of days of data and multiplying by 30.
+          for each subcategory, then dividing by the number of days of data and multiplying by 30.
         </p>
         <p className="mt-2">
           Example: $900 spent on restaurants over 90 days = $10/day = $300/month average
