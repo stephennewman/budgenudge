@@ -43,9 +43,12 @@ export default function CategoryAnalysisPage() {
         return;
       }
       const allDates = allTx.map(t => t.date).sort();
-      const firstDate = new Date(allDates[allDates.length - 1]); // oldest
-      const lastDate = new Date(allDates[0]); // newest
-      const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      // Use the user's true first and last transaction date for all subcategories
+      const globalFirstDateStr = allDates[allDates.length - 1];
+      const globalLastDateStr = allDates[0];
+      const globalFirstDate = new Date(globalFirstDateStr);
+      const globalLastDate = new Date(globalLastDateStr);
+      const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
       // 2. Get user's spending transactions with subcategory data
       const { data: transactions, error: transactionsError } = await supabase
@@ -108,8 +111,8 @@ export default function CategoryAnalysisPage() {
           category: subcategory,
           total_spending: data.totalSpending,
           transaction_count: data.transactionCount,
-          first_transaction_date: data.firstTransactionDate,
-          last_transaction_date: data.lastTransactionDate,
+          first_transaction_date: globalFirstDateStr,
+          last_transaction_date: globalLastDateStr,
           days_of_data: daysOfData,
           avg_daily_spending: avgDailySpending,
           avg_monthly_spending: avgMonthlySpending,
