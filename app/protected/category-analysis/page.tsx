@@ -17,6 +17,9 @@ interface CategorySpendingData {
   avg_monthly_spending: number;
   avg_transaction_amount: number;
   merchants: string[];
+  current_month_spending: number;
+  pacing_percentage: number;
+  pacing_status: 'under' | 'on-track' | 'over';
 }
 
 export default function CategoryAnalysisPage() {
@@ -115,6 +118,39 @@ export default function CategoryAnalysisPage() {
         const avgDailySpending = data.totalSpending / daysOfData;
         const avgMonthlySpending = avgDailySpending * 30; // Approximate month
         const avgTransactionAmount = data.totalSpending / data.transactionCount;
+        
+        // Calculate current month spending for this subcategory
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const currentMonthStart = new Date(currentYear, currentMonth, 1);
+        const currentMonthEnd = new Date(currentYear, currentMonth + 1, 0);
+        
+        const currentMonthTransactions = transactions.filter(t => {
+          const txDate = new Date(t.date);
+          return txDate >= currentMonthStart && txDate <= currentMonthEnd && (t.subcategory || 'Other') === subcategory;
+        });
+        
+        const currentMonthSpending = currentMonthTransactions.reduce((sum, tx) => sum + tx.amount, 0);
+        
+        // Calculate pacing
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const dayOfMonth = now.getDate();
+        const monthProgress = dayOfMonth / daysInMonth; // e.g., 17/31 = 0.548
+        
+        const expectedSpendingAtThisPoint = avgMonthlySpending * monthProgress;
+        const pacingPercentage = currentMonthSpending / expectedSpendingAtThisPoint;
+        
+        // Determine pacing status
+        let pacingStatus: 'under' | 'on-track' | 'over';
+        if (pacingPercentage < 0.9) {
+          pacingStatus = 'under';
+        } else if (pacingPercentage > 1.1) {
+          pacingStatus = 'over';
+        } else {
+          pacingStatus = 'on-track';
+        }
+        
         return {
           category: subcategory,
           total_spending: data.totalSpending,
@@ -125,7 +161,10 @@ export default function CategoryAnalysisPage() {
           avg_daily_spending: avgDailySpending,
           avg_monthly_spending: avgMonthlySpending,
           avg_transaction_amount: avgTransactionAmount,
-          merchants: Array.from(data.merchants).sort() // Convert set to sorted array
+          merchants: Array.from(data.merchants).sort(),
+          current_month_spending: currentMonthSpending,
+          pacing_percentage: pacingPercentage,
+          pacing_status: pacingStatus
         };
       });
 
@@ -255,6 +294,37 @@ export default function CategoryAnalysisPage() {
                       {formatCurrency(category.avg_monthly_spending)}
                     </div>
                     <div className="text-sm text-gray-500">avg/month</div>
+                  </div>
+                </div>
+                
+                {/* Pacing Analysis */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">This Month</div>
+                      <div className="text-lg font-bold text-gray-900">
+                        {formatCurrency(category.current_month_spending)}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center space-x-2">
+                        <div className={`w-3 h-3 rounded-full ${
+                          category.pacing_status === 'under' ? 'bg-green-500' :
+                          category.pacing_status === 'on-track' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                        }`}></div>
+                        <div className="text-sm">
+                          <div className="font-medium text-gray-900">
+                            {category.pacing_status === 'under' ? 'Under Pace' :
+                             category.pacing_status === 'on-track' ? 'On Track' :
+                             'Over Pace'}
+                          </div>
+                          <div className="text-gray-500">
+                            {Math.round(category.pacing_percentage * 100)}% of expected
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
