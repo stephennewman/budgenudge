@@ -31,7 +31,23 @@ export default function CategoryAnalysisPage() {
       setLoading(true);
       setError(null);
 
-      // Get user's transactions with subcategory data
+      // 1. Get ALL transactions to determine the user's true data period
+      const { data: allTx, error: allTxError } = await supabase
+        .from('transactions')
+        .select('date')
+        .order('date', { ascending: false });
+      if (allTxError) throw new Error(`Failed to fetch all transactions: ${allTxError.message}`);
+      if (!allTx || allTx.length === 0) {
+        setCategoryData([]);
+        setLoading(false);
+        return;
+      }
+      const allDates = allTx.map(t => t.date).sort();
+      const firstDate = new Date(allDates[allDates.length - 1]); // oldest
+      const lastDate = new Date(allDates[0]); // newest
+      const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+      // 2. Get user's spending transactions with subcategory data
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select(`
@@ -52,12 +68,6 @@ export default function CategoryAnalysisPage() {
         setLoading(false);
         return;
       }
-
-      // Calculate the user's full transaction history period
-      const allDates = transactions.map(t => t.date).sort();
-      const firstDate = new Date(allDates[allDates.length - 1]); // oldest
-      const lastDate = new Date(allDates[0]); // newest
-      const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
       // Process transactions to calculate subcategory spending
       const categoryMap = new Map<string, {
