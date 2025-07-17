@@ -138,6 +138,7 @@ export async function GET(request: NextRequest) {
         }
         */
         console.log(`⏰ TEMP: Bypassing time check for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute} EST)`);
+        // FORCE REDEPLOY - Time check is bypassed for testing
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
