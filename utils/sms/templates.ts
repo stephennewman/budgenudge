@@ -99,20 +99,24 @@ export async function generateRecentTransactionsMessage(userId: string): Promise
 
     const itemIds = userItems.map(item => item.plaid_item_id);
 
-    // Get 20 most recent transactions
+    // Get yesterday's transactions
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
     const { data: recentTransactions } = await supabase
       .from('transactions')
       .select('date, merchant_name, name, amount')
       .in('plaid_item_id', itemIds)
+      .eq('date', yesterdayStr)
       .gt('amount', 0) // Only spending transactions
-      .order('date', { ascending: false })
-      .limit(20);
+      .order('amount', { ascending: false }); // Most expensive first
 
     if (!recentTransactions || recentTransactions.length === 0) {
-      return "📱 RECENT ACTIVITY\n\nNo recent transactions found.";
+      return "📱 YESTERDAY'S ACTIVITY\n\nNo transactions yesterday.";
     }
 
-    let message = "📱 RECENT ACTIVITY\nLast 20 Transactions\n\n";
+    let message = "📱 YESTERDAY'S ACTIVITY\n\n";
 
     recentTransactions.forEach(transaction => {
       // Format date as 'Jul 15' for consistency
@@ -126,13 +130,13 @@ export async function generateRecentTransactionsMessage(userId: string): Promise
 
     // Add total
     const total = recentTransactions.reduce((sum, t) => sum + t.amount, 0);
-    message += `\n💰 Total: $${total.toFixed(2)}`;
+    message += `\n💰 Yesterday's Total: $${total.toFixed(2)}`;
 
     return message;
 
   } catch (error) {
     console.error('Error generating recent transactions message:', error);
-    return "📱 RECENT ACTIVITY\n\nError loading recent transactions.";
+    return "📱 YESTERDAY'S ACTIVITY\n\nError loading yesterday's transactions.";
   }
 }
 

@@ -75,7 +75,7 @@ export default function Home() {
             <div className="text-4xl mb-4">🕐</div>
             <h3 className="font-semibold mb-3 text-lg">Recent Activity Spotcheck</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Quick review of your last 20 transactions. Stay aware of your spending without obsessive account checking or waiting for delayed bank notifications.
+              Quick review of yesterday's transactions. Stay aware of your spending without obsessive account checking or waiting for delayed bank notifications.
             </p>
           </div>
         </div>

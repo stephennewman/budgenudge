@@ -36,10 +36,10 @@ const smsTypeInfo = {
     example: `📊 SPENDING PACING\nJuly 2025\nMonth Progress: 47% (Day 14)\n\n🟢 Amazon:\n   This month: $120\n   Avg monthly: $130\n   Pacing: 92%\n\n🟡 Publix:\n   This month: $200\n   Avg monthly: $150\n   Pacing: 133%\n\n🟢 Circle K:\n   This month: $40\n   Avg monthly: $45\n   Pacing: 89%`
   },
   activity: {
-    title: 'Recent Activity',
-    description: 'Recent transactions from the last 3 days',
+    title: 'Yesterday\'s Activity',
+    description: 'All transactions from yesterday',
     icon: '📋',
-    example: `📱 RECENT ACTIVITY\nLast 20 Transactions\n\nJul 13: Blush Nail Lounge - $50.00\nJul 13: Legends Hospitalit - $47.31\nJul 13: Publix - $4.99\nJul 13: Publix - $65.88\nJul 13: Vercel Inc. - $20.00\nJul 13: Cursor Usage Mid J - $100.04\nJul 13: Circle K - $43.96\nJul 12: Advance Auto Parts - $17.11\nJul 12: Publix - $56.12\nJul 12: Walmart - $30.87\nJul 12: Amazon - $25.99\nJul 12: Target - $45.67\nJul 11: Starbucks - $8.50\nJul 11: Gas Station - $35.00\nJul 11: Restaurant - $67.89\nJul 10: Grocery Store - $89.45\nJul 10: Pharmacy - $12.99\nJul 10: Coffee Shop - $4.75\nJul 9: Hardware Store - $23.45\nJul 9: Bookstore - $15.99\n\n💰 Total: $678.90`
+    example: `📱 YESTERDAY'S ACTIVITY\n\nJul 16: Publix - $65.88\nJul 16: Amazon - $25.99\nJul 16: Starbucks - $8.50\nJul 16: Gas Station - $35.00\nJul 16: Restaurant - $67.89\nJul 16: Grocery Store - $89.45\n\n💰 Yesterday's Total: $292.71`
   }
 };
 
