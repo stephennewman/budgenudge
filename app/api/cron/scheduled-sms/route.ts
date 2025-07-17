@@ -129,11 +129,15 @@ export async function GET(request: NextRequest) {
         const [sendHour, sendMinute] = sendTime.split(':').map(Number);
         const sendMinutes = sendHour * 60 + sendMinute;
         // Only send if current time is within 10 minutes of send_time
+        // TEMPORARILY DISABLED FOR TESTING
+        /*
         if (Math.abs(nowMinutes - sendMinutes) > 10) {
           logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST` });
           console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST)`);
           continue;
         }
+        */
+        console.log(`⏰ TEMP: Bypassing time check for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute} EST)`);
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
