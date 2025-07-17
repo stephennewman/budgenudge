@@ -108,7 +108,6 @@ export async function GET(request: NextRequest) {
 
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');
-    const nowMinutes = nowEST.hour * 60 + nowEST.minute;
 
     // Process each user
     for (const userItem of itemsWithUsers) {
@@ -126,8 +125,6 @@ export async function GET(request: NextRequest) {
         if (settings && settings.send_time) {
           sendTime = settings.send_time;
         }
-        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
-        const sendMinutes = sendHour * 60 + sendMinute;
         // Only send if current time is within 10 minutes of send_time
         // TEMPORARILY DISABLED FOR TESTING
         /*
