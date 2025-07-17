@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface TaggedMerchant {
   id: number;
@@ -45,13 +46,27 @@ export default function RecurringBillsManager() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Historical transactions state
-  const [expandedMerchant, setExpandedMerchant] = useState<number | null>(null);
   const [merchantTransactions, setMerchantTransactions] = useState<{[key: number]: Transaction[]}>({});
   const [loadingTransactions, setLoadingTransactions] = useState<{[key: number]: boolean}>({});
+
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     fetchTaggedMerchants();
   }, []);
+
+  useEffect(() => {
+    // When active merchants are loaded, fetch transactions for each
+    if (taggedMerchants.length > 0) {
+      const activeMerchants = taggedMerchants.filter(m => m.is_active);
+      activeMerchants.forEach((merchant) => {
+        if (!merchantTransactions[merchant.id] && !loadingTransactions[merchant.id]) {
+          fetchMerchantTransactions(merchant.id, merchant.merchant_name);
+        }
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taggedMerchants]);
 
   const fetchTaggedMerchants = async () => {
     try {
@@ -70,35 +85,37 @@ export default function RecurringBillsManager() {
 
   const fetchMerchantTransactions = async (merchantId: number, merchantName: string) => {
     if (merchantTransactions[merchantId]) {
-      // Already fetched, just toggle
-      setExpandedMerchant(expandedMerchant === merchantId ? null : merchantId);
       return;
     }
-
     setLoadingTransactions(prev => ({ ...prev, [merchantId]: true }));
-    
     try {
-      const response = await fetch('/api/plaid/transactions');
-      const data = await response.json();
-      
-      if (response.ok && data.transactions) {
-        // Filter transactions for this merchant (same logic as analyze endpoint)
-        const filtered = data.transactions.filter((t: Transaction) => {
-          const tName = (t.merchant_name || t.name || '').toLowerCase();
-          const searchName = merchantName.toLowerCase();
-          return tName.includes(searchName);
-        });
-        
-        // Sort by date (newest first) and limit to last 5 transactions
-        const sorted = filtered
-          .sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, 5);
-        
-        setMerchantTransactions(prev => ({ ...prev, [merchantId]: sorted }));
-        setExpandedMerchant(merchantId);
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No user');
+      // Get user's plaid_item_ids
+      const { data: items, error: itemsError } = await supabase
+        .from('items')
+        .select('plaid_item_id')
+        .eq('user_id', user.id);
+      if (itemsError) throw itemsError;
+      const itemIds = items?.map(item => item.plaid_item_id) || [];
+      if (itemIds.length === 0) {
+        setMerchantTransactions(prev => ({ ...prev, [merchantId]: [] }));
+        return;
       }
+      // Query transactions for these items and merchant
+      const { data: transactions, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .in('plaid_item_id', itemIds)
+        .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
+        .order('date', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      setMerchantTransactions(prev => ({ ...prev, [merchantId]: transactions || [] }));
     } catch (error) {
       console.error('Error fetching merchant transactions:', error);
+      setMerchantTransactions(prev => ({ ...prev, [merchantId]: [] }));
     } finally {
       setLoadingTransactions(prev => ({ ...prev, [merchantId]: false }));
     }
@@ -369,15 +386,6 @@ export default function RecurringBillsManager() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => fetchMerchantTransactions(merchant.id, merchant.merchant_name)}
-                          disabled={loadingTransactions[merchant.id]}
-                        >
-                          {loadingTransactions[merchant.id] ? '⏳' : expandedMerchant === merchant.id ? '📋' : '📋'}
-                          {expandedMerchant === merchant.id ? ' Hide' : ' History'}
-                        </Button>
                         <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
                         <Button 
                           variant="outline" 
@@ -400,29 +408,33 @@ export default function RecurringBillsManager() {
                 </div>
                 
                 {/* Historical Transactions */}
-                {expandedMerchant === merchant.id && (
+                {loadingTransactions[merchant.id] ? (
+                  <div className="px-3 pb-3">
+                    <div className="bg-white border rounded-md p-3">
+                      <div className="text-sm text-gray-500">Loading transactions...</div>
+                    </div>
+                  </div>
+                ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
                   <div className="px-3 pb-3">
                     <div className="bg-white border rounded-md p-3">
                       <h4 className="text-sm font-medium text-gray-700 mb-2">📋 Recent Transactions (Spot Check)</h4>
-                      {loadingTransactions[merchant.id] ? (
-                        <div className="text-sm text-gray-500">Loading...</div>
-                      ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
-                        <div className="space-y-1">
-                          {merchantTransactions[merchant.id].map((transaction) => (
-                            <div key={transaction.id} className="flex justify-between items-center text-sm py-1">
-                              <div className="flex-1">
-                                <div className="font-medium">{transaction.merchant_name || transaction.name}</div>
-                                <div className="text-gray-500">{transaction.date} • {transaction.category?.[0]}</div>
-                              </div>
-                              <div className="font-medium text-red-600">
-                                ${Math.abs(transaction.amount).toFixed(2)}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-gray-500">No recent transactions found for this merchant.</div>
-                      )}
+                      <ul className="list-disc pl-5 space-y-1">
+                        {merchantTransactions[merchant.id].map((transaction) => (
+                          <li key={transaction.id} className="text-sm">
+                            <span className="font-medium">{transaction.merchant_name || transaction.name}</span>
+                            {" — "}
+                            <span className="text-gray-500">{transaction.date}</span>
+                            {" — "}
+                            <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="px-3 pb-3">
+                    <div className="bg-white border rounded-md p-3">
+                      <div className="text-sm text-gray-500">No recent transactions found for this merchant.</div>
                     </div>
                   </div>
                 )}

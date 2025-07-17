@@ -81,3 +81,10 @@
 
 **Last Updated**: 2025-07-13 23:42 UTC  
 **Next Review**: After next 30-minute cron cycle to verify SMS improvements 
+
+## [2025-07-16] Deployment Log
+- Recurring bills section now shows all items, including those due today (no 15-item limit)
+- SMS send time and frequency options hidden in UI (can be toggled back on)
+- Fixed TypeScript lint errors in sms-preferences page
+- Deployed to Vercel: https://budgenudge-rl7rg3ifd-krezzo.vercel.app
+- Commit: 0adec86 

@@ -58,6 +58,13 @@ export async function GET(request: NextRequest) {
       .from('items')
       .select('id, user_id, plaid_item_id');
 
+    // DEBUG LOGGING START
+    console.log('DEBUG: itemsWithUsers:', itemsWithUsers);
+    console.log('DEBUG: itemsError:', itemsError);
+    console.log('DEBUG: Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('DEBUG: Service Role Key present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    // DEBUG LOGGING END
+
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
       console.log('📭 No bank connections found');
       // Update cron_log as success (no users)

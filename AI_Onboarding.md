@@ -452,3 +452,10 @@ BudgeNudge has successfully built what most fintech companies struggle with: a w
 **Next Action Ready**: Prepared to execute on high-priority roadmap items or user-requested tasks
 
 *BudgeNudge represents a major technical achievement in fintech: solving the real-time webhook challenge that enables true instant financial awareness. The system is production-ready and positioned for growth phase development.* 
+
+## [2025-07-16] Deployment
+- Recurring bills now include today and show all items (no 15-item limit)
+- SMS send time/frequency options hidden in UI (can be toggled back on)
+- Fixed TypeScript lint errors in sms-preferences page
+- Deployed to Vercel: https://budgenudge-rl7rg3ifd-krezzo.vercel.app
+- Commit: 0adec86 

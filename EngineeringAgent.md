@@ -571,3 +571,11 @@ vercel inspect <url> --logs  # Debug if needed
 - All critical paths validated in production
 - No open technical debt
 - Next: Monitor logs and user feedback 
+
+## [2025-07-16] Deployment
+- Updated recurring bills logic to include today (>= filter)
+- Removed 15-item limit on recurring bills
+- Hid SMS send time/frequency options in UI (code preserved)
+- Fixed TypeScript lint errors in sms-preferences page
+- Build, commit, push, and Vercel production deploy complete
+- Commit: 0adec86 
