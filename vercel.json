@@ -1,8 +1,9 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/scheduled-sms",
-      "schedule": "*/30 * * * *"
-    }
+    // DISABLED: SMS sends every 30 minutes
+    // {
+    //   "path": "/api/cron/scheduled-sms",
+    //   "schedule": "*/30 * * * *"
+    // }
   ]
 } 
