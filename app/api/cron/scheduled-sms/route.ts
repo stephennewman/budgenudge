@@ -54,6 +54,14 @@ export async function GET(request: NextRequest) {
     console.log('🕐 Starting NEW SMS template processing...');
     
     // Get all users with bank connections
+    console.log('DEBUG: About to query items table...');
+    
+    // Test query: count all rows
+    const { count: totalItems, error: countError } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true });
+    console.log('DEBUG: Total items count:', totalItems, 'countError:', countError);
+    
     const { data: itemsWithUsers, error: itemsError } = await supabase
       .from('items')
       .select('id, user_id, plaid_item_id');
@@ -63,6 +71,8 @@ export async function GET(request: NextRequest) {
     console.log('DEBUG: itemsError:', itemsError);
     console.log('DEBUG: Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
     console.log('DEBUG: Service Role Key present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    console.log('DEBUG: itemsWithUsers length:', itemsWithUsers?.length || 0);
+    console.log('DEBUG: itemsWithUsers type:', typeof itemsWithUsers);
     // DEBUG LOGGING END
 
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
