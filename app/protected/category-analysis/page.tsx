@@ -16,6 +16,7 @@ interface CategorySpendingData {
   avg_daily_spending: number;
   avg_monthly_spending: number;
   avg_transaction_amount: number;
+  merchants: string[];
 }
 
 export default function CategoryAnalysisPage() {
@@ -57,7 +58,8 @@ export default function CategoryAnalysisPage() {
           amount,
           date,
           subcategory,
-          plaid_item_id
+          plaid_item_id,
+          merchant_name
         `)
         .gte('amount', 0) // Only spending transactions (positive amounts)
         .order('date', { ascending: false });
@@ -79,6 +81,7 @@ export default function CategoryAnalysisPage() {
         amounts: number[];
         firstTransactionDate: string;
         lastTransactionDate: string;
+        merchants: Set<string>; // Add merchants set
       }>();
 
       transactions.forEach(transaction => {
@@ -91,12 +94,17 @@ export default function CategoryAnalysisPage() {
             amounts: [],
             firstTransactionDate: transaction.date,
             lastTransactionDate: transaction.date,
+            merchants: new Set(), // Initialize merchants set
           });
         }
         const categoryData = categoryMap.get(subcategory)!;
         categoryData.totalSpending += transaction.amount;
         categoryData.transactionCount += 1;
         categoryData.amounts.push(transaction.amount);
+        // Add merchant name to the set
+        if (transaction.merchant_name) {
+          categoryData.merchants.add(transaction.merchant_name);
+        }
         // Update first/last transaction date for this subcategory
         if (transaction.date < categoryData.firstTransactionDate) categoryData.firstTransactionDate = transaction.date;
         if (transaction.date > categoryData.lastTransactionDate) categoryData.lastTransactionDate = transaction.date;
@@ -116,7 +124,8 @@ export default function CategoryAnalysisPage() {
           days_of_data: daysOfData,
           avg_daily_spending: avgDailySpending,
           avg_monthly_spending: avgMonthlySpending,
-          avg_transaction_amount: avgTransactionAmount
+          avg_transaction_amount: avgTransactionAmount,
+          merchants: Array.from(data.merchants).sort() // Convert set to sorted array
         };
       });
 
@@ -283,6 +292,19 @@ export default function CategoryAnalysisPage() {
                     </div>
                   </div>
                 </div>
+
+                {category.merchants.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-900 mb-2">Merchants</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {category.merchants.map((merchant, merchantIndex) => (
+                        <span key={merchantIndex} className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                          {merchant}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
