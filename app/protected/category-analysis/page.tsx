@@ -1,0 +1,288 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createSupabaseClient } from '@/utils/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import ManualRefreshButton from '@/components/manual-refresh-button';
+
+interface CategorySpendingData {
+  category: string;
+  total_spending: number;
+  transaction_count: number;
+  first_transaction_date: string;
+  last_transaction_date: string;
+  days_of_data: number;
+  avg_daily_spending: number;
+  avg_monthly_spending: number;
+  avg_transaction_amount: number;
+}
+
+export default function CategoryAnalysisPage() {
+  const [categoryData, setCategoryData] = useState<CategorySpendingData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const supabase = createSupabaseClient();
+
+  const fetchCategoryData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get user's transactions with category data
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select(`
+          amount,
+          date,
+          category,
+          plaid_item_id
+        `)
+        .gte('amount', 0) // Only spending transactions (positive amounts)
+        .order('date', { ascending: false });
+
+      if (transactionsError) {
+        throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
+      }
+
+      if (!transactions || transactions.length === 0) {
+        setCategoryData([]);
+        setLoading(false);
+        return;
+      }
+
+      // Process transactions to calculate category spending
+      const categoryMap = new Map<string, {
+        totalSpending: number;
+        transactionCount: number;
+        dates: Set<string>;
+        amounts: number[];
+      }>();
+
+      transactions.forEach(transaction => {
+        // Handle category array - use first category or 'Other' if none
+        const category = transaction.category?.[0] || 'Other';
+        
+        if (!categoryMap.has(category)) {
+          categoryMap.set(category, {
+            totalSpending: 0,
+            transactionCount: 0,
+            dates: new Set(),
+            amounts: []
+          });
+        }
+
+        const categoryData = categoryMap.get(category)!;
+        categoryData.totalSpending += transaction.amount;
+        categoryData.transactionCount += 1;
+        categoryData.dates.add(transaction.date);
+        categoryData.amounts.push(transaction.amount);
+      });
+
+      // Convert to array and calculate averages
+      const processedData: CategorySpendingData[] = Array.from(categoryMap.entries()).map(([category, data]) => {
+        const dates = Array.from(data.dates).sort();
+        const firstDate = new Date(dates[0]);
+        const lastDate = new Date(dates[dates.length - 1]);
+        const daysOfData = Math.max(1, Math.ceil((lastDate.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        
+        const avgDailySpending = data.totalSpending / daysOfData;
+        const avgMonthlySpending = avgDailySpending * 30; // Approximate month
+        const avgTransactionAmount = data.totalSpending / data.transactionCount;
+
+        return {
+          category,
+          total_spending: data.totalSpending,
+          transaction_count: data.transactionCount,
+          first_transaction_date: dates[0],
+          last_transaction_date: dates[dates.length - 1],
+          days_of_data: daysOfData,
+          avg_daily_spending: avgDailySpending,
+          avg_monthly_spending: avgMonthlySpending,
+          avg_transaction_amount: avgTransactionAmount
+        };
+      });
+
+      // Sort by average monthly spending (highest to lowest)
+      processedData.sort((a, b) => b.avg_monthly_spending - a.avg_monthly_spending);
+
+      setCategoryData(processedData);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error fetching category data:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCategoryData();
+  }, []);
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getCategoryIcon = (category: string) => {
+    const icons: { [key: string]: string } = {
+      'Food and Drink': '🍽️',
+      'Restaurants': '🍽️',
+      'Groceries': '🛒',
+      'Shopping': '🛍️',
+      'Transportation': '🚗',
+      'Gas': '⛽',
+      'Entertainment': '🎬',
+      'Travel': '✈️',
+      'Healthcare': '🏥',
+      'Utilities': '💡',
+      'Rent': '🏠',
+      'Mortgage': '🏠',
+      'Insurance': '🛡️',
+      'Education': '📚',
+      'Personal Care': '💄',
+      'Fitness': '💪',
+      'Pets': '🐕',
+      'Gifts': '🎁',
+      'Charity': '❤️',
+      'Other': '📊'
+    };
+    return icons[category] || '💰';
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading category analysis...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md mx-auto">
+            <p className="text-red-700">Error: {error}</p>
+            <Button onClick={fetchCategoryData} className="mt-2">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 Category Spending Analysis</h1>
+          <p className="text-gray-600">
+            Historical spending by category, ranked by average monthly spend
+          </p>
+        </div>
+        <ManualRefreshButton onRefresh={fetchCategoryData} />
+      </div>
+
+      {lastUpdated && (
+        <div className="text-sm text-gray-500 mb-6">
+          Last updated: {lastUpdated.toLocaleString()}
+        </div>
+      )}
+
+      {categoryData.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-600">No spending data found. Connect your bank account to see category analysis.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-6">
+          {categoryData.map((category, index) => (
+            <Card key={category.category} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-2xl">{getCategoryIcon(category.category)}</span>
+                    <div>
+                      <CardTitle className="text-xl">{category.category}</CardTitle>
+                      <p className="text-sm text-gray-500">
+                        #{index + 1} in monthly spending
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {formatCurrency(category.avg_monthly_spending)}
+                    </div>
+                    <div className="text-sm text-gray-500">avg/month</div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="font-medium text-gray-900">Total Spent</div>
+                    <div className="text-gray-600">{formatCurrency(category.total_spending)}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900">Transactions</div>
+                    <div className="text-gray-600">{category.transaction_count}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900">Avg Transaction</div>
+                    <div className="text-gray-600">{formatCurrency(category.avg_transaction_amount)}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-900">Data Period</div>
+                    <div className="text-gray-600">{category.days_of_data} days</div>
+                  </div>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="font-medium text-gray-900">Daily Average</div>
+                      <div className="text-gray-600">{formatCurrency(category.avg_daily_spending)}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium text-gray-900">Date Range</div>
+                      <div className="text-gray-600">
+                        {formatDate(category.first_transaction_date)} - {formatDate(category.last_transaction_date)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-8 text-center text-sm text-gray-500">
+        <p>
+          💡 <strong>How it works:</strong> We calculate your average monthly spending by adding up all transactions 
+          for each category, then dividing by the number of days of data and multiplying by 30.
+        </p>
+        <p className="mt-2">
+          Example: $900 spent on restaurants over 90 days = $10/day = $300/month average
+        </p>
+      </div>
+    </div>
+  );
+} 

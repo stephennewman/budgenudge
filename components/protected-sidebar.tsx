@@ -19,6 +19,10 @@ export default async function ProtectedSidebar() {
           label: "💳 Transactions",
           href: "/transactions",
         },
+        {
+          label: "📊 Category Analysis",
+          href: "/category-analysis",
+        },
         // REMOVED FOR PERFORMANCE: Heavy analytics features
         // {
         //   label: "Analysis",
