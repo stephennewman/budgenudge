@@ -91,8 +91,8 @@ export default function TransactionDashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-muted-foreground">
-              Connect your Schwab account to start tracking transactions automatically.
-              Once connected, new transactions will sync via webhooks instantly!
+              Connect your primary baccount to start tracking transactions automatically.
+              Once connected, new transactions will sync automatically!
             </p>
             <PlaidLinkButton onSuccess={handleConnectionSuccess} />
           </CardContent>

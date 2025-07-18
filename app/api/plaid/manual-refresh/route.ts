@@ -86,7 +86,7 @@ export async function POST(request: Request) {
               // Check if it's an access token issue
               if (error.response.data?.error_code === 'INVALID_ACCESS_TOKEN' || 
                   error.response.data?.error_code === 'ACCESS_TOKEN_EXPIRED') {
-                throw new Error(`Access token invalid or expired for Charles Schwab account. Please reconnect your bank account.`);
+                throw new Error(`Access token invalid or expired. Please reconnect your bank account.`);
               }
             }
           }
