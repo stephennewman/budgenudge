@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Create link token with phone number verification
+    // Create link token
     const response = await plaidClient.linkTokenCreate({
       user: {
         client_user_id: user.id,
@@ -36,10 +36,6 @@ export async function POST(request: Request) {
       language: 'en',
       webhook: process.env.PLAID_WEBHOOK_URL,
       redirect_uri: process.env.PLAID_REDIRECT_URI,
-      phone_number_verification: {
-        enabled: true,
-        verification_type: 'sms'
-      },
     });
 
     return NextResponse.json({ link_token: response.data.link_token });

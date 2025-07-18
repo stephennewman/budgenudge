@@ -9,17 +9,6 @@ interface PlaidLinkButtonProps {
   onSuccess: () => void;
 }
 
-// Extended metadata type to include phone verification
-interface PlaidLinkMetadataWithPhone {
-  institution?: {
-    institution_id: string;
-    name: string;
-  };
-  phone_number_verification?: {
-    phone_number: string;
-  };
-}
-
 export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,17 +51,7 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        // Save phone number if provided by Plaid
-        const metadataWithPhone = metadata as PlaidLinkMetadataWithPhone;
-        if (metadataWithPhone.phone_number_verification?.phone_number) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            await supabase.auth.updateUser({
-              data: { phone: metadataWithPhone.phone_number_verification.phone_number }
-            });
-            console.log('📱 Phone number saved from Plaid:', metadataWithPhone.phone_number_verification.phone_number);
-          }
-        }
+
 
         // Exchange public token for access token
         const response = await fetch('/api/plaid/exchange-public-token', {
