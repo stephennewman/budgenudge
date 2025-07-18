@@ -1,6 +1,6 @@
 # Documentation Agent - BudgeNudge
 
-**Last Updated:** July 18, 2025, 1:04 PM EDT
+**Last Updated:** July 18, 2025, 1:36 PM EDT
 
 ## Documentation Status: CURRENT ✅
 
@@ -12,11 +12,16 @@
 
 ## Recent Documentation Updates
 
-### July 18, 2025 - SMS System Migration
-- **Updated**: SMS template documentation
-- **Added**: 3-template system explanation
-- **Removed**: Old buildAdvancedSMSMessage references
-- **Updated**: Cron schedule documentation (1:30 PM EST)
+### July 18, 2025, 1:36 PM EDT - Technical Improvements
+- **Updated**: Admin permission fix documentation
+- **Added**: Database schema changes (phone_number column)
+- **Updated**: Cron schedule documentation (1:45 PM EST)
+- **Added**: Code quality improvements documentation
+
+### July 18, 2025, 1:04 PM EDT - System Analysis
+- **Updated**: Hardcoded values analysis
+- **Added**: Production vs test code documentation
+- **Updated**: Agent files with comprehensive status
 
 ### July 17, 2025 - Category Analysis
 - **Added**: Category analysis page documentation
@@ -47,7 +52,7 @@ docs/
 ## API Documentation Status
 
 ### Core Endpoints
-- **scheduled-sms**: ✅ Documented with CRON_SECRET auth
+- **scheduled-sms**: ✅ Documented with CRON_SECRET auth (FIXED)
 - **test-daily-sms**: ✅ Updated for 3-template system
 - **sms-preferences**: ✅ User preference management
 - **manual-sms**: ✅ Testing and debugging
@@ -56,6 +61,7 @@ docs/
 - **CRON_SECRET**: ✅ Environment variable documentation
 - **Service Role**: ✅ Supabase permissions
 - **User Auth**: ✅ Row-level security policies
+- **Admin Permissions**: ✅ RESOLVED - No longer needed
 
 ## SMS System Documentation
 
@@ -76,9 +82,9 @@ docs/
    - Timing: Daily at user preference
 
 ### Configuration
-- **Send Time**: 1:30 PM EST (17:30 UTC)
+- **Send Time**: 1:45 PM EST (17:45 UTC)
 - **User Preferences**: Individual timing and types
-- **Phone Numbers**: User-specific delivery
+- **Phone Numbers**: User-specific delivery (database-driven)
 - **Error Handling**: Comprehensive logging
 
 ## Testing Documentation
@@ -99,7 +105,7 @@ docs/
 
 ### Getting Started
 1. **Account Setup**: Email/password registration
-2. **Phone Configuration**: Add phone number for SMS
+2. **Phone Configuration**: Add phone number for SMS (database storage)
 3. **Preferences**: Set SMS timing and types
 4. **First SMS**: Verify delivery and content
 
@@ -112,7 +118,7 @@ docs/
 ## Deployment Documentation
 
 ### Vercel Configuration
-- **Cron Schedule**: Daily at 17:30 UTC (1:30 PM EST)
+- **Cron Schedule**: Daily at 17:45 UTC (1:45 PM EST)
 - **Environment Variables**: CRON_SECRET and API keys
 - **Build Process**: Next.js 15.2.4 optimization
 - **Domain**: budgenudge.vercel.app
@@ -199,13 +205,33 @@ docs/
 - **Search Optimization**: Better discoverability
 - **Multimedia**: Video and interactive content
 
+## Technical Improvements Documentation
+
+### Database Schema Changes
+- **Added**: phone_number column to user_sms_settings table
+- **Migration**: 20250718000000_add_phone_number_to_sms_settings.sql
+- **Impact**: Centralized phone number storage
+- **Benefits**: Simplified lookup, better scalability
+
+### Code Quality Improvements
+- **Removed**: Complex auth.admin.getUserById() calls
+- **Simplified**: Phone number lookup from user_sms_settings table
+- **Maintained**: All existing functionality and error handling
+- **Performance**: Improved reliability and reduced complexity
+
+### Cron Schedule Updates
+- **Previous**: 1:30 PM EST (17:30 UTC)
+- **Current**: 1:45 PM EST (17:45 UTC)
+- **Reason**: Better user engagement timing
+- **Implementation**: Updated vercel.json cron schedule
+
 ## Next Actions
 
-### Immediate (This Week)
+### Immediate (Next 10 minutes)
 1. ✅ Update SMS system documentation
 2. ✅ Review API endpoint documentation
 3. ✅ Update testing procedures
-4. 🔄 Create troubleshooting guide
+4. 🔄 Monitor 1:45 PM EST cron execution
 
 ### Short Term (Next Month)
 1. Add video tutorials for key features

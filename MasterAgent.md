@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 18, 2025, 1:04 PM EDT
+**Last Updated:** July 18, 2025, 1:36 PM EDT
 
 ## Project Overview
 
@@ -34,32 +34,34 @@
 
 ### SMS System - FULLY OPERATIONAL ✅
 - **3-Template SMS System**: Recurring bills, recent transactions, and spending pacing
-- **Scheduled Delivery**: Daily at 1:30 PM EST (17:30 UTC)
+- **Scheduled Delivery**: Daily at 1:45 PM EST (17:45 UTC)
 - **User Preferences**: Individual send times stored in database
 - **Authorization**: Proper CRON_SECRET authentication
 - **Logging**: Comprehensive SMS delivery and error logging
+- **Database**: Phone numbers stored in user_sms_settings table
 
-### Recent Major Changes (July 2025)
-1. **SMS Template Migration**: Replaced old buildAdvancedSMSMessage with new 3-template system
-2. **Cron Schedule Update**: Changed from 7:00 AM UTC to 1:30 PM EST for better user engagement
-3. **Authorization Fix**: Fixed CRON_SECRET authentication in scheduled-sms endpoint
-4. **Time Check Logic**: Restored proper user preference time checking
-5. **Production Testing**: Verified system works correctly in production environment
+### Recent Major Changes (July 18, 2025)
+1. **Admin Permission Fix**: Resolved 403 "User not allowed" errors in cron job
+2. **Database Schema Update**: Added phone_number column to user_sms_settings table
+3. **Cron Schedule Update**: Changed from 1:30 PM EST to 1:45 PM EST for better timing
+4. **Phone Number Lookup**: Simplified from auth.admin.getUserById() to user_sms_settings table
+5. **Production Testing**: Verified cron endpoint works without errors
 
 ### Deployment History
-- **July 18, 2025**: SMS system fully operational with 1:30 PM EST schedule
+- **July 18, 2025, 1:36 PM EDT**: Fixed admin permission errors and updated to 1:45 PM EST schedule
+- **July 18, 2025, 1:04 PM EDT**: Updated all agent files with current project status
 - **July 18, 2025**: Fixed authorization and time check logic
 - **July 18, 2025**: Updated cron schedule to 1:30 PM EST
 - **July 18, 2025**: Migrated to new 3-template SMS system
-- **July 18, 2025**: Removed old buildAdvancedSMSMessage function
 
 ## Agent Coordination
 
 ### Engineering Agent Status
 - SMS system fully functional and tested
-- All endpoints properly authenticated
-- Database schema optimized for SMS preferences
+- Admin permission errors resolved
+- Database schema optimized with phone_number column
 - Production deployment successful
+- Ready for 1:45 PM ET cron execution
 
 ### Product Agent Status
 - Core SMS functionality complete
@@ -80,7 +82,7 @@
 ## Strategic Direction
 
 ### Immediate Priorities
-1. Monitor SMS delivery success rates
+1. Monitor 1:45 PM EST SMS delivery (next 10 minutes)
 2. Gather user feedback on notification timing
 3. Analyze spending pattern detection accuracy
 4. Optimize SMS content based on user engagement
@@ -94,7 +96,7 @@
 ## Risk Assessment
 
 ### Current Risks (0-100 Scale)
-- **SMS Delivery Failures**: 15 (Low - robust error handling in place)
+- **SMS Delivery Failures**: 10 (Low - admin errors resolved)
 - **User Engagement Drop**: 25 (Medium - need to monitor metrics)
 - **API Rate Limits**: 10 (Low - proper pacing implemented)
 
@@ -104,8 +106,26 @@
 - **Merchant Insights**: 75 (Medium value, low effort)
 - **User Onboarding**: 80 (High value, moderate effort)
 
+## Technical Improvements Made
+
+### Database Schema
+- **Added**: phone_number column to user_sms_settings table
+- **Migration**: Applied 20250718000000_add_phone_number_to_sms_settings.sql
+- **Data**: Updated User 1 phone number and send time to 1:45 PM ET
+
+### Code Quality
+- **Removed**: Complex auth.admin.getUserById() calls
+- **Simplified**: Phone number lookup from user_sms_settings table
+- **Maintained**: All existing functionality and error handling
+- **Performance**: Improved reliability and reduced complexity
+
+### Cron Schedule
+- **Previous**: 1:30 PM EST (17:30 UTC)
+- **Current**: 1:45 PM EST (17:45 UTC)
+- **Next Run**: Today at 1:45 PM EST (9 minutes from now)
+
 ## Next Actions
-1. Monitor first week of 1:30 PM EST SMS delivery
+1. Monitor first 1:45 PM EST SMS delivery (imminent)
 2. Analyze user engagement metrics
 3. Gather feedback on SMS content and timing
 4. Plan next feature development cycle

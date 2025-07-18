@@ -112,31 +112,31 @@ export async function GET(request: NextRequest) {
         usersProcessed++;
 
         // Fetch user's SMS settings (send_time) and phone number
-        let sendTime = '18:00'; // Default to 6:00 PM
+        let sendTime = '14:00'; // Default to 2:00 PM EST
         let userPhoneNumber: string | null = null;
         
-        // Get send_time from user_sms_settings
-        const { data: settings } = await supabase
+        // Get both send_time and phone_number in a single query
+        const { data: settings, error: settingsError } = await supabase
           .from('user_sms_settings')
-          .select('send_time')
-          .eq('user_id', userId)
-          .single();
-        if (settings && settings.send_time) {
-          sendTime = settings.send_time;
-        }
-
-        // Get phone number from user_sms_settings table
-        const { data: phoneSettings } = await supabase
-          .from('user_sms_settings')
-          .select('phone_number')
+          .select('send_time, phone_number')
           .eq('user_id', userId)
           .single();
         
-        if (phoneSettings && phoneSettings.phone_number) {
-          userPhoneNumber = phoneSettings.phone_number;
-          console.log(`📱 Found phone number for user ${userId}: ${userPhoneNumber}`);
+        if (settingsError) {
+          console.log(`⚠️ Error fetching settings for user ${userId}:`, settingsError);
+        }
+        
+        if (settings) {
+          sendTime = settings.send_time || '14:00';
+          userPhoneNumber = settings.phone_number;
+          
+          if (userPhoneNumber) {
+            console.log(`📱 Found phone number for user ${userId}: ${userPhoneNumber}`);
+          } else {
+            console.log(`📭 No phone number found for user ${userId}`);
+          }
         } else {
-          console.log(`📭 No phone number found for user ${userId}`);
+          console.log(`📭 No settings found for user ${userId}`);
         }
 
         // Skip users without phone numbers
