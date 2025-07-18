@@ -137,8 +137,18 @@ export async function GET(request: NextRequest) {
           continue;
         }
         
+        console.log(`🔍 DEBUG: User ${userId} auth data:`, {
+          id: userData?.user?.id,
+          email: userData?.user?.email,
+          user_metadata: userData?.user?.user_metadata,
+          phone: userData?.user?.user_metadata?.phone
+        });
+        
         if (userData?.user?.user_metadata?.phone) {
           userPhoneNumber = userData.user.user_metadata.phone;
+          console.log(`📱 DEBUG: Found phone number for user ${userId}: ${userPhoneNumber}`);
+        } else {
+          console.log(`📭 DEBUG: No phone number found for user ${userId}`);
         }
 
         // Skip users without phone numbers
