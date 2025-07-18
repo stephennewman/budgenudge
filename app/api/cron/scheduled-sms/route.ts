@@ -298,7 +298,8 @@ export async function GET(request: NextRequest) {
 export async function POST(req: NextRequest) {
   const isVercelCron = req.headers.get('x-vercel-cron');
   const authHeader = req.headers.get('authorization');
-  if (!isVercelCron && authHeader !== 'Bearer cron_secret_2024') {
+  const CRON_SECRET = process.env.CRON_SECRET;
+  if (!isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   return GET(req);
