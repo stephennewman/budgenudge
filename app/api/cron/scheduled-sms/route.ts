@@ -122,6 +122,8 @@ export async function GET(request: NextRequest) {
           .eq('user_id', userId)
           .single();
         
+        console.log(`🔍 DEBUG: Query result for user ${userId}:`, { settings, settingsError });
+        
         if (settingsError) {
           console.log(`⚠️ Error fetching settings for user ${userId}:`, settingsError);
         }
@@ -129,6 +131,8 @@ export async function GET(request: NextRequest) {
         if (settings) {
           sendTime = settings.send_time || '14:00';
           userPhoneNumber = settings.phone_number;
+          
+          console.log(`🔍 DEBUG: Parsed settings for user ${userId}:`, { sendTime, userPhoneNumber });
           
           if (userPhoneNumber) {
             console.log(`📱 Found phone number for user ${userId}: ${userPhoneNumber}`);
