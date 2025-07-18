@@ -156,17 +156,24 @@ export async function GET(request: NextRequest) {
           console.log(`📭 Skipping user ${userId} (no phone number in auth.users)`);
           continue;
         }
-        // Only send if current time is within 10 minutes of send_time
-        // TEMPORARILY DISABLED FOR TESTING
-        /*
-        if (Math.abs(nowMinutes - sendMinutes) > 10) {
-          logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST` });
-          console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST)`);
+
+        // Only send if current time is within 10 minutes of user's preferred send_time
+        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+        const sendTimeMinutes = sendHour * 60 + sendMinute;
+        const nowMinutes = nowEST.hour * 60 + nowEST.minute;
+        const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
+
+        // Handle day boundary (e.g., if send time is 23:50 and current is 00:05)
+        const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
+        const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
+
+        if (actualTimeDifference > 10) {
+          logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
+          console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
           continue;
         }
-        */
-        console.log(`⏰ TEMP: Bypassing time check for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute} EST)`);
-        // FORCE REDEPLOY - Phone number filtering test - CACHE CLEAR
+
+        console.log(`⏰ ✅ Time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`)
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
