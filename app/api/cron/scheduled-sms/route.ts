@@ -115,25 +115,36 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Fetch user's SMS settings (send_time and phone_number)
+        // Fetch user's SMS settings (send_time) and phone number from auth.users
         let sendTime = '18:00'; // Default to 6:00 PM
         let userPhoneNumber: string | null = null;
+        
+        // Get send_time from user_sms_settings
         const { data: settings } = await supabase
           .from('user_sms_settings')
-          .select('send_time, phone_number')
+          .select('send_time')
           .eq('user_id', userId)
           .single();
-        if (settings) {
-          if (settings.send_time) {
-            sendTime = settings.send_time;
-          }
-          userPhoneNumber = settings.phone_number;
+        if (settings && settings.send_time) {
+          sendTime = settings.send_time;
+        }
+
+        // Get phone number from auth.users table
+        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
+        if (userError) {
+          console.error(`Error fetching user ${userId}:`, userError);
+          logDetails.push({ userId, skipped: true, reason: 'Error fetching user data' });
+          continue;
+        }
+        
+        if (userData?.user?.user_metadata?.phone) {
+          userPhoneNumber = userData.user.user_metadata.phone;
         }
 
         // Skip users without phone numbers
         if (!userPhoneNumber || userPhoneNumber.trim() === '') {
-          logDetails.push({ userId, skipped: true, reason: 'No phone number set' });
-          console.log(`📭 Skipping user ${userId} (no phone number set)`);
+          logDetails.push({ userId, skipped: true, reason: 'No phone number in auth.users' });
+          console.log(`📭 Skipping user ${userId} (no phone number in auth.users)`);
           continue;
         }
         // Only send if current time is within 10 minutes of send_time
