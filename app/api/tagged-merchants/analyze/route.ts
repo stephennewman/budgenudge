@@ -41,9 +41,9 @@ export async function POST(request: Request) {
       .order('date', { ascending: false })
       .limit(50);
 
-    if (!transactions || transactions.length < 2) {
+    if (!transactions || transactions.length === 0) {
       return NextResponse.json({ 
-        error: 'Not enough transaction history to analyze this merchant (minimum 2 transactions required)' 
+        error: 'No transaction history found for this merchant' 
       }, { status:400 });
     }
 

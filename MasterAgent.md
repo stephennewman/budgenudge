@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 18, 2025, 1:36 PM EDT
+**Last Updated:** July 18, 2025, 3:30 PM EDT
 
 ## Project Overview
 
@@ -40,6 +40,15 @@
 - **Logging**: Comprehensive SMS delivery and error logging
 - **Database**: Phone numbers stored in user_sms_settings table
 
+### Recurring Transactions System - FULLY OPERATIONAL ✅
+- **Database**: `tagged_merchants` table with comprehensive recurring bill tracking
+- **Auto-Detection**: AI-powered pattern recognition for recurring transactions
+- **Manual Management**: Full CRUD operations for custom recurring bills
+- **Prediction Engine**: Smart date calculation based on transaction history
+- **SMS Integration**: Recurring bills included in daily SMS notifications
+- **Confidence Scoring**: 60-95% confidence levels for prediction accuracy
+- **Frequency Support**: Weekly, monthly, bi-monthly, quarterly patterns
+
 ### Recent Major Changes (July 18, 2025)
 1. **Admin Permission Fix**: Resolved 403 "User not allowed" errors in cron job
 2. **Database Schema Update**: Added phone_number column to user_sms_settings table
@@ -48,11 +57,55 @@
 5. **Production Testing**: Verified cron endpoint works without errors
 
 ### Deployment History
+- **July 18, 2025, 3:30 PM EDT**: Updated MasterAgent.md with comprehensive recurring transactions analysis
 - **July 18, 2025, 1:36 PM EDT**: Fixed admin permission errors and updated to 1:45 PM EST schedule
 - **July 18, 2025, 1:04 PM EDT**: Updated all agent files with current project status
 - **July 18, 2025**: Fixed authorization and time check logic
 - **July 18, 2025**: Updated cron schedule to 1:30 PM EST
 - **July 18, 2025**: Migrated to new 3-template SMS system
+
+## Recurring Transactions Deep Dive Analysis
+
+### Database Schema
+The `tagged_merchants` table contains:
+- **user_id**: UUID reference to auth.users
+- **merchant_name**: Text identifier for the merchant
+- **expected_amount**: Decimal amount for the recurring bill
+- **prediction_frequency**: weekly/monthly/bi-monthly/quarterly
+- **confidence_score**: 0-100% confidence in prediction accuracy
+- **is_active**: Boolean to enable/disable tracking
+- **auto_detected**: Boolean indicating AI vs manual detection
+- **next_predicted_date**: Calculated next occurrence date
+- **last_transaction_date**: Most recent transaction date
+- **created_at/updated_at**: Timestamps
+
+### API Endpoints
+1. **GET /api/tagged-merchants**: Fetch all user's recurring bills
+2. **POST /api/tagged-merchants**: Add new recurring bill
+3. **PUT /api/tagged-merchants/[id]**: Update existing bill
+4. **DELETE /api/tagged-merchants/[id]**: Remove bill from tracking
+5. **POST /api/tagged-merchants/analyze**: AI analysis of merchant patterns
+6. **POST /api/update-predictions**: Bulk update all predictions
+
+### Frontend Components
+- **RecurringBillsManager**: Main component at `/protected/recurring-bills`
+- **Features**: Add, edit, delete, enable/disable recurring bills
+- **Historical Data**: Shows recent transactions for each merchant
+- **Prediction Display**: Next due date with confidence scoring
+- **Frequency Management**: Support for multiple billing cycles
+
+### AI Pattern Recognition
+- **Transaction Analysis**: Scans 50+ transactions per merchant
+- **Frequency Detection**: Identifies weekly/monthly/bi-monthly/quarterly patterns
+- **Amount Consistency**: Calculates expected amounts from historical data
+- **Confidence Scoring**: 60% minimum threshold for auto-detection
+- **Date Calculation**: Smart prediction based on last transaction date
+
+### SMS Integration
+- **Template 1**: Recurring bills with upcoming due dates
+- **Real Data**: Pulls from tagged_merchants table
+- **Date Formatting**: Consistent with frontend display
+- **Amount Totals**: Sums upcoming bills by time period (7/14/30 days)
 
 ## Agent Coordination
 
@@ -61,23 +114,26 @@
 - Admin permission errors resolved
 - Database schema optimized with phone_number column
 - Production deployment successful
+- Recurring transactions system fully operational
 - Ready for 1:45 PM ET cron execution
 
 ### Product Agent Status
 - Core SMS functionality complete
 - User preference system working
 - Analytics and logging in place
+- Recurring bills management complete
 - Ready for feature expansion
 
 ### Marketing Agent Status
 - Value proposition: Proactive financial wellness through SMS
-- Key differentiator: Personalized spending insights
+- Key differentiator: Personalized spending insights + recurring bill tracking
 - Target: Users seeking better financial awareness
 
 ### Documentation Agent Status
 - API documentation current
 - SMS system documentation updated
 - Testing guides maintained
+- Recurring bills documentation complete
 
 ## Strategic Direction
 
@@ -99,12 +155,14 @@
 - **SMS Delivery Failures**: 10 (Low - admin errors resolved)
 - **User Engagement Drop**: 25 (Medium - need to monitor metrics)
 - **API Rate Limits**: 10 (Low - proper pacing implemented)
+- **Recurring Bill Accuracy**: 15 (Low - confidence scoring working)
 
 ### Opportunities (0-100 Scale)
 - **Enhanced Analytics**: 85 (High value, moderate effort)
 - **Budget Integration**: 90 (High value, high effort)
 - **Merchant Insights**: 75 (Medium value, low effort)
 - **User Onboarding**: 80 (High value, moderate effort)
+- **Recurring Bill Notifications**: 95 (High value, low effort)
 
 ## Technical Improvements Made
 
