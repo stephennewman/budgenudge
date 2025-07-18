@@ -115,15 +115,26 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Fetch user's preferred send_time from user_sms_settings
+        // Fetch user's SMS settings (send_time and phone_number)
         let sendTime = '18:00'; // Default to 6:00 PM
+        let userPhoneNumber: string | null = null;
         const { data: settings } = await supabase
           .from('user_sms_settings')
-          .select('send_time')
+          .select('send_time, phone_number')
           .eq('user_id', userId)
           .single();
-        if (settings && settings.send_time) {
-          sendTime = settings.send_time;
+        if (settings) {
+          if (settings.send_time) {
+            sendTime = settings.send_time;
+          }
+          userPhoneNumber = settings.phone_number;
+        }
+
+        // Skip users without phone numbers
+        if (!userPhoneNumber || userPhoneNumber.trim() === '') {
+          logDetails.push({ userId, skipped: true, reason: 'No phone number set' });
+          console.log(`📭 Skipping user ${userId} (no phone number set)`);
+          continue;
         }
         // Only send if current time is within 10 minutes of send_time
         // TEMPORARILY DISABLED FOR TESTING
@@ -159,9 +170,9 @@ export async function GET(request: NextRequest) {
             console.log(`📱 Sending ${templateType} SMS to user ${userId}`);
             console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
-            // Send SMS using primary phone number (no overrides)
+            // Send SMS using user's phone number
             const smsResult = await sendEnhancedSlickTextSMS({
-              phoneNumber: '+16173472721', // Default for now - will use user's primary later
+              phoneNumber: userPhoneNumber,
               message: smsMessage,
               userId: userId
             });

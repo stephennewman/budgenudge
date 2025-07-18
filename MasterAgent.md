@@ -20,6 +20,19 @@
 
 ## 🚀 Recent Deployments
 
+### 2025-07-17 16:45 ET - Category Spending Analysis Feature (Build: 521a013)
+**New Feature**: Added comprehensive category spending analysis page with historical data ranking.
+
+**Implementation**: 
+- Created new `/protected/category-analysis` page with full category breakdown
+- Calculates average monthly spending by category using total spending ÷ days of data × 30
+- Ranks categories from highest to lowest average monthly spend
+- Shows total spending, transaction count, average transaction amount, and date ranges
+- Added category icons and responsive design
+- Integrated into protected sidebar navigation
+
+**Result**: Users can now see detailed historical spending analysis by category, helping identify spending patterns and prioritize budget areas.
+
 ### 2025-07-17 15:35 ET - SMS Character Limit Fix & Cache Clear (Build: a567096)
 **Problem**: SMS messages were failing due to exceeding 918 character limit with 20 transactions.
 
@@ -50,6 +63,7 @@
 ✅ **SMS Notifications**: 3-template system (Bills, Yesterday's Activity, Spending Pacing)  
 ✅ **User Preferences**: Subscription control for SMS types  
 ✅ **Transaction Analysis**: Spending patterns and categorization  
+✅ **Category Analysis**: Historical spending by category with monthly averages  
 ✅ **Recurring Bills**: Automated bill prediction and reminders  
 ✅ **Real-time Monitoring**: 30-minute automated check cycles  
 ✅ **Character Limit Compliance**: SMS messages optimized for 918 character limit
@@ -97,7 +111,14 @@
 **Next Review**: Monitor next cron cycle to verify consistent SMS delivery
 
 ## [2025-07-17] Deployment Log
-- Fixed SMS character limit by changing from 20 transactions to yesterday's transactions
+- **16:45 ET**: Added Category Spending Analysis page with historical data ranking
+  - New `/protected/category-analysis` route with comprehensive category breakdown
+  - Calculates average monthly spending using total spending ÷ days of data × 30
+  - Ranks categories from highest to lowest average monthly spend
+  - Added to protected sidebar navigation
+  - Deployed to Vercel: https://budgenudge.vercel.app
+  - Commit: 521a013
+- **15:35 ET**: Fixed SMS character limit by changing from 20 transactions to yesterday's transactions
 - Updated all UI references and examples to reflect new format
 - Fixed linting errors preventing deployment
 - Cleared deployment cache to ensure latest code active
