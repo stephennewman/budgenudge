@@ -51,6 +51,17 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
+        // Save phone number if provided by Plaid
+        if ((metadata as any).phone_number_verification?.phone_number) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.auth.updateUser({
+              data: { phone: (metadata as any).phone_number_verification.phone_number }
+            });
+            console.log('📱 Phone number saved from Plaid:', (metadata as any).phone_number_verification.phone_number);
+          }
+        }
+
         // Exchange public token for access token
         const response = await fetch('/api/plaid/exchange-public-token', {
           method: 'POST',
