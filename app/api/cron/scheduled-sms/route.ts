@@ -102,10 +102,6 @@ export async function GET(request: NextRequest) {
     // Later this can be controlled by user preferences
     const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'pacing'];
     
-    // let successCount = 0;
-    // let failureCount = 0;
-    // let processedUsers = 0;
-
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');
 
@@ -115,7 +111,7 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Fetch user's SMS settings (send_time) and phone number from auth.users
+        // Fetch user's SMS settings (send_time) and phone number
         let sendTime = '18:00'; // Default to 6:00 PM
         let userPhoneNumber: string | null = null;
         
@@ -129,22 +125,15 @@ export async function GET(request: NextRequest) {
           sendTime = settings.send_time;
         }
 
-        // Get phone number from auth.users table using service role
-        const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
-        if (userError) {
-          console.error(`Error fetching user ${userId}:`, userError);
-          logDetails.push({ userId, skipped: true, reason: 'Error fetching user data' });
-          continue;
-        }
+        // Get phone number from user_sms_settings table
+        const { data: phoneSettings } = await supabase
+          .from('user_sms_settings')
+          .select('phone_number')
+          .eq('user_id', userId)
+          .single();
         
-        console.log(`🔍 DEBUG: User ${userId} auth data:`, {
-          id: userData?.user?.id,
-          email: userData?.user?.email,
-          phone: userData?.user?.user_metadata?.phone
-        });
-        
-        if (userData?.user?.user_metadata?.phone) {
-          userPhoneNumber = userData.user.user_metadata.phone;
+        if (phoneSettings && phoneSettings.phone_number) {
+          userPhoneNumber = phoneSettings.phone_number;
           console.log(`📱 Found phone number for user ${userId}: ${userPhoneNumber}`);
         } else {
           console.log(`📭 No phone number found for user ${userId}`);
@@ -152,8 +141,8 @@ export async function GET(request: NextRequest) {
 
         // Skip users without phone numbers
         if (!userPhoneNumber || userPhoneNumber.trim() === '') {
-          logDetails.push({ userId, skipped: true, reason: 'No phone number in auth.users' });
-          console.log(`📭 Skipping user ${userId} (no phone number in auth.users)`);
+          logDetails.push({ userId, skipped: true, reason: 'No phone number in user_sms_settings' });
+          console.log(`📭 Skipping user ${userId} (no phone number in user_sms_settings)`);
           continue;
         }
 
@@ -299,8 +288,11 @@ export async function POST(req: NextRequest) {
   const isVercelCron = req.headers.get('x-vercel-cron');
   const authHeader = req.headers.get('authorization');
   const CRON_SECRET = process.env.CRON_SECRET;
+  
   if (!isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  
+  // For manual testing, just call the GET method
   return GET(req);
 } 
