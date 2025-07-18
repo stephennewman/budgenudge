@@ -157,24 +157,23 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // TEMPORARILY DISABLED: Time check for testing - send SMS regardless of time
         // Only send if current time is within 10 minutes of user's preferred send_time
-        // const [sendHour, sendMinute] = sendTime.split(':').map(Number);
-        // const sendTimeMinutes = sendHour * 60 + sendMinute;
-        // const nowMinutes = nowEST.hour * 60 + nowEST.minute;
-        // const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
+        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+        const sendTimeMinutes = sendHour * 60 + sendMinute;
+        const nowMinutes = nowEST.hour * 60 + nowEST.minute;
+        const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
 
         // Handle day boundary (e.g., if send time is 23:50 and current is 00:05)
-        // const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
-        // const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
+        const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
+        const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
 
-        // if (actualTimeDifference > 10) {
-        //   logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
-        //   console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
-        //   continue;
-        // }
+        if (actualTimeDifference > 10) {
+          logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
+          console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
+          continue;
+        }
 
-        console.log(`⏰ ✅ Time check DISABLED for testing - sending SMS to user ${userId} (preferred send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)`)
+        console.log(`⏰ ✅ Time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`)
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
 
