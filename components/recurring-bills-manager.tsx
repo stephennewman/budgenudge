@@ -400,7 +400,7 @@ export default function RecurringBillsManager() {
                 ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
                   <div className="px-3 pb-3">
                     <div className="bg-white border rounded-md p-3">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">📋 Recent Transactions (Spot Check)</h4>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">📋 Recent Transactions</h4>
                       <ul className="list-disc pl-5 space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
                           <li key={transaction.id} className="text-sm">
