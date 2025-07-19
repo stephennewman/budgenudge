@@ -5,20 +5,14 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   try {
-    const requestBody = await request.json();
-    console.log('🔍 DEBUG: Received request body:', JSON.stringify(requestBody, null, 2));
-    
-    const { public_token } = requestBody;
+    const { public_token } = await request.json();
 
     if (!public_token) {
-      console.error('❌ Missing public_token in request');
       return NextResponse.json(
         { error: 'public_token is required' },
         { status: 400 }
       );
     }
-
-    console.log('✅ public_token received, proceeding with exchange...');
 
     // Get the authorization header
     const authHeader = request.headers.get('authorization');
@@ -41,11 +35,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Exchange public token for access token
-    console.log('🔄 Calling Plaid itemPublicTokenExchange...');
     const response = await plaidClient.itemPublicTokenExchange({
       public_token,
     });
-    console.log('✅ Plaid token exchange successful');
 
     const { access_token, item_id } = response.data;
 
@@ -113,49 +105,11 @@ export async function POST(request: NextRequest) {
       accounts: accountsResponse.data.accounts.length,
       transactions: transactionsResponse.data.transactions.length
     });
-  } catch (error: unknown) {
-    console.error('❌ Error exchanging public token:', error);
-    
-    // Type guard for axios error
-    const isAxiosError = (err: unknown): err is { 
-      response?: { 
-        status?: number; 
-        data?: { 
-          error_code?: string; 
-          error_message?: string; 
-          error_type?: string;
-        } 
-      } 
-    } => {
-      return typeof err === 'object' && err !== null && 'response' in err;
-    };
-    
-    // Log more detailed error information
-    if (isAxiosError(error) && error.response) {
-      console.error('📋 Error response status:', error.response.status);
-      console.error('📋 Error response data:', JSON.stringify(error.response.data, null, 2));
-      
-      // Check if it's a Plaid API error
-      if (error.response.data?.error_code) {
-        console.error('🔴 Plaid API Error Code:', error.response.data.error_code);
-        console.error('🔴 Plaid API Error Message:', error.response.data.error_message);
-        
-        return NextResponse.json(
-          { 
-            error: 'Plaid API Error',
-            plaid_error_code: error.response.data.error_code,
-            plaid_error_message: error.response.data.error_message
-          },
-          { status: error.response.status || 400 }
-        );
-      }
-    }
-    
+  } catch (error) {
+    console.error('Error exchanging public token:', error);
     handlePlaidError(error);
-    
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to exchange token', details: errorMessage },
+      { error: 'Failed to exchange token' },
       { status: 500 }
     );
   }

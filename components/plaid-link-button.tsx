@@ -51,8 +51,7 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
           const { data: { session } } = await supabase.auth.getSession();
           if (!session) return;
 
-          // DEBUG: Log all metadata to see what's available
-          console.log('🔍 DEBUG: Full Plaid Link metadata:', JSON.stringify(metadata, null, 2));
+
 
           // Exchange public token for access token
           const response = await fetch('/api/plaid/exchange-public-token', {

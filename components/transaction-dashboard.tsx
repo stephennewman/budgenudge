@@ -22,20 +22,15 @@ export default function TransactionDashboard() {
   async function checkConnection() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('🔍 DEBUG: User from checkConnection:', user?.id);
       if (!user) return;
 
       // Check if user has any connected items
-      const { data: items, error } = await supabase
+      const { data: items } = await supabase
         .from('items')
         .select('*')
         .eq('user_id', user.id);
 
-      console.log('🔍 DEBUG: Items query result:', { items, error, itemCount: items?.length });
-      
-      const hasConnection = !!(items && items.length > 0);
-      console.log('🔍 DEBUG: Setting isConnected to:', hasConnection);
-      setIsConnected(hasConnection);
+      setIsConnected(!!(items && items.length > 0));
       
       if (items && items.length > 0) {
         await fetchTransactions();
@@ -43,7 +38,6 @@ export default function TransactionDashboard() {
     } catch (error) {
       console.error('Error checking connection:', error);
     } finally {
-      console.log('🔍 DEBUG: Setting isLoading to false');
       setIsLoading(false);
     }
   }
@@ -80,10 +74,7 @@ export default function TransactionDashboard() {
 
 
 
-  console.log('🔍 DEBUG: TransactionDashboard render state:', { isLoading, isConnected, accountCount: accounts.length });
-
   if (isLoading) {
-    console.log('🔍 DEBUG: Showing loading state');
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-muted-foreground">Loading...</div>
@@ -92,7 +83,6 @@ export default function TransactionDashboard() {
   }
 
   if (!isConnected) {
-    console.log('🔍 DEBUG: Showing PlaidLinkButton (not connected)');
     return (
       <div className="max-w-2xl mx-auto p-6">
         <Card>
@@ -110,8 +100,6 @@ export default function TransactionDashboard() {
       </div>
     );
   }
-
-  console.log('🔍 DEBUG: Showing full dashboard (connected)');
 
   return (
     <div className="space-y-6">
