@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
 import { tagMerchantWithAI } from '@/utils/ai/merchant-tagging';
 
+interface TaggingResult {
+  merchant: string;
+  ai_merchant_name: string;
+  ai_category_tag: string;
+  transaction_count: number;
+  was_cached: boolean;
+}
+
+interface TaggingError {
+  merchant: string;
+  error: string;
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createSupabaseClient();
@@ -13,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { batch_size = 50, max_transactions = 500 } = body;
+    const { max_transactions = 500 } = body;
 
     console.log(`🏷️ Starting bulk AI tagging for user ${user.id}`);
 
@@ -69,8 +82,8 @@ export async function POST(request: Request) {
     let processedCount = 0;
     let apiCallCount = 0;
     let cachedCount = 0;
-    const results: any[] = [];
-    const errors: any[] = [];
+    const results: TaggingResult[] = [];
+    const errors: TaggingError[] = [];
 
     // Check existing cache
     const merchantPatterns = Array.from(merchantGroups.keys());
