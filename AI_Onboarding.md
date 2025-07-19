@@ -105,7 +105,10 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Solution**: Updated analyze endpoint + existing database records to ensure future prediction dates
 - **Database Update**: All merchants now have future prediction dates (Aug 2025+)
 - **User Action**: ✅ **FULLY RESOLVED** - All starred transactions now appear in recurring bills page
-- **Validation**: Complete end-to-end workflow restored - star → analyze → recurring bills display
+- **Additional Fix**: Created server-side API for historical transaction display (resolved "No recent transactions found")
+- **Technical Improvement**: Moved from client-side to server-side queries to avoid RLS permission issues
+- **Bundle Optimization**: Reduced recurring bills page size from 8.55kB to 4.62kB  
+- **Validation**: Complete end-to-end workflow restored - star → analyze → recurring bills → historical transactions display
 
 ### 🗓️ July 19, 2025 - COMPLETE SUCCESS: User Access Restored + Google SSO Working ✅ RESOLVED
 - **9:45 AM EDT**: User successfully accessed original account with full transaction history via Google SSO
