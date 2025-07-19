@@ -27,8 +27,9 @@ export const signUpAction = async (formData: FormData) => {
   const phone = formData.get("phone") as string;
   const client = await createSupabaseClient();
 
-  const url = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/auth/callback`
+  // Use the correct URL for the current environment
+  const url = process.env.NODE_ENV === 'production'
+    ? "https://budgenudge.vercel.app/auth/callback"
     : "http://localhost:3000/auth/callback";
 
   const { error } = await client.auth.signUp({
