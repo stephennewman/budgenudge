@@ -83,6 +83,23 @@ Complete PostgreSQL schema with 15+ core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 19, 2025 - CRITICAL BUG FIX: Star Transactions Now Appear in Recurring Bills ✅ DEPLOYED
+- **2:10 PM EDT**: Successfully fixed critical bug where starred transactions disappeared from recurring bills page
+- **Root Cause Identified**: `analyze` endpoint was inserting merchants without `is_active: true`, causing them to be filtered out
+- **Triple-Fix Solution Implemented**:
+  - ✅ **Analyze Endpoint**: Added `is_active: true` to transaction starring functionality
+  - ✅ **Main POST Endpoint**: Added `is_active: true` to manual merchant additions
+  - ✅ **Database Migration**: Set default value and fixed existing null records
+- **Technical Details**:
+  - Fixed `app/api/tagged-merchants/analyze/route.ts` 
+  - Fixed `app/api/tagged-merchants/route.ts`
+  - Created migration `20250719150000_fix_tagged_merchants_is_active.sql`
+  - Fixed TypeScript lint errors in test-rules-engine
+- **Git Commit**: `af4f5f4` - "🔧 FIX: Star transactions now appear in recurring bills"
+- **Deployment**: Building on Vercel (https://budgenudge-9qimjb0qr-krezzo.vercel.app)
+- **Impact**: ✅ Users can now star transactions and see them immediately in recurring bills page
+- **Validation**: Complete end-to-end workflow restored - star → analyze → recurring bills display
+
 ### 🗓️ July 19, 2025 - COMPLETE SUCCESS: User Access Restored + Google SSO Working ✅ RESOLVED
 - **9:45 AM EDT**: User successfully accessed original account with full transaction history via Google SSO
 - **Issue Resolution**: Multiple user accounts identified - user authenticated into original account containing transaction data
