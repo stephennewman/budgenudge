@@ -39,12 +39,6 @@ export async function GET() {
     const untagged = total - tagged;
     const percentage = total > 0 ? Math.round((tagged / total) * 100) : 0;
 
-    // Get sample of untagged transactions
-    const untaggedSample = allTransactions
-      .filter(t => !t.ai_merchant_name)
-      .slice(0, 10)
-      .map(t => t.merchant_name || t.name);
-
     // Get unique untagged merchants
     const untaggedMerchants = new Set();
     allTransactions.forEach(t => {
