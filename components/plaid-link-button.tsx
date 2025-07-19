@@ -44,27 +44,28 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
 
   const { open, ready } = usePlaidLink({
     token: linkToken,
-    onSuccess: async (public_token, metadata) => {
-      setIsLoading(true);
-      try {
-        // Get current session for auth
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
+          onSuccess: async (public_token, metadata) => {
+        setIsLoading(true);
+        try {
+          // Get current session for auth
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) return;
 
+          // DEBUG: Log all metadata to see what's available
+          console.log('🔍 DEBUG: Full Plaid Link metadata:', JSON.stringify(metadata, null, 2));
 
-
-        // Exchange public token for access token
-        const response = await fetch('/api/plaid/exchange-public-token', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`
-          },
-          body: JSON.stringify({ 
-            public_token,
-            institution_id: metadata.institution?.institution_id,
-          }),
-        });
+          // Exchange public token for access token
+          const response = await fetch('/api/plaid/exchange-public-token', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ 
+              public_token,
+              institution_id: metadata.institution?.institution_id,
+            }),
+          });
 
         if (response.ok) {
           onSuccess();
