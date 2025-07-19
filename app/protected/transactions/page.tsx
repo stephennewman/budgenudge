@@ -35,6 +35,8 @@ interface Transaction {
   account_owner?: string;
   created_at?: string;
   updated_at?: string;
+  ai_merchant_name?: string;
+  ai_category_tag?: string;
 }
 
 // Merchant analytics data from database
@@ -499,6 +501,34 @@ export default function TransactionsPage() {
           </span>
         ) : (
           <span className="text-gray-400">-</span>
+        );
+      },
+    },
+    {
+      accessorKey: 'ai_merchant_name',
+      header: 'AI Merchant',
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const aiMerchant = getValue();
+        return aiMerchant ? (
+          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium">
+            {aiMerchant}
+          </span>
+        ) : (
+          <span className="text-gray-400 text-xs">Not tagged</span>
+        );
+      },
+    },
+    {
+      accessorKey: 'ai_category_tag',
+      header: 'AI Category',
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const aiCategory = getValue();
+        return aiCategory ? (
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
+            {aiCategory}
+          </span>
+        ) : (
+          <span className="text-gray-400 text-xs">Not tagged</span>
         );
       },
     },

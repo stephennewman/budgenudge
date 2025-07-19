@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     // Query transactions for this merchant
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
-      .select('id, date, merchant_name, name, amount, subcategory')
+      .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag')
       .in('plaid_item_id', itemIds)
       .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
       .order('date', { ascending: false })

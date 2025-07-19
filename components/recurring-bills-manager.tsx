@@ -26,6 +26,8 @@ interface Transaction {
   merchant_name?: string;
   category?: string[];
   subcategory?: string;
+  ai_merchant_name?: string;
+  ai_category_tag?: string;
 }
 
 export default function RecurringBillsManager() {
@@ -414,6 +416,18 @@ export default function RecurringBillsManager() {
                               <>
                                 {" — "}
                                 <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{transaction.subcategory}</span>
+                              </>
+                            )}
+                            {transaction.ai_merchant_name && (
+                              <>
+                                {" — "}
+                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">{transaction.ai_merchant_name}</span>
+                              </>
+                            )}
+                            {transaction.ai_category_tag && (
+                              <>
+                                {" — "}
+                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">{transaction.ai_category_tag}</span>
                               </>
                             )}
                           </li>
