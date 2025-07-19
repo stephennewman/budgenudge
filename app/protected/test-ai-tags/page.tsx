@@ -77,6 +77,43 @@ export default function TestAITagsPage() {
     }
   };
 
+  const tagRealTransactions = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('🏷️ Tagging real transactions');
+
+      const response = await fetch('/api/tag-sample-transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setResult({
+        success: true,
+        message: 'Real transactions tagged successfully',
+        tagged: data.tagged,
+        total_found: data.total_found,
+        results: data.results,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (err) {
+      console.error('Real transaction tagging failed:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const checkTransactionStats = async () => {
     setIsLoading(true);
     setError(null);
@@ -136,6 +173,13 @@ export default function TestAITagsPage() {
               variant="outline"
             >
               {isLoading ? '⏳ Loading...' : '📊 Check Stats'}
+            </Button>
+            <Button 
+              onClick={tagRealTransactions}
+              disabled={isLoading}
+              variant="outline"
+            >
+              {isLoading ? '⏳ Tagging...' : '🏷️ Tag Real Transactions'}
             </Button>
           </div>
         </Card>
