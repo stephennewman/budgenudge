@@ -94,6 +94,7 @@ export async function POST(request: Request) {
         prediction_frequency,
         confidence_score: parseInt(confidence_score),
         auto_detected,
+        is_active: true, // ✅ FIXED: Ensure manually added merchants are active by default
         next_predicted_date: next_predicted_date.toISOString().split('T')[0],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

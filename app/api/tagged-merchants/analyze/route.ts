@@ -89,6 +89,7 @@ export async function POST(request: Request) {
         prediction_frequency: analysis.frequency,
         confidence_score: analysis.confidence_score,
         auto_detected: false, // User-triggered analysis
+        is_active: true, // ✅ FIXED: Ensure starred merchants are active by default
         last_transaction_date: lastTransaction.toISOString().split('T')[0],
         next_predicted_date: nextPredictedDate.toISOString().split('T')[0],
         created_at: new Date().toISOString(),
