@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
 
 interface TaggedMerchant {
   id: number;
@@ -49,8 +49,6 @@ export default function RecurringBillsManager() {
   const [merchantTransactions, setMerchantTransactions] = useState<{[key: number]: Transaction[]}>({});
   const [loadingTransactions, setLoadingTransactions] = useState<{[key: number]: boolean}>({});
 
-  const supabase = createClientComponentClient();
-
   useEffect(() => {
     fetchTaggedMerchants();
   }, []);
@@ -89,30 +87,15 @@ export default function RecurringBillsManager() {
     }
     setLoadingTransactions(prev => ({ ...prev, [merchantId]: true }));
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('No user');
-      // Get user's plaid_item_ids
-      const { data: items, error: itemsError } = await supabase
-        .from('items')
-        .select('plaid_item_id')
-        .eq('user_id', user.id);
-      if (itemsError) throw itemsError;
-      const itemIds = items?.map(item => item.plaid_item_id) || [];
-      if (itemIds.length === 0) {
-        setMerchantTransactions(prev => ({ ...prev, [merchantId]: [] }));
-        return;
+      // Use server-side API endpoint to fetch transactions
+      const response = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(merchantName)}`);
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch transactions');
       }
-      // Query transactions for these items and merchant
-      const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .in('plaid_item_id', itemIds)
-        .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
-        .order('date', { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      setMerchantTransactions(prev => ({ ...prev, [merchantId]: transactions || [] }));
+      
+      setMerchantTransactions(prev => ({ ...prev, [merchantId]: data.transactions || [] }));
     } catch (error) {
       console.error('Error fetching merchant transactions:', error);
       setMerchantTransactions(prev => ({ ...prev, [merchantId]: [] }));
