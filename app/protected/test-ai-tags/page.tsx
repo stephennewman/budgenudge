@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 export default function TestAITagsPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const testSampleTransactions = [
@@ -185,8 +185,8 @@ export default function TestAITagsPage() {
         <Card className="p-6 bg-blue-50 border-blue-200">
           <h2 className="text-xl font-semibold mb-4 text-blue-800">📝 How It Works</h2>
           <div className="space-y-2 text-blue-700">
-            <p><strong>AI Merchant Names:</strong> "PUBLIX SUPER MARKET #1234" → "Publix"</p>
-            <p><strong>AI Categories:</strong> Logical grouping like "Groceries", "Restaurant", "Subscription"</p>
+            <p><strong>AI Merchant Names:</strong> &quot;PUBLIX SUPER MARKET #1234&quot; → &quot;Publix&quot;</p>
+            <p><strong>AI Categories:</strong> Logical grouping like &quot;Groceries&quot;, &quot;Restaurant&quot;, &quot;Subscription&quot;</p>
             <p><strong>Smart Caching:</strong> Same merchants get cached to reduce API costs</p>
             <p><strong>Fallback Logic:</strong> If OpenAI fails, intelligent fallbacks are used</p>
           </div>

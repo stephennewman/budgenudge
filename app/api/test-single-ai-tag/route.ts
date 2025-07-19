@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { tagMerchantWithAI } from '@/utils/ai/merchant-tagging';
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     // Test with a sample transaction
     const testTransaction = {
