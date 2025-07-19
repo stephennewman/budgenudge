@@ -59,8 +59,10 @@ export async function POST(request: Request) {
 
     // Calculate next predicted date
     const lastTransaction = new Date(transactions[0].date);
+    const today = new Date();
     let nextPredictedDate: Date;
     
+    // Calculate from last transaction date
     switch (analysis.frequency) {
       case 'weekly':
         nextPredictedDate = new Date(lastTransaction.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -76,6 +78,26 @@ export async function POST(request: Request) {
         break;
       default:
         nextPredictedDate = new Date(lastTransaction.getFullYear(), lastTransaction.getMonth() + 1, lastTransaction.getDate());
+    }
+    
+    // If predicted date is in the past, calculate from today instead
+    if (nextPredictedDate <= today) {
+      switch (analysis.frequency) {
+        case 'weekly':
+          nextPredictedDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'monthly':
+          nextPredictedDate = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+          break;
+        case 'bi-monthly':
+          nextPredictedDate = new Date(today.getFullYear(), today.getMonth() + 2, today.getDate());
+          break;
+        case 'quarterly':
+          nextPredictedDate = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate());
+          break;
+        default:
+          nextPredictedDate = new Date(today.getFullYear(), today.getMonth() + 1, today.getDate());
+      }
     }
 
     // Add to tagged merchants
