@@ -45,7 +45,10 @@ export default async function SignUp(props: {
           placeholder="Your password"
           required
         />
-        <AuthSubmitButton />
+        <AuthSubmitButton 
+          idleText="Sign up" 
+          loadingText="Creating account..." 
+        />
         <FormMessage message={searchParams} />
       </div>
     </form>
