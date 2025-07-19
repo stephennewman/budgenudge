@@ -559,7 +559,7 @@ export default function TransactionsPage() {
     {
       accessorKey: 'ai_merchant_name',
       header: 'AI Merchant',
-      cell: ({ getValue, row }: { getValue: () => string | undefined; row: any }) => {
+      cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiMerchant = getValue();
         const transaction = row.original;
         return aiMerchant ? (
@@ -584,7 +584,7 @@ export default function TransactionsPage() {
     {
       accessorKey: 'ai_category_tag',
       header: 'AI Category',
-      cell: ({ getValue, row }: { getValue: () => string | undefined; row: any }) => {
+      cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiCategory = getValue();
         const transaction = row.original;
         return aiCategory ? (
