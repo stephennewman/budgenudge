@@ -50,6 +50,7 @@ export default function TestAITagsPage() {
           headers: {
             'Content-Type': 'application/json',
           },
+          credentials: 'include',
           body: JSON.stringify(transaction)
         });
 
@@ -88,7 +89,8 @@ export default function TestAITagsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        credentials: 'include'
       });
 
       const data = await response.json();
@@ -121,6 +123,7 @@ export default function TestAITagsPage() {
     try {
       const response = await fetch('/api/tag-stats', {
         method: 'GET',
+        credentials: 'include',
       });
 
       const data = await response.json();
@@ -158,6 +161,7 @@ export default function TestAITagsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           max_transactions: 1000 // Increased limit
         })
@@ -199,6 +203,7 @@ export default function TestAITagsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           max_transactions: 5000 // Much higher limit for remaining transactions
         })
