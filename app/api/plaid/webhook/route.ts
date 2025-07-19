@@ -242,12 +242,9 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         // Store transactions in database using the verified database plaid_item_id
         const storedTransactions = await storeTransactions(response.data.transactions, item.plaid_item_id);
         
-        // 🤖 Auto-tag new transactions with AI (background, non-blocking)
+        // Transaction storage completed - AI tagging handled by separate scheduled process
         if (storedTransactions && storedTransactions.length > 0) {
-          autoTagNewTransactions(storedTransactions).catch(error => {
-            console.warn('⚠️ Background AI tagging failed (non-critical):', error);
-          });
-          console.log(`🤖 Started background AI tagging for ${storedTransactions.length} new transactions`);
+          console.log(`💾✅ Successfully stored ${storedTransactions.length} new transactions - AI tagging will be handled by scheduled process every 15 minutes`);
         }
         
         // Update account balances

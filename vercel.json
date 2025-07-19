@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/scheduled-sms",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/auto-ai-tag-new",
+      "schedule": "*/15 * * * *"
     }
   ]
 } 
