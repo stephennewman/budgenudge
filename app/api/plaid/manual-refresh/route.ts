@@ -114,6 +114,15 @@ export async function POST(request: Request) {
         console.log(`💾 Stored ${storedTransactions?.length || 0} new/updated transactions in database`);
         totalNewTransactions += storedTransactions?.length || 0;
 
+        // 🤖 Auto-tag new transactions with AI (non-blocking)
+        if (storedTransactions && storedTransactions.length > 0) {
+          // Call the existing AI tagging API in background
+          triggerBackgroundAITagging().catch((error: unknown) => {
+            console.warn('⚠️ Background AI tagging failed (non-critical):', error);
+          });
+          console.log(`🤖 Started background AI tagging for ${storedTransactions.length} new transactions`);
+        }
+
         // Update account balances (same as webhook)
         try {
           const accountsResponse = await plaidClient.accountsGet({
@@ -191,5 +200,30 @@ export async function POST(request: Request) {
       },
       { status: 500 }
     );
+  }
+}
+
+// 🤖 Simple background AI tagging using existing API
+async function triggerBackgroundAITagging() {
+  try {
+    console.log('🤖 Triggering background AI tagging...');
+    
+    // Call the existing tag-all-transactions API (internal call)
+    const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tag-all-transactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ max_transactions: 100 })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log(`🤖 Background AI tagging completed: ${result.tagged || 0} transactions tagged`);
+    } else {
+      console.warn('🤖 Background AI tagging failed with status:', response.status);
+    }
+  } catch (error) {
+    console.error('🤖 Background AI tagging error:', error);
   }
 } 
