@@ -117,7 +117,16 @@ export async function POST(request: NextRequest) {
     console.error('❌ Error exchanging public token:', error);
     
     // Type guard for axios error
-    const isAxiosError = (err: unknown): err is { response?: { status?: number; data?: any } } => {
+    const isAxiosError = (err: unknown): err is { 
+      response?: { 
+        status?: number; 
+        data?: { 
+          error_code?: string; 
+          error_message?: string; 
+          error_type?: string;
+        } 
+      } 
+    } => {
       return typeof err === 'object' && err !== null && 'response' in err;
     };
     
