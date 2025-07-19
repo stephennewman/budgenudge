@@ -161,29 +161,40 @@ export async function POST(request: Request) {
         }
       }
 
-      // Update all transactions for this merchant
+      // Update all transactions for this merchant in smaller batches
       const transactionIds = merchantTransactions.map(tx => tx.id);
-      const { error: updateError } = await supabase
-        .from('transactions')
-        .update({
-          ai_merchant_name: aiMerchantName,
-          ai_category_tag: aiCategoryTag
-        })
-        .in('id', transactionIds);
+      const batchSize = 50; // Process 50 transactions at a time
+      let updatedCount = 0;
+      
+      for (let i = 0; i < transactionIds.length; i += batchSize) {
+        const batch = transactionIds.slice(i, i + batchSize);
+        const { error: updateError } = await supabase
+          .from('transactions')
+          .update({
+            ai_merchant_name: aiMerchantName,
+            ai_category_tag: aiCategoryTag
+          })
+          .in('id', batch);
 
-      if (updateError) {
-        console.error(`❌ Failed to update transactions for ${merchantPattern}:`, updateError);
-        errors.push({
-          merchant: merchantPattern,
-          error: 'Database update failed'
-        });
-      } else {
-        processedCount += merchantTransactions.length;
+        if (updateError) {
+          console.error(`❌ Failed to update batch ${i + 1}-${i + batch.length} for ${merchantPattern}:`, updateError);
+          errors.push({
+            merchant: `${merchantPattern} (batch ${i + 1}-${i + batch.length})`,
+            error: 'Database update failed'
+          });
+        } else {
+          updatedCount += batch.length;
+          console.log(`✅ Updated batch ${i + 1}-${i + batch.length} for ${merchantPattern}`);
+        }
+      }
+
+      if (updatedCount > 0) {
+        processedCount += updatedCount;
         results.push({
           merchant: merchantPattern,
           ai_merchant_name: aiMerchantName,
           ai_category_tag: aiCategoryTag,
-          transaction_count: merchantTransactions.length,
+          transaction_count: updatedCount,
           was_cached: !!cached
         });
       }
