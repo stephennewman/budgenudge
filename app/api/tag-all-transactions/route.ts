@@ -85,15 +85,15 @@ export async function POST(request: Request) {
     const results: TaggingResult[] = [];
     const errors: TaggingError[] = [];
 
-    // Check existing cache
+    // Check existing cache (prioritize manual overrides)
     const merchantPatterns = Array.from(merchantGroups.keys());
     const { data: cachedTags } = await supabase
       .from('merchant_ai_tags')
-      .select('merchant_pattern, ai_merchant_name, ai_category_tag')
+      .select('merchant_pattern, ai_merchant_name, ai_category_tag, is_manual_override')
       .in('merchant_pattern', merchantPatterns);
 
     const cacheMap = new Map(cachedTags?.map(tag => [tag.merchant_pattern, tag]) || []);
-    console.log(`💾 Found ${cachedTags?.length || 0} cached merchant patterns`);
+    console.log(`💾 Found ${cachedTags?.length || 0} cached merchant patterns (${cachedTags?.filter(t => t.is_manual_override).length || 0} manual overrides)`);
 
     // Process merchants in smaller batches
     const merchantEntries = Array.from(merchantGroups.entries());
@@ -108,11 +108,12 @@ export async function POST(request: Request) {
       let aiCategoryTag: string;
 
       if (cached) {
-        // Use cached result
+        // Use cached result (respect manual overrides)
         aiMerchantName = cached.ai_merchant_name;
         aiCategoryTag = cached.ai_category_tag;
         cachedCount += merchantTransactions.length;
-        console.log(`💾 Using cached: ${merchantPattern} → ${aiMerchantName} (${aiCategoryTag})`);
+        const overrideLabel = cached.is_manual_override ? ' [MANUAL OVERRIDE]' : '';
+        console.log(`💾 Using cached: ${merchantPattern} → ${aiMerchantName} (${aiCategoryTag})${overrideLabel}`);
       } else {
         // Call AI for new merchant
         try {

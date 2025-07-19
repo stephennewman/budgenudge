@@ -17,6 +17,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import ManualRefreshButton from '@/components/manual-refresh-button';
+import AITagEditor from '@/components/ai-tag-editor';
 
 // Transaction interface - using flexible approach to handle API response
 interface Transaction {
@@ -83,7 +84,58 @@ export default function TransactionsPage() {
   const [taggedMerchants, setTaggedMerchants] = useState<Set<string>>(new Set());
   const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   
+  // AI Tag Editor state
+  const [tagEditorOpen, setTagEditorOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<{
+    merchant_pattern: string;
+    ai_merchant_name: string;
+    ai_category_tag: string;
+  } | null>(null);
+  
   const supabase = createSupabaseClient();
+
+  // Handle opening the tag editor
+  const handleEditTags = (transaction: Transaction) => {
+    const merchantPattern = transaction.merchant_name || transaction.name;
+    setEditingTransaction({
+      merchant_pattern: merchantPattern,
+      ai_merchant_name: transaction.ai_merchant_name || '',
+      ai_category_tag: transaction.ai_category_tag || ''
+    });
+    setTagEditorOpen(true);
+  };
+
+  // Handle saving tag overrides
+  const handleSaveTagOverride = async (data: {
+    merchant_pattern: string;
+    ai_merchant_name: string;
+    ai_category_tag: string;
+    apply_to_existing: boolean;
+  }) => {
+    try {
+      const response = await fetch('/api/manual-tag-override', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Tag override applied:', result.message);
+        
+        // Refresh the transactions to show updated tags
+        await fetchData();
+      } else {
+        const error = await response.json();
+        console.error('❌ Failed to apply tag override:', error.error);
+      }
+    } catch (error) {
+      console.error('❌ Tag override error:', error);
+    }
+  };
 
   // Frontend normalization function (matches backend normalize_merchant_name)
   function normalizeTransactionMerchantName(rawName: string): string {
@@ -507,28 +559,50 @@ export default function TransactionsPage() {
     {
       accessorKey: 'ai_merchant_name',
       header: 'AI Merchant',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+      cell: ({ getValue, row }: { getValue: () => string | undefined; row: any }) => {
         const aiMerchant = getValue();
+        const transaction = row.original;
         return aiMerchant ? (
-          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium">
+          <button
+            onClick={() => handleEditTags(transaction)}
+            className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer"
+            title="Click to edit AI tags"
+          >
             {aiMerchant}
-          </span>
+          </button>
         ) : (
-          <span className="text-gray-400 text-xs">Not tagged</span>
+          <button
+            onClick={() => handleEditTags(transaction)}
+            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
+            title="Click to add AI tags"
+          >
+            Not tagged
+          </button>
         );
       },
     },
     {
       accessorKey: 'ai_category_tag',
       header: 'AI Category',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+      cell: ({ getValue, row }: { getValue: () => string | undefined; row: any }) => {
         const aiCategory = getValue();
+        const transaction = row.original;
         return aiCategory ? (
-          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium">
+          <button
+            onClick={() => handleEditTags(transaction)}
+            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium hover:bg-green-200 transition-colors cursor-pointer"
+            title="Click to edit AI tags"
+          >
             {aiCategory}
-          </span>
+          </button>
         ) : (
-          <span className="text-gray-400 text-xs">Not tagged</span>
+          <button
+            onClick={() => handleEditTags(transaction)}
+            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
+            title="Click to add AI tags"
+          >
+            Not tagged
+          </button>
         );
       },
     },
@@ -732,6 +806,19 @@ export default function TransactionsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Tag Editor Modal */}
+      {editingTransaction && (
+        <AITagEditor
+          isOpen={tagEditorOpen}
+          onClose={() => {
+            setTagEditorOpen(false);
+            setEditingTransaction(null);
+          }}
+          onSave={handleSaveTagOverride}
+          initialData={editingTransaction}
+        />
+      )}
     </div>
   );
 } 
