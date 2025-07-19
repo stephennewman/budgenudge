@@ -22,6 +22,88 @@ interface AITagEditorProps {
   };
 }
 
+function ComboBox({ 
+  value, 
+  onChange, 
+  options, 
+  placeholder,
+  id 
+}: { 
+  value: string; 
+  onChange: (value: string) => void; 
+  options: string[]; 
+  placeholder: string;
+  id: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(value);
+
+  // Sort options alphabetically and filter based on search
+  const filteredOptions = options
+    .sort((a, b) => a.localeCompare(b))
+    .filter(option => 
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .slice(0, 10); // Limit to 10 options for performance
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setSearchTerm(newValue);
+    onChange(newValue);
+    setIsOpen(true);
+  };
+
+  const handleOptionClick = (option: string) => {
+    setSearchTerm(option);
+    onChange(option);
+    setIsOpen(false);
+  };
+
+  const handleInputFocus = () => {
+    setIsOpen(true);
+  };
+
+  const handleInputBlur = () => {
+    // Delay closing to allow option clicks
+    setTimeout(() => setIsOpen(false), 150);
+  };
+
+  // Update searchTerm when value changes externally
+  useEffect(() => {
+    setSearchTerm(value);
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        value={searchTerm}
+        onChange={handleInputChange}
+        onFocus={handleInputFocus}
+        onBlur={handleInputBlur}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      
+      {isOpen && filteredOptions.length > 0 && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+          {filteredOptions.map((option, index) => (
+            <button
+              key={index}
+              type="button"
+              className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none text-sm"
+              onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+              onClick={() => handleOptionClick(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AITagEditorProps) {
   const [merchantName, setMerchantName] = useState(initialData.ai_merchant_name);
   const [categoryTag, setCategoryTag] = useState(initialData.ai_category_tag);
@@ -113,37 +195,43 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
 
           <div className="space-y-2">
             <Label htmlFor="merchant-name">Merchant Name</Label>
-            <Input
-              id="merchant-name"
-              value={merchantName}
-              onChange={(e) => setMerchantName(e.target.value)}
-              placeholder="Enter merchant name"
-              list="merchant-options"
-            />
-            {!isLoading && (
-              <datalist id="merchant-options">
-                {tagOptions.merchant_names.map((name) => (
-                  <option key={name} value={name} />
-                ))}
-              </datalist>
+            {isLoading ? (
+              <Input
+                id="merchant-name"
+                value={merchantName}
+                onChange={(e) => setMerchantName(e.target.value)}
+                placeholder="Loading options..."
+                disabled
+              />
+            ) : (
+              <ComboBox
+                id="merchant-name"
+                value={merchantName}
+                onChange={setMerchantName}
+                options={tagOptions.merchant_names}
+                placeholder="Enter or search merchant name"
+              />
             )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="category-tag">Category</Label>
-            <Input
-              id="category-tag"
-              value={categoryTag}
-              onChange={(e) => setCategoryTag(e.target.value)}
-              placeholder="Enter category"
-              list="category-options"
-            />
-            {!isLoading && (
-              <datalist id="category-options">
-                {tagOptions.category_tags.map((category) => (
-                  <option key={category} value={category} />
-                ))}
-              </datalist>
+            {isLoading ? (
+              <Input
+                id="category-tag"
+                value={categoryTag}
+                onChange={(e) => setCategoryTag(e.target.value)}
+                placeholder="Loading options..."
+                disabled
+              />
+            ) : (
+              <ComboBox
+                id="category-tag"
+                value={categoryTag}
+                onChange={setCategoryTag}
+                options={tagOptions.category_tags}
+                placeholder="Enter or search category"
+              />
             )}
           </div>
 

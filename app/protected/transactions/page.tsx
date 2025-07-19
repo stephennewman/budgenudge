@@ -92,6 +92,9 @@ export default function TransactionsPage() {
     ai_category_tag: string;
   } | null>(null);
   
+  // Visual feedback state
+  const [highlightedTransactions, setHighlightedTransactions] = useState<Set<string | number>>(new Set());
+  
   const supabase = createSupabaseClient();
 
   // Handle opening the tag editor
@@ -125,9 +128,42 @@ export default function TransactionsPage() {
       if (response.ok) {
         const result = await response.json();
         console.log('✅ Tag override applied:', result.message);
+        console.log(`📊 Updated ${result.updated_transactions} transactions`);
         
-        // Refresh the transactions to show updated tags
-        await fetchData();
+        // Update local state instead of full reload
+        setTransactions(prevTransactions => {
+          const updatedTransactions = prevTransactions.map(tx => {
+            const merchantPattern = tx.merchant_name || tx.name;
+            if (merchantPattern === data.merchant_pattern) {
+              return {
+                ...tx,
+                ai_merchant_name: data.ai_merchant_name,
+                ai_category_tag: data.ai_category_tag
+              };
+            }
+            return tx;
+          });
+          
+          // Find transactions that were updated and highlight them
+          const updatedIds = new Set<string | number>();
+          updatedTransactions.forEach(tx => {
+            const merchantPattern = tx.merchant_name || tx.name;
+            if (merchantPattern === data.merchant_pattern) {
+              updatedIds.add(tx.id);
+            }
+          });
+          
+          // Set highlighting for updated transactions
+          setHighlightedTransactions(updatedIds);
+          
+          // Remove highlighting after 3 seconds
+          setTimeout(() => {
+            setHighlightedTransactions(new Set());
+          }, 3000);
+          
+          return updatedTransactions;
+        });
+        
       } else {
         const error = await response.json();
         console.error('❌ Failed to apply tag override:', error.error);
@@ -729,7 +765,11 @@ export default function TransactionsPage() {
                     table.getRowModel().rows.map((row) => (
                       <tr
                         key={row.id}
-                        className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                        className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${
+                          highlightedTransactions.has(row.original.id) 
+                            ? 'bg-green-50 border-green-200 shadow-md ring-2 ring-green-300 ring-opacity-50' 
+                            : ''
+                        }`}
                       >
                         {row.getVisibleCells().map((cell) => (
                           <td key={cell.id} className="p-4 align-middle [&:has([role=checkbox])]:pr-0">
