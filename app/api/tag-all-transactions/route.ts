@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { max_transactions = 500 } = body;
+    const { max_transactions = 1000 } = body; // Increased default limit
 
     console.log(`🏷️ Starting bulk AI tagging for user ${user.id}`);
 

@@ -114,6 +114,38 @@ export default function TestAITagsPage() {
     }
   };
 
+  const checkComprehensiveStats = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/tag-stats', {
+        method: 'GET',
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setResult({
+        success: true,
+        message: 'Comprehensive AI tagging stats',
+        stats: data.stats,
+        untagged_sample: data.untagged_sample,
+        recommendations: data.recommendations,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (err) {
+      console.error('Stats check failed:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const tagAllTransactions = async () => {
     setIsLoading(true);
     setError(null);
@@ -127,8 +159,7 @@ export default function TestAITagsPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          batch_size: 50,
-          max_transactions: 500 // Reasonable limit for safety
+          max_transactions: 1000 // Increased limit
         })
       });
 
@@ -156,13 +187,21 @@ export default function TestAITagsPage() {
     }
   };
 
-  const checkTransactionStats = async () => {
+  const tagAllRemainingTransactions = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/test-ai-tagging', {
-        method: 'GET',
+      console.log('🏷️ Starting mega-batch AI tagging of ALL remaining transactions');
+
+      const response = await fetch('/api/tag-all-transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          max_transactions: 5000 // Much higher limit for remaining transactions
+        })
       });
 
       const data = await response.json();
@@ -173,14 +212,16 @@ export default function TestAITagsPage() {
 
       setResult({
         success: true,
-        message: 'Transaction stats retrieved',
+        message: 'Mega-batch AI tagging completed',
         stats: data.stats,
-        untagged_sample: data.untagged_sample,
+        results: data.results,
+        errors: data.errors,
+        estimated_cost: data.estimated_cost,
         timestamp: new Date().toISOString()
       });
 
     } catch (err) {
-      console.error('Stats check failed:', err);
+      console.error('Mega-batch AI tagging failed:', err);
       setError(err instanceof Error ? err.message : 'Unknown error occurred');
     } finally {
       setIsLoading(false);
@@ -210,7 +251,7 @@ export default function TestAITagsPage() {
               {isLoading ? '⏳ Testing...' : '🚀 Test AI Tagging'}
             </Button>
             <Button 
-              onClick={checkTransactionStats}
+              onClick={checkComprehensiveStats}
               disabled={isLoading}
               variant="outline"
             >
@@ -227,9 +268,17 @@ export default function TestAITagsPage() {
               onClick={tagAllTransactions}
               disabled={isLoading}
               className="bg-green-600 hover:bg-green-700"
-              title="Tag up to 500 untagged transactions using AI"
+              title="Tag up to 1000 untagged transactions using AI"
             >
-              {isLoading ? '⏳ Bulk Tagging...' : '🚀 Bulk Tag All (up to 500)'}
+              {isLoading ? '⏳ Bulk Tagging...' : '🚀 Bulk Tag All (up to 1000)'}
+            </Button>
+            <Button 
+              onClick={tagAllRemainingTransactions}
+              disabled={isLoading}
+              className="bg-purple-600 hover:bg-purple-700"
+              title="Tag ALL remaining untagged transactions using AI"
+            >
+              {isLoading ? '⏳ Mega-Batch Tagging...' : '🚀 Mega-Batch Tag All'}
             </Button>
           </div>
         </Card>
@@ -292,9 +341,10 @@ export default function TestAITagsPage() {
           <div className="space-y-2 text-green-700">
             <p><strong>Efficient:</strong> Groups transactions by merchant to minimize API calls</p>
             <p><strong>Cost-Effective:</strong> Uses caching - typically ~$0.01 per unique merchant</p>
-            <p><strong>Safe Limits:</strong> Processes up to 500 transactions to avoid timeouts</p>
+            <p><strong>Multiple Options:</strong> Bulk (1000 max) or Mega-Batch (all remaining)</p>
             <p><strong>Rate Limited:</strong> Includes delays to respect OpenAI rate limits</p>
             <p><strong>Progress Tracking:</strong> Shows detailed stats and results</p>
+            <p><strong>Comprehensive Stats:</strong> Check current tagging status before processing</p>
           </div>
         </Card>
 
