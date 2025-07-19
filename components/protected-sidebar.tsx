@@ -44,6 +44,10 @@ export default async function ProtectedSidebar() {
           label: "📱 SMS Preferences",
           href: "/sms-preferences",
         },
+        {
+          label: "🤖 AI Tagging Test",
+          href: "/test-ai-tags",
+        },
         // REMOVED FOR PERFORMANCE: Subscription/paid features
         // {
         //   label: "Pricing",
