@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
+import VerificationSuccessBanner from "@/components/verification-success-banner";
 // REMOVED: SMS and refresh components for cleaner dashboard
 // import SmsButton from "@/components/sms-button";
 // import RecurringSmsButton from "@/components/recurring-sms-button";
@@ -31,6 +32,8 @@ export default async function ProtectedPage() {
   if (!hasConnectedAccount) {
     return (
       <div className="space-y-8">
+        <VerificationSuccessBanner />
+        
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">Welcome to BudgeNudge!</h1>
           <p className="text-muted-foreground mt-2">
@@ -69,6 +72,8 @@ export default async function ProtectedPage() {
   // Full dashboard for connected users
   return (
     <div className="space-y-8">
+      <VerificationSuccessBanner />
+      
       <div className="flex flex-col">
         <h1 className="text-2xl font-medium">🏠 Dashboard</h1>
         <p className="text-muted-foreground mt-2">

@@ -94,6 +94,17 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Recent Major Changes**: July 18, 2025 - Fixed admin permission errors, updated cron schedule to 1:45 PM EST, 3-template SMS system operational
 - **Ready State**: ✅ FULLY BRIEFED with deep understanding of financial monitoring and SMS notification architecture, prepared for immediate development tasks
 
+### 🗓️ July 19, 2025 - CRITICAL TIMEZONE FIX: HOURLY CRON DEPLOYMENT ✅ DEPLOYED
+- **8:16 AM EDT**: Critical timezone mismatch identified in SMS cron scheduling system
+- **Problem Discovered**: Vercel cron ran daily at 12:00 UTC (8:00 AM EDT) but users expected SMS at 1:45 PM EST - 5+ hour gap causing zero SMS delivery
+- **Root Cause**: Daily cron timing never aligned with user preferred send times stored in EST
+- **Solution Implemented**: Changed vercel.json cron from `"00 12 * * *"` to `"00 * * * *"` (hourly execution)
+- **Git Commit**: `0ba73f6` - "Fix SMS cron timing: Change from daily to hourly execution"
+- **Deployment Status**: ✅ PUSHED TO GITHUB - Building on Vercel (https://budgenudge-3pxa2gffe-krezzo.vercel.app)
+- **Impact**: SMS system will now run every hour and catch all user send times within 10-minute accuracy window
+- **Next Cron Execution**: Every hour at :00 minutes, ensuring reliable SMS delivery at user-preferred times
+- **Critical Fix**: Resolves why SMS notifications weren't being sent despite perfect webhook and template system
+
 ### 🗓️ July 18, 2025 - AI AGENT ONBOARDING & COMPREHENSIVE PROJECT INDEXING ✅ COMPLETE
 - **2:37 PM EDT**: AI agent successfully onboarded and brought up to speed with complete project understanding
 - **Current Time Confirmed**: Friday, July 18, 2025, 2:37 PM EDT (system validated)

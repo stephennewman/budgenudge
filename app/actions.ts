@@ -28,7 +28,7 @@ export const signUpAction = async (formData: FormData) => {
   const client = await createSupabaseClient();
 
   const url = process.env.VERCEL_URL
-    ? `${process.env.VERCEL_URL}/auth/callback`
+    ? `https://${process.env.VERCEL_URL}/auth/callback`
     : "http://localhost:3000/auth/callback";
 
   const { error } = await client.auth.signUp({
