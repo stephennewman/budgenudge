@@ -1,5 +1,6 @@
 import { signUpAction } from "@/app/actions";
 import AuthSubmitButton from "@/components/auth-submit-button";
+import GoogleSignInButton from "@/components/google-sign-in-button";
 import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +23,20 @@ export default async function SignUp(props: {
           Sign in
         </Link>
       </p>
-      <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
+      
+      {/* Google Sign-Up */}
+      <div className="mt-8">
+        <GoogleSignInButton text="Sign up with Google" />
+      </div>
+      
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-6">
+        <div className="flex-1 h-px bg-border"></div>
+        <span className="text-sm text-muted-foreground">Or continue with email</span>
+        <div className="flex-1 h-px bg-border"></div>
+      </div>
+      
+      <div className="flex flex-col gap-2 [&>input]:mb-3">
         <Label htmlFor="email">Email</Label>
         <Input name="email" placeholder="you@example.com" required />
         

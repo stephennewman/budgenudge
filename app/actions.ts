@@ -50,6 +50,30 @@ export const signUpAction = async (formData: FormData) => {
   return redirect("/check-email");
 };
 
+export const googleSignInAction = async () => {
+  const client = await createSupabaseClient();
+  
+  // Use the correct URL for the current environment
+  const redirectTo = process.env.NODE_ENV === 'production'
+    ? "https://budgenudge.vercel.app/auth/callback"
+    : "http://localhost:3000/auth/callback";
+
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+    },
+  });
+
+  if (error) {
+    return encodedRedirect("error", "/sign-in", "Could not authenticate with Google");
+  }
+
+  if (data.url) {
+    redirect(data.url); // Redirect to Google OAuth
+  }
+};
+
 export const signOutAction = async () => {
   const client = await createSupabaseClient();
   await client.auth.signOut();
