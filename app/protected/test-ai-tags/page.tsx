@@ -114,6 +114,48 @@ export default function TestAITagsPage() {
     }
   };
 
+  const tagAllTransactions = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      console.log('🏷️ Starting bulk AI tagging of all transactions');
+
+      const response = await fetch('/api/tag-all-transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          batch_size: 50,
+          max_transactions: 500 // Reasonable limit for safety
+        })
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      setResult({
+        success: true,
+        message: 'Bulk AI tagging completed',
+        stats: data.stats,
+        results: data.results,
+        errors: data.errors,
+        estimated_cost: data.estimated_cost,
+        timestamp: new Date().toISOString()
+      });
+
+    } catch (err) {
+      console.error('Bulk AI tagging failed:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const checkTransactionStats = async () => {
     setIsLoading(true);
     setError(null);
@@ -181,6 +223,14 @@ export default function TestAITagsPage() {
             >
               {isLoading ? '⏳ Tagging...' : '🏷️ Tag Real Transactions'}
             </Button>
+            <Button 
+              onClick={tagAllTransactions}
+              disabled={isLoading}
+              className="bg-green-600 hover:bg-green-700"
+              title="Tag up to 500 untagged transactions using AI"
+            >
+              {isLoading ? '⏳ Bulk Tagging...' : '🚀 Bulk Tag All (up to 500)'}
+            </Button>
           </div>
         </Card>
 
@@ -233,6 +283,18 @@ export default function TestAITagsPage() {
             <p><strong>AI Categories:</strong> Logical grouping like &quot;Groceries&quot;, &quot;Restaurant&quot;, &quot;Subscription&quot;</p>
             <p><strong>Smart Caching:</strong> Same merchants get cached to reduce API costs</p>
             <p><strong>Fallback Logic:</strong> If OpenAI fails, intelligent fallbacks are used</p>
+          </div>
+        </Card>
+
+        {/* Bulk Processing Info */}
+        <Card className="p-6 bg-green-50 border-green-200">
+          <h2 className="text-xl font-semibold mb-4 text-green-800">🚀 Bulk Processing</h2>
+          <div className="space-y-2 text-green-700">
+            <p><strong>Efficient:</strong> Groups transactions by merchant to minimize API calls</p>
+            <p><strong>Cost-Effective:</strong> Uses caching - typically ~$0.01 per unique merchant</p>
+            <p><strong>Safe Limits:</strong> Processes up to 500 transactions to avoid timeouts</p>
+            <p><strong>Rate Limited:</strong> Includes delays to respect OpenAI rate limits</p>
+            <p><strong>Progress Tracking:</strong> Shows detailed stats and results</p>
           </div>
         </Card>
 
