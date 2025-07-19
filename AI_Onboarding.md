@@ -83,6 +83,15 @@ Complete PostgreSQL schema with 15+ core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🗓️ July 19, 2025 - UI ENHANCEMENT: Added Subcategory Column to Transactions Table ✅ DEPLOYED
+- **3:20 PM EDT**: Enhanced transactions table with subcategory display for better transaction insights
+- **Feature**: Added subcategory column between Category and Status columns on main transactions page
+- **Styling**: Subcategory displays as blue badge when available, shows "-" when not present
+- **Consistency**: Matches styling used in recurring bills transaction history section
+- **Table Structure**: Star | Date | Description | Merchant | Amount | Category | **Subcategory** | Status | Count
+- **User Benefit**: Provides more granular transaction categorization (e.g., Subscription, Food, Gas, etc.)
+- **Deployment**: Live on production, fully functional across all transaction views
+
 ### 🗓️ July 19, 2025 - CRITICAL BUG FIX: Star Transactions Now Appear in Recurring Bills ✅ COMPLETED
 - **2:10 PM EDT**: Successfully fixed critical bug where starred transactions disappeared from recurring bills page
 - **Root Cause Identified**: `analyze` endpoint was inserting merchants without `is_active: true`, causing them to be filtered out
@@ -109,6 +118,7 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Technical Improvement**: Moved from client-side to server-side queries to avoid RLS permission issues
 - **Bundle Optimization**: Reduced recurring bills page size from 8.55kB to 4.62kB  
 - **Validation**: Complete end-to-end workflow restored - star → analyze → recurring bills → historical transactions display
+- **UI Enhancement**: Added subcategory column to main transactions table for better categorization insights
 
 ### 🗓️ July 19, 2025 - COMPLETE SUCCESS: User Access Restored + Google SSO Working ✅ RESOLVED
 - **9:45 AM EDT**: User successfully accessed original account with full transaction history via Google SSO
