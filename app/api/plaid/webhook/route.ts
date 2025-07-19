@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/utils/plaid/client';
 import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/server';
 import { createClient } from '@supabase/supabase-js';
-import { tagMerchantWithAI, type MerchantTaggingInput } from '@/utils/ai/merchant-tagging';
 
 // Set timeout to 60 seconds for Hobby plan (prevents 503 errors)
 export const maxDuration = 60;
