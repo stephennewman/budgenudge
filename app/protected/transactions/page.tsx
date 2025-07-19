@@ -489,6 +489,20 @@ export default function TransactionsPage() {
       },
     },
     {
+      accessorKey: 'subcategory',
+      header: 'Subcategory',
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const subcategory = getValue();
+        return subcategory ? (
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+            {subcategory}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        );
+      },
+    },
+    {
       accessorKey: 'pending',
       header: 'Status',
       cell: ({ getValue }: { getValue: () => boolean }) => (
