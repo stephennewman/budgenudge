@@ -210,11 +210,17 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
 
   // Load preview when apply to existing is checked and we have values
   useEffect(() => {
-    if (applyToExisting && merchantName.trim() && categoryTag.trim()) {
-      loadPreview();
-    } else {
+    if (!applyToExisting || !merchantName.trim() || !categoryTag.trim()) {
       setPreview(null);
+      return;
     }
+
+    // Debounce the preview loading to prevent jumpiness
+    const debounceTimer = setTimeout(() => {
+      loadPreview();
+    }, 800); // Wait 800ms after user stops typing
+
+    return () => clearTimeout(debounceTimer);
   }, [applyToExisting, merchantName, categoryTag, loadPreview]);
 
   const handleSave = async () => {
@@ -319,20 +325,29 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
           </div>
 
           {/* Preview Section */}
-          {applyToExisting && (isLoadingPreview || preview) && (
-            <div className="border rounded-lg p-4 bg-blue-50">
+          {applyToExisting && (
+            <div className="border rounded-lg p-4 bg-blue-50 min-h-[100px]">
               <h4 className="font-medium text-blue-900 mb-2">🔍 Smart Matching Preview</h4>
               
-              {isLoadingPreview ? (
-                <div className="text-sm text-blue-700">Loading preview...</div>
+              {!merchantName.trim() || !categoryTag.trim() ? (
+                <div className="text-sm text-blue-600 italic">
+                  Enter merchant name and category to see preview
+                </div>
+              ) : isLoadingPreview ? (
+                <div className="text-sm text-blue-700">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    Loading preview...
+                  </div>
+                </div>
               ) : preview ? (
                 <div className="space-y-3">
                   <div className="text-sm text-blue-700">
                     <strong>{preview.matched_transactions}</strong> transactions will be updated
                     {preview.core_merchant_name && (
-                                             <span className="block text-xs mt-1">
-                         Core merchant: &quot;{preview.core_merchant_name}&quot;
-                       </span>
+                      <span className="block text-xs mt-1">
+                        Core merchant: &quot;{preview.core_merchant_name}&quot;
+                      </span>
                     )}
                   </div>
                   
@@ -357,7 +372,11 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
                     </div>
                   )}
                 </div>
-              ) : null}
+              ) : (
+                <div className="text-sm text-blue-600 italic">
+                  Preview will appear here when you stop typing
+                </div>
+              )}
             </div>
           )}
 
