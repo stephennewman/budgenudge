@@ -59,7 +59,7 @@ export default function AIMerchantAnalysisPage() {
         return;
       }
 
-      // Get all spending transactions with AI merchant names
+      // Get all spending transactions (including those pending AI processing)
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select(`
@@ -72,7 +72,6 @@ export default function AIMerchantAnalysisPage() {
         `)
         .in('plaid_item_id', itemIds)
         .gte('amount', 0) // Only spending transactions
-        .not('ai_merchant_name', 'is', null) // Only transactions with AI merchant names
         .order('date', { ascending: false });
 
       if (transactionsError) {
@@ -101,18 +100,21 @@ export default function AIMerchantAnalysisPage() {
         transactionDates: string[]; // For frequency analysis
       }>();
 
-      // Debug: Check recent transactions
-      const recentTransactions = transactions.filter(t => {
-        const txDate = new Date(t.date);
-        return txDate.getFullYear() === 2025 && txDate.getMonth() === 6; // July 2025 (month is 0-indexed)
-      });
-      console.log('DEBUG: July 2025 transactions found:', recentTransactions.length);
-      if (recentTransactions.length > 0) {
-        console.log('DEBUG: Sample July transaction:', recentTransactions[0]);
-      }
+             // Debug: Check recent transactions
+       const recentTransactions = transactions.filter(t => {
+         const txDate = new Date(t.date);
+         return txDate.getFullYear() === 2025 && txDate.getMonth() === 6; // July 2025 (month is 0-indexed)
+       });
+       console.log('DEBUG: July 2025 transactions found:', recentTransactions.length);
+       console.log('DEBUG: Total transactions found:', transactions.length);
+       console.log('DEBUG: Transactions with AI merchant names:', transactions.filter(t => t.ai_merchant_name).length);
+       if (recentTransactions.length > 0) {
+         console.log('DEBUG: Sample July transaction:', recentTransactions[0]);
+       }
 
       transactions.forEach(transaction => {
-        const aiMerchant = transaction.ai_merchant_name || 'Unknown';
+        // Use AI merchant name if available, fallback to original merchant name, then transaction name
+        const aiMerchant = transaction.ai_merchant_name || transaction.merchant_name || transaction.name || 'Unknown';
         const aiCategory = transaction.ai_category_tag || 'Uncategorized';
         const txDate = new Date(transaction.date);
         const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
@@ -418,25 +420,27 @@ export default function AIMerchantAnalysisPage() {
        )}
 
        {/* Debug info on page */}
-       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-         <h4 className="font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
-         <div className="text-sm text-yellow-700 space-y-1">
-           <div>Current Month Key: {new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</div>
-           <div>Total Merchants Found: {merchantData.length}</div>
-           <div>Sample Merchant Data: {merchantData.length > 0 ? JSON.stringify({
-             merchant: merchantData[0].ai_merchant,
-             currentMonthSpending: merchantData[0].current_month_spending,
-             avgMonthly: Math.round(merchantData[0].avg_monthly_spending)
-           }) : 'None'}</div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+           <h4 className="font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
+           <div className="text-sm text-yellow-700 space-y-1">
+             <div>Current Month Key: {new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</div>
+             <div>Total Merchants Found: {merchantData.length}</div>
+             <div>Merchants with July Spending: {merchantData.filter(m => m.current_month_spending > 0).length}</div>
+             <div>Total July Spending: ${merchantData.reduce((sum, m) => sum + m.current_month_spending, 0).toFixed(2)}</div>
+             <div>Sample Merchant Data: {merchantData.length > 0 ? JSON.stringify({
+               merchant: merchantData[0].ai_merchant,
+               currentMonthSpending: merchantData[0].current_month_spending,
+               avgMonthly: Math.round(merchantData[0].avg_monthly_spending)
+             }) : 'None'}</div>
+           </div>
          </div>
-       </div>
 
       {merchantData.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-gray-600">No AI-tagged merchant transactions found. AI tagging may still be in progress.</p>
-          </CardContent>
-        </Card>
+                 <Card>
+           <CardContent className="text-center py-8">
+             <p className="text-gray-600">No merchant transactions found. This could mean no transactions are available or they&apos;re still being processed.</p>
+           </CardContent>
+         </Card>
       ) : (
         <div className="space-y-6">
           {/* Summary Stats */}
