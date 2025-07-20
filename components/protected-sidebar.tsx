@@ -27,6 +27,10 @@ export default async function ProtectedSidebar() {
           label: "🤖 AI Category Analysis",
           href: "/ai-category-analysis",
         },
+        {
+          label: "🏪 AI Merchant Analysis",
+          href: "/ai-merchant-analysis",
+        },
         // REMOVED FOR PERFORMANCE: Heavy analytics features
         // {
         //   label: "Analysis",
