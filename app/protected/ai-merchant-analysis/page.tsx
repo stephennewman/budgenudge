@@ -101,11 +101,32 @@ export default function AIMerchantAnalysisPage() {
         transactionDates: string[]; // For frequency analysis
       }>();
 
+      // Debug: Check recent transactions
+      const recentTransactions = transactions.filter(t => {
+        const txDate = new Date(t.date);
+        return txDate.getFullYear() === 2025 && txDate.getMonth() === 6; // July 2025 (month is 0-indexed)
+      });
+      console.log('DEBUG: July 2025 transactions found:', recentTransactions.length);
+      if (recentTransactions.length > 0) {
+        console.log('DEBUG: Sample July transaction:', recentTransactions[0]);
+      }
+
       transactions.forEach(transaction => {
         const aiMerchant = transaction.ai_merchant_name || 'Unknown';
         const aiCategory = transaction.ai_category_tag || 'Uncategorized';
         const txDate = new Date(transaction.date);
         const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Debug: Log a few transaction processings
+        if (Math.random() < 0.01) { // Log ~1% of transactions
+          console.log('DEBUG: Processing transaction:', {
+            date: transaction.date,
+            txDate: txDate,
+            monthKey,
+            aiMerchant,
+            amount: transaction.amount
+          });
+        }
 
         if (!merchantMap.has(aiMerchant)) {
           merchantMap.set(aiMerchant, {
@@ -178,6 +199,16 @@ export default function AIMerchantAnalysisPage() {
         const now = new Date();
         const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const currentMonthSpending = data.monthlySpending.get(currentMonthKey) || 0;
+        
+        // Debug logging for current month calculation
+        if (aiMerchant === 'Amazon' || aiMerchant === 'Target' || data.monthlySpending.size > 0) {
+          console.log(`DEBUG ${aiMerchant}:`, {
+            currentMonthKey,
+            currentMonthSpending,
+            allMonthKeys: Array.from(data.monthlySpending.keys()),
+            monthlySpendingMap: Object.fromEntries(data.monthlySpending)
+          });
+        }
 
         // Calculate pacing
         const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();

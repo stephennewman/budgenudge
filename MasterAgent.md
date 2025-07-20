@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 19, 2025, 10:00 PM EDT
+**Last Updated:** July 19, 2025, 10:10 PM EDT
 
 ## Project Overview
 
@@ -68,6 +68,13 @@
 6. **99% Coverage Achieved**: System now automatically tags 99% of all transactions
 
 ### Deployment History
+- **July 19, 2025, 10:10 PM EDT**: NEW FEATURE - AI Merchant Analysis Page (88/100 Impact Score)
+  - 🏪 **Advanced Merchant Analytics**: Table-based analysis by AI-normalized merchant names
+  - 📊 **Enhanced Table Format**: Triple sorting (spending/transactions/frequency) with user's requested view
+  - 🔄 **Frequency Intelligence**: Calculates transaction frequency patterns (Frequent/Occasional/Rare)
+  - 🧠 **Cross-Category Insights**: Shows merchant spending across multiple AI categories
+  - 📈 **Smart Classification**: Automatic merchant type detection based on transaction patterns
+  - ⚡ **Technical Excellence**: 51s build, 5.31kB bundle, frequency algorithms, merchant icons
 - **July 19, 2025, 10:00 PM EDT**: NEW FEATURE - AI Category Analysis Page (85/100 Impact Score)
   - 🤖 **Major Analytics Feature**: Comprehensive table-based AI category analysis
   - 📊 **User-Requested Format**: Table view with sortable columns (spending/transactions/merchants)

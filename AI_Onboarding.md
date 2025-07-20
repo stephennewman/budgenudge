@@ -83,6 +83,23 @@ Complete PostgreSQL schema with 15+ core tables:
 
 *All major activities, deployments, and strategic updates logged chronologically (most recent first)*
 
+### 🏪 July 19, 2025 - NEW FEATURE: AI Merchant Analysis Page ✅ DEPLOYED
+- **10:10 PM EDT**: Successfully deployed AI Merchant Analysis page with table-based insights
+- **FEATURE DELIVERED**: `/protected/ai-merchant-analysis` - Merchant-focused AI spending analysis  
+- **ADVANCED CAPABILITIES**:
+  - ✅ **Table Format**: User's requested table view with sortable columns (spending/transactions/frequency)
+  - ✅ **AI Merchant Intelligence**: Uses `ai_merchant_name` from AI normalization system
+  - ✅ **Frequency Analysis**: Calculates average days between transactions for each merchant
+  - ✅ **Merchant Classification**: Automatic categorization (Frequent/Occasional/Rare)
+  - ✅ **Category Cross-Reference**: Shows top categories per merchant with transaction counts
+  - ✅ **Advanced Metrics**: Monthly averages, pacing analysis, spending trends, transaction frequency
+  - ✅ **Smart Icons**: Merchant-specific icons (Amazon 📦, Starbucks ☕, etc.)
+  - ✅ **Interactive Sorting**: Triple sort options with ascending/descending
+- **NAVIGATION**: Added to sidebar after AI Category Analysis for logical grouping
+- **TECHNICAL**: 51-second build, 5.31kB bundle, frequency algorithms, merchant type classification
+- **USER VALUE**: Deep merchant insights with frequency patterns and spending behavior analysis
+- **Impact Score**: 88/100 - Powerful merchant analytics with requested table format
+
 ### 🤖 July 19, 2025 - NEW FEATURE: AI Category Analysis Page ✅ DEPLOYED
 - **10:00 PM EDT**: Successfully deployed comprehensive AI Category Analysis page with table view
 - **FEATURE DELIVERED**: `/protected/ai-category-analysis` - AI-driven spending insights
