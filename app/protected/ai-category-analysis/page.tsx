@@ -85,8 +85,8 @@ export default function AICategoryAnalysisPage() {
 
       // Calculate global date range
       const allDates = transactions.map(t => t.date).sort();
-      const globalFirstDate = new Date(allDates[0]);
-      const globalLastDate = new Date(allDates[allDates.length - 1]);
+      const globalFirstDate = new Date(allDates[0] + 'T12:00:00');
+      const globalLastDate = new Date(allDates[allDates.length - 1] + 'T12:00:00');
       const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
       // Process transactions by AI category
@@ -101,7 +101,9 @@ export default function AICategoryAnalysisPage() {
       transactions.forEach(transaction => {
         const aiCategory = transaction.ai_category_tag || 'Uncategorized';
         const merchantName = transaction.ai_merchant_name || transaction.merchant_name || 'Unknown';
-        const txDate = new Date(transaction.date);
+        // Fix timezone parsing - add noon time to avoid timezone edge cases
+        const dateStr = transaction.date;
+        const txDate = new Date(dateStr + 'T12:00:00');
         const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
 
         if (!categoryMap.has(aiCategory)) {
