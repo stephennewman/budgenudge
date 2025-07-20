@@ -411,11 +411,25 @@ export default function AIMerchantAnalysisPage() {
         <ManualRefreshButton onRefresh={fetchAIMerchantData} />
       </div>
 
-      {lastUpdated && (
-        <div className="text-sm text-gray-500 mb-6">
-          Last updated: {lastUpdated.toLocaleString()}
-        </div>
-      )}
+             {lastUpdated && (
+         <div className="text-sm text-gray-500 mb-6">
+           Last updated: {lastUpdated.toLocaleString()}
+         </div>
+       )}
+
+       {/* Debug info on page */}
+       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+         <h4 className="font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
+         <div className="text-sm text-yellow-700 space-y-1">
+           <div>Current Month Key: {new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</div>
+           <div>Total Merchants Found: {merchantData.length}</div>
+           <div>Sample Merchant Data: {merchantData.length > 0 ? JSON.stringify({
+             merchant: merchantData[0].ai_merchant,
+             currentMonthSpending: merchantData[0].current_month_spending,
+             avgMonthly: Math.round(merchantData[0].avg_monthly_spending)
+           }) : 'None'}</div>
+         </div>
+       </div>
 
       {merchantData.length === 0 ? (
         <Card>
