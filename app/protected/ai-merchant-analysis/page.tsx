@@ -101,15 +101,29 @@ export default function AIMerchantAnalysisPage() {
       }>();
 
              // Debug: Check recent transactions
+       console.log('DEBUG: All transactions raw:', transactions.slice(0, 3)); // First 3 transactions
+       console.log('DEBUG: Sample transaction dates:', transactions.slice(0, 10).map(t => ({ date: t.date, parsed: new Date(t.date), year: new Date(t.date).getFullYear(), month: new Date(t.date).getMonth() })));
+       
        const recentTransactions = transactions.filter(t => {
          const txDate = new Date(t.date);
          return txDate.getFullYear() === 2025 && txDate.getMonth() === 6; // July 2025 (month is 0-indexed)
        });
+       
+       // Also check 2024 in case the year is wrong
+       const july2024Transactions = transactions.filter(t => {
+         const txDate = new Date(t.date);
+         return txDate.getFullYear() === 2024 && txDate.getMonth() === 6;
+       });
+       
        console.log('DEBUG: July 2025 transactions found:', recentTransactions.length);
+       console.log('DEBUG: July 2024 transactions found:', july2024Transactions.length);
        console.log('DEBUG: Total transactions found:', transactions.length);
        console.log('DEBUG: Transactions with AI merchant names:', transactions.filter(t => t.ai_merchant_name).length);
        if (recentTransactions.length > 0) {
-         console.log('DEBUG: Sample July transaction:', recentTransactions[0]);
+         console.log('DEBUG: Sample July 2025 transaction:', recentTransactions[0]);
+       }
+       if (july2024Transactions.length > 0) {
+         console.log('DEBUG: Sample July 2024 transaction:', july2024Transactions[0]);
        }
 
       transactions.forEach(transaction => {
@@ -423,15 +437,22 @@ export default function AIMerchantAnalysisPage() {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
            <h4 className="font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
            <div className="text-sm text-yellow-700 space-y-1">
+             <div>Current Date: {new Date().toISOString()}</div>
              <div>Current Month Key: {new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</div>
              <div>Total Merchants Found: {merchantData.length}</div>
              <div>Merchants with July Spending: {merchantData.filter(m => m.current_month_spending > 0).length}</div>
              <div>Total July Spending: ${merchantData.reduce((sum, m) => sum + m.current_month_spending, 0).toFixed(2)}</div>
-             <div>Sample Merchant Data: {merchantData.length > 0 ? JSON.stringify({
-               merchant: merchantData[0].ai_merchant,
-               currentMonthSpending: merchantData[0].current_month_spending,
-               avgMonthly: Math.round(merchantData[0].avg_monthly_spending)
-             }) : 'None'}</div>
+             {merchantData.length > 0 && (
+               <>
+                 <div>First 3 Merchants: {merchantData.slice(0, 3).map(m => `${m.ai_merchant}: $${m.current_month_spending}`).join(', ')}</div>
+                 <div>Sample Merchant Data: {JSON.stringify({
+                   merchant: merchantData[0].ai_merchant,
+                   currentMonthSpending: merchantData[0].current_month_spending,
+                   avgMonthly: Math.round(merchantData[0].avg_monthly_spending),
+                   totalSpending: Math.round(merchantData[0].total_spending)
+                 })}</div>
+               </>
+             )}
            </div>
          </div>
 
