@@ -37,35 +37,47 @@ function ComboBox({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState(value);
+  const [showAllOnFocus, setShowAllOnFocus] = useState(false);
 
   // Sort options alphabetically and filter based on search
   const filteredOptions = options
     .sort((a, b) => a.localeCompare(b))
-    .filter(option => 
-      option.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .slice(0, 10); // Limit to 10 options for performance
+    .filter(option => {
+      // Show all options when focused and user hasn't started typing
+      if (showAllOnFocus && searchTerm === value) {
+        return true;
+      }
+      // Otherwise filter based on search term
+      return option.toLowerCase().includes(searchTerm.toLowerCase());
+    })
+    .slice(0, 50); // Increased limit to 50 options
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     setSearchTerm(newValue);
     onChange(newValue);
     setIsOpen(true);
+    setShowAllOnFocus(false); // User is typing, so filter normally
   };
 
   const handleOptionClick = (option: string) => {
     setSearchTerm(option);
     onChange(option);
     setIsOpen(false);
+    setShowAllOnFocus(false);
   };
 
   const handleInputFocus = () => {
     setIsOpen(true);
+    setShowAllOnFocus(true); // Show all options when first focused
   };
 
   const handleInputBlur = () => {
     // Delay closing to allow option clicks
-    setTimeout(() => setIsOpen(false), 150);
+    setTimeout(() => {
+      setIsOpen(false);
+      setShowAllOnFocus(false);
+    }, 150);
   };
 
   // Update searchTerm when value changes externally
@@ -86,7 +98,7 @@ function ComboBox({
       />
       
       {isOpen && filteredOptions.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
           {filteredOptions.map((option, index) => (
             <button
               key={index}
