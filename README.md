@@ -1,24 +1,24 @@
-# 💳 BudgeNudge - Real-Time Transaction Monitoring
+# 💳 BudgeNudge - Intelligent Financial Wellness via SMS
 
-**🎉 MILESTONE ACHIEVED!** After 3+ months of development, BudgeNudge is now a fully operational real-time financial transaction monitoring system with live Plaid webhook integration.
+**🎉 MILESTONE ACHIEVED!** After 3+ months of development, BudgeNudge is now a fully operational intelligent financial wellness platform with multi-bank integration and AI-powered insights.
 
 ## ✅ System Status: LIVE & OPERATIONAL
 
-- **✅ Real-time webhook processing** - Plaid → BudgeNudge → SMS alerts
-- **✅ Charles Schwab integration** - Live monitoring of account transactions  
-- **✅ Near-time SMS notifications** - Alerts sent to phone number via text
-- **✅ 100+ transactions tracked** - Complete transaction history in Supabase
-- **✅ Zero manual intervention** - Fully automated monitoring system
+- **✅ Multi-bank integration** - Connect any bank supported by Plaid
+- **✅ Scheduled SMS insights** - Daily personalized financial intelligence  
+- **✅ AI-powered analytics** - Smart merchant tagging and spending categorization
+- **✅ 100+ transactions analyzed** - Complete transaction history with AI insights
+- **✅ Zero manual intervention** - Fully automated daily insights system
 
 ## 🚀 What BudgeNudge Does
 
-BudgeNudge monitors your financial accounts in real-time and sends instant SMS alerts whenever a transaction occurs. Built with Next.js, Supabase, and Plaid's webhook system.
+BudgeNudge connects to your financial accounts and sends intelligent daily SMS insights about your spending patterns, upcoming bills, and financial health. Built with Next.js, Supabase, Plaid's multi-bank platform, and OpenAI.
 
 **The Flow:**
-1. You make a purchase → Charles Schwab processes it
-2. Plaid detects the transaction → Sends webhook to BudgeNudge
-3. BudgeNudge processes the webhook → Stores in database + sends SMS
-4. You get notified instantly on your phone 📱
+1. Connect your bank accounts → Any Plaid-supported financial institution
+2. AI analyzes your transactions → Smart merchant tagging and categorization
+3. Daily SMS delivery → Personalized insights delivered at your preferred time
+4. Stay financially aware → Proactive insights without opening any apps 📱
 
 ## 🛠 Tech Stack
 
@@ -26,7 +26,7 @@ BudgeNudge monitors your financial accounts in real-time and sends instant SMS a
 - **Backend**: Next.js API routes, Supabase PostgreSQL
 - **Financial Data**: Plaid API with webhook integration
 - **Authentication**: Supabase Auth + Update.dev billing
-- **Notifications**: Resend API → T-Mobile SMS gateway
+- **Notifications**: SlickText professional SMS API
 - **Deployment**: Vercel with custom domain (budgenudge.vercel.app)
 
 ## 📊 Current Metrics
@@ -38,15 +38,15 @@ BudgeNudge monitors your financial accounts in real-time and sends instant SMS a
 
 ## 🔥 Key Features
 
-### Near-Time Monitoring
-- Webhook processing sooner after transactions occur
-- Automatic storage in Supabase database
-- Live dashboard showing all transaction history
+### Intelligent Daily Insights
+- Scheduled SMS delivery with personalized financial intelligence
+- AI-powered spending analysis and merchant categorization
+- Predictive bill reminders and spending pattern recognition
 
-### SMS Notifications  
-- SMS alerts via T-Mobile email gateway
-- Transaction details including amount and merchant
-- No manual checking required
+### Professional SMS Delivery  
+- Daily SMS insights via SlickText professional API
+- Personalized content including spending summaries and bill alerts
+- Customizable timing and notification preferences
 
 ### Bank-Level Security
 - Read-only access via Plaid's secure API
@@ -100,7 +100,8 @@ Required environment variables:
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Supabase anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
-- `RESEND_API_KEY` - Resend API key for SMS notifications
+- `SLICKTEXT_API_KEY` - SlickText API key for professional SMS delivery
+- `SLICKTEXT_BRAND_ID` - SlickText brand ID for SMS campaigns
 
 ## 🎉 Success Story
 
