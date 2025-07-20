@@ -23,6 +23,10 @@ export default async function ProtectedSidebar() {
           label: "📊 Category Analysis",
           href: "/category-analysis",
         },
+        {
+          label: "🤖 AI Category Analysis",
+          href: "/ai-category-analysis",
+        },
         // REMOVED FOR PERFORMANCE: Heavy analytics features
         // {
         //   label: "Analysis",
