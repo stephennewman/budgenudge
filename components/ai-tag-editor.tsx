@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -123,6 +123,19 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
   const [tagOptions, setTagOptions] = useState<TagOption>({ merchant_names: [], category_tags: [] });
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [preview, setPreview] = useState<{
+    matched_transactions: number;
+    sample_transactions: Array<{
+      merchant_name: string;
+      name: string;
+      current_ai_merchant: string;
+      current_ai_category: string;
+      amount: number;
+      date: string;
+    }>;
+    core_merchant_name: string;
+  } | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   // Load tag options on component mount
   useEffect(() => {
@@ -135,6 +148,7 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
   useEffect(() => {
     setMerchantName(initialData.ai_merchant_name);
     setCategoryTag(initialData.ai_category_tag);
+    setPreview(null);
   }, [initialData]);
 
   const loadTagOptions = async () => {
@@ -158,6 +172,50 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
       setIsLoading(false);
     }
   };
+
+  const loadPreview = useCallback(async () => {
+    if (!merchantName.trim() || !categoryTag.trim()) {
+      setPreview(null);
+      return;
+    }
+
+    setIsLoadingPreview(true);
+    try {
+      const response = await fetch('/api/manual-tag-override', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          merchant_pattern: initialData.merchant_pattern,
+          ai_merchant_name: merchantName.trim(),
+          ai_category_tag: categoryTag.trim(),
+          apply_to_existing: true,
+          preview_only: true
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setPreview(data);
+      }
+    } catch (error) {
+      console.error('Failed to load preview:', error);
+      setPreview(null);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  }, [initialData.merchant_pattern, merchantName, categoryTag]);
+
+  // Load preview when apply to existing is checked and we have values
+  useEffect(() => {
+    if (applyToExisting && merchantName.trim() && categoryTag.trim()) {
+      loadPreview();
+    } else {
+      setPreview(null);
+    }
+  }, [applyToExisting, merchantName, categoryTag, loadPreview]);
 
   const handleSave = async () => {
     if (!merchantName.trim() || !categoryTag.trim()) {
@@ -184,7 +242,7 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md p-6 bg-white">
+      <Card className="w-full max-w-2xl p-6 bg-white max-h-[90vh] overflow-y-auto">
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Edit AI Tags</h3>
@@ -256,9 +314,52 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
               className="rounded"
             />
             <Label htmlFor="apply-existing" className="text-sm">
-              Apply to all existing transactions from this merchant
+              Apply to all similar transactions from this merchant
             </Label>
           </div>
+
+          {/* Preview Section */}
+          {applyToExisting && (isLoadingPreview || preview) && (
+            <div className="border rounded-lg p-4 bg-blue-50">
+              <h4 className="font-medium text-blue-900 mb-2">🔍 Smart Matching Preview</h4>
+              
+              {isLoadingPreview ? (
+                <div className="text-sm text-blue-700">Loading preview...</div>
+              ) : preview ? (
+                <div className="space-y-3">
+                  <div className="text-sm text-blue-700">
+                    <strong>{preview.matched_transactions}</strong> transactions will be updated
+                    {preview.core_merchant_name && (
+                                             <span className="block text-xs mt-1">
+                         Core merchant: &quot;{preview.core_merchant_name}&quot;
+                       </span>
+                    )}
+                  </div>
+                  
+                  {preview.sample_transactions.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-blue-800">Sample transactions that will be updated:</div>
+                      <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {preview.sample_transactions.slice(0, 5).map((tx, index) => (
+                          <div key={index} className="text-xs bg-white p-2 rounded border">
+                            <div className="font-mono">{tx.merchant_name || tx.name}</div>
+                            <div className="text-gray-600">
+                              {tx.current_ai_category} → <span className="font-medium">{categoryTag}</span>
+                            </div>
+                          </div>
+                        ))}
+                        {preview.sample_transactions.length > 5 && (
+                          <div className="text-xs text-blue-600 italic">
+                            ...and {preview.sample_transactions.length - 5} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-4">
             <Button 
@@ -274,7 +375,7 @@ export default function AITagEditor({ isOpen, onClose, onSave, initialData }: AI
               className="flex-1"
               disabled={isSaving || !merchantName.trim() || !categoryTag.trim()}
             >
-              {isSaving ? 'Saving...' : 'Save Changes'}
+              {isSaving ? 'Saving...' : applyToExisting && preview ? `Update ${preview.matched_transactions} Transactions` : 'Save Changes'}
             </Button>
           </div>
         </div>

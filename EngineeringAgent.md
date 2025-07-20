@@ -1,6 +1,6 @@
 # Engineering Agent - BudgeNudge
 
-**Last Updated:** July 19, 2025, 11:45 PM EDT
+**Last Updated:** July 19, 2025, 8:05 PM EDT
 
 ## Technical Status: FULLY OPERATIONAL ✅
 
@@ -14,6 +14,23 @@
 - **Deployment**: Vercel with automatic deployments
 
 ### Recent Engineering Achievements
+
+#### UX Enhancement: AI Tag Editor Dropdown Improvements (July 19, 2025, 8:05 PM EDT)
+- **Problem**: Users had to clear category field before accessing dropdown options + limited scrollable options
+- **Solution**: Enhanced ComboBox component with improved UX flow and expanded option visibility
+- **Technical Implementation**:
+  - ✅ **showAllOnFocus State**: Shows complete option list when field is clicked (no filtering)
+  - ✅ **Increased Option Limit**: Expanded from 10 to 50 dropdown options for better coverage
+  - ✅ **Enhanced Scrolling**: Improved dropdown height from `max-h-48` to `max-h-60` pixels
+  - ✅ **Smart Filtering Logic**: Preserves existing value while showing all options on focus
+- **User Experience Improvements**:
+  - Click field → immediately see all options (no clearing required)
+  - Scroll through 50+ AI tag options efficiently
+  - Intuitive dropdown behavior matching user expectations
+- **Git Commit**: `175e6b2` - Fix AI tag editor dropdown UX: show full options on click + scrollable dropdown with 50 options
+- **Build Time**: 52 seconds successful deployment
+- **Production URL**: https://budgenudge-59tz81rw6-krezzo.vercel.app
+- **Impact**: ✅ **MAJOR UX IMPROVEMENT** - AI tag editing workflow now efficient and user-friendly
 
 #### Major Achievement: AI Tagging System Complete Redesign (July 19, 2025, 11:45 PM EDT)
 - **Problem**: Webhook-based AI tagging causing reliability issues and potential timeouts
