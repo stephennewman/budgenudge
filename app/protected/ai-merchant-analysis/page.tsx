@@ -100,44 +100,7 @@ export default function AIMerchantAnalysisPage() {
         transactionDates: string[]; // For frequency analysis
       }>();
 
-             // Debug: Check recent transactions and timezone issues
-       console.log('DEBUG: All transactions raw:', transactions.slice(0, 3)); // First 3 transactions
-       console.log('DEBUG: Current time info:', {
-         localTime: new Date(),
-         utcTime: new Date().toISOString(),
-         localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-         timezoneOffset: new Date().getTimezoneOffset()
-       });
-       console.log('DEBUG: Sample transaction dates:', transactions.slice(0, 10).map(t => ({ 
-         rawDate: t.date, 
-         parsedLocal: new Date(t.date), 
-         parsedUTC: new Date(t.date + 'T00:00:00Z'), // Force UTC interpretation
-         year: new Date(t.date).getFullYear(), 
-         month: new Date(t.date).getMonth(),
-         monthUTC: new Date(t.date + 'T00:00:00Z').getMonth()
-       })));
-       
-                const recentTransactions = transactions.filter(t => {
-           const txDate = new Date(t.date + 'T12:00:00'); // Consistent parsing
-           return txDate.getFullYear() === 2025 && txDate.getMonth() === 6; // July 2025 (month is 0-indexed)
-         });
-         
-         // Also check 2024 in case the year is wrong
-         const july2024Transactions = transactions.filter(t => {
-           const txDate = new Date(t.date + 'T12:00:00'); // Consistent parsing
-           return txDate.getFullYear() === 2024 && txDate.getMonth() === 6;
-         });
-       
-       console.log('DEBUG: July 2025 transactions found:', recentTransactions.length);
-       console.log('DEBUG: July 2024 transactions found:', july2024Transactions.length);
-       console.log('DEBUG: Total transactions found:', transactions.length);
-       console.log('DEBUG: Transactions with AI merchant names:', transactions.filter(t => t.ai_merchant_name).length);
-       if (recentTransactions.length > 0) {
-         console.log('DEBUG: Sample July 2025 transaction:', recentTransactions[0]);
-       }
-       if (july2024Transactions.length > 0) {
-         console.log('DEBUG: Sample July 2024 transaction:', july2024Transactions[0]);
-       }
+             
 
              transactions.forEach(transaction => {
          // Use AI merchant name if available, fallback to original merchant name, then transaction name
@@ -149,16 +112,7 @@ export default function AIMerchantAnalysisPage() {
          const txDate = new Date(dateStr + 'T12:00:00'); // Add noon time to avoid timezone edge cases
          const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
          
-         // Debug: Log a few transaction processings
-         if (Math.random() < 0.01) { // Log ~1% of transactions
-           console.log('DEBUG: Processing transaction:', {
-             rawDate: transaction.date,
-             txDate: txDate,
-             monthKey,
-             aiMerchant,
-             amount: transaction.amount
-           });
-         }
+
 
         if (!merchantMap.has(aiMerchant)) {
           merchantMap.set(aiMerchant, {
@@ -234,15 +188,7 @@ export default function AIMerchantAnalysisPage() {
         const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         const currentMonthSpending = data.monthlySpending.get(currentMonthKey) || 0;
         
-        // Debug logging for current month calculation
-        if (aiMerchant === 'Amazon' || aiMerchant === 'Target' || data.monthlySpending.size > 0) {
-          console.log(`DEBUG ${aiMerchant}:`, {
-            currentMonthKey,
-            currentMonthSpending,
-            allMonthKeys: Array.from(data.monthlySpending.keys()),
-            monthlySpendingMap: Object.fromEntries(data.monthlySpending)
-          });
-        }
+        
 
         // Calculate pacing
         const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -451,30 +397,7 @@ export default function AIMerchantAnalysisPage() {
          </div>
        )}
 
-       {/* Debug info on page */}
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-           <h4 className="font-medium text-yellow-800 mb-2">🐛 Debug Info</h4>
-           <div className="text-sm text-yellow-700 space-y-1">
-             <div>Current Date (Local): {new Date().toString()}</div>
-             <div>Current Date (UTC): {new Date().toISOString()}</div>
-             <div>Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}</div>
-             <div>Current Month Key: {new Date().getFullYear()}-{String(new Date().getMonth() + 1).padStart(2, '0')}</div>
-             <div>Total Merchants Found: {merchantData.length}</div>
-             <div>Merchants with July Spending: {merchantData.filter(m => m.current_month_spending > 0).length}</div>
-             <div>Total July Spending: ${merchantData.reduce((sum, m) => sum + m.current_month_spending, 0).toFixed(2)}</div>
-             {merchantData.length > 0 && (
-               <>
-                 <div>First 3 Merchants: {merchantData.slice(0, 3).map(m => `${m.ai_merchant}: $${m.current_month_spending}`).join(', ')}</div>
-                 <div>Sample Merchant Data: {JSON.stringify({
-                   merchant: merchantData[0].ai_merchant,
-                   currentMonthSpending: merchantData[0].current_month_spending,
-                   avgMonthly: Math.round(merchantData[0].avg_monthly_spending),
-                   totalSpending: Math.round(merchantData[0].total_spending)
-                 })}</div>
-               </>
-             )}
-           </div>
-         </div>
+       
 
       {merchantData.length === 0 ? (
                  <Card>
