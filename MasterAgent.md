@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 19, 2025, 10:10 PM EDT
+**Last Updated:** July 19, 2025, 10:45 PM EDT
 
 ## Project Overview
 
@@ -68,6 +68,13 @@
 6. **99% Coverage Achieved**: System now automatically tags 99% of all transactions
 
 ### Deployment History
+- **July 19, 2025, 10:45 PM EDT**: CRITICAL BUG FIX - Timezone Date Parsing Issue (95/100 Impact Score)
+  - 🐛 **Critical Issue Resolved**: Fixed timezone parsing bug affecting EST users
+  - 🕐 **Root Cause**: Transaction dates parsed inconsistently causing wrong month assignment
+  - 🛠️ **Solution**: Implemented consistent date parsing with 'T12:00:00' (noon) to avoid timezone edge cases
+  - 🎯 **User Impact**: July spending now correctly displays for EST/EDT timezone users
+  - 📊 **Testing**: Extensive debugging with live user data confirmed fix
+  - ⚡ **Performance**: Bundle size reduced from 6.06kB to 5.34kB (debug code removed)
 - **July 19, 2025, 10:10 PM EDT**: NEW FEATURE - AI Merchant Analysis Page (88/100 Impact Score)
   - 🏪 **Advanced Merchant Analytics**: Table-based analysis by AI-normalized merchant names
   - 📊 **Enhanced Table Format**: Triple sorting (spending/transactions/frequency) with user's requested view

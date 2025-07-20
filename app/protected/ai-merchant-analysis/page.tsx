@@ -446,32 +446,7 @@ export default function AIMerchantAnalysisPage() {
           {/* Table View */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>🏪 Merchant Breakdown</span>
-                <div className="flex gap-2">
-                  <Button
-                    variant={sortBy === 'spending' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleSort('spending')}
-                  >
-                    Sort by Spending {sortBy === 'spending' && (sortOrder === 'desc' ? '↓' : '↑')}
-                  </Button>
-                  <Button
-                    variant={sortBy === 'transactions' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleSort('transactions')}
-                  >
-                    Sort by Transactions {sortBy === 'transactions' && (sortOrder === 'desc' ? '↓' : '↑')}
-                  </Button>
-                  <Button
-                    variant={sortBy === 'frequency' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => handleSort('frequency')}
-                  >
-                    Sort by Frequency {sortBy === 'frequency' && (sortOrder === 'desc' ? '↓' : '↑')}
-                  </Button>
-                </div>
-              </CardTitle>
+              <CardTitle>🏪 Merchant Breakdown</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -479,13 +454,49 @@ export default function AIMerchantAnalysisPage() {
                   <thead>
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Merchant</th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Monthly Avg</th>
+                      <th 
+                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('spending')}
+                      >
+                        <div className="flex items-center justify-end">
+                          Monthly Avg
+                          {sortBy === 'spending' && (
+                            <span className="ml-1">
+                              {sortOrder === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                       <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Type</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Frequency</th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Transactions</th>
+                      <th 
+                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('frequency')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Frequency
+                          {sortBy === 'frequency' && (
+                            <span className="ml-1">
+                              {sortOrder === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('transactions')}
+                      >
+                        <div className="flex items-center justify-end">
+                          Transactions
+                          {sortBy === 'transactions' && (
+                            <span className="ml-1">
+                              {sortOrder === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                       <th className="text-right py-3 px-2 font-medium text-gray-900">Avg/Transaction</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Categories</th>
                     </tr>
