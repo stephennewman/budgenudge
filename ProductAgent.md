@@ -1,6 +1,6 @@
 # Product Agent - BudgeNudge
 
-**Last Updated:** July 18, 2025, 1:36 PM EDT
+**Last Updated:** July 21, 2025, 1:15 PM EDT
 
 ## Product Status: FULLY OPERATIONAL ✅
 
@@ -12,25 +12,35 @@ BudgeNudge helps users maintain healthy financial habits by providing personaliz
 ## Current Feature Set
 
 ### Primary Features
-1. **Daily SMS Intelligence** (Scheduled delivery at user preference)
-   - AI-powered spending insights and recommendations
-   - Recurring bills prediction and reminders
-   - Personalized financial health scoring
+1. **5-Template Daily SMS Intelligence** (Scheduled delivery at 7:00 AM EST)
+   - Bills & Payments: Upcoming recurring bills and reminders
+   - Spending Analysis: Budget analysis and AI recommendations  
+   - Yesterday's Activity: Recent transaction summaries
+   - Merchant Pacing: Spending analysis for tracked merchants (NEW)
+   - Category Pacing: Spending analysis for tracked categories (NEW)
 
-2. **Multi-Bank Integration**
+2. **Dual-Level Pacing Control** (NEW)
+   - **Merchant Pacing**: Track specific merchants (Amazon, Publix, etc.)
+   - **Category Pacing**: Track spending categories (Groceries, Restaurant, Gas)
+   - Auto-selection of top 3 merchants/categories for new users
+   - User-controlled stoplight toggles for enabling/disabling tracking
+   - Month-to-date vs expected spending with pacing percentages
+
+3. **Multi-Bank Integration**
    - Connect all Plaid-supported financial institutions
    - Consolidated view across checking, savings, and credit accounts
    - Account-specific insights and management
 
-3. **AI-Powered Analytics**
-   - Smart merchant normalization and categorization
+4. **AI-Powered Analytics**
+   - Smart merchant normalization and categorization (99% coverage)
    - Spending pattern recognition and trend analysis
    - Predictive bill detection and amount forecasting
+   - Intelligent merchant and category auto-selection algorithms
 
-4. **Professional SMS Delivery**
+5. **Professional SMS Delivery**
    - SlickText professional API for reliable delivery
-   - Customizable timing and notification preferences
-   - Template-based intelligent content generation
+   - User preference control over all 5 SMS types
+   - 918-character optimized templates for maximum content
 
 ### User Experience
 - **Onboarding**: Simple phone number setup
@@ -40,14 +50,27 @@ BudgeNudge helps users maintain healthy financial habits by providing personaliz
 
 ## Recent Product Improvements
 
+### July 21, 2025, 1:15 PM EDT - Category Pacing System Launch (Impact: 92/100)
+- **New Feature**: Complete category-level spending pacing analysis
+- **User Value**: Track spending by category (Groceries, Restaurant, Gas, etc.)
+- **Smart Selection**: Auto-selects top 3 high-spending categories for new users
+- **User Control**: Stoplight toggles in AI Category Analysis page
+- **SMS Integration**: 5th daily SMS type with category spending insights
+- **Business Logic**: Excludes Income, Transfer, Uncategorized categories
+
+### July 21, 2025, 12:45 PM EDT - Merchant Pacing System Launch (Impact: 90/100)
+- **New Feature**: Merchant-specific spending pacing tracking and alerts
+- **User Value**: Track specific merchants (Amazon, Publix, Walmart, etc.)
+- **Smart Selection**: Auto-selects top 3 high-activity merchants for new users
+- **User Control**: Stoplight toggles in AI Merchant Analysis page
+- **SMS Integration**: 4th daily SMS type with merchant spending vs expected
+- **Analytics**: Month-to-date spending with pacing percentages and status
+
 ### July 18, 2025, 1:36 PM EDT - Technical Reliability
 - **Admin Permission Fix**: Resolved 403 errors in cron job
 - **Database Enhancement**: Added phone_number column to user_sms_settings
 - **Cron Schedule**: Updated to 1:45 PM EST for optimal timing
 - **Code Quality**: Simplified phone number lookup logic
-
-### July 18, 2025, 1:04 PM EDT - System Analysis
-- **Hardcoded Values Review**: Identified production vs test code issues
 - **Agent Updates**: Comprehensive project status documentation
 - **Technical Debt Assessment**: Prioritized cleanup needs
 

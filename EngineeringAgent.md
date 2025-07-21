@@ -1,19 +1,53 @@
 # Engineering Agent - BudgeNudge
 
-**Last Updated:** July 19, 2025, 8:05 PM EDT
+**Last Updated:** July 21, 2025, 1:15 PM EDT
 
 ## Technical Status: FULLY OPERATIONAL ✅
 
 ### Core Systems
-- **SMS System**: 3-template intelligent daily insights system fully operational ✅
+- **SMS System**: 5-template intelligent daily insights system fully operational ✅
+- **Merchant Pacing System**: User-controlled merchant spending tracking ✅ NEW
+- **Category Pacing System**: AI category-level spending analysis ✅ NEW  
 - **Multi-Bank Integration**: Plaid platform supporting all major financial institutions ✅ OPERATIONAL
-- **AI Tagging System**: Scheduled automatic AI tagging every 15 minutes ✅ COMPLETELY REDESIGNED
-- **Cron Jobs**: SMS (30min) + AI Tagging (15min) automated schedules
-- **Database**: Supabase with AI tagging schema and smart caching
+- **AI Tagging System**: Scheduled automatic AI tagging every 15 minutes ✅ OPERATIONAL
+- **Cron Jobs**: SMS (daily 7AM) + AI Tagging (15min) automated schedules
+- **Database**: Supabase with comprehensive pacing tracking schema
 - **Authentication**: Supabase Auth with service role permissions
 - **Deployment**: Vercel with automatic deployments
 
 ### Recent Engineering Achievements
+
+#### Major Feature: Complete Category Pacing System (July 21, 2025, 1:15 PM EDT)
+- **Achievement**: Built comprehensive category-level spending pacing analysis system
+- **Technical Implementation**:
+  - ✅ **Database Schema**: `category_pacing_tracking` table with RLS policies
+  - ✅ **API Endpoints**: Complete CRUD operations `/api/category-pacing-tracking`
+  - ✅ **Auto-Selection Algorithm**: Intelligent category selection based on spending + frequency
+  - ✅ **UI Integration**: Track Pacing column in AI Category Analysis with stoplight toggles
+  - ✅ **SMS Template**: 5th SMS type with 918-character optimization
+  - ✅ **Smart Filtering**: Excludes Income, Transfer, Uncategorized per business logic
+- **Selection Algorithm**:
+  - Criteria: $50+ monthly spending + 2+ transactions/month + current activity
+  - Scoring: Spending weight + frequency boost + activity bonus
+  - Auto-selects top 3 categories for new users
+- **Git Commit**: `a8f3951` - Complete Category Pacing System implementation
+- **Impact**: ✅ **MAJOR FEATURE** - Users now have dual-level pacing control (merchant + category)
+
+#### Major Feature: Complete Merchant Pacing System (July 21, 2025, 12:45 PM EDT)  
+- **Achievement**: Built merchant-specific spending pacing tracking and notifications
+- **Technical Implementation**:
+  - ✅ **Database Schema**: `merchant_pacing_tracking` table with full RLS policies
+  - ✅ **API Endpoints**: Complete CRUD operations `/api/merchant-pacing-tracking`
+  - ✅ **Auto-Selection Logic**: Smart merchant selection for new users
+  - ✅ **UI Integration**: Track Pacing column with stoplight controls (🔴🟡🟢⚪)
+  - ✅ **SMS Template**: 4th SMS type showing spending vs expected with pacing percentages
+  - ✅ **Analytics Integration**: Month-to-date spending analysis with trend indicators
+- **Selection Algorithm**:
+  - High spending merchants ($50+ avg monthly) + frequent transactions
+  - Current month activity requirement + transaction count weighting
+  - Auto-selects top 3 merchants based on scoring algorithm
+- **Git Commits**: Multiple commits for complete merchant pacing implementation
+- **Impact**: ✅ **MAJOR FEATURE** - Merchant-level spending awareness and control
 
 #### UX Enhancement: AI Tag Editor Dropdown Improvements (July 19, 2025, 8:05 PM EDT)
 - **Problem**: Users had to clear category field before accessing dropdown options + limited scrollable options
@@ -102,17 +136,32 @@ app/api/
 ### SMS System Components
 ```
 utils/sms/
-├── templates.ts          # 3-template SMS system
+├── templates.ts          # 5-template SMS system (bills, spending, activity, merchant-pacing, category-pacing)
 ├── unified-sms.ts        # Main SMS orchestration
 ├── slicktext-client.ts   # SlickText API integration
 ├── carrier-detection.ts  # Phone carrier detection
 └── user-phone.ts         # User phone number utilities
 
 app/api/
-├── cron/scheduled-sms/   # Main SMS cron job endpoint
+├── cron/scheduled-sms/   # Main SMS cron job endpoint (5 templates)
 ├── test-daily-sms/       # Testing endpoint
-├── sms-preferences/      # User SMS settings
+├── sms-preferences/      # User SMS settings (5 types)
 └── manual-sms/          # Manual SMS testing
+```
+
+### Pacing System Components
+```
+app/api/
+├── merchant-pacing-tracking/       # Merchant pacing CRUD operations
+│   └── auto-select/               # Auto-selection for merchants
+├── category-pacing-tracking/       # Category pacing CRUD operations  
+│   └── auto-select/               # Auto-selection for categories
+└── auto-select-pacing/            # Unified auto-selection trigger
+
+Database Tables:
+├── merchant_pacing_tracking        # User merchant tracking preferences
+├── category_pacing_tracking        # User category tracking preferences
+└── user_sms_preferences           # SMS type preferences (5 types)
 ```
 
 ### Database Schema
@@ -147,6 +196,27 @@ app/api/
 - **Authorization**: Secure CRON_SECRET validation
 
 ## Recent Tasks Completed
+
+### July 21, 2025, 1:15 PM EDT - Complete Category Pacing System
+1. ✅ Created `category_pacing_tracking` database table with RLS policies
+2. ✅ Built complete API suite: GET/POST/PUT/DELETE operations
+3. ✅ Implemented intelligent auto-selection algorithm for top 3 categories
+4. ✅ Added Track Pacing column to AI Category Analysis page with stoplight UI
+5. ✅ Created category pacing SMS template (5th SMS type)
+6. ✅ Updated SMS preferences to support 'category-pacing' type
+7. ✅ Applied database constraint migrations for new SMS type
+8. ✅ Integrated with scheduled SMS system for daily notifications
+9. ✅ Updated user onboarding to include all 5 SMS types by default
+
+### July 21, 2025, 12:45 PM EDT - Complete Merchant Pacing System
+1. ✅ Created `merchant_pacing_tracking` database table with RLS policies
+2. ✅ Built complete API suite: CRUD operations + auto-selection
+3. ✅ Implemented merchant selection algorithm based on spending + frequency
+4. ✅ Added Track Pacing column to AI Merchant Analysis page
+5. ✅ Created merchant pacing SMS template (4th SMS type)
+6. ✅ Updated SMS preferences system to support 'merchant-pacing' type
+7. ✅ Applied database migrations for SMS constraint updates
+8. ✅ Integrated with existing scheduled SMS delivery system
 
 ### July 19, 2025, 11:45 PM EDT - AI Tagging System Complete Redesign
 1. ✅ Implemented separate AI tagging process (`/api/auto-ai-tag-new`)

@@ -11,11 +11,11 @@ export async function POST(request: NextRequest) {
         apiRoute: '/api/test-sms-pacing'
       }, { status: 400 });
     }
-    const message = await generateSMSMessage(userId, 'pacing');
+    const message = await generateSMSMessage(userId, 'merchant-pacing');
     return NextResponse.json({
       success: true,
       apiRoute: '/api/test-sms-pacing',
-      templateType: 'pacing',
+              templateType: 'merchant-pacing',
       message,
       messageLength: message.length
     });

@@ -10,7 +10,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'spending' | 'activity' | 'merchant-pacing' | 'category-pacing';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -30,12 +30,7 @@ const smsTypeInfo = {
     icon: '💳',
     example: `⭐ Recurring Bills\n9 upcoming\n\nJul 15: Disney+ - $3.41\nJul 16: Netflix - $28.30\nJul 16: Duke Energy - $308.00\nJul 16: Fccu A2a Acct - $424.61\nJul 21: Everydaydose Dose  - $36.00\nJul 22: GEICO - $114.18\nJul 23: Prudential - $30.02\nJul 27: Amazon Prime - $15.13\nJul 28: Spectrum - $118.00\n\nNEXT 7 DAYS: $800.32\nNEXT 14 DAYS: $1077.65\nNEXT 30 DAYS: $3841.29`
   },
-  spending: {
-    title: 'Spending Analysis',
-    description: 'Budget analysis, account balance, and AI-powered recommendations',
-    icon: '💰',
-    example: `📊 SPENDING PACING\nJuly 2025\nMonth Progress: 47% (Day 14)\n\n🟢 Amazon:\n   This month: $120\n   Avg monthly: $130\n   Pacing: 92%\n\n🟡 Publix:\n   This month: $200\n   Avg monthly: $150\n   Pacing: 133%\n\n🟢 Circle K:\n   This month: $40\n   Avg monthly: $45\n   Pacing: 89%`
-  },
+
   activity: {
     title: 'Yesterday\'s Activity',
     description: 'All transactions from yesterday',

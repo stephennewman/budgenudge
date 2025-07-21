@@ -34,7 +34,7 @@ export async function GET() {
     console.log(`📊 TEST SMS: Found ${userItems.length} bank connections`);
 
     // Test all 3 new templates
-    const templateTypes = ['recurring', 'recent', 'pacing'] as const;
+    const templateTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'] as const;
     const results = [];
 
     for (const templateType of templateTypes) {

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('userId') || DEFAULT_USER_ID;
     
     const results: Record<string, { success: boolean; message?: string; length?: number; error?: string }> = {};
-    const templateTypes = ['recurring', 'recent', 'pacing'] as const;
+    const templateTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'] as const;
     for (const templateType of templateTypes) {
       try {
         const message = await generateSMSMessage(userId, templateType);

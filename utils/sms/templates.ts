@@ -536,14 +536,12 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
 // ===================================
 // UNIFIED TEMPLATE SELECTOR
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'pacing' | 'merchant-pacing' | 'category-pacing'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
     case 'recent':
       return await generateRecentTransactionsMessage(userId);
-    case 'pacing':
-      return await generatePacingAnalysisMessage(userId);
     case 'merchant-pacing':
       return await generateMerchantPacingMessage(userId);
     case 'category-pacing':

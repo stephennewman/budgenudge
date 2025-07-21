@@ -13,7 +13,7 @@ export async function GET() {
     console.log(`🔍 Testing NEW templates for user: ${userId}`);
     
     // Test all 3 new templates
-    const templateTypes = ['recurring', 'recent', 'pacing'] as const;
+            const templateTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'] as const;
     const results = [];
     let successCount = 0;
     let failureCount = 0;

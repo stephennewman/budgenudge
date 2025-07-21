@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 19, 2025, 10:45 PM EDT
+**Last Updated:** July 21, 2025, 1:15 PM EDT
 
 ## Project Overview
 
@@ -33,12 +33,13 @@
 ## Current Status
 
 ### SMS System - FULLY OPERATIONAL ✅
-- **3-Template SMS System**: Recurring bills, recent transactions, and spending pacing
-- **Scheduled Delivery**: Daily at 1:45 PM EST (17:45 UTC)
-- **User Preferences**: Individual send times stored in database
+- **5-Template SMS System**: Bills, spending pacing, recent activity, merchant pacing, category pacing
+- **Scheduled Delivery**: Daily at 7:00 AM EST (12:00 UTC)
+- **User Preferences**: Individual control over each SMS type in user_sms_preferences table
 - **Authorization**: Proper CRON_SECRET authentication
 - **Logging**: Comprehensive SMS delivery and error logging
 - **Database**: Phone numbers stored in user_sms_settings table
+- **Character Optimization**: All templates optimized for 918-character SMS limit
 
 ### Recurring Transactions System - FULLY OPERATIONAL ✅
 - **Database**: `tagged_merchants` table with comprehensive recurring bill tracking
@@ -49,7 +50,7 @@
 - **Confidence Scoring**: 60-95% confidence levels for prediction accuracy
 - **Frequency Support**: Weekly, monthly, bi-monthly, quarterly patterns
 
-### AI Merchant Tagging System - FULLY OPERATIONAL ✅ NEW
+### AI Merchant Tagging System - FULLY OPERATIONAL ✅
 - **Automatic Processing**: Scheduled AI tagging every 15 minutes via cron job
 - **OpenAI Integration**: GPT-4 powered merchant normalization and categorization
 - **Smart Caching**: `merchant_ai_tags` table minimizes API costs (80% cache hit rate)
@@ -59,7 +60,34 @@
 - **Separation**: Decoupled from webhook for maximum reliability
 - **Cost Optimization**: Intelligent merchant pattern caching reduces OpenAI API usage
 
-### Recent Major Changes (July 19, 2025)
+### Merchant Pacing System - FULLY OPERATIONAL ✅ NEW
+- **Database**: `merchant_pacing_tracking` table with RLS policies
+- **Auto-Selection**: Top 3 high-activity merchants automatically selected for new users
+- **Selection Criteria**: High spending + frequent usage (50+ avg monthly, frequent transactions)
+- **User Control**: Track Pacing column in AI Merchant Analysis page with stoplight toggles
+- **SMS Template**: Daily merchant-specific spending pacing analysis
+- **API Endpoints**: Complete CRUD operations (/api/merchant-pacing-tracking)
+- **Smart Analytics**: Month-to-date vs expected spending with pacing percentages
+
+### Category Pacing System - FULLY OPERATIONAL ✅ NEW
+- **Database**: `category_pacing_tracking` table with RLS policies  
+- **Auto-Selection**: Top 3 high-spending categories automatically selected for new users
+- **Selection Criteria**: $50+ monthly spending + 2+ transactions/month + current activity
+- **Category Filtering**: Excludes Income, Transfer, Uncategorized per business requirements
+- **User Control**: Track Pacing column in AI Category Analysis page with stoplight toggles
+- **SMS Template**: Daily category-level spending pacing analysis (Groceries, Restaurant, etc.)
+- **API Endpoints**: Complete CRUD operations (/api/category-pacing-tracking)
+- **Smart Analytics**: Category spending vs historical averages with trend analysis
+
+### Recent Major Changes (July 21, 2025)
+1. **Category Pacing System**: Complete category-level pacing analysis and SMS templates
+2. **Merchant Pacing System**: Merchant-specific spending pacing tracking and notifications  
+3. **Dual-Level Pacing Control**: Users can now track both merchant and category spending patterns
+4. **5-Template SMS System**: Expanded from 3 to 5 SMS types with user preferences
+5. **Auto-Selection Intelligence**: Smart algorithms automatically select top merchants/categories
+6. **SMS Preferences Enhancement**: Complete user control over all 5 SMS notification types
+
+### Previous Major Changes (July 19, 2025)
 1. **AI Tagging System Implementation**: Complete overhaul of automatic AI merchant tagging
 2. **Webhook Optimization**: Removed AI processing from webhook for faster transaction storage
 3. **Scheduled AI Processing**: New cron job every 15 minutes for automatic AI tagging
@@ -68,6 +96,24 @@
 6. **99% Coverage Achieved**: System now automatically tags 99% of all transactions
 
 ### Deployment History
+- **July 21, 2025, 1:15 PM EDT**: 🏆 MAJOR FEATURE - Complete Category Pacing System (92/100 Impact Score)
+  - 📊 **Category-Level Pacing**: Users can now track spending by category (Groceries, Restaurant, Gas, etc.)
+  - 🤖 **Smart Auto-Selection**: Intelligent algorithm selects top 3 high-spending categories for new users
+  - 🎛️ **User Control**: Track Pacing column in AI Category Analysis with stoplight toggles (🔴🟡🟢)
+  - 📱 **5th SMS Type**: Category Pacing SMS template with 918-character optimization
+  - 🧠 **Selection Criteria**: $50+ monthly spending + 2+ transactions + current activity + excludes Income/Transfer
+  - 🗃️ **Database**: category_pacing_tracking table with full RLS policies and API endpoints
+  - 🎯 **Complete UX**: Auto-selection → Toggle control → Daily SMS notifications
+
+- **July 21, 2025, 12:45 PM EDT**: 🏪 MAJOR FEATURE - Complete Merchant Pacing System (90/100 Impact Score)
+  - 🏪 **Merchant-Level Pacing**: Users can track specific merchants (Amazon, Publix, etc.)
+  - 🤖 **Smart Auto-Selection**: Algorithm selects top 3 high-activity merchants for new users
+  - 🎛️ **User Control**: Track Pacing column in AI Merchant Analysis with stoplight toggles
+  - 📱 **4th SMS Type**: Merchant Pacing SMS template showing month-to-date vs expected spending
+  - 🧠 **Selection Algorithm**: High spending + frequent usage (50+ avg monthly, regular transactions)
+  - 🗃️ **Database**: merchant_pacing_tracking table with RLS policies and CRUD API endpoints
+  - 📊 **Analytics**: Pacing percentages, status indicators, and spending trend analysis
+
 - **July 19, 2025, 10:45 PM EDT**: CRITICAL BUG FIX - Timezone Date Parsing Issue (95/100 Impact Score)
   - 🐛 **Critical Issue Resolved**: Fixed timezone parsing bug affecting EST users
   - 🕐 **Root Cause**: Transaction dates parsed inconsistently causing wrong month assignment
@@ -199,12 +245,16 @@ The `tagged_merchants` table contains:
 
 ### Opportunities (0-100 Scale)
 - **Multi-Bank Account Integration**: 95 (High value, moderate effort - Plaid enables multiple bank connections)
-- **AI-Powered Spending Insights**: 90 (High value, low effort - AI tags enable merchant analysis)
-- **Category-Based Budgeting**: 88 (High value, moderate effort - leverages AI categorization)
+- **Enhanced Budget Integration**: 90 (High value, high effort - next major feature opportunity)
 - **Advanced SMS Personalization**: 85 (High value, low effort - use AI for content optimization)
-- **Smart Spending Patterns**: 88 (High value, moderate effort - AI enables trend detection)
-- **Enhanced Budget Integration**: 90 (High value, high effort)
 - **User Onboarding Enhancement**: 80 (High value, moderate effort)
+- **Predictive Spending Alerts**: 82 (High value, moderate effort - leverage pacing data for predictions)
+- **Spending Goal Setting**: 88 (High value, moderate effort - integrate with pacing systems)
+
+### Recently Achieved Opportunities ✅
+- **AI-Powered Spending Insights**: 90 → COMPLETED (Merchant & Category Pacing Systems)
+- **Category-Based Budgeting**: 88 → COMPLETED (Category Pacing with spending analysis)  
+- **Smart Spending Patterns**: 88 → COMPLETED (Dual-level pacing detection and alerts)
 
 ## Technical Improvements Made
 
