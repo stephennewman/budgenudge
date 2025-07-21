@@ -31,31 +31,39 @@ export async function GET(request: NextRequest) {
 
     // Ensure all SMS types exist for the user
     const allSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing'];
-    const existingTypes = preferences?.map(p => p.sms_type) || [];
-    const missingTypes = allSmsTypes.filter(type => !existingTypes.includes(type));
+    const existingTypes = new Set(preferences?.map(p => p.sms_type) || []);
+    const missingTypes = allSmsTypes.filter(type => !existingTypes.has(type));
 
-    // Create missing preferences
+    // Create missing preferences one by one to handle conflicts gracefully  
     if (missingTypes.length > 0) {
-      const defaultPreferences = missingTypes.map(type => ({
-        user_id: userId,
-        sms_type: type,
-        enabled: true,
-        frequency: 'daily'
-      }));
-
-      const { data: createdPrefs, error: createError } = await supabase
-        .from('user_sms_preferences')
-        .insert(defaultPreferences)
-        .select();
-
-      if (createError) {
-        console.error('Error creating missing preferences:', createError);
-        return NextResponse.json({ error: 'Failed to create missing preferences' }, { status: 500 });
+      for (const smsType of missingTypes) {
+        try {
+          await supabase
+            .from('user_sms_preferences')
+            .insert({
+              user_id: userId,
+              sms_type: smsType,
+              enabled: true,
+              frequency: 'daily'
+            });
+        } catch {
+          // Ignore unique constraint violations (record already exists)
+          console.log(`Preference for ${smsType} may already exist, skipping`);
+        }
       }
 
-      // Combine existing and newly created preferences
-      const allPreferences = [...(preferences || []), ...(createdPrefs || [])];
-      return NextResponse.json({ success: true, preferences: allPreferences });
+      // Fetch all preferences to get the complete, up-to-date list
+      const { data: finalPreferences, error: finalError } = await supabase
+        .from('user_sms_preferences')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (finalError) {
+        console.error('Error fetching final preferences:', finalError);
+        return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, preferences: finalPreferences });
     }
 
     return NextResponse.json({ success: true, preferences });
