@@ -303,7 +303,7 @@ export default function SMSPreferencesPage() {
         <h3 className="font-semibold text-blue-900 mb-2">How it works:</h3>
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• Each SMS type can be enabled/disabled independently</li>
-          <li>• All SMS will be sent daily at 7:00 AM EST</li>
+          <li>• All SMS will be sent daily at 6:00 AM EST</li>
           <li>• Optionally override phone numbers for specific SMS types</li>
           <li>• SMS messages are only sent when there&apos;s meaningful data to report</li>
           <li>• All messages are labeled with their type (📅 BILLS SMS, 📅 SPENDING SMS, etc.)</li>

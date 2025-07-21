@@ -32,7 +32,7 @@ export default function AIMerchantAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'frequency'>('spending');
+  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'frequency' | 'remaining'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedMerchants, setTrackedMerchants] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
@@ -321,6 +321,11 @@ export default function AIMerchantAnalysisPage() {
           case 'frequency':
             comparison = a.frequency_days - b.frequency_days; // Lower days = higher frequency
             break;
+          case 'remaining':
+            const aRemaining = a.avg_monthly_spending - a.current_month_spending;
+            const bRemaining = b.avg_monthly_spending - b.current_month_spending;
+            comparison = aRemaining - bRemaining;
+            break;
         }
         return sortOrder === 'desc' ? -comparison : comparison;
       });
@@ -446,7 +451,7 @@ export default function AIMerchantAnalysisPage() {
     return `${Math.round(days / 30)}m`;
   };
 
-  const handleSort = (newSortBy: 'spending' | 'transactions' | 'frequency') => {
+  const handleSort = (newSortBy: 'spending' | 'transactions' | 'frequency' | 'remaining') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
     } else {
@@ -565,7 +570,19 @@ export default function AIMerchantAnalysisPage() {
                       </th>
                       <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Remaining</th>
+                      <th 
+                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('remaining')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Remaining
+                          {sortBy === 'remaining' && (
+                            <span className="ml-1">
+                              {sortOrder === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Type</th>
                       <th 

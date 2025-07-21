@@ -30,7 +30,7 @@ export default function AICategoryAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'merchants'>('spending');
+  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'merchants' | 'remaining'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedCategories, setTrackedCategories] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
@@ -308,6 +308,11 @@ export default function AICategoryAnalysisPage() {
           case 'merchants':
             comparison = a.unique_merchants - b.unique_merchants;
             break;
+          case 'remaining':
+            const aRemaining = a.avg_monthly_spending - a.current_month_spending;
+            const bRemaining = b.avg_monthly_spending - b.current_month_spending;
+            comparison = aRemaining - bRemaining;
+            break;
         }
         return sortOrder === 'desc' ? -comparison : comparison;
       });
@@ -376,7 +381,7 @@ export default function AICategoryAnalysisPage() {
     }
   };
 
-  const handleSort = (newSortBy: 'spending' | 'transactions' | 'merchants') => {
+  const handleSort = (newSortBy: 'spending' | 'transactions' | 'merchants' | 'remaining') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
     } else {
@@ -493,7 +498,19 @@ export default function AICategoryAnalysisPage() {
                       </th>
                       <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Remaining</th>
+                      <th 
+                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('remaining')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Remaining
+                          {sortBy === 'remaining' && (
+                            <span className="ml-1">
+                              {sortOrder === 'desc' ? '↓' : '↑'}
+                            </span>
+                          )}
+                        </div>
+                      </th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
                       <th 
                         className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
