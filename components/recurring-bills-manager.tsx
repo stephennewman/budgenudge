@@ -237,11 +237,7 @@ export default function RecurringBillsManager() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <BouncingMoneyLoader />
-      </div>
-    );
+    return <BouncingMoneyLoader />;
   }
 
   // Filter and sort active merchants by upcoming date (soonest first, future dates only)

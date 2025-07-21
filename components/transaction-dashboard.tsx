@@ -76,11 +76,7 @@ export default function TransactionDashboard() {
 
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <BouncingMoneyLoader />
-      </div>
-    );
+    return <BouncingMoneyLoader />;
   }
 
   if (!isConnected) {

@@ -226,11 +226,7 @@ export default function CategoryAnalysisPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <BouncingMoneyLoader />
-      </div>
-    );
+    return <BouncingMoneyLoader />;
   }
 
   if (error) {

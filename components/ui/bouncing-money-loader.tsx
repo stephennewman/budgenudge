@@ -48,7 +48,7 @@ export function BouncingMoneyLoader({
         }
       `}</style>
       
-      <div className={cn("flex items-center justify-center min-h-[200px]", className)}>
+      <div className={cn("fixed inset-0 flex items-center justify-center bg-white z-50", className)}>
         <div className="money-bag-bounce">
           <div className="text-6xl select-none">💰</div>
         </div>

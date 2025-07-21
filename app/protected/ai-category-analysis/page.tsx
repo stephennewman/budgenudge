@@ -291,11 +291,7 @@ export default function AICategoryAnalysisPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <BouncingMoneyLoader />
-      </div>
-    );
+    return <BouncingMoneyLoader />;
   }
 
   if (error) {
