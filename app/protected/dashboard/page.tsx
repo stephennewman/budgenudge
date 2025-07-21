@@ -9,39 +9,37 @@ interface DashboardData {
   upcomingBills: Array<{
     id: number;
     merchant_name: string;
-    ai_merchant_name: string;
+    ai_merchant_name?: string;
     expected_amount: number;
     next_predicted_date: string;
     prediction_frequency: string;
   }>;
-  activityTrend: Array<{
+  recentTransactions: Array<{
+    id: string;
     date: string;
-    transaction_count: number;
+    merchant_name: string;
+    ai_merchant_name?: string;
+    amount: number;
+    ai_category_tag?: string;
   }>;
-  spendingTrend: Array<{
-    date: string;
-    total_amount: number;
+  monthlySpend: {
+    current: number;
+    lastMonth: number;
+    change: number;
+  };
+  categoryPacing: Array<{
+    category: string;
+    current_spent: number;
+    monthly_budget: number;
+    status: 'green' | 'yellow' | 'red';
+    percentage: number;
   }>;
   merchantPacing: Array<{
     merchant_name: string;
-    ai_merchant_name: string;
+    ai_merchant_name?: string;
+    current_spent: number;
+    expected_amount: number;
     status: 'green' | 'yellow' | 'red';
-    percentage: number;
-  }>;
-  categoryPacing: Array<{
-    category: string;
-    status: 'green' | 'yellow' | 'red';
-    percentage: number;
-  }>;
-  merchantSpending: Array<{
-    merchant_name: string;
-    ai_merchant_name: string;
-    total_amount: number;
-    percentage: number;
-  }>;
-  categorySpending: Array<{
-    category: string;
-    total_amount: number;
     percentage: number;
   }>;
 }
@@ -60,62 +58,83 @@ export default function DashboardPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // For now, let's create some mock data to demonstrate the dashboard
-      // In a real implementation, you'd fetch this from your APIs
-      const mockData: DashboardData = {
-        upcomingBills: [
-          { id: 1, merchant_name: 'Netflix', ai_merchant_name: 'Netflix', expected_amount: 15.99, next_predicted_date: '2025-01-25', prediction_frequency: 'monthly' },
-          { id: 2, merchant_name: 'Spotify', ai_merchant_name: 'Spotify', expected_amount: 9.99, next_predicted_date: '2025-01-26', prediction_frequency: 'monthly' },
-          { id: 3, merchant_name: 'Amazon Prime', ai_merchant_name: 'Amazon Prime', expected_amount: 14.99, next_predicted_date: '2025-01-28', prediction_frequency: 'monthly' },
-          { id: 4, merchant_name: 'Electric Company', ai_merchant_name: 'ConEd', expected_amount: 85.00, next_predicted_date: '2025-01-30', prediction_frequency: 'monthly' },
-          { id: 5, merchant_name: 'Internet', ai_merchant_name: 'Verizon', expected_amount: 79.99, next_predicted_date: '2025-02-01', prediction_frequency: 'monthly' },
-        ],
-        activityTrend: [
-          { date: '2025-01-15', transaction_count: 12 },
-          { date: '2025-01-16', transaction_count: 8 },
-          { date: '2025-01-17', transaction_count: 15 },
-          { date: '2025-01-18', transaction_count: 6 },
-          { date: '2025-01-19', transaction_count: 9 },
-          { date: '2025-01-20', transaction_count: 14 },
-          { date: '2025-01-21', transaction_count: 11 },
-        ],
-        spendingTrend: [
-          { date: '2025-01-15', total_amount: 234.56 },
-          { date: '2025-01-16', total_amount: 89.12 },
-          { date: '2025-01-17', total_amount: 456.78 },
-          { date: '2025-01-18', total_amount: 123.45 },
-          { date: '2025-01-19', total_amount: 298.33 },
-          { date: '2025-01-20', total_amount: 187.91 },
-          { date: '2025-01-21', total_amount: 345.67 },
-        ],
-        merchantPacing: [
-          { merchant_name: 'Amazon', ai_merchant_name: 'Amazon', status: 'red', percentage: 135 },
-          { merchant_name: 'Starbucks', ai_merchant_name: 'Starbucks', status: 'yellow', percentage: 78 },
-          { merchant_name: 'Grocery Store', ai_merchant_name: 'Whole Foods', status: 'green', percentage: 45 },
-          { merchant_name: 'Gas Station', ai_merchant_name: 'Shell', status: 'green', percentage: 62 },
-        ],
-        categoryPacing: [
-          { category: 'Dining', status: 'red', percentage: 120 },
-          { category: 'Shopping', status: 'yellow', percentage: 85 },
-          { category: 'Groceries', status: 'green', percentage: 55 },
-          { category: 'Transportation', status: 'green', percentage: 40 },
-        ],
-        merchantSpending: [
-          { merchant_name: 'Amazon', ai_merchant_name: 'Amazon', total_amount: 234.56, percentage: 35 },
-          { merchant_name: 'Whole Foods', ai_merchant_name: 'Whole Foods', total_amount: 189.23, percentage: 28 },
-          { merchant_name: 'Starbucks', ai_merchant_name: 'Starbucks', total_amount: 98.45, percentage: 15 },
-          { merchant_name: 'Shell', ai_merchant_name: 'Shell', total_amount: 78.90, percentage: 12 },
-          { merchant_name: 'Others', ai_merchant_name: 'Others', total_amount: 67.86, percentage: 10 },
-        ],
-        categorySpending: [
-          { category: 'Shopping', total_amount: 298.45, percentage: 40 },
-          { category: 'Groceries', total_amount: 223.67, percentage: 30 },
-          { category: 'Dining', total_amount: 134.23, percentage: 18 },
-          { category: 'Transportation', total_amount: 89.65, percentage: 12 },
-        ],
+      // Fetch upcoming bills (tagged merchants)
+      const billsResponse = await fetch('/api/tagged-merchants');
+      const billsData = await billsResponse.json();
+      
+      // Fetch recent transactions
+      const transactionsResponse = await fetch('/api/plaid/transactions');
+      const transactionsData = await transactionsResponse.json();
+      
+      // Fetch category pacing
+      const categoryPacingResponse = await fetch('/api/category-pacing-tracking');
+      const categoryPacingData = await categoryPacingResponse.json();
+
+      // Fetch merchant pacing  
+      const merchantPacingResponse = await fetch('/api/merchant-pacing-tracking');
+      const merchantPacingData = await merchantPacingResponse.json();
+
+      // Calculate monthly spend from recent transactions
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+
+             const allTransactions = transactionsData.transactions || [];
+       
+       const currentMonthSpend = allTransactions
+         .filter((tx: { date: string; amount: number }) => new Date(tx.date) >= startOfMonth && tx.amount < 0)
+         .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(tx.amount), 0);
+       
+       const lastMonthSpend = allTransactions
+         .filter((tx: { date: string; amount: number }) => {
+           const txDate = new Date(tx.date);
+           return txDate >= startOfLastMonth && txDate <= endOfLastMonth && tx.amount < 0;
+         })
+         .reduce((sum: number, tx: { amount: number }) => sum + Math.abs(tx.amount), 0);
+
+      const spendChange = lastMonthSpend > 0 ? ((currentMonthSpend - lastMonthSpend) / lastMonthSpend) * 100 : 0;
+
+             const processedData: DashboardData = {
+         upcomingBills: (billsData.taggedMerchants || [])
+           .filter((merchant: { is_active: boolean }) => merchant.is_active)
+           .sort((a: { next_predicted_date: string }, b: { next_predicted_date: string }) => 
+             new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime())
+           .slice(0, 3),
+         recentTransactions: (allTransactions || [])
+           .filter((tx: { amount: number }) => tx.amount < 0)
+           .slice(0, 4),
+        monthlySpend: {
+          current: currentMonthSpend,
+          lastMonth: lastMonthSpend,
+          change: spendChange
+        },
+                 categoryPacing: (categoryPacingData.tracked_categories || [])
+           .map((cat: { category: string; current_spent: number; monthly_budget: number }) => ({
+             category: cat.category,
+             current_spent: cat.current_spent || 0,
+             monthly_budget: cat.monthly_budget || 0,
+             percentage: cat.monthly_budget > 0 ? (cat.current_spent / cat.monthly_budget) * 100 : 0,
+             status: cat.monthly_budget > 0 ? 
+               (cat.current_spent / cat.monthly_budget > 1 ? 'red' as const : 
+                cat.current_spent / cat.monthly_budget > 0.8 ? 'yellow' as const : 'green' as const) : 'green' as const
+           }))
+           .slice(0, 3),
+         merchantPacing: (merchantPacingData.tracked_merchants || [])
+           .map((merchant: { merchant_name: string; ai_merchant_name?: string; current_spent: number; expected_amount: number }) => ({
+             merchant_name: merchant.merchant_name,
+             ai_merchant_name: merchant.ai_merchant_name,
+             current_spent: merchant.current_spent || 0,
+             expected_amount: merchant.expected_amount || 0,
+             percentage: merchant.expected_amount > 0 ? (merchant.current_spent / merchant.expected_amount) * 100 : 0,
+             status: merchant.expected_amount > 0 ? 
+               (merchant.current_spent / merchant.expected_amount > 1 ? 'red' as const : 
+                merchant.current_spent / merchant.expected_amount > 0.8 ? 'yellow' as const : 'green' as const) : 'green' as const
+           }))
+           .slice(0, 3)
       };
 
-      setDashboardData(mockData);
+      setDashboardData(processedData);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -138,14 +157,6 @@ export default function DashboardPage() {
     }
   };
 
-  const getStatusBorder = (status: 'green' | 'yellow' | 'red') => {
-    switch (status) {
-      case 'green': return 'border-green-200';
-      case 'yellow': return 'border-yellow-200';
-      case 'red': return 'border-red-200';
-    }
-  };
-
   if (loading) {
     return <BouncingMoneyLoader />;
   }
@@ -159,178 +170,116 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">📊 Dashboard</h1>
-        <p className="text-gray-600">Your financial snapshot at a glance</p>
+    <div className="container mx-auto px-4 py-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold mb-1">📊 Dashboard</h1>
+        <p className="text-gray-600 text-sm">Your financial snapshot</p>
       </div>
 
-      {/* Grid Layout for Widgets */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {/* Compact Grid Layout - Focus on Above the Fold */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Upcoming Bills Widget */}
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-200 col-span-1 md:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-blue-800 flex items-center gap-2">
-              ⭐ Upcoming Bills
-              <span className="text-sm font-normal text-blue-600">(Next 5)</span>
-            </CardTitle>
+        {/* Monthly Spend Summary */}
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-blue-800 text-sm">💰 This Month</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {dashboardData.upcomingBills.map((bill) => (
-                <div key={bill.id} className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm">
-                  <div>
-                    <div className="font-medium text-gray-900">{bill.ai_merchant_name}</div>
-                    <div className="text-sm text-gray-500">{formatDate(bill.next_predicted_date)} • {bill.prediction_frequency}</div>
-                  </div>
-                  <div className="text-lg font-bold text-blue-600">${bill.expected_amount.toFixed(2)}</div>
-                </div>
-              ))}
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold text-blue-900">${dashboardData.monthlySpend.current.toFixed(0)}</div>
+            <div className="text-xs text-blue-600">
+              {dashboardData.monthlySpend.change > 0 ? '↗' : '↘'} {Math.abs(dashboardData.monthlySpend.change).toFixed(0)}% vs last month
             </div>
           </CardContent>
         </Card>
 
-        {/* Activity Trending */}
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-100 border-green-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-green-800">📈 Activity Trend</CardTitle>
+        {/* Next Bills */}
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-purple-800 text-sm">⭐ Next Bills</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-                             {dashboardData.activityTrend.map((day) => (
-                 <div key={day.date} className="flex justify-between items-center">
-                   <span className="text-sm text-gray-600">{formatDate(day.date)}</span>
-                   <div className="flex items-center gap-2">
-                     <div 
-                       className="bg-green-500 h-2 rounded"
-                       style={{ width: `${(day.transaction_count / 15) * 60}px` }}
-                     ></div>
-                     <span className="text-sm font-medium text-green-700">{day.transaction_count}</span>
-                   </div>
-                 </div>
-               ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Spending Trending */}
-        <Card className="bg-gradient-to-br from-purple-50 to-violet-100 border-purple-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-purple-800">💰 Spend Trend</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {dashboardData.spendingTrend.map((day) => (
-                <div key={day.date} className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{formatDate(day.date)}</span>
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="bg-purple-500 h-2 rounded"
-                      style={{ width: `${(day.total_amount / 500) * 60}px` }}
-                    ></div>
-                    <span className="text-sm font-medium text-purple-700">${day.total_amount.toFixed(0)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Merchant Pacing */}
-        <Card className="bg-gradient-to-br from-orange-50 to-amber-100 border-orange-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-orange-800">🏪 Merchant Pacing</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {dashboardData.merchantPacing.map((merchant, index) => (
-                <div key={index} className={`p-3 rounded-lg border ${getStatusBorder(merchant.status)}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900">{merchant.ai_merchant_name}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(merchant.status)}`}>
-                      {merchant.percentage}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-1">
+                         {dashboardData.upcomingBills.slice(0, 2).map((bill) => (
+              <div key={bill.id} className="flex justify-between text-xs">
+                <span className="truncate">{bill.ai_merchant_name || bill.merchant_name}</span>
+                <span className="font-medium">${bill.expected_amount.toFixed(0)}</span>
+              </div>
+            ))}
+            {dashboardData.upcomingBills.length === 0 && (
+              <div className="text-xs text-gray-500">No upcoming bills</div>
+            )}
           </CardContent>
         </Card>
 
         {/* Category Pacing */}
-        <Card className="bg-gradient-to-br from-teal-50 to-cyan-100 border-teal-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-teal-800">🗂️ Category Pacing</CardTitle>
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-green-800 text-sm">🗂️ Category Pace</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {dashboardData.categoryPacing.map((category, index) => (
-                <div key={index} className={`p-3 rounded-lg border ${getStatusBorder(category.status)}`}>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-gray-900">{category.category}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(category.status)}`}>
-                      {category.percentage}%
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-1">
+                         {dashboardData.categoryPacing.slice(0, 2).map((cat, index) => (
+               <div key={`cat-${index}`} className="flex justify-between items-center text-xs">
+                 <span className="truncate">{cat.category}</span>
+                 <span className={`px-1 py-0.5 rounded text-xs ${getStatusColor(cat.status)}`}>
+                   {cat.percentage.toFixed(0)}%
+                 </span>
+               </div>
+             ))}
+            {dashboardData.categoryPacing.length === 0 && (
+              <div className="text-xs text-gray-500">No tracking active</div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Merchant Spending Pie Chart */}
-        <Card className="bg-gradient-to-br from-rose-50 to-pink-100 border-rose-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-rose-800">🥧 Merchant Spending</CardTitle>
+        {/* Merchant Pacing */}
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-orange-800 text-sm">🏪 Merchant Pace</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {dashboardData.merchantSpending.map((merchant, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className={`w-3 h-3 rounded`}
-                      style={{ backgroundColor: `hsl(${index * 60}, 70%, 60%)` }}
-                    ></div>
-                    <span className="text-sm text-gray-700">{merchant.ai_merchant_name}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">${merchant.total_amount.toFixed(0)}</div>
-                    <div className="text-xs text-gray-500">{merchant.percentage}%</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <CardContent className="space-y-1">
+                         {dashboardData.merchantPacing.slice(0, 2).map((merchant, index) => (
+               <div key={`merchant-${index}`} className="flex justify-between items-center text-xs">
+                 <span className="truncate">{merchant.ai_merchant_name || merchant.merchant_name}</span>
+                 <span className={`px-1 py-0.5 rounded text-xs ${getStatusColor(merchant.status)}`}>
+                   {merchant.percentage.toFixed(0)}%
+                 </span>
+               </div>
+             ))}
+            {dashboardData.merchantPacing.length === 0 && (
+              <div className="text-xs text-gray-500">No tracking active</div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Category Spending Pie Chart */}
-        <Card className="bg-gradient-to-br from-slate-50 to-gray-100 border-slate-200">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-slate-800">📊 Category Spending</CardTitle>
+      </div>
+
+      {/* Recent Activity Section - More compact */}
+      <div className="mt-6">
+        <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-gray-800 text-sm">📈 Recent Activity</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {dashboardData.categorySpending.map((category, index) => (
-                <div key={index} className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className={`w-3 h-3 rounded`}
-                      style={{ backgroundColor: `hsl(${index * 90 + 180}, 70%, 60%)` }}
-                    ></div>
-                    <span className="text-sm text-gray-700">{category.category}</span>
+                             {dashboardData.recentTransactions.map((tx) => (
+                 <div key={tx.id} className="flex justify-between items-center text-xs py-1 border-b border-gray-200 last:border-b-0">
+                  <div className="flex-1 truncate">
+                    <span className="font-medium">{tx.ai_merchant_name || tx.merchant_name}</span>
+                    {tx.ai_category_tag && (
+                      <span className="ml-2 text-gray-500">• {tx.ai_category_tag}</span>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium">${category.total_amount.toFixed(0)}</div>
-                    <div className="text-xs text-gray-500">{category.percentage}%</div>
+                  <div className="text-right ml-2">
+                    <div className="font-medium">${Math.abs(tx.amount).toFixed(2)}</div>
+                    <div className="text-gray-500">{formatDate(tx.date)}</div>
                   </div>
                 </div>
               ))}
+              {dashboardData.recentTransactions.length === 0 && (
+                <div className="text-xs text-gray-500 text-center py-2">No recent transactions</div>
+              )}
             </div>
           </CardContent>
         </Card>
-
       </div>
     </div>
   );
