@@ -10,6 +10,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface TaggedMerchant {
   id: number;
   merchant_name: string;
+  ai_merchant_name?: string;
   expected_amount: number;
   prediction_frequency: string;
   confidence_score: number;
@@ -345,31 +346,22 @@ export default function RecurringBillsManager() {
                       <div className="flex items-center gap-4 flex-1">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{merchant.merchant_name}</span>
-                            {merchant.auto_detected && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">🤖 Auto</span>}
+                            <span className="font-medium truncate">{merchant.ai_merchant_name || merchant.merchant_name}</span>
                           </div>
                           <div className="text-sm text-gray-600">
                             Next: {formatNextDate(merchant.next_predicted_date)} • 
                             <span className={getConfidenceColor(merchant.confidence_score)}> {merchant.confidence_score}% confidence</span>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="font-semibold">${merchant.expected_amount.toFixed(2)}</div>
-                          <div className="text-sm text-gray-600 flex items-center gap-1">
+                        <div className="text-center">
+                          <div className="font-semibold">${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}</div>
+                          <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
                             {getFrequencyEmoji(merchant.prediction_frequency)}
-                            {merchant.prediction_frequency}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleToggleActive(merchant.id, merchant.is_active)}
-                        >
-                          Disable
-                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -397,23 +389,11 @@ export default function RecurringBillsManager() {
                       <ul className="list-disc pl-5 space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
                           <li key={transaction.id} className="text-sm">
-                            <span className="font-medium">{transaction.merchant_name || transaction.name}</span>
+                            <span className="font-medium">{transaction.ai_merchant_name || transaction.merchant_name || transaction.name}</span>
                             {" — "}
                             <span className="text-gray-500">{transaction.date}</span>
                             {" — "}
                             <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
-                            {transaction.subcategory && (
-                              <>
-                                {" — "}
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{transaction.subcategory}</span>
-                              </>
-                            )}
-                            {transaction.ai_merchant_name && (
-                              <>
-                                {" — "}
-                                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">{transaction.ai_merchant_name}</span>
-                              </>
-                            )}
                             {transaction.ai_category_tag && (
                               <>
                                 {" — "}

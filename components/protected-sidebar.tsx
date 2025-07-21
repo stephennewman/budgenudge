@@ -49,7 +49,7 @@ export default async function ProtectedSidebar() {
           href: "/recurring-bills",
         },
         {
-          label: "📱 Text Snapshots",
+          label: "📱 Texts",
           href: "/sms-preferences",
         },
         // REMOVED: Test items per user request

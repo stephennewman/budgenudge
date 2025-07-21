@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
@@ -484,20 +484,14 @@ export default function AIMerchantAnalysisPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🏪 Merchants</h1>
-          <p className="text-gray-600">
-            Spending analysis by AI-normalized merchant names with frequency insights
-          </p>
+          {lastUpdated && (
+            <p className="text-gray-600">
+              Last updated: {lastUpdated.toLocaleString()}
+            </p>
+          )}
         </div>
         <ManualRefreshButton onRefresh={fetchAIMerchantData} />
       </div>
-
-             {lastUpdated && (
-         <div className="text-sm text-gray-500 mb-6">
-           Last updated: {lastUpdated.toLocaleString()}
-         </div>
-       )}
-
-       
 
       {merchantData.length === 0 ? (
                  <Card>
@@ -507,47 +501,8 @@ export default function AIMerchantAnalysisPage() {
          </Card>
       ) : (
         <div className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-blue-600">
-                  {merchantData.length}
-                </div>
-                <div className="text-sm text-gray-600">AI Merchants</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(merchantData.reduce((sum, merchant) => sum + merchant.total_spending, 0))}
-                </div>
-                <div className="text-sm text-gray-600">Total Spending</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-purple-600">
-                  {merchantData.reduce((sum, merchant) => sum + merchant.transaction_count, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Transactions</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-orange-600">
-                  {merchantData.filter(m => m.merchant_type === 'frequent').length}
-                </div>
-                <div className="text-sm text-gray-600">Frequent Merchants</div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Table View */}
           <Card>
-            <CardHeader>
-              <CardTitle>🏪 Merchant Breakdown</CardTitle>
-            </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">

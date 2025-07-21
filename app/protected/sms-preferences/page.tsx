@@ -192,7 +192,7 @@ export default function SMSPreferencesPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Text Snapshots</h1>
+        <h1 className="text-3xl font-bold">Texts</h1>
         <p className="text-gray-600">
           All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
         </p>

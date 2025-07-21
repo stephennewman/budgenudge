@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
@@ -414,18 +414,14 @@ export default function AICategoryAnalysisPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🗂️ Categories</h1>
-          <p className="text-gray-600">
-            Spending analysis powered by AI-generated categories and merchant normalization
-          </p>
+          {lastUpdated && (
+            <p className="text-gray-600">
+              Last updated: {lastUpdated.toLocaleString()}
+            </p>
+          )}
         </div>
         <ManualRefreshButton onRefresh={fetchAICategoryData} />
       </div>
-
-      {lastUpdated && (
-        <div className="text-sm text-gray-500 mb-6">
-          Last updated: {lastUpdated.toLocaleString()}
-        </div>
-      )}
 
       {categoryData.length === 0 ? (
         <Card>
@@ -435,47 +431,8 @@ export default function AICategoryAnalysisPage() {
         </Card>
       ) : (
         <div className="space-y-6">
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-blue-600">
-                  {categoryData.length}
-                </div>
-                <div className="text-sm text-gray-600">AI Categories</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-green-600">
-                  {formatCurrency(categoryData.reduce((sum, cat) => sum + cat.total_spending, 0))}
-                </div>
-                <div className="text-sm text-gray-600">Total Spending</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-purple-600">
-                  {categoryData.reduce((sum, cat) => sum + cat.transaction_count, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Transactions</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-orange-600">
-                  {categoryData.reduce((sum, cat) => sum + cat.unique_merchants, 0)}
-                </div>
-                <div className="text-sm text-gray-600">Unique Merchants</div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Table View */}
           <Card>
-            <CardHeader>
-              <CardTitle>📊 Category Breakdown</CardTitle>
-            </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <table className="w-full">
