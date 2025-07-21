@@ -29,13 +29,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
     }
 
-    // If no preferences exist, create defaults
-    if (!preferences || preferences.length === 0) {
-      const defaultPreferences = [
-        { user_id: userId, sms_type: 'bills', enabled: true, frequency: 'daily' },
-        { user_id: userId, sms_type: 'spending', enabled: true, frequency: 'daily' },
-        { user_id: userId, sms_type: 'activity', enabled: true, frequency: 'daily' }
-      ];
+    // Ensure all SMS types exist for the user
+    const allSmsTypes = ['bills', 'spending', 'activity', 'merchant-pacing'];
+    const existingTypes = preferences?.map(p => p.sms_type) || [];
+    const missingTypes = allSmsTypes.filter(type => !existingTypes.includes(type));
+
+    // Create missing preferences
+    if (missingTypes.length > 0) {
+      const defaultPreferences = missingTypes.map(type => ({
+        user_id: userId,
+        sms_type: type,
+        enabled: true,
+        frequency: 'daily'
+      }));
 
       const { data: createdPrefs, error: createError } = await supabase
         .from('user_sms_preferences')
@@ -43,11 +49,13 @@ export async function GET(request: NextRequest) {
         .select();
 
       if (createError) {
-        console.error('Error creating default preferences:', createError);
-        return NextResponse.json({ error: 'Failed to create default preferences' }, { status: 500 });
+        console.error('Error creating missing preferences:', createError);
+        return NextResponse.json({ error: 'Failed to create missing preferences' }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, preferences: createdPrefs });
+      // Combine existing and newly created preferences
+      const allPreferences = [...(preferences || []), ...(createdPrefs || [])];
+      return NextResponse.json({ success: true, preferences: allPreferences });
     }
 
     return NextResponse.json({ success: true, preferences });
