@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PlaidLinkButton from './plaid-link-button';
@@ -76,8 +77,8 @@ export default function TransactionDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <BouncingMoneyLoader />
       </div>
     );
   }

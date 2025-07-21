@@ -227,10 +227,8 @@ export default function CategoryAnalysisPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <BouncingMoneyLoader text="Loading subcategory analysis..." />
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <BouncingMoneyLoader />
       </div>
     );
   }

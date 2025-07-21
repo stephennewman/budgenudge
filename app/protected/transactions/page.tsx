@@ -687,8 +687,8 @@ export default function TransactionsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <BouncingMoneyLoader text="Loading transactions..." />
+      <div className="flex items-center justify-center min-h-screen">
+        <BouncingMoneyLoader />
       </div>
     );
   }

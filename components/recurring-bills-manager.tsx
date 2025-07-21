@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
 
 interface TaggedMerchant {
@@ -237,16 +238,9 @@ export default function RecurringBillsManager() {
 
   if (loading) {
     return (
-      <Card className="p-6">
-        <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded mb-4"></div>
-          <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded"></div>
-          </div>
-        </div>
-      </Card>
+      <div className="flex items-center justify-center min-h-screen">
+        <BouncingMoneyLoader />
+      </div>
     );
   }
 
