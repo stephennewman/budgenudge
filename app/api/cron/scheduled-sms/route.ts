@@ -5,7 +5,7 @@ import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-type NewSMSTemplateType = 'recurring' | 'recent' | 'pacing' | 'merchant-pacing';
+type NewSMSTemplateType = 'recurring' | 'recent' | 'pacing' | 'merchant-pacing' | 'category-pacing';
 
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
@@ -98,9 +98,9 @@ export async function GET(request: NextRequest) {
 
     console.log(`👥 Found ${itemsWithUsers.length} users with bank connections`);
 
-    // For now, send all 4 templates to all users (simplified approach)
+    // For now, send all 5 templates to all users (simplified approach)
     // Later this can be controlled by user preferences
-    const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'pacing', 'merchant-pacing'];
+    const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'pacing', 'merchant-pacing', 'category-pacing'];
     
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');

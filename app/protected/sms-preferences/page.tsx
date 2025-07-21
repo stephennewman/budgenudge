@@ -10,7 +10,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'spending' | 'activity' | 'merchant-pacing';
+  sms_type: 'bills' | 'spending' | 'activity' | 'merchant-pacing' | 'category-pacing';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -47,6 +47,12 @@ const smsTypeInfo = {
     description: 'Spending pacing analysis for your tracked merchants (configure on AI Merchant Analysis page)',
     icon: '🏪',
     example: `📊 MERCHANT PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Amazon:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $280.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Publix:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 137%\n   Status: Over pace`
+  },
+  'category-pacing': {
+    title: 'Category Pacing',
+    description: 'Spending pacing analysis for your tracked spending categories (configure on AI Category Analysis page)',
+    icon: '📊',
+    example: `📊 CATEGORY PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Groceries:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Restaurant:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $180.00\n   Pacing: 137%\n   Status: Over pace`
   }
 };
 

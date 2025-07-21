@@ -109,11 +109,13 @@ async function setupNewUser(user: { id: string; user_metadata?: { phone?: string
       console.log('✅ SMS settings created for user');
     }
 
-    // 2. Create default SMS preferences
+    // 2. Create default SMS preferences (all 5 types)
     const defaultPreferences = [
       { user_id: user.id, sms_type: 'bills', enabled: true, frequency: 'daily' },
       { user_id: user.id, sms_type: 'spending', enabled: true, frequency: 'daily' },
-      { user_id: user.id, sms_type: 'activity', enabled: true, frequency: 'daily' }
+      { user_id: user.id, sms_type: 'activity', enabled: true, frequency: 'daily' },
+      { user_id: user.id, sms_type: 'merchant-pacing', enabled: true, frequency: 'daily' },
+      { user_id: user.id, sms_type: 'category-pacing', enabled: true, frequency: 'daily' }
     ];
 
     const { error: prefsError } = await supabase

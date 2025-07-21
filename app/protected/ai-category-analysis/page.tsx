@@ -32,8 +32,96 @@ export default function AICategoryAnalysisPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'merchants'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [trackedCategories, setTrackedCategories] = useState<Set<string>>(new Set());
+  const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
 
   const supabase = createSupabaseClient();
+
+  // Fetch tracked categories for the current user
+  const fetchTrackedCategories = async () => {
+    try {
+      const response = await fetch('/api/category-pacing-tracking');
+      const data = await response.json();
+      
+      if (data.success && data.tracked_categories) {
+        const tracked = new Set<string>(
+          data.tracked_categories
+            .filter((t: { is_active: boolean }) => t.is_active)
+            .map((t: { ai_category: string }) => t.ai_category)
+        );
+        setTrackedCategories(tracked);
+      }
+    } catch (error) {
+      console.error('Error fetching tracked categories:', error);
+    }
+  };
+
+  // Toggle category tracking
+  const toggleCategoryTracking = async (categoryName: string) => {
+    try {
+      setTrackingLoading(prev => new Set([...prev, categoryName]));
+
+      const isCurrentlyTracked = trackedCategories.has(categoryName);
+      const endpoint = '/api/category-pacing-tracking';
+      const method = isCurrentlyTracked ? 'PUT' : 'POST';
+      
+      const body = isCurrentlyTracked 
+        ? { ai_category: categoryName, is_active: false }
+        : { ai_category: categoryName };
+
+      const response = await fetch(endpoint, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        if (isCurrentlyTracked) {
+          setTrackedCategories(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(categoryName);
+            return newSet;
+          });
+        } else {
+          setTrackedCategories(prev => new Set([...prev, categoryName]));
+        }
+      } else {
+        console.error('Failed to toggle category tracking:', data.error);
+      }
+    } catch (error) {
+      console.error('Error toggling category tracking:', error);
+    } finally {
+      setTrackingLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(categoryName);
+        return newSet;
+      });
+    }
+  };
+
+  // Auto-select top categories for new users
+  const runAutoSelection = async () => {
+    try {
+      console.log('🤖 Running auto-selection for top categories...');
+      const response = await fetch('/api/category-pacing-tracking/auto-select', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.auto_selected?.length > 0) {
+        console.log(`✅ Auto-selected ${data.auto_selected.length} categories:`, data.category_analysis);
+        // Refresh tracked categories to show the newly selected ones
+        await fetchTrackedCategories();
+      } else {
+        console.log('ℹ️ Auto-selection result:', data.message);
+      }
+    } catch (error) {
+      console.error('Error in auto-selection:', error);
+    }
+  };
 
   const fetchAICategoryData = async () => {
     try {
@@ -235,7 +323,14 @@ export default function AICategoryAnalysisPage() {
   };
 
   useEffect(() => {
-    fetchAICategoryData();
+    const loadPageData = async () => {
+      await fetchAICategoryData();
+      await fetchTrackedCategories();
+      // Run auto-selection for users who haven't set up category tracking yet
+      await runAutoSelection();
+    };
+    
+    loadPageData();
   }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatCurrency = (amount: number) => {
@@ -381,6 +476,7 @@ export default function AICategoryAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
+                      <th className="text-center py-3 px-2 font-medium text-gray-900">Track Pacing</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Category</th>
                       <th 
                         className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
@@ -431,6 +527,25 @@ export default function AICategoryAnalysisPage() {
                   <tbody>
                                          {categoryData.map((category) => (
                       <tr key={category.ai_category} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            onClick={() => toggleCategoryTracking(category.ai_category)}
+                            disabled={trackingLoading.has(category.ai_category)}
+                            className="text-2xl hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={trackedCategories.has(category.ai_category) ? 
+                              `Stop tracking ${category.ai_category} pacing` : 
+                              `Track ${category.ai_category} pacing`}
+                          >
+                            {trackingLoading.has(category.ai_category) ? (
+                              '⏳'
+                            ) : trackedCategories.has(category.ai_category) ? (
+                              category.pacing_status === 'over' ? '🔴' :
+                              category.pacing_status === 'under' ? '🟢' : '🟡'
+                            ) : (
+                              '⚪'
+                            )}
+                          </button>
+                        </td>
                         <td className="py-3 px-2">
                           <div className="flex items-center space-x-2">
                             <span className="text-lg">{getCategoryIcon(category.ai_category)}</span>

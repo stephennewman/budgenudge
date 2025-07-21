@@ -367,9 +367,176 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
 }
 
 // ===================================
+// 5. CATEGORY PACING TEMPLATE (NEW)
+// ===================================
+export async function generateCategoryPacingMessage(userId: string): Promise<string> {
+  try {
+    // Get user's tracked categories
+    const { data: trackedCategories, error: trackingError } = await supabase
+      .from('category_pacing_tracking')
+      .select('ai_category')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (trackingError) {
+      console.error('Error fetching tracked categories:', trackingError);
+      return "📱 BudgeNudge\n\nError loading category pacing data.";
+    }
+
+    if (!trackedCategories || trackedCategories.length === 0) {
+      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo categories selected for tracking.\nConfigure on AI Category Analysis page.";
+    }
+
+    // Get user's Plaid items
+    const { data: items } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', userId);
+
+    const itemIds = items?.map(item => item.plaid_item_id) || [];
+    if (itemIds.length === 0) {
+      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo accounts connected.";
+    }
+
+    // Get current date info
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const monthProgress = Math.round((dayOfMonth / daysInMonth) * 100);
+
+    // Get transactions for tracked categories (last 3 months for analysis)
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const analysisStartDate = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}-01`;
+    const currentMonthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+
+    const trackedCategoryNames = trackedCategories.map(t => t.ai_category);
+
+    const { data: transactions } = await supabase
+      .from('transactions')
+      .select('amount, ai_category_tag, date')
+      .in('plaid_item_id', itemIds)
+      .gte('amount', 0)
+      .gte('date', analysisStartDate)
+      .in('ai_category_tag', trackedCategoryNames);
+
+    if (!transactions || transactions.length === 0) {
+      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo transaction data found for tracked categories.";
+    }
+
+    // Analyze each tracked category
+    const categoryAnalysis = new Map<string, {
+      totalSpending: number;
+      currentMonthSpending: number;
+      transactionCount: number;
+    }>();
+
+    transactions.forEach(transaction => {
+      const category = transaction.ai_category_tag;
+      const isCurrentMonth = transaction.date >= currentMonthStart;
+
+      if (!categoryAnalysis.has(category)) {
+        categoryAnalysis.set(category, {
+          totalSpending: 0,
+          currentMonthSpending: 0,
+          transactionCount: 0
+        });
+      }
+
+      const analysis = categoryAnalysis.get(category)!;
+      analysis.totalSpending += transaction.amount;
+      analysis.transactionCount += 1;
+
+      if (isCurrentMonth) {
+        analysis.currentMonthSpending += transaction.amount;
+      }
+    });
+
+    // Build SMS content
+    const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long' });
+    let smsContent = `📊 CATEGORY PACING\n${monthName} ${currentYear}\nMonth Progress: ${monthProgress}% (Day ${dayOfMonth})\n\n`;
+
+    // Process categories and sort by spending
+    const categoryResults: Array<{
+      category: string;
+      currentMonthSpending: number;
+      avgMonthlySpending: number;
+      expectedByNow: number;
+      pacing: number;
+      status: string;
+      statusEmoji: string;
+    }> = [];
+
+    trackedCategoryNames.forEach(categoryName => {
+      const analysis = categoryAnalysis.get(categoryName);
+      if (!analysis) return;
+
+      const avgMonthlySpending = analysis.totalSpending / 3; // 3 months of data
+      const expectedByNow = avgMonthlySpending * (monthProgress / 100);
+      const pacing = expectedByNow > 0 ? Math.round((analysis.currentMonthSpending / expectedByNow) * 100) : 0;
+
+      let status: string;
+      let statusEmoji: string;
+      if (pacing < 90) {
+        status = "Under pace";
+        statusEmoji = "🟢";
+      } else if (pacing > 110) {
+        status = "Over pace";
+        statusEmoji = "🔴";
+      } else {
+        status = "On pace";
+        statusEmoji = "🟡";
+      }
+
+      categoryResults.push({
+        category: categoryName,
+        currentMonthSpending: analysis.currentMonthSpending,
+        avgMonthlySpending,
+        expectedByNow,
+        pacing,
+        status,
+        statusEmoji
+      });
+    });
+
+    // Sort by current month spending (highest first) and limit to fit character limit
+    categoryResults.sort((a, b) => b.currentMonthSpending - a.currentMonthSpending);
+
+    // Add categories to SMS (limit to fit 918 character limit)
+    categoryResults.forEach((result, index) => {
+      if (smsContent.length > 750) return; // Reserve space for closing
+
+      smsContent += `${result.statusEmoji} ${result.category}:\n`;
+      smsContent += `   Month to date: $${Math.round(result.currentMonthSpending)}\n`;
+      smsContent += `   Expected by now: $${Math.round(result.expectedByNow)}\n`;
+      smsContent += `   Avg monthly: $${Math.round(result.avgMonthlySpending)}\n`;
+      smsContent += `   Pacing: ${result.pacing}%\n`;
+      smsContent += `   Status: ${result.status}`;
+      
+      if (index < categoryResults.length - 1 && smsContent.length < 700) {
+        smsContent += "\n\n";
+      }
+    });
+
+    // Ensure message fits within 918 character limit
+    if (smsContent.length > 918) {
+      smsContent = smsContent.substring(0, 915) + "...";
+    }
+
+    return smsContent;
+
+  } catch (error) {
+    console.error('Error generating category pacing message:', error);
+    return "📱 BudgeNudge\n\nError generating category pacing analysis.";
+  }
+}
+
+// ===================================
 // UNIFIED TEMPLATE SELECTOR
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'pacing' | 'merchant-pacing'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'pacing' | 'merchant-pacing' | 'category-pacing'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -379,6 +546,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generatePacingAnalysisMessage(userId);
     case 'merchant-pacing':
       return await generateMerchantPacingMessage(userId);
+    case 'category-pacing':
+      return await generateCategoryPacingMessage(userId);
     default:
       return "📱 BudgeNudge\n\nInvalid template type.";
   }
