@@ -12,10 +12,6 @@ export default async function ProtectedSidebar() {
       basePath="/protected"
       items={[
         {
-          label: "📊 Dashboard",
-          href: "/dashboard",
-        },
-        {
           label: "🏠 Account",
           href: "/",
         },
