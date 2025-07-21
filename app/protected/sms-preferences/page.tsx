@@ -39,13 +39,13 @@ const smsTypeInfo = {
   },
   'merchant-pacing': {
     title: 'Merchant Pacing',
-    description: 'Spending pacing analysis for your tracked merchants (configure on AI Merchant Analysis page)',
+    description: 'Spending pacing analysis for your tracked merchants (configure on Merchants page)',
     icon: '🏪',
     example: `📊 MERCHANT PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Amazon:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $280.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Publix:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 137%\n   Status: Over pace`
   },
   'category-pacing': {
     title: 'Category Pacing',
-    description: 'Spending pacing analysis for your tracked spending categories (configure on AI Category Analysis page)',
+    description: 'Spending pacing analysis for your tracked spending categories (configure on Categories page)',
     icon: '📊',
     example: `📊 CATEGORY PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Groceries:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Restaurant:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $180.00\n   Pacing: 137%\n   Status: Over pace`
   }
@@ -192,7 +192,7 @@ export default function SMSPreferencesPage() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">SMS Preferences</h1>
+        <h1 className="text-3xl font-bold">Text Snapshots</h1>
         <p className="text-gray-600">
           All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
         </p>

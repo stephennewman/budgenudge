@@ -75,9 +75,9 @@ export default async function ProtectedPage() {
       <VerificationSuccessBanner />
       
       <div className="flex flex-col">
-        <h1 className="text-2xl font-medium">🏠 Dashboard</h1>
+        <h1 className="text-2xl font-medium">🏠 Account</h1>
         <p className="text-muted-foreground mt-2">
-          Real-time financial monitoring with automated transaction alerts
+          Simple financial monitoring with daily automated text updates
         </p>
       </div>
 

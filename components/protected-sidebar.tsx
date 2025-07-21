@@ -12,23 +12,23 @@ export default async function ProtectedSidebar() {
       basePath="/protected"
       items={[
         {
-          label: "🏠 Dashboard",
+          label: "🏠 Account",
           href: "/",
         },
         {
           label: "💳 Transactions",
           href: "/transactions",
         },
+        // {
+        //   label: "📊 Category Analysis",
+        //   href: "/category-analysis",
+        // },
         {
-          label: "📊 Category Analysis",
-          href: "/category-analysis",
-        },
-        {
-          label: "🤖 AI Category Analysis",
+          label: "🗂️ Categories",
           href: "/ai-category-analysis",
         },
         {
-          label: "🏪 AI Merchant Analysis",
+          label: "🏪 Merchants",
           href: "/ai-merchant-analysis",
         },
         // REMOVED FOR PERFORMANCE: Heavy analytics features
@@ -45,17 +45,18 @@ export default async function ProtectedSidebar() {
         //   href: "/calendar",
         // },
         {
-          label: "⭐ Recurring Bills",
+          label: "⭐ Bills",
           href: "/recurring-bills",
         },
         {
-          label: "📱 SMS Preferences",
+          label: "📱 Text Snapshots",
           href: "/sms-preferences",
         },
-        {
-          label: "🤖 AI Tagging Test",
-          href: "/test-ai-tags",
-        },
+        // REMOVED: Test items per user request
+        // {
+        //   label: "🤖 AI Tagging Test",
+        //   href: "/test-ai-tags",
+        // },
         // REMOVED FOR PERFORMANCE: Subscription/paid features
         // {
         //   label: "Pricing",
@@ -70,10 +71,10 @@ export default async function ProtectedSidebar() {
         //   href: "/paid-content",
         //   disabled: data != null && !data.hasAccess,
         // },
-        {
-          label: "🧪 Test Suite",
-          href: "/test-suite",
-        },
+        // {
+        //   label: "🧪 Test Suite",
+        //   href: "/test-suite",
+        // },
       ]}
     />
   );

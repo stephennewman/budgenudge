@@ -483,7 +483,7 @@ export default function AIMerchantAnalysisPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🏪 AI Merchant Analysis</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🏪 Merchants</h1>
           <p className="text-gray-600">
             Spending analysis by AI-normalized merchant names with frequency insights
           </p>

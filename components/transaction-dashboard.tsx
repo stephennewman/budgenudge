@@ -1,22 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PlaidLinkButton from './plaid-link-button';
-
-interface Account {
-  account_id: string;
-  name: string;
-  type: string;
-  subtype: string;
-}
 
 export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
-  const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createSupabaseClient();
 
@@ -54,10 +46,8 @@ export default function TransactionDashboard() {
         }
       });
       
-      const data = await response.json();
-      
       if (response.ok) {
-        setAccounts(data.accounts || []);
+        // Connected accounts section removed
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -100,30 +90,6 @@ export default function TransactionDashboard() {
 
   return (
     <div className="space-y-6">
-
-      {/* Connected Accounts - FULL WIDTH */}
-      {accounts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Connected Accounts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2">
-              {accounts.map((account) => (
-                <div key={account.account_id} className="flex justify-between items-center p-2 border rounded">
-                  <div>
-                    <div className="font-medium">{account.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {account.type} - {account.subtype}
-                    </div>
-                  </div>
-                  <div className="text-green-600">✅ Connected</div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* REMOVED: All Transactions card
       <Card>
