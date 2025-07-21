@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
 interface SMSPreference {
@@ -54,17 +52,11 @@ const smsTypeInfo = {
 export default function SMSPreferencesPage() {
   const [preferences, setPreferences] = useState<SMSPreference[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [userId, setUserId] = useState<string>('');
-  // const [sendTime, setSendTime] = useState<string>('18:00');
-  // const [sendTimeSaving, setSendTimeSaving] = useState(false);
-
   const supabase = createSupabaseClient();
 
   useEffect(() => {
     loadUserAndPreferences();
-    loadSendTime();
     // No dependencies needed, functions are defined inline
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -79,8 +71,6 @@ export default function SMSPreferencesPage() {
         setLoading(false);
         return;
       }
-
-      setUserId(user.id);
 
       // Fetch SMS preferences
       const response = await fetch(`/api/sms-preferences?userId=${user.id}`);
@@ -100,102 +90,19 @@ export default function SMSPreferencesPage() {
     }
   };
 
-  const loadSendTime = async () => {
-    try {
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError || !user) return;
-      const { data: settings } = await supabase
-        .from('user_sms_settings')
-        .select('send_time')
-        .eq('user_id', user.id)
-        .single();
-      if (settings && settings.send_time) {
-        // setSendTime(settings.send_time);
-      }
-    } catch {
-      // ignore
-    }
-  };
-
-  // const handleSendTimeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const newTime = e.target.value;
-  //   // setSendTime(newTime);
-  //   // setSendTimeSaving(true);
-  //   setMessage(null);
-  //   try {
-  //     // Get current user
-  //     const { data: { user }, error: userError } = await supabase.auth.getUser();
-  //     if (userError || !user) return;
-  //     // Upsert user_sms_settings
-  //     const { error: upsertError } = await supabase
-  //       .from('user_sms_settings')
-  //       .upsert({ user_id: user.id, send_time: newTime }, { onConflict: 'user_id' });
-  //     if (!upsertError) {
-  //       setMessage({ type: 'success', text: 'Daily SMS send time updated!' });
-  //     } else {
-  //       setMessage({ type: 'error', text: 'Failed to update send time.' });
-  //     }
-  //   } catch {
-  //     setMessage({ type: 'error', text: 'Failed to update send time.' });
-  //   } finally {
-  //     // setSendTimeSaving(false);
-  //   }
-  // };
-
-  const handlePreferenceChange = (smsType: string, field: keyof SMSPreference, value: string | boolean) => {
-    setPreferences(prev => 
-      prev.map(pref => 
-        pref.sms_type === smsType 
-          ? { ...pref, [field]: value }
-          : pref
-      )
-    );
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage(null);
-
-    try {
-      const response = await fetch('/api/sms-preferences', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          preferences
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setMessage({ type: 'success', text: 'SMS preferences updated successfully!' });
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Failed to update preferences' });
-      }
-
-    } catch (error) {
-      console.error('Error saving preferences:', error);
-      setMessage({ type: 'error', text: 'Failed to save preferences' });
-    } finally {
-      setSaving(false);
-    }
-  };
-
   if (loading) {
     return <BouncingMoneyLoader />;
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">Texts</h1>
-        <p className="text-gray-600">
-          All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
-        </p>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Texts</h1>
+          <p className="text-gray-600">
+            All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
+          </p>
+        </div>
       </div>
 
       {/* Daily SMS Send Time Picker (hidden) */}
@@ -216,7 +123,7 @@ export default function SMSPreferencesPage() {
       */}
 
       {message && (
-        <div className={`p-4 rounded-lg ${
+        <div className={`p-4 rounded-lg mb-6 ${
           message.type === 'success' 
             ? 'bg-green-50 border border-green-200 text-green-800' 
             : 'bg-red-50 border border-red-200 text-red-800'
@@ -231,7 +138,7 @@ export default function SMSPreferencesPage() {
           return (
             <Card key={pref.sms_type} className="p-6">
               <div className="space-y-4">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start">
                   <div className="flex items-center space-x-3">
                     <span className="text-2xl">{info.icon}</span>
                     <div>
@@ -239,18 +146,7 @@ export default function SMSPreferencesPage() {
                       <p className="text-gray-600">{info.description}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Label htmlFor={`${pref.sms_type}-enabled`} className="text-sm font-medium">
-                      Enable
-                    </Label>
-                    <input
-                      id={`${pref.sms_type}-enabled`}
-                      type="checkbox"
-                      checked={pref.enabled}
-                      onChange={(e) => handlePreferenceChange(pref.sms_type, 'enabled', e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                  </div>
+                  {/* Hidden enabled checkmarks */}
                 </div>
 
                 <div className="bg-gray-50 p-3 rounded-lg">
@@ -278,7 +174,7 @@ export default function SMSPreferencesPage() {
                             {option.label}
                           </option>
                         ))}
-                      </select>
+                        </select>
                     </div>
                   </div>
                 )}
@@ -289,26 +185,7 @@ export default function SMSPreferencesPage() {
         })}
       </div>
 
-      <div className="flex justify-center pt-6">
-        <Button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-8 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Save Preferences'}
-        </Button>
-      </div>
-
-      <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-2">How it works:</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Each SMS type can be enabled/disabled independently</li>
-          <li>• All SMS will be sent daily at 6:00 AM EST</li>
-          <li>• Optionally override phone numbers for specific SMS types</li>
-          <li>• SMS messages are only sent when there&apos;s meaningful data to report</li>
-          <li>• All messages are labeled with their type (📅 BILLS SMS, 📅 SPENDING SMS, etc.)</li>
-        </ul>
-      </div>
+      {/* Hidden save button and how it works section */}
     </div>
   );
 } 

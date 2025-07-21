@@ -220,21 +220,10 @@ export default function RecurringBillsManager() {
     });
   };
 
-  const getFrequencyEmoji = (frequency: string) => {
-    switch (frequency) {
-      case 'weekly': return '📅';
-      case 'monthly': return '🗓️';
-      case 'bi-monthly': return '📋';
-      case 'quarterly': return '📆';
-      default: return '⏰';
-    }
-  };
-
-  const getConfidenceColor = (score: number) => {
-    if (score >= 90) return 'text-green-600';
-    if (score >= 80) return 'text-blue-600';
-    if (score >= 70) return 'text-yellow-600';
-    return 'text-gray-600';
+  const getConfidenceColor = (score: number): string => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   if (loading) {
@@ -348,15 +337,12 @@ export default function RecurringBillsManager() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium truncate">{merchant.ai_merchant_name || merchant.merchant_name}</span>
                           </div>
+                          <div className="text-sm text-gray-600 mb-1">
+                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}
+                          </div>
                           <div className="text-sm text-gray-600">
                             Next: {formatNextDate(merchant.next_predicted_date)} • 
                             <span className={getConfidenceColor(merchant.confidence_score)}> {merchant.confidence_score}% confidence</span>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="font-semibold">${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}</div>
-                          <div className="text-sm text-gray-600 flex items-center justify-center gap-1">
-                            {getFrequencyEmoji(merchant.prediction_frequency)}
                           </div>
                         </div>
                       </div>
