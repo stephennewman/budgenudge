@@ -12,6 +12,10 @@ export default async function ProtectedSidebar() {
       basePath="/protected"
       items={[
         {
+          label: "📊 Dashboard",
+          href: "/dashboard",
+        },
+        {
           label: "🏠 Account",
           href: "/",
         },
@@ -52,29 +56,6 @@ export default async function ProtectedSidebar() {
           label: "📱 Texts",
           href: "/sms-preferences",
         },
-        // REMOVED: Test items per user request
-        // {
-        //   label: "🤖 AI Tagging Test",
-        //   href: "/test-ai-tags",
-        // },
-        // REMOVED FOR PERFORMANCE: Subscription/paid features
-        // {
-        //   label: "Pricing",
-        //   href: "/pricing",
-        // },
-        // {
-        //   label: "Subscription",
-        //   href: "/subscription",
-        // },
-        // {
-        //   label: "Paid Content",
-        //   href: "/paid-content",
-        //   disabled: data != null && !data.hasAccess,
-        // },
-        // {
-        //   label: "🧪 Test Suite",
-        //   href: "/test-suite",
-        // },
       ]}
     />
   );

@@ -2,13 +2,8 @@ import { createSupabaseClient } from "@/utils/supabase/server";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
-// REMOVED: SMS and refresh components for cleaner dashboard
-// import SmsButton from "@/components/sms-button";
-// import RecurringSmsButton from "@/components/recurring-sms-button";
-// import ManualRefreshButton from "@/components/manual-refresh-button";
 
-
-export default async function ProtectedPage() {
+export default async function AccountPage() {
   const client = await createSupabaseClient();
   const {
     data: { user },
@@ -35,9 +30,9 @@ export default async function ProtectedPage() {
         <VerificationSuccessBanner />
         
         <div className="flex flex-col">
-          <h1 className="text-2xl font-medium">Welcome to BudgeNudge!</h1>
+          <h1 className="text-2xl font-medium">🏠 Account Setup</h1>
           <p className="text-muted-foreground mt-2">
-            Connect your bank account to start receiving real-time transaction alerts
+            Complete your account setup to start using BudgeNudge
           </p>
         </div>
 
@@ -69,7 +64,7 @@ export default async function ProtectedPage() {
     );
   }
 
-  // Full dashboard for connected users
+  // Account management for connected users
   return (
     <div className="space-y-8">
       <VerificationSuccessBanner />
@@ -77,62 +72,31 @@ export default async function ProtectedPage() {
       <div className="flex flex-col">
         <h1 className="text-2xl font-medium">🏠 Account</h1>
         <p className="text-muted-foreground mt-2">
-          Simple financial monitoring with daily automated text updates
+          Manage your account settings and connected bank accounts
         </p>
       </div>
 
-      {/* REMOVED: Control Panel with SMS and Transaction Data cards
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="border rounded-lg p-6 space-y-4">
-          <h2 className="font-medium">📱 SMS Notifications</h2>
-          <p className="text-sm text-muted-foreground">
-            Test your SMS notifications and get summaries of your spending patterns.
-          </p>
-          
-          <div className="space-y-3">
-            <SmsButton 
-              buttonText="📱 Send Test SMS"
-              message={`🔔 Test Alert from BudgeNudge!\n\nHey ${user?.email}!\n\nThis is a manual test of your SMS notification system.\n\nTriggered at: ${new Date().toLocaleString()}\n\n✅ Your notifications are working perfectly!`}
-              variant="outline"
-              userId={user?.id}
-              allowScheduling={true}
-            />
-            
-            <RecurringSmsButton 
-              userId={user?.id}
-              buttonText="📊 Text My Recurring Bills"
-              variant="outline"
-            />
-          </div>
-        </div>
-
-        <div className="border rounded-lg p-6 space-y-4">
-          <h2 className="font-medium">🔄 Transaction Data</h2>
-          <p className="text-sm text-muted-foreground">
-            Manually refresh your transaction data to get the latest updates from your bank.
-          </p>
-          
-          <ManualRefreshButton />
-        </div>
-      </div>
-      */}
-
-      {/* Plaid Transaction Dashboard */}
+      {/* Connected Bank Accounts */}
       <TransactionDashboard />
 
-      <div className="space-y-6">
+      {/* Account Settings Grid */}
+      <div className="grid gap-6 md:grid-cols-2">
+        
+        {/* User Profile */}
         <div className="border rounded-lg p-6 space-y-4">
-          <h2 className="font-medium">User Information</h2>
-          <div className="grid gap-2 text-sm">
-            <div className="grid grid-cols-[120px_1fr]">
+          <h2 className="font-medium flex items-center gap-2">
+            👤 Profile Information
+          </h2>
+          <div className="grid gap-3 text-sm">
+            <div className="grid grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">Email</div>
-              <div>{user?.email}</div>
+              <div className="font-medium">{user?.email}</div>
             </div>
-            <div className="grid grid-cols-[120px_1fr]">
+            <div className="grid grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">User ID</div>
-              <div className="font-mono">{user?.id}</div>
+              <div className="font-mono text-xs text-gray-500">{user?.id}</div>
             </div>
-            <div className="grid grid-cols-[120px_1fr]">
+            <div className="grid grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">Last Sign In</div>
               <div>
                 {user.last_sign_in_at
@@ -143,27 +107,73 @@ export default async function ProtectedPage() {
           </div>
         </div>
 
+        {/* Authentication Status */}
         <div className="border rounded-lg p-6 space-y-4">
-          <h2 className="font-medium">Authentication Status</h2>
-          <div className="grid gap-2 text-sm">
-            <div className="grid grid-cols-[120px_1fr]">
+          <h2 className="font-medium flex items-center gap-2">
+            🔐 Security & Authentication
+          </h2>
+          <div className="grid gap-3 text-sm">
+            <div className="grid grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">Status</div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                Authenticated
+                <span className="font-medium text-green-700">Authenticated</span>
               </div>
             </div>
-            <div className="grid grid-cols-[120px_1fr]">
+            <div className="grid grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">Providers</div>
-              <div>
+              <div className="font-medium">
                 {user.identities
                   ?.map(identity => identity.provider)
                   .join(", ") || "Email"}
               </div>
             </div>
+            <div className="grid grid-cols-[100px_1fr] gap-2">
+              <div className="text-muted-foreground">Created</div>
+              <div>
+                {new Date(user.created_at).toLocaleDateString()}
+              </div>
+            </div>
           </div>
-          <div className="pt-4 border-t">
-            <AuthPageSignOutButton />
+        </div>
+
+        {/* Account Actions */}
+        <div className="border rounded-lg p-6 space-y-4">
+          <h2 className="font-medium flex items-center gap-2">
+            ⚙️ Account Actions
+          </h2>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm text-muted-foreground">Sign out of your account</label>
+              <AuthPageSignOutButton />
+            </div>
+          </div>
+        </div>
+
+        {/* Account Summary */}
+        <div className="border rounded-lg p-6 space-y-4">
+          <h2 className="font-medium flex items-center gap-2">
+            📈 Account Summary
+          </h2>
+          <div className="grid gap-3 text-sm">
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <div className="text-muted-foreground">Connected Banks</div>
+              <div className="font-medium">{items?.length || 0} account(s)</div>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <div className="text-muted-foreground">SMS Notifications</div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span className="font-medium text-green-700">Active</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-[140px_1fr] gap-2">
+              <div className="text-muted-foreground">AI Tagging</div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                <span className="font-medium text-green-700">Enabled</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
