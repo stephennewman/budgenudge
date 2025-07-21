@@ -1,6 +1,6 @@
 # Master Agent - BudgeNudge
 
-**Last Updated:** July 21, 2025, 1:15 PM EDT
+**Last Updated:** July 21, 2025, 5:45 PM EDT
 
 ## Project Overview
 
@@ -33,13 +33,15 @@
 ## Current Status
 
 ### SMS System - FULLY OPERATIONAL ✅
-- **5-Template SMS System**: Bills, spending pacing, recent activity, merchant pacing, category pacing
+- **4-Template SMS System**: Bills, recent activity, merchant pacing, category pacing
+- **User-Controlled Pacing**: Replaced old hardcoded Amazon/Publix/Walmart template with user-controlled merchant and category pacing
 - **Scheduled Delivery**: Daily at 7:00 AM EST (12:00 UTC)
 - **User Preferences**: Individual control over each SMS type in user_sms_preferences table
 - **Authorization**: Proper CRON_SECRET authentication
 - **Logging**: Comprehensive SMS delivery and error logging
 - **Database**: Phone numbers stored in user_sms_settings table
 - **Character Optimization**: All templates optimized for 918-character SMS limit
+- **Database Integrity**: Fixed "Failed to create missing preferences" error with improved conflict handling
 
 ### Recurring Transactions System - FULLY OPERATIONAL ✅
 - **Database**: `tagged_merchants` table with comprehensive recurring bill tracking
@@ -79,13 +81,23 @@
 - **API Endpoints**: Complete CRUD operations (/api/category-pacing-tracking)
 - **Smart Analytics**: Category spending vs historical averages with trend analysis
 
+### Budget Analysis System - FULLY OPERATIONAL ✅ NEW
+- **Spend Remaining Column**: Visual budget indicators on both AI Merchant and Category Analysis pages
+- **Visual Indicators**: 🟩 Under budget, 🟨 Approaching budget (90-100%), 🟥 Over budget
+- **Smart Calculation**: Current month-to-date spending vs historical average monthly spending
+- **Sortable Interface**: Click "Remaining" column header to sort by budget status
+- **Real-Time Analysis**: Shows exact remaining dollar amounts with color-coded status
+- **Universal Coverage**: Applied to all merchants and categories, not just tracked items
+
 ### Recent Major Changes (July 21, 2025)
-1. **Category Pacing System**: Complete category-level pacing analysis and SMS templates
-2. **Merchant Pacing System**: Merchant-specific spending pacing tracking and notifications  
-3. **Dual-Level Pacing Control**: Users can now track both merchant and category spending patterns
-4. **5-Template SMS System**: Expanded from 3 to 5 SMS types with user preferences
-5. **Auto-Selection Intelligence**: Smart algorithms automatically select top merchants/categories
-6. **SMS Preferences Enhancement**: Complete user control over all 5 SMS notification types
+1. **Budget Analysis System**: Visual spend remaining indicators with sortable columns across analysis pages
+2. **SMS System Cleanup**: Removed old hardcoded Amazon/Publix/Walmart template, replaced with user-controlled pacing
+3. **Database Integrity Fix**: Resolved "Failed to create missing preferences" error with improved conflict handling
+4. **Category Pacing System**: Complete category-level pacing analysis and SMS templates
+5. **Merchant Pacing System**: Merchant-specific spending pacing tracking and notifications  
+6. **4-Template SMS System**: Streamlined to Bills, Activity, Merchant Pacing, Category Pacing with full user control
+7. **Auto-Selection Intelligence**: Smart algorithms automatically select top merchants/categories
+8. **Sortable Budget Analysis**: Users can sort by remaining budget to quickly identify over/under spending
 
 ### Previous Major Changes (July 19, 2025)
 1. **AI Tagging System Implementation**: Complete overhaul of automatic AI merchant tagging
@@ -96,6 +108,25 @@
 6. **99% Coverage Achieved**: System now automatically tags 99% of all transactions
 
 ### Deployment History
+- **July 21, 2025, 5:45 PM EDT**: ✨ NEW FEATURE - Sortable Budget Analysis System (85/100 Impact Score)
+  - 🟩🟨🟥 **Visual Budget Indicators**: Spend remaining column with colored squares on analysis pages
+  - 🔄 **Sortable Interface**: Click "Remaining" header to sort by budget status (ascending/descending)
+  - 📊 **Smart Calculation**: Current month vs historical average spending analysis
+  - 🎯 **Universal Coverage**: Applied to all merchants and categories for comprehensive budget visibility
+  - 📱 **Enhanced UX**: Quick visual identification of over/under spending patterns
+
+- **July 21, 2025, 5:15 PM EDT**: 🔧 CRITICAL FIX - SMS Preferences Database Error (90/100 Impact Score)
+  - 🐛 **Error Resolved**: Fixed "Failed to create missing preferences" error on SMS preferences page
+  - 🛠️ **Conflict Handling**: Improved database constraint handling with individual inserts and graceful failures
+  - 🔒 **Data Integrity**: Enhanced user experience with proper preference initialization
+  - ✅ **User Impact**: SMS preferences page now works flawlessly for all users
+
+- **July 21, 2025, 4:30 PM EDT**: 🧹 CLEANUP - Removed Old Hardcoded SMS Template (75/100 Impact Score)
+  - 🗑️ **Template Removal**: Eliminated old hardcoded Amazon/Publix/Walmart spending analysis template
+  - 🎛️ **User Control**: Replaced with user-controlled merchant and category pacing systems
+  - 📱 **SMS Streamline**: Reduced from 5 to 4 templates with better personalization
+  - 🎯 **No More Spam**: Users only receive pacing SMS for merchants/categories they choose to track
+
 - **July 21, 2025, 1:15 PM EDT**: 🏆 MAJOR FEATURE - Complete Category Pacing System (92/100 Impact Score)
   - 📊 **Category-Level Pacing**: Users can now track spending by category (Groceries, Restaurant, Gas, etc.)
   - 🤖 **Smart Auto-Selection**: Intelligent algorithm selects top 3 high-spending categories for new users

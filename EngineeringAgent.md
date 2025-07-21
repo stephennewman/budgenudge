@@ -1,21 +1,48 @@
 # Engineering Agent - BudgeNudge
 
-**Last Updated:** July 21, 2025, 1:15 PM EDT
+**Last Updated:** July 21, 2025, 5:45 PM EDT
 
 ## Technical Status: FULLY OPERATIONAL ✅
 
 ### Core Systems
-- **SMS System**: 5-template intelligent daily insights system fully operational ✅
-- **Merchant Pacing System**: User-controlled merchant spending tracking ✅ NEW
-- **Category Pacing System**: AI category-level spending analysis ✅ NEW  
+- **SMS System**: 4-template user-controlled intelligent daily insights system fully operational ✅
+- **Budget Analysis System**: Visual spend remaining indicators with sortable columns ✅ NEW
+- **Merchant Pacing System**: User-controlled merchant spending tracking ✅ OPERATIONAL
+- **Category Pacing System**: AI category-level spending analysis ✅ OPERATIONAL  
 - **Multi-Bank Integration**: Plaid platform supporting all major financial institutions ✅ OPERATIONAL
 - **AI Tagging System**: Scheduled automatic AI tagging every 15 minutes ✅ OPERATIONAL
 - **Cron Jobs**: SMS (daily 7AM) + AI Tagging (15min) automated schedules
-- **Database**: Supabase with comprehensive pacing tracking schema
+- **Database**: Supabase with comprehensive pacing tracking and analysis schema
 - **Authentication**: Supabase Auth with service role permissions
 - **Deployment**: Vercel with automatic deployments
 
 ### Recent Engineering Achievements
+
+#### Enhancement: Sortable Budget Analysis System (July 21, 2025, 5:45 PM EDT)
+- **Achievement**: Implemented visual budget remaining indicators with sortable functionality
+- **Technical Implementation**:
+  - ✅ **UI Enhancement**: Added "Remaining" column between Pacing and Trend on both analysis pages
+  - ✅ **Visual Indicators**: 🟩 Under budget, 🟨 Approaching (90-100%), 🟥 Over budget squares
+  - ✅ **Calculation Logic**: `avg_monthly_spending - current_month_spending` with percentage analysis
+  - ✅ **Sortable Interface**: Click handler with ascending/descending sort functionality
+  - ✅ **TypeScript Types**: Updated sort types and handleSort functions for type safety
+  - ✅ **Universal Coverage**: Applied to all merchants and categories for comprehensive analysis
+
+#### Critical Fix: SMS Preferences Database Error (July 21, 2025, 5:15 PM EDT)
+- **Achievement**: Resolved "Failed to create missing preferences" error affecting user experience
+- **Technical Implementation**:
+  - ✅ **Conflict Resolution**: Replaced bulk insert with individual inserts and try/catch error handling
+  - ✅ **Database Logic**: Improved unique constraint handling with graceful failure recovery
+  - ✅ **Type Safety**: Updated preference types and Set-based logic for efficient type checking
+  - ✅ **User Experience**: Eliminated error message and ensured smooth SMS preferences initialization
+
+#### System Cleanup: Removed Old Hardcoded SMS Template (July 21, 2025, 4:30 PM EDT)
+- **Achievement**: Eliminated legacy hardcoded Amazon/Publix/Walmart spending template
+- **Technical Implementation**:
+  - ✅ **Template Removal**: Removed 'pacing' and 'spending' SMS types from all endpoints
+  - ✅ **Database Migration**: Cleaned up `user_sms_preferences` constraints and existing records
+  - ✅ **Code Cleanup**: Updated 14 files removing old template references and fixing TypeScript types
+  - ✅ **System Streamline**: Reduced SMS system from 5 to 4 templates with improved user control
 
 #### Major Feature: Complete Category Pacing System (July 21, 2025, 1:15 PM EDT)
 - **Achievement**: Built comprehensive category-level spending pacing analysis system
