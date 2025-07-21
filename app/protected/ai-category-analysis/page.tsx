@@ -493,6 +493,7 @@ export default function AICategoryAnalysisPage() {
                       </th>
                       <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
+                      <th className="text-center py-3 px-2 font-medium text-gray-900">Remaining</th>
                       <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
                       <th 
                         className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
@@ -565,6 +566,26 @@ export default function AICategoryAnalysisPage() {
                             {category.pacing_status === 'over' && '🔴'}
                             {Math.round(category.pacing_percentage * 100)}%
                           </span>
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {(() => {
+                            const remaining = category.avg_monthly_spending - category.current_month_spending;
+                            const percentSpent = category.avg_monthly_spending > 0 ? (category.current_month_spending / category.avg_monthly_spending) : 0;
+                            
+                            let emoji = '🟩'; // Under budget
+                            if (percentSpent >= 1.0) {
+                              emoji = '🟥'; // Over budget
+                            } else if (percentSpent >= 0.9) {
+                              emoji = '🟨'; // Approaching budget
+                            }
+                            
+                            return (
+                              <div className="text-center">
+                                <div className="text-lg">{emoji}</div>
+                                <div className="text-xs text-gray-600">{formatCurrency(Math.abs(remaining))}</div>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="py-3 px-2 text-center">
                           <span className="text-lg">{getTrendIcon(category.spending_trend)}</span>
