@@ -1,6 +1,6 @@
-import { Spinner } from "@/components/ui/spinner";
+import { BouncingMoneyLoader } from "@/components/ui/bouncing-money-loader";
 
-export default function PricingLoading() {
+export default function PaidContentLoading() {
   return (
     <>
       <div>
@@ -8,10 +8,7 @@ export default function PricingLoading() {
         <p className="text-muted-foreground mt-2">Generate cat photos</p>
       </div>
       <div className="flex items-center justify-center h-full">
-        <div className="flex items-center gap-2">
-          <Spinner className="w-6 h-6" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+        <BouncingMoneyLoader text="Loading premium content..." />
       </div>
     </>
   );

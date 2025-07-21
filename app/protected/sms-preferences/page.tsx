@@ -5,6 +5,7 @@ import { createSupabaseClient } from '@/utils/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
 interface SMSPreference {
   id?: number;
@@ -180,7 +181,7 @@ export default function SMSPreferencesPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <div className="text-lg">Loading SMS preferences...</div>
+        <BouncingMoneyLoader text="Loading SMS preferences..." />
       </div>
     );
   }

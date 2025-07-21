@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
 
 interface AIMerchantData {
@@ -357,8 +358,7 @@ export default function AIMerchantAnalysisPage() {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading AI merchant analysis...</p>
+          <BouncingMoneyLoader text="Loading AI merchant analysis..." />
         </div>
       </div>
     );
