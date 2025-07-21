@@ -248,9 +248,128 @@ export async function generatePacingAnalysisMessage(userId: string): Promise<str
 }
 
 // ===================================
+// 4. MERCHANT PACING TEMPLATE (NEW)
+// ===================================
+export async function generateMerchantPacingMessage(userId: string): Promise<string> {
+  try {
+    // Get user's tracked merchants
+    const { data: trackedMerchants, error: trackingError } = await supabase
+      .from('merchant_pacing_tracking')
+      .select('ai_merchant_name')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    if (trackingError) {
+      console.error('Error fetching tracked merchants for SMS:', trackingError);
+      return '📊 MERCHANT PACING\n\nError loading tracked merchants.';
+    }
+
+    if (!trackedMerchants || trackedMerchants.length === 0) {
+      return '📊 MERCHANT PACING\n\nNo merchants are being tracked for pacing analysis.';
+    }
+
+    // Get user's item IDs
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', userId);
+
+    if (!userItems || userItems.length === 0) {
+      return '📊 MERCHANT PACING\n\nNo bank accounts connected.';
+    }
+
+    const itemIds = userItems.map(item => item.plaid_item_id);
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const monthProgress = (dayOfMonth / daysInMonth) * 100;
+
+    let message = `📊 MERCHANT PACING\n${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}\nMonth Progress: ${monthProgress.toFixed(0)}% (Day ${dayOfMonth})\n\n`;
+
+    const merchantNames = trackedMerchants.map(t => t.ai_merchant_name);
+    let processedCount = 0;
+
+    for (const merchantName of merchantNames) {
+      // Check message length limit (918 chars) - allow ~120 chars per merchant
+      if (message.length > 780) break; // Leave room for current merchant
+
+      // Get all historical transactions for this merchant
+      const { data: allTxns } = await supabase
+        .from('transactions')
+        .select('amount, date')
+        .in('plaid_item_id', itemIds)
+        .eq('ai_merchant_name', merchantName)
+        .gt('amount', 0);
+
+      if (allTxns && allTxns.length > 0) {
+        // Calculate total spend and average monthly spending
+        const totalSpend = allTxns.reduce((sum, t) => sum + t.amount, 0);
+        const dates = allTxns.map(t => new Date(t.date));
+        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+        const totalDays = Math.max(1, Math.floor((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const avgDailySpend = totalSpend / totalDays;
+        const avgMonthlySpend = avgDailySpend * 30;
+
+        // Get this month's spending
+        const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+        const { data: currentMonthTxns } = await supabase
+          .from('transactions')
+          .select('amount')
+          .in('plaid_item_id', itemIds)
+          .eq('ai_merchant_name', merchantName)
+          .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+          .gt('amount', 0);
+        
+        const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
+
+        // Calculate pacing
+        const expectedSpendToDate = avgMonthlySpend * (dayOfMonth / 30);
+        const pacingPercentage = expectedSpendToDate > 0 ? (currentMonthSpend / expectedSpendToDate) * 100 : 0;
+
+        // Determine status and icon
+        let status = '';
+        let icon = '';
+        if (pacingPercentage < 90) {
+          status = 'Under pace';
+          icon = '🟢';
+        } else if (pacingPercentage <= 110) {
+          status = 'On track';
+          icon = '🟡';
+        } else {
+          status = 'Over pace';
+          icon = '🔴';
+        }
+
+        message += `${icon} ${merchantName}:\n`;
+        message += `   Month to date: $${currentMonthSpend.toFixed(2)}\n`;
+        message += `   Expected by now: $${expectedSpendToDate.toFixed(2)}\n`;
+        message += `   Avg monthly: $${avgMonthlySpend.toFixed(2)}\n`;
+        message += `   Pacing: ${pacingPercentage.toFixed(0)}%\n`;
+        message += `   Status: ${status}\n\n`;
+
+        processedCount++;
+      }
+    }
+
+    if (processedCount === 0) {
+      return `📊 MERCHANT PACING\n${now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}\n\nNo spending data found for tracked merchants.`;
+    }
+
+    return message.trim();
+
+  } catch (error) {
+    console.error('Error generating merchant pacing message:', error);
+    return '📊 MERCHANT PACING\n\nError analyzing merchant spending patterns.';
+  }
+}
+
+// ===================================
 // UNIFIED TEMPLATE SELECTOR
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'pacing'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'pacing' | 'merchant-pacing'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -258,6 +377,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateRecentTransactionsMessage(userId);
     case 'pacing':
       return await generatePacingAnalysisMessage(userId);
+    case 'merchant-pacing':
+      return await generateMerchantPacingMessage(userId);
     default:
       return "📱 BudgeNudge\n\nInvalid template type.";
   }

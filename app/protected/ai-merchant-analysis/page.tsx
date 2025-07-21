@@ -34,8 +34,74 @@ export default function AIMerchantAnalysisPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'frequency'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [trackedMerchants, setTrackedMerchants] = useState<Set<string>>(new Set());
+  const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
 
   const supabase = createSupabaseClient();
+
+  // Fetch tracked merchants for the current user
+  const fetchTrackedMerchants = async () => {
+    try {
+      const response = await fetch('/api/merchant-pacing-tracking');
+      const data = await response.json();
+      
+      if (data.success && data.tracked_merchants) {
+        const tracked = new Set<string>(
+          data.tracked_merchants
+            .filter((t: { is_active: boolean }) => t.is_active)
+            .map((t: { ai_merchant_name: string }) => t.ai_merchant_name)
+        );
+        setTrackedMerchants(tracked);
+      }
+    } catch (error) {
+      console.error('Error fetching tracked merchants:', error);
+    }
+  };
+
+  // Toggle merchant tracking
+  const toggleMerchantTracking = async (merchantName: string) => {
+    try {
+      setTrackingLoading(prev => new Set([...prev, merchantName]));
+      
+      const isCurrentlyTracked = trackedMerchants.has(merchantName);
+      
+      const response = await fetch('/api/merchant-pacing-tracking', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ai_merchant_name: merchantName,
+          is_active: !isCurrentlyTracked,
+          auto_selected: false
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setTrackedMerchants(prev => {
+          const newSet = new Set(prev);
+          if (isCurrentlyTracked) {
+            newSet.delete(merchantName);
+          } else {
+            newSet.add(merchantName);
+          }
+          return newSet;
+        });
+      } else {
+        console.error('Failed to toggle merchant tracking:', data.error);
+      }
+    } catch (error) {
+      console.error('Error toggling merchant tracking:', error);
+    } finally {
+      setTrackingLoading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(merchantName);
+        return newSet;
+      });
+    }
+  };
 
   const fetchAIMerchantData = async () => {
     try {
@@ -269,8 +335,43 @@ export default function AIMerchantAnalysisPage() {
     }
   };
 
+  // Auto-select top merchants for new users
+  const runAutoSelection = async () => {
+    try {
+      console.log('🤖 Running auto-selection for top merchants...');
+      const response = await fetch('/api/merchant-pacing-tracking/auto-select', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.auto_selected?.length > 0) {
+        console.log(`✅ Auto-selected ${data.auto_selected.length} merchants:`, data.merchant_analysis);
+        // Refresh tracked merchants to show the newly selected ones
+        await fetchTrackedMerchants();
+      } else {
+        console.log('ℹ️ Auto-selection result:', data.message);
+      }
+    } catch (error) {
+      console.error('Error during auto-selection:', error);
+    }
+  };
+
   useEffect(() => {
-    fetchAIMerchantData();
+    const initializePage = async () => {
+      await fetchAIMerchantData();
+      await fetchTrackedMerchants();
+      
+      // Check if user needs auto-selection (no tracked merchants)
+      const checkResponse = await fetch('/api/merchant-pacing-tracking/auto-select');
+      const checkData = await checkResponse.json();
+      
+      if (checkData.success && checkData.needs_auto_selection) {
+        await runAutoSelection();
+      }
+    };
+
+    initializePage();
   }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatCurrency = (amount: number) => {
@@ -447,6 +548,7 @@ export default function AIMerchantAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
+                      <th className="text-center py-3 px-2 font-medium text-gray-900">Track Pacing</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Merchant</th>
                       <th 
                         className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
@@ -498,6 +600,25 @@ export default function AIMerchantAnalysisPage() {
                   <tbody>
                     {merchantData.map((merchant) => (
                       <tr key={merchant.ai_merchant} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-2 text-center">
+                          <button
+                            onClick={() => toggleMerchantTracking(merchant.ai_merchant)}
+                            disabled={trackingLoading.has(merchant.ai_merchant)}
+                            className="text-2xl hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={trackedMerchants.has(merchant.ai_merchant) ? 
+                              `Stop tracking pacing for ${merchant.ai_merchant}` : 
+                              `Start tracking pacing for ${merchant.ai_merchant}`}
+                          >
+                            {trackingLoading.has(merchant.ai_merchant) ? (
+                              '⏳'
+                            ) : trackedMerchants.has(merchant.ai_merchant) ? (
+                              merchant.pacing_status === 'under' ? '🟢' :
+                              merchant.pacing_status === 'over' ? '🔴' : '🟡'
+                            ) : (
+                              '⚪'
+                            )}
+                          </button>
+                        </td>
                         <td className="py-3 px-2">
                           <div className="flex items-center space-x-2">
                             <span className="text-lg">{getMerchantIcon(merchant.ai_merchant)}</span>

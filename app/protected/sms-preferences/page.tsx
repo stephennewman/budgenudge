@@ -10,7 +10,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'spending' | 'activity';
+  sms_type: 'bills' | 'spending' | 'activity' | 'merchant-pacing';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -41,6 +41,12 @@ const smsTypeInfo = {
     description: 'All transactions from yesterday',
     icon: '📋',
     example: `📱 YESTERDAY'S ACTIVITY\n\nJul 16: Publix - $65.88\nJul 16: Amazon - $25.99\nJul 16: Starbucks - $8.50\nJul 16: Gas Station - $35.00\nJul 16: Restaurant - $67.89\nJul 16: Grocery Store - $89.45\n\n💰 Yesterday's Total: $292.71`
+  },
+  'merchant-pacing': {
+    title: 'Merchant Pacing',
+    description: 'Spending pacing analysis for your tracked merchants (configure on AI Merchant Analysis page)',
+    icon: '🏪',
+    example: `📊 MERCHANT PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Amazon:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $280.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Publix:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 137%\n   Status: Over pace`
   }
 };
 
