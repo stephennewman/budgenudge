@@ -5,11 +5,12 @@ import { tagMerchantWithAI, type MerchantTaggingInput } from '@/utils/ai/merchan
 // This endpoint can be called by cron jobs or manually to tag new transactions
 export async function POST(request: Request) {
   try {
-    // Verify cron secret for automated calls
+    // Verify cron secret for automated calls (allow Vercel cron or Bearer token)
+    const isVercelCron = request.headers.get('x-vercel-cron');
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     
-    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+    if (!isVercelCron && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
