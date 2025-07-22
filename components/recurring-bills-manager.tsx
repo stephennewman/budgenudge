@@ -243,9 +243,9 @@ export default function RecurringBillsManager() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">⭐ Bills</h2>
-          <p className="text-gray-600 mt-1">
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-medium">⭐ Bills</h1>
+          <p className="text-muted-foreground mt-2">
             {activeMerchants.length} active predictions
           </p>
         </div>
