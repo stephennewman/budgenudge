@@ -1,4 +1,4 @@
-# Sales Agent - BudgeNudge
+# Sales Agent - Krezzo
 
 **Last Updated:** July 18, 2025, 1:36 PM EDT
 
@@ -7,7 +7,7 @@
 ### Core Value Proposition
 **"Transform Financial Awareness with Daily SMS Insights"**
 
-BudgeNudge delivers personalized financial wellness through intelligent SMS notifications, helping users build better spending habits and avoid financial stress.
+Krezzo delivers personalized financial wellness through intelligent SMS notifications, helping users build better spending habits and avoid financial stress.
 
 ## Target Market Analysis
 

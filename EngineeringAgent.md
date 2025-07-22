@@ -1,4 +1,4 @@
-# Engineering Agent - BudgeNudge
+# Engineering Agent - Krezzo
 
 **Last Updated:** July 21, 2025, 5:45 PM EDT
 

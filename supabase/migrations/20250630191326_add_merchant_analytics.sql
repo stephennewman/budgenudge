@@ -1,5 +1,5 @@
 -- =====================================================
--- BudgeNudge Merchant Analytics Schema
+-- Krezzo Merchant Analytics Schema
 -- Missing database objects that the application expects
 -- =====================================================
 

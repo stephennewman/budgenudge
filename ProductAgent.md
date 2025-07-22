@@ -1,4 +1,4 @@
-# Product Agent - BudgeNudge
+# Product Agent - Krezzo
 
 **Last Updated:** July 21, 2025, 5:45 PM EDT
 
@@ -7,7 +7,7 @@
 ### Core Value Proposition
 **Intelligent Financial Wellness Through Daily SMS Insights**
 
-BudgeNudge helps users maintain healthy financial habits by providing personalized daily SMS insights about their spending patterns, recurring bills, and AI-powered financial intelligence across all their connected bank accounts.
+Krezzo helps users maintain healthy financial habits by providing personalized daily SMS insights about their spending patterns, recurring bills, and AI-powered financial intelligence across all their connected bank accounts.
 
 ## Current Feature Set
 

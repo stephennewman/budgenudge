@@ -1,4 +1,4 @@
-# Documentation Agent - BudgeNudge
+# Documentation Agent - Krezzo
 
 **Last Updated:** July 19, 2025, 11:45 PM EDT
 

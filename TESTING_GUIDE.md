@@ -1,4 +1,4 @@
-# 🧪 BudgeNudge Manual Testing Guide
+# 🧪 Krezzo Manual Testing Guide
 
 **Test your deployment:** https://budgenudge-lm9sfj52v-krezzo.vercel.app
 
@@ -191,4 +191,4 @@ If any tests fail, check the detailed error messages and run manual verification
 
 ---
 
-🎉 **If all tests pass, your BudgeNudge deployment is fully operational and ready for production use!** 
+🎉 **If all tests pass, your Krezzo deployment is fully operational and ready for production use!** 

@@ -1,5 +1,5 @@
 -- =====================================================
--- BudgeNudge Transaction Rules Engine
+-- Krezzo Transaction Rules Engine
 -- Rules for merchant normalization and category overrides
 -- =====================================================
 

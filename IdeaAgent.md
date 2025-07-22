@@ -1,4 +1,4 @@
-# 💡 IDEA AGENT - BudgeNudge Feature Ideas & Roadmap
+# 💡 IDEA AGENT - Krezzo Feature Ideas & Roadmap
 
 **Last Updated:** July 13, 2025 12:10 PM EDT
 **Status:** Production-Ready Foundation Complete

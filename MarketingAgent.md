@@ -1,4 +1,4 @@
-# Marketing Agent - BudgeNudge
+# Marketing Agent - Krezzo
 
 **Last Updated:** July 18, 2025, 1:36 PM EDT
 
@@ -7,7 +7,7 @@
 ### Core Value Proposition
 **"Your Personal Financial Intelligence - Delivered Daily via SMS"**
 
-BudgeNudge transforms financial awareness from reactive to proactive through intelligent, personalized daily SMS insights that help users build better spending habits across all their connected bank accounts.
+Krezzo transforms financial awareness from reactive to proactive through intelligent, personalized daily SMS insights that help users build better spending habits across all their connected bank accounts.
 
 ## Target Audience
 

@@ -1,10 +1,10 @@
-# Master Agent - BudgeNudge
+# Master Agent - Krezzo
 
 **Last Updated:** July 21, 2025, 5:45 PM EDT
 
 ## Project Overview
 
-**Purpose:** BudgeNudge is a financial wellness app that provides personalized scheduled SMS notifications to help users manage their spending, track recurring bills, and maintain healthy financial habits through intelligent daily insights.
+**Purpose:** Krezzo is a financial wellness app that provides personalized scheduled SMS notifications to help users manage their spending, track recurring bills, and maintain healthy financial habits through intelligent daily insights.
 
 **Goals:**
 - Help users stay aware of their spending patterns through scheduled insights

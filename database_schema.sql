@@ -1,5 +1,5 @@
 -- =====================================================
--- BudgeNudge Plaid Database Schema
+-- Krezzo Plaid Database Schema
 -- Run this in your Supabase SQL Editor
 -- =====================================================
 

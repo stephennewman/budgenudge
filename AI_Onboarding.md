@@ -1,6 +1,6 @@
-# 🤖 AI ONBOARDING - BudgeNudge Project
+# 🤖 AI ONBOARDING - Krezzo Project
 
-**Project Name**: BudgeNudge - Real-Time Financial Transaction Monitoring
+**Project Name**: Krezzo - Real-Time Financial Transaction Monitoring
 **Current Time**: Sunday, July 19, 2025, 11:45 PM EDT  
 **Project Status**: ✅ **PRODUCTION OPERATIONAL + AI TAGGING SYSTEM PERFECTED**
 **Live URL**: https://budgenudge.vercel.app

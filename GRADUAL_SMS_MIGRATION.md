@@ -1,6 +1,6 @@
 # 🔄 Gradual SMS Migration Guide - Resend to SlickText
 
-**Purpose**: Safely migrate BudgeNudge from email-to-SMS (Resend) to professional SMS (SlickText) without breaking existing functionality.
+**Purpose**: Safely migrate Krezzo from email-to-SMS (Resend) to professional SMS (SlickText) without breaking existing functionality.
 
 **Status**: Phase 1 Complete - Ready for Testing  
 **Created**: July 11, 2025  
