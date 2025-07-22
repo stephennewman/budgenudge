@@ -1,4 +1,3 @@
-import Content from "@/components/content";
 import ProtectedSidebar from "@/components/protected-sidebar";
 
 export default function ProtectedLayout({
@@ -7,11 +6,13 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Content>
-      <div className="flex w-full h-full">
-        <ProtectedSidebar />
-        <div className="flex-1 pl-4 pr-4 py-2 overflow-x-auto">{children}</div>
-      </div>
-    </Content>
+    <div className="flex h-screen w-full">
+      <ProtectedSidebar />
+      <main className="flex-1 overflow-auto">
+        <div className="p-6 max-w-none">
+          {children}
+        </div>
+      </main>
+    </div>
   );
 }
