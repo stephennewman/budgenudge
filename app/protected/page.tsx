@@ -44,10 +44,9 @@ export default async function AccountPage() {
           </div>
           
           <div>
-            <h2 className="text-xl font-medium mb-2">Connect Your Bank Account</h2>
+            <h2 className="text-xl font-medium mb-2">🏦 Connect Your Bank Account</h2>
             <p className="text-muted-foreground mb-6">
-              Securely link your bank account to get instant SMS notifications for every transaction. 
-              We use Plaid&apos;s bank-grade security to protect your information.
+              Krezzo has partnered with Plaid to securely connect to thousands of banks. Authenticate your primary bank account and start automatically syncing transactional data.
             </p>
           </div>
 

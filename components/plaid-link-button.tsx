@@ -96,7 +96,7 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
       disabled={!ready || isLoading}
       className="bg-blue-600 hover:bg-blue-700"
     >
-      {isLoading ? 'Connecting...' : '🏦 Connect Bank Account'}
+      {isLoading ? 'Connecting...' : 'Connect my account'}
     </Button>
   );
 } 

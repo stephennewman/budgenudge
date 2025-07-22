@@ -81,19 +81,8 @@ export default function TransactionDashboard() {
 
   if (!isConnected) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>🏦 Connect Your Bank Account</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Connect your primary baccount to start tracking transactions automatically.
-              Once connected, new transactions will sync automatically!
-            </p>
-            <PlaidLinkButton onSuccess={handleConnectionSuccess} />
-          </CardContent>
-        </Card>
+      <div className="flex justify-center">
+        <PlaidLinkButton onSuccess={handleConnectionSuccess} />
       </div>
     );
   }
