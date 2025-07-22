@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/header";
-import { Inter } from "next/font/google";
+import { Manrope } from "next/font/google";
 
-const inter = Inter({ subsets: ["latin"] });
+const manrope = Manrope({ subsets: ["latin"] });
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={manrope.className}>
         <Header />
         {children}
       </body>
