@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient } from '@/utils/plaid/client';
-import { createSupabaseServerClient, storeTransactions } from '@/utils/plaid/server';
+import { createSupabaseServerClient } from '@/utils/plaid/server';
+import { storeTransactions } from '@/utils/plaid/server-enhanced';
 import { createClient } from '@supabase/supabase-js';
 
 // Set timeout to 60 seconds for Hobby plan (prevents 503 errors)
