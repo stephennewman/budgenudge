@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import Script from "next/script";
 
 export default function Home() {
   return (
@@ -44,13 +45,23 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex gap-4 justify-center mb-12">
+        <div className="flex gap-4 justify-center mb-8">
           <Button asChild size="lg" className="text-lg px-8 py-4">
             <Link href="/sign-up">Break the Cycle - $20</Link>
           </Button>
           <Button variant="outline" asChild size="lg" className="text-lg px-8 py-4">
             <Link href="/sign-in">Sign In</Link>
           </Button>
+        </div>
+
+        {/* SlickText Form */}
+        <div className="mb-12 flex justify-center">
+          <div id="slicktext-form-container" className="w-full max-w-md">
+            <Script
+              src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ"
+              strategy="afterInteractive"
+            />
+          </div>
         </div>
 
         {/* Value Proposition Section */}
