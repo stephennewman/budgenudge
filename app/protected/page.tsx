@@ -52,9 +52,7 @@ export default async function AccountPage() {
 
           <TransactionDashboard />
 
-          <div className="pt-4 border-t">
-            <AuthPageSignOutButton />
-          </div>
+
         </div>
       </div>
     );
