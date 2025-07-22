@@ -380,11 +380,11 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
 
     if (trackingError) {
       console.error('Error fetching tracked categories:', trackingError);
-      return "📱 BudgeNudge\n\nError loading category pacing data.";
+      return "📱 Krezzo\n\nError loading category pacing data.";
     }
 
     if (!trackedCategories || trackedCategories.length === 0) {
-      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo categories selected for tracking.\nConfigure on AI Category Analysis page.";
+      return "📱 Krezzo\n\n📊 CATEGORY PACING\n\nNo categories selected for tracking.\nConfigure on AI Category Analysis page.";
     }
 
     // Get user's Plaid items
@@ -395,7 +395,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
 
     const itemIds = items?.map(item => item.plaid_item_id) || [];
     if (itemIds.length === 0) {
-      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo accounts connected.";
+      return "📱 Krezzo\n\n📊 CATEGORY PACING\n\nNo accounts connected.";
     }
 
     // Get current date info
@@ -423,7 +423,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
       .in('ai_category_tag', trackedCategoryNames);
 
     if (!transactions || transactions.length === 0) {
-      return "📱 BudgeNudge\n\n📊 CATEGORY PACING\n\nNo transaction data found for tracked categories.";
+      return "📱 Krezzo\n\n📊 CATEGORY PACING\n\nNo transaction data found for tracked categories.";
     }
 
     // Analyze each tracked category
@@ -529,7 +529,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
 
   } catch (error) {
     console.error('Error generating category pacing message:', error);
-    return "📱 BudgeNudge\n\nError generating category pacing analysis.";
+    return "📱 Krezzo\n\nError generating category pacing analysis.";
   }
 }
 
@@ -547,6 +547,6 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
     case 'category-pacing':
       return await generateCategoryPacingMessage(userId);
     default:
-      return "📱 BudgeNudge\n\nInvalid template type.";
+      return "📱 Krezzo\n\nInvalid template type.";
   }
 } 

@@ -1,5 +1,5 @@
 /**
- * Unified SMS Service for BudgeNudge
+ * Unified SMS Service for Krezzo
  * Supports gradual migration from Resend to SlickText
  * With fallback mechanisms and monitoring
  */
@@ -78,7 +78,7 @@ async function sendViaResend({ phoneNumber, message, userEmail }: SMSRequest): P
     const emailAddress = `${cleanPhone}@${gateway}`;
 
     const result = await resend.emails.send({
-      from: 'BudgeNudge <alerts@krezzo.com>',
+              from: 'Krezzo <alerts@krezzo.com>',
       to: [emailAddress],
       subject: 'Transaction Alert',
       text: message,

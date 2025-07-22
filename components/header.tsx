@@ -37,7 +37,7 @@ export default function Header() {
     <nav className="border-b w-full h-16 shrink-0 flex items-center">
       <div className="px-6 w-full flex items-center justify-between mx-auto">
         <Link href="/" className="text-sm font-medium">
-          💰 BudgeNudge
+          💰 Krezzo
         </Link>
         <div className="flex items-center gap-2">
           {!loading && user == null && !isAuthPage && (

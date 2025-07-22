@@ -1,5 +1,5 @@
 /**
- * SlickText SMS API Client for BudgeNudge
+ * SlickText SMS API Client for Krezzo
  * Professional SMS delivery replacing email-to-SMS gateways
  * Documentation: https://api.slicktext.com/docs/v2/overview
  */
@@ -58,7 +58,7 @@ export class SlickTextClient {
     return {
       'Authorization': `Bearer ${this.config.apiKey}`,
       'Content-Type': 'application/json',
-      'User-Agent': 'BudgeNudge/1.0'
+      'User-Agent': 'Krezzo/1.0'
     };
   }
 
@@ -122,10 +122,10 @@ export class SlickTextClient {
         method: 'POST',
         body: JSON.stringify({
           phone_number: contact.phone_number.replace(/\D/g, ''), // Remove non-digits
-          first_name: contact.first_name || 'BudgeNudge',
+          first_name: contact.first_name || 'Krezzo',
           last_name: contact.last_name || 'User',
           email: contact.email,
-          opt_in_source: contact.opt_in_source || 'BudgeNudge Transaction Alerts',
+          opt_in_source: contact.opt_in_source || 'Krezzo Transaction Alerts',
           list_ids: contact.list_ids || [],
           custom_fields: contact.custom_fields || {}
         })
@@ -187,12 +187,12 @@ export class SlickTextClient {
         if (!contactId) {
           try {
             const createContactPayload = {
-              first_name: message.contact?.first_name || 'BudgeNudge',
+              first_name: message.contact?.first_name || 'Krezzo',
               last_name: message.contact?.last_name || 'User',
               mobile_number: `+1${phoneNumber}`,
               email: message.contact?.email,
               opt_in_status: 'subscribed',
-              source: 'BudgeNudge Financial Alerts'
+              source: 'Krezzo Financial Alerts'
             };
 
             console.log('📤 Creating new contact:', createContactPayload);
@@ -255,7 +255,7 @@ export class SlickTextClient {
               send_immediately: boolean;
               scheduled_at?: string;
             } = {
-              name: `BudgeNudge Alert ${Date.now()}`,
+              name: `Krezzo Alert ${Date.now()}`,
               body: message.content,  // Changed from 'message' to 'body'
               contact_ids: contactId ? [contactId] : undefined,
               phone_numbers: contactId ? undefined : [`+1${phoneNumber}`],
@@ -426,7 +426,7 @@ export async function sendEnhancedSlickTextSMS({
     const contact: SlickTextContact = {
       phone_number: phoneNumber,
       email: userEmail,
-      opt_in_source: 'BudgeNudge Financial Alerts',
+      opt_in_source: 'Krezzo Financial Alerts',
       custom_fields: {
         user_id: userId || 'unknown',
         signup_date: new Date().toISOString()

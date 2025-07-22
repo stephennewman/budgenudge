@@ -33,18 +33,18 @@ export async function POST(request: NextRequest) {
     switch (userMessage) {
       case 'STOP':
       case 'UNSUBSCRIBE':
-        responseMessage = "You've been unsubscribed from BudgeNudge alerts. Text START to resume.";
+                  responseMessage = "You've been unsubscribed from Krezzo alerts. Text START to resume.";
         responseType = 'command:STOP';
         break;
         
       case 'START':
       case 'SUBSCRIBE':
-        responseMessage = "Welcome back! You'll receive BudgeNudge transaction alerts again.";
+                  responseMessage = "Welcome back! You'll receive Krezzo transaction alerts again.";
         responseType = 'command:START';
         break;
         
       case 'HELP':
-        responseMessage = "BudgeNudge Financial Alerts 💰\n\nCommands: BALANCE, STOP, START\n\nVisit: https://budgenudge.vercel.app";
+                  responseMessage = "Krezzo Financial Alerts 💰\n\nCommands: BALANCE, STOP, START\n\nVisit: https://budgenudge.vercel.app";
         responseType = 'command:HELP';
         break;
         
@@ -135,7 +135,7 @@ async function generateAIResponseDebug(message: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are BudgeNudge AI assistant. Keep responses under 300 characters for SMS. Help with financial questions.'
+            content: 'You are Krezzo AI assistant. Keep responses under 300 characters for SMS. Help with financial questions.'
           },
           {
             role: 'user',
@@ -178,5 +178,5 @@ function getKeywordResponseDebug(message: string): string {
     return "💳 View account balance at https://budgenudge.vercel.app";
   }
   
-  return "Hi! I'm BudgeNudge's assistant. Visit https://budgenudge.vercel.app or text HELP!";
+              return "Hi! I'm Krezzo's assistant. Visit https://budgenudge.vercel.app or text HELP!";
 } 

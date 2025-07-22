@@ -28,7 +28,7 @@ export default function InPageSidebar({
       {/* Header */}
       <div className="p-4 border-b">
         <Link href="/" className="text-lg font-semibold">
-          💰 BudgeNudge
+                      💰 Krezzo
         </Link>
       </div>
       

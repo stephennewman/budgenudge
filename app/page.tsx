@@ -8,7 +8,7 @@ export default function Home() {
       <div className="mx-auto max-w-4xl flex flex-col text-center">
         <div className="flex justify-center items-center mb-8">
           <div className="text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            💳 BudgeNudge
+            💳 Krezzo
           </div>
         </div>
         
@@ -228,7 +228,7 @@ export default function Home() {
 
         {/* Social Proof */}
         <div className="bg-gray-50 dark:bg-gray-900/20 rounded-xl p-8 mb-16">
-          <h2 className="text-2xl font-bold mb-6">Why Users Choose BudgeNudge</h2>
+          <h2 className="text-2xl font-bold mb-6">Why Users Choose Krezzo</h2>
           <div className="grid md:grid-cols-3 gap-6 text-sm">
             <div className="text-center">
               <div className="text-3xl font-bold text-blue-600 mb-2">78%</div>

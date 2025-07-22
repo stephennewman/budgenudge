@@ -38,7 +38,7 @@ export default function VerificationSuccessBanner() {
           <div className="flex-1">
             <h3 className="text-sm font-medium text-green-800">Email Verified Successfully!</h3>
             <p className="mt-1 text-sm text-green-700">
-              Welcome to BudgeNudge! Your email has been verified and you&apos;re now logged in. 
+              Welcome to Krezzo! Your email has been verified and you&apos;re now logged in. 
               {' '}Start by connecting your bank account to receive real-time transaction alerts.
             </p>
           </div>

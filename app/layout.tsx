@@ -11,7 +11,7 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "BudgeNudge - Real-Time Transaction Monitoring",
+      title: "Krezzo - Real-Time Transaction Monitoring",
   description: "Get instant SMS alerts for all your financial transactions with automated Plaid webhook integration",
 };
 

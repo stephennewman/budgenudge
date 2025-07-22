@@ -80,7 +80,7 @@ async function testPageAccess(name, url, path) {
 }
 
 async function runTests() {
-  console.log('🚀 BudgeNudge Deployment Test Script');
+      console.log('🚀 Krezzo Deployment Test Script');
   console.log('=====================================\n');
 
   const useLocal = process.argv.includes('--local');
@@ -131,7 +131,7 @@ async function runTests() {
 // Handle command line arguments
 if (process.argv.includes('--help')) {
   console.log(`
-BudgeNudge Deployment Test Script
+    Krezzo Deployment Test Script
 
 Usage:
   node scripts/test-deployment.js          # Test production

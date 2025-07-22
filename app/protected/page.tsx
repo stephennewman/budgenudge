@@ -32,7 +32,7 @@ export default async function AccountPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">🏠 Account Setup</h1>
           <p className="text-muted-foreground mt-2">
-            Complete your account setup to start using BudgeNudge
+            Complete your account setup to start using Krezzo
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export default async function AccountPage() {
 
           <div className="pt-4 border-t">
             <p className="text-xs text-muted-foreground mb-4">
-              Your account is authenticated, but you need to connect a bank account to access BudgeNudge features.
+              Your account is authenticated, but you need to connect a bank account to access Krezzo features.
             </p>
             <AuthPageSignOutButton />
           </div>

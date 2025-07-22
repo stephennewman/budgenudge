@@ -44,7 +44,7 @@ export async function POST() {
   const results: TestResult[] = [];
   const startTime = Date.now();
 
-  console.log('🧪 Starting BudgeNudge Test Suite...');
+        console.log('🧪 Starting Krezzo Test Suite...');
 
   // Test 1: Database Connection
   results.push(await runTest('Database Connection', async () => {
@@ -201,7 +201,7 @@ export async function POST() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'BudgeNudge Test <noreply@krezzo.com>',
+                  from: 'Krezzo Test <noreply@krezzo.com>',
         to: [smsGateway],
         subject: 'Test Suite SMS',
         text: testMessage,

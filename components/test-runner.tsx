@@ -86,7 +86,7 @@ export default function TestRunner() {
   return (
     <Card className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-2">🧪 BudgeNudge Test Suite</h2>
+        <h2 className="text-2xl font-bold mb-2">🧪 Krezzo Test Suite</h2>
         <p className="text-gray-600">
           Comprehensive testing for all 6 deployment fixes: signup redirect, email confirmation, 
           onboarding flow, user data isolation, dynamic SMS, and webhook restoration.

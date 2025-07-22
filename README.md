@@ -1,6 +1,6 @@
-# 💳 BudgeNudge - Intelligent Financial Wellness via SMS
+# 💳 Krezzo - Intelligent Financial Wellness via SMS
 
-**🎉 MILESTONE ACHIEVED!** After 3+ months of development, BudgeNudge is now a fully operational intelligent financial wellness platform with multi-bank integration and AI-powered insights.
+**🎉 MILESTONE ACHIEVED!** After 3+ months of development, Krezzo is now a fully operational intelligent financial wellness platform with multi-bank integration and AI-powered insights.
 
 ## ✅ System Status: LIVE & OPERATIONAL
 
@@ -10,9 +10,9 @@
 - **✅ 100+ transactions analyzed** - Complete transaction history with AI insights
 - **✅ Zero manual intervention** - Fully automated daily insights system
 
-## 🚀 What BudgeNudge Does
+## 🚀 What Krezzo Does
 
-BudgeNudge connects to your financial accounts and sends intelligent daily SMS insights about your spending patterns, upcoming bills, and financial health. Built with Next.js, Supabase, Plaid's multi-bank platform, and OpenAI.
+Krezzo connects to your financial accounts and sends intelligent daily SMS insights about your spending patterns, upcoming bills, and financial health. Built with Next.js, Supabase, Plaid's multi-bank platform, and OpenAI.
 
 **The Flow:**
 1. Connect your bank accounts → Any Plaid-supported financial institution
@@ -105,7 +105,7 @@ Required environment variables:
 
 ## 🎉 Success Story
 
-From concept to completion, BudgeNudge demonstrates how to build a production-ready financial monitoring system:
+From concept to completion, Krezzo demonstrates how to build a production-ready financial monitoring system:
 
 1. **Month 1-2**: Foundation setup, authentication, basic Plaid integration
 2. **Month 3**: Webhook challenges, debugging, SMS integration
@@ -120,7 +120,7 @@ Visit [budgenudge.vercel.app](https://budgenudge.vercel.app) to see the live sys
 
 ## 🏆 Built With Determination
 
-This project showcases the power of persistence in solving complex webhook integrations. After months of development, BudgeNudge now provides instant financial awareness that banks charge premium fees for.
+This project showcases the power of persistence in solving complex webhook integrations. After months of development, Krezzo now provides instant financial awareness that banks charge premium fees for.
 
 **Mission Accomplished!** 🚀
 
