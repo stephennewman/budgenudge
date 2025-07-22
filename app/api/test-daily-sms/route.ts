@@ -30,7 +30,7 @@ export async function GET() {
         // Send SMS using SlickText
         const smsResult = await sendEnhancedSlickTextSMS({
           phoneNumber: userPhone,
-          message: `🧪 DAILY ${templateType.toUpperCase()} TEMPLATE - BudgeNudge\n\n${smsMessage}`,
+          message: `🧪 DAILY ${templateType.toUpperCase()} TEMPLATE - Krezzo\n\n${smsMessage}`,
           userId: userId
         });
 

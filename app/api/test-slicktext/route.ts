@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         console.log('📊 Fetching real transaction data for Stephen Newman...');
         testMessage = await buildRealDataMessage();
       } else {
-        testMessage = `🚀 SlickText Integration Test - BudgeNudge
+        testMessage = `🚀 SlickText Integration Test - Krezzo
 
 ✅ Professional SMS delivery active
 ✅ Contact management enabled
@@ -221,7 +221,7 @@ async function buildRealDataMessage(): Promise<string> {
       .slice(0, 6);
 
     // Build real message
-    let message = `💰 STEPHEN'S REAL BUDGENUDGE DATA\n\n`;
+          let message = `💰 STEPHEN'S REAL KREZZO DATA\n\n`;
     message += `💳 AVAILABLE BALANCE: $${totalAvailable.toFixed(2)}\n\n`;
     
     message += `🏪 PUBLIX THIS MONTH: $${publixThisMonth.toFixed(2)}\n`;

@@ -143,15 +143,15 @@ Krezzo transforms financial awareness from reactive to proactive through intelli
 ## Competitive Messaging
 
 ### vs. Traditional Budgeting Apps
-- **BudgeNudge**: "AI-powered insights delivered daily via SMS across all your accounts"
+- **Krezzo**: "AI-powered insights delivered daily via SMS across all your accounts"
 - **Others**: "Remember to check multiple apps for each bank account"
 
 ### vs. Bill Reminder Services
-- **BudgeNudge**: "Complete multi-bank financial intelligence with AI insights"
+- **Krezzo**: "Complete multi-bank financial intelligence with AI insights"
 - **Others**: "Only bill reminders, no spending analysis or multi-bank view"
 
 ### vs. Financial Advisors
-- **BudgeNudge**: "Daily AI-powered guidance at a fraction of the cost"
+- **Krezzo**: "Daily AI-powered guidance at a fraction of the cost"
 - **Others**: "Expensive, infrequent meetings with limited account visibility"
 
 ## Success Metrics

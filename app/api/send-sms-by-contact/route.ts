@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'BudgeNudge/1.0'
+        'User-Agent': 'Krezzo/1.0'
       },
       body: JSON.stringify({
         body: message,

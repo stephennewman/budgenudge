@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!recurringMerchants || recurringMerchants.length === 0) {
-      const noRecurringMessage = `📊 BudgeNudge Recurring Bills
+      const noRecurringMessage = `📊 Krezzo Recurring Bills
 
 🎉 Great news! No recurring transactions detected yet.
 
@@ -78,9 +78,9 @@ Generated: ${new Date().toLocaleString('en-US', {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'BudgeNudge <noreply@krezzo.com>',
+          from: 'Krezzo <noreply@krezzo.com>',
           to: [targetPhoneNumber],
-          subject: 'BudgeNudge Alert',
+          subject: 'Krezzo Alert',
           text: noRecurringMessage,
         }),
       });
@@ -97,7 +97,7 @@ Generated: ${new Date().toLocaleString('en-US', {
     }
 
     // Build the SMS message
-    let smsMessage = `🔄 RECURRING SMS - BudgeNudge Monthly Bills Analysis
+          let smsMessage = `🔄 RECURRING SMS - Krezzo Monthly Bills Analysis
 
 Generated: ${new Date().toLocaleString('en-US', { 
       timeZone: 'America/New_York',
@@ -168,9 +168,9 @@ Generated: ${new Date().toLocaleString('en-US', {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'BudgeNudge <noreply@krezzo.com>',
+        from: 'Krezzo <noreply@krezzo.com>',
         to: [targetPhoneNumber],
-        subject: 'BudgeNudge Alert',
+        subject: 'Krezzo Alert',
         text: smsMessage,
       }),
     });

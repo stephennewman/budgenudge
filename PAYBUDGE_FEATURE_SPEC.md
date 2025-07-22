@@ -338,7 +338,7 @@ async function createPayAlignedSubscription(
 ## 📱 USER EXPERIENCE FLOW
 
 ### **Phase 1: Onboarding & Detection**
-1. **User signs up** → Existing BudgeNudge flow
+1. **User signs up** → Existing Krezzo flow
 2. **Connect bank account** → Existing Plaid integration  
 3. **PayBudge Analysis** → "Analyzing your pay schedule..."
 4. **Pattern Detection** → "We detected you get paid weekly on Fridays"
@@ -449,7 +449,7 @@ Create several budget approaches per user but only display the active one:
 
 ## 🎯 COMPETITIVE IMPACT
 
-This feature represents a **category-defining innovation** that could establish BudgeNudge as the leader in intelligent financial management. The combination of:
+This feature represents a **category-defining innovation** that could establish Krezzo as the leader in intelligent financial management. The combination of:
 
 1. **Pay-aligned billing** (unique to market)
 2. **Automatic budget resets** (user delight)  
@@ -460,4 +460,4 @@ Creates a **defensible competitive moat** that would be extremely difficult for 
 
 ---
 
-**Ready for development! This spec provides comprehensive guidance for implementing PayBudge as BudgeNudge's breakthrough differentiating feature.** 
+**Ready for development! This spec provides comprehensive guidance for implementing PayBudge as Krezzo's breakthrough differentiating feature.** 

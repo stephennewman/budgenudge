@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Debug: Log target phone number
     console.log('DEBUG: Target phone number:', targetPhoneNumber);
     
-    let smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    let smsMessage = message || `🔔 MANUAL SMS - Krezzo Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your Krezzo app.`;
     let transactionsText = '';
     
     // If a valid templateType is provided, use the corresponding SMS template
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Default message if none provided
-    // const smsMessage = message || `🔔 MANUAL SMS - BudgeNudge Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your BudgeNudge app.`;
+    // const smsMessage = message || `🔔 MANUAL SMS - Krezzo Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your Krezzo app.`;
     
     // Debug: Log message content
     console.log('DEBUG: SMS message content:', smsMessage);

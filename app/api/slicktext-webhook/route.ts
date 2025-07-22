@@ -39,20 +39,20 @@ export async function POST(request: NextRequest) {
     switch (userMessage) {
       case 'STOP':
       case 'UNSUBSCRIBE':
-        responseMessage = "You've been unsubscribed from BudgeNudge alerts. Text START to resume. For support: https://budgenudge.vercel.app";
+                  responseMessage = "You've been unsubscribed from Krezzo alerts. Text START to resume. For support: https://budgenudge.vercel.app";
         break;
         
       case 'START':
       case 'SUBSCRIBE':
-        responseMessage = "Welcome back! You'll receive BudgeNudge transaction alerts again. Text HELP for assistance or STOP to unsubscribe.";
+                  responseMessage = "Welcome back! You'll receive Krezzo transaction alerts again. Text HELP for assistance or STOP to unsubscribe.";
         break;
         
       case 'HELP':
-        responseMessage = "BudgeNudge Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://budgenudge.vercel.app";
+                  responseMessage = "Krezzo Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://budgenudge.vercel.app";
         break;
         
       case 'BALANCE':
-        responseMessage = "💰 To check your account balance and recent transactions, please log into your BudgeNudge dashboard at https://budgenudge.vercel.app. For immediate help, text HELP.";
+                  responseMessage = "💰 To check your account balance and recent transactions, please log into your Krezzo dashboard at https://budgenudge.vercel.app. For immediate help, text HELP.";
         break;
         
       default:
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'User-Agent': 'BudgeNudge/1.0'
+            'User-Agent': 'Krezzo/1.0'
           },
           body: JSON.stringify({
             body: responseMessage,
@@ -133,7 +133,7 @@ async function generateAIResponse(message: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: `You are BudgeNudge's AI assistant for SMS support. BudgeNudge is a real-time financial transaction monitoring app that sends SMS alerts when users spend money.
+            content: `You are Krezzo's AI assistant for SMS support. Krezzo is a real-time financial transaction monitoring app that sends SMS alerts when users spend money.
 
 Key features:
 - Real-time transaction alerts via SMS
@@ -174,17 +174,17 @@ function getKeywordResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('spend') || lowerMessage.includes('money') || lowerMessage.includes('transaction')) {
-    return "💰 To view your spending and transactions, please log into BudgeNudge at https://budgenudge.vercel.app. Text HELP for more options!";
+                return "💰 To view your spending and transactions, please log into Krezzo at https://budgenudge.vercel.app. Text HELP for more options!";
   }
   
   if (lowerMessage.includes('balance') || lowerMessage.includes('account')) {
-    return "💳 Check your account balance and recent activity on the BudgeNudge dashboard: https://budgenudge.vercel.app";
+                return "💳 Check your account balance and recent activity on the Krezzo dashboard: https://budgenudge.vercel.app";
   }
   
   if (lowerMessage.includes('alert') || lowerMessage.includes('notification')) {
-    return "🔔 BudgeNudge sends real-time alerts when you spend money. Manage alerts at https://budgenudge.vercel.app or text STOP to unsubscribe.";
+                return "🔔 Krezzo sends real-time alerts when you spend money. Manage alerts at https://budgenudge.vercel.app or text STOP to unsubscribe.";
   }
   
   // Default helpful response
-  return "Hi! I'm BudgeNudge's assistant. I help with financial monitoring questions. Visit https://budgenudge.vercel.app or text HELP for commands!";
+              return "Hi! I'm Krezzo's assistant. I help with financial monitoring questions. Visit https://budgenudge.vercel.app or text HELP for commands!";
 } 

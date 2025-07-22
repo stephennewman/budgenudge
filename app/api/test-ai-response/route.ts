@@ -85,7 +85,7 @@ async function generateAIResponse(message: string): Promise<{
         messages: [
           {
             role: 'system',
-            content: `You are BudgeNudge's AI assistant for SMS support. BudgeNudge is a real-time financial transaction monitoring app that sends SMS alerts when users spend money.
+            content: `You are Krezzo's AI assistant for SMS support. Krezzo is a real-time financial transaction monitoring app that sends SMS alerts when users spend money.
 
 Key features:
 - Real-time transaction alerts via SMS
@@ -149,23 +149,23 @@ function getKeywordResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('spend') || lowerMessage.includes('money') || lowerMessage.includes('transaction')) {
-    return "💰 To view your spending and transactions, please log into BudgeNudge at https://budgenudge.vercel.app. Text HELP for more options!";
+                return "💰 To view your spending and transactions, please log into Krezzo at https://budgenudge.vercel.app. Text HELP for more options!";
   }
   
   if (lowerMessage.includes('balance') || lowerMessage.includes('account')) {
-    return "💳 Check your account balance and recent activity on the BudgeNudge dashboard: https://budgenudge.vercel.app";
+                return "💳 Check your account balance and recent activity on the Krezzo dashboard: https://budgenudge.vercel.app";
   }
   
   if (lowerMessage.includes('alert') || lowerMessage.includes('notification')) {
-    return "🔔 BudgeNudge sends real-time alerts when you spend money. Manage alerts at https://budgenudge.vercel.app or text STOP to unsubscribe.";
+                return "🔔 Krezzo sends real-time alerts when you spend money. Manage alerts at https://budgenudge.vercel.app or text STOP to unsubscribe.";
   }
   
   if (lowerMessage.includes('help')) {
-    return "BudgeNudge Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://budgenudge.vercel.app";
+                return "Krezzo Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://budgenudge.vercel.app";
   }
   
   // Default helpful response
-  return "Hi! I'm BudgeNudge's assistant. I help with financial monitoring questions. Visit https://budgenudge.vercel.app or text HELP for commands!";
+              return "Hi! I'm Krezzo's assistant. I help with financial monitoring questions. Visit https://budgenudge.vercel.app or text HELP for commands!";
 }
 
 export async function GET() {

@@ -1,4 +1,4 @@
--- Restore safe default RLS policies for BudgeNudge Supabase tables
+-- Restore safe default RLS policies for Krezzo Supabase tables
 
 -- 1. items
 drop policy if exists "Authenticated users can access their own items" on public.items;
