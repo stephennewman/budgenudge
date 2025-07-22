@@ -53,9 +53,6 @@ export default async function AccountPage() {
           <TransactionDashboard />
 
           <div className="pt-4 border-t">
-            <p className="text-xs text-muted-foreground mb-4">
-              Your account is authenticated, but you need to connect a bank account to access Krezzo features.
-            </p>
             <AuthPageSignOutButton />
           </div>
         </div>
