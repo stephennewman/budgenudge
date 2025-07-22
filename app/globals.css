@@ -93,11 +93,7 @@
   }
 }
 
-@layer utilities {
-  body {
-    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  }
-}
+
 
 @layer base {
   :root {
