@@ -28,8 +28,8 @@ export const signUpAction = async (formData: FormData) => {
   const client = await createSupabaseClient();
 
   // Use the correct URL for the current environment
-  const url = process.env.NODE_ENV === 'production'
-    ? "https://budgenudge.vercel.app/auth/callback"
+  const url = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/auth/callback`
     : "http://localhost:3000/auth/callback";
 
   const { error } = await client.auth.signUp({
@@ -54,8 +54,8 @@ export const googleSignInAction = async () => {
   const client = await createSupabaseClient();
   
   // Use the correct URL for the current environment
-  const redirectTo = process.env.NODE_ENV === 'production'
-    ? "https://budgenudge.vercel.app/auth/callback"
+  const redirectTo = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}/auth/callback`
     : "http://localhost:3000/auth/callback";
 
   const { data, error } = await client.auth.signInWithOAuth({
