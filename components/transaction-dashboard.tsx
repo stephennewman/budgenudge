@@ -109,8 +109,8 @@ export default function TransactionDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-2">
-              {accounts.map((account) => (
-                <div key={account.account_id} className="flex justify-between items-center p-2 border rounded">
+              {accounts.map((account, index) => (
+                <div key={`account-${account.account_id}-${index}`} className="flex justify-between items-center p-2 border rounded">
                   <div>
                     <div className="font-medium">{account.name}</div>
                     <div className="text-sm text-muted-foreground">
