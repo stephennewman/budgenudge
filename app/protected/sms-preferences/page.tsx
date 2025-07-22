@@ -97,9 +97,9 @@ export default function SMSPreferencesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Texts</h1>
-          <p className="text-gray-600">
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-medium">📱 Texts</h1>
+          <p className="text-muted-foreground mt-2">
             All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
           </p>
         </div>
