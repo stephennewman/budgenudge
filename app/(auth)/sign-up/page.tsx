@@ -4,7 +4,6 @@ import GoogleSignInButton from "@/components/google-sign-in-button";
 import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
 
 export default async function SignUp(props: {
   searchParams: Promise<Message>;
@@ -13,16 +12,10 @@ export default async function SignUp(props: {
 
   return (
     <form
-      className="flex-1 flex flex-col w-full max-w-sm mx-auto mt-24"
+      className="flex-1 flex flex-col w-full max-w-sm mx-auto mt-8"
       action={signUpAction}
     >
       <h1 className="text-2xl font-medium">Sign up</h1>
-      <p className="text-sm text-foreground">
-        Already have an account?{" "}
-        <Link className="text-foreground font-medium underline" href="/sign-in">
-          Sign in
-        </Link>
-      </p>
       
       {/* Google Sign-Up */}
       <div className="mt-8">
