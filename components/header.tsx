@@ -1,12 +1,32 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { createSupabaseClient } from "@/utils/supabase/server";
+import { createSupabaseClient } from "@/utils/supabase/client";
+import { useState, useEffect } from "react";
+import { User } from "@supabase/supabase-js";
 
-export default async function Header() {
-  const client = await createSupabaseClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
+export default function Header() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createSupabaseClient();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setLoading(false);
+    };
+
+    getUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   return (
     <nav className="border-b w-full h-16 shrink-0 flex items-center">
@@ -15,7 +35,7 @@ export default async function Header() {
           💰 BudgeNudge
         </Link>
         <div className="flex items-center gap-2">
-          {user == null && (
+          {!loading && user == null && (
             <>
               <Button variant="outline" asChild>
                 <Link href="/sign-in">Sign In</Link>
