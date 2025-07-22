@@ -43,38 +43,9 @@ interface Transaction {
   logo_url?: string;
 }
 
-// Merchant analytics data from database
-interface MerchantAnalyticsData {
-  merchant_name: string;
-  total_transactions: number;
-  total_spending: number;
-  spending_transactions: number;
-  avg_weekly_spending: number;
-  avg_monthly_spending: number;
-  avg_weekly_transactions: number;
-  avg_monthly_transactions: number;
-  is_recurring: boolean;
-  recurring_reason: string;
-}
-
-// Extended interface with calculated analytics
+// SIMPLIFIED: Basic transaction interface without heavy analytics
 interface TransactionWithAnalytics extends Transaction {
   id: string | number;
-  totalTransactionsAllTime: number;
-  avgTransactionsMonthly: number;
-  avgTransactionsWeekly: number;
-  daysSinceFirstTransaction: number;
-  daysOfHistoricalData: number;
-  weeksOfHistoricalData: number;
-  monthsOfHistoricalData: number;
-  merchantTransactionCount: number;
-  merchantTransactionsPerWeek: number;
-  merchantTransactionsPerMonth: number;
-  // NEW: Spending-focused analytics
-  totalHistoricalSpending: number;
-  avgWeeklySpending: number;
-  avgMonthlySpending: number;
-  totalMerchantTransactions: number;
 }
 
 export default function TransactionsPage() {
@@ -176,59 +147,6 @@ export default function TransactionsPage() {
     }
   };
 
-  // Frontend normalization function (matches backend normalize_merchant_name)
-  function normalizeTransactionMerchantName(rawName: string): string {
-    if (!rawName || rawName.trim() === '') {
-      return 'Unknown Merchant';
-    }
-    
-    let normalized = rawName.trim();
-    
-    // Apply same normalization patterns as backend
-    if (normalized.match(/^JPM CHASE PAYMENT \d+/i)) {
-      normalized = 'JPM Chase Payment';
-    } else if (normalized.match(/^CHASE CREDIT CRD AUTOPAY/i)) {
-      normalized = 'Chase Credit Card Autopay';
-    } else if (normalized.match(/^BANK OF AMERICA/i)) {
-      normalized = 'Bank of America';
-    } else if (normalized.match(/^CERTIPAY PAYROLL PAYROLL \d+/i)) {
-      normalized = 'Certipay Payroll';
-    } else if (normalized.match(/^GCA PAY \d+ \d+/i)) {
-      normalized = 'GCA Pay';
-    } else if (normalized.match(/^Check Paid #\d+/i)) {
-      normalized = 'Check Payment';
-    } else if (normalized.match(/^Funds Transfer.*-\d+/i)) {
-      normalized = 'Funds Transfer to Brokerage';
-    } else if (normalized.match(/^Amazon Prime Video/i)) {
-      normalized = 'Amazon Prime';
-    } else if (normalized.match(/^Amazon Prime/i)) {
-      normalized = 'Amazon Prime';
-    } else if (normalized.match(/^Cursor Usage Mid/i)) {
-      normalized = 'Cursor Usage';
-    } else if (normalized.match(/\d{6}/)) {
-      // Remove 6-digit date codes (YYMMDD format)
-      normalized = normalized.replace(/\d{6}/g, '').trim();
-      normalized = normalized.replace(/\s+/g, ' '); // Clean extra spaces
-    } else if (normalized.match(/#\d+/)) {
-      // Remove transaction IDs like #1234
-      normalized = normalized.replace(/#\d+/g, '').trim();
-      normalized = normalized.replace(/\s+/g, ' '); // Clean extra spaces
-    }
-    
-    // Final cleanup: ensure proper capitalization and remove extra spaces
-    normalized = normalized.replace(/\s+/g, ' ').trim();
-    
-    // Convert to title case for consistency
-    normalized = normalized.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
-    
-    // If normalization resulted in empty string, use original
-    if (normalized === '' || normalized === 'Unknown Merchant') {
-      normalized = rawName;
-    }
-    
-    return normalized;
-  }
-
   // Fetch tagged merchants
   async function fetchTaggedMerchants() {
     try {
@@ -313,188 +231,36 @@ export default function TransactionsPage() {
 
   // Analytics are now fetched from cached merchant_analytics table for performance
 
-  // Fetch transactions and cached merchant analytics
+  // OPTIMIZED: Simplified data fetching for faster loading
   async function fetchData() {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Fetch both transactions and cached merchant analytics in parallel
-      const [transactionsResponse, analyticsResponse] = await Promise.all([
-        fetch('/api/plaid/transactions', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        }),
-        fetch('/api/merchant-analytics', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        })
-      ]);
+      // SIMPLIFIED: Just fetch transactions - remove heavy analytics processing
+      const transactionsResponse = await fetch('/api/plaid/transactions', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
       
       const transactionsData = await transactionsResponse.json();
-      const analyticsData = await analyticsResponse.json();
       
-      if (transactionsResponse.ok && transactionsData.transactions && 
-          analyticsResponse.ok && analyticsData.merchants) {
-        
+      if (transactionsResponse.ok && transactionsData.transactions) {
         console.log('Transactions fetched:', transactionsData.transactions.length);
-        console.log('Cached analytics fetched:', analyticsData.merchants.length);
         
-        // Create a lookup map for merchant analytics
-        const merchantLookup = analyticsData.merchants.reduce((acc: Record<string, MerchantAnalyticsData>, merchant: MerchantAnalyticsData) => {
-          acc[merchant.merchant_name] = merchant;
-          return acc;
-        }, {});
-        
-        // Calculate overall timeframe analytics from transaction dates
-        const allDates = transactionsData.transactions.map((t: Transaction) => new Date(t.date));
-        const earliestDate = allDates.length > 0 ? new Date(Math.min(...allDates.map((d: Date) => d.getTime()))) : new Date();
-        const latestDate = allDates.length > 0 ? new Date(Math.max(...allDates.map((d: Date) => d.getTime()))) : new Date();
-        const today = new Date();
-        
-        // Calculate time ranges
-        const daysSinceFirst = Math.max(1, Math.ceil((today.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const daysOfData = Math.max(1, Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const weeksOfData = Math.max(1, daysOfData / 7);
-        const monthsOfData = Math.max(1, daysOfData / 30.44);
-        
-        // Calculate averages
-        const totalTransactions = transactionsData.transactions.length;
-        const avgTransactionsMonthly = totalTransactions / monthsOfData;
-        const avgTransactionsWeekly = totalTransactions / weeksOfData;
-
-        // Calculate transaction counts and amounts per merchant from actual visible transactions
-        const merchantTransactionCounts = transactionsData.transactions.reduce((acc: Record<string, number>, transaction: Transaction) => {
-          const merchantKey = transaction.merchant_name || transaction.name;
-          acc[merchantKey] = (acc[merchantKey] || 0) + 1;
-          return acc;
-        }, {});
-
-
-
-        // Enhance transactions with cached analytics and proper time calculations
-        const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => {
-          const rawMerchantKey = transaction.merchant_name || transaction.name;
-          const normalizedMerchantKey = normalizeTransactionMerchantName(rawMerchantKey);
-          const merchantData = merchantLookup[normalizedMerchantKey] || {};
-          
-          // DEBUG: Log lookup failures for key merchants
-          if (rawMerchantKey.includes('CAPTAINS') || rawMerchantKey.includes('BBQ')) {
-            console.log(`🔍 CAPTAINS BBQ LOOKUP:`, {
-              raw: rawMerchantKey,
-              normalized: normalizedMerchantKey,
-              foundInCache: !!merchantData.merchant_name,
-              cachedSpending: merchantData.total_spending,
-              transactionAmount: transaction.amount
-            });
-          }
-          
-          return {
-            ...transaction,
-            id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
-            // Use cached analytics for spending-specific metrics
-            merchantTransactionCount: merchantData.total_transactions || 0,
-            merchantTransactionsPerWeek: merchantData.avg_weekly_transactions || 0,
-            merchantTransactionsPerMonth: merchantData.avg_monthly_transactions || 0,
-            totalHistoricalSpending: merchantData.total_spending || 0,
-            avgWeeklySpending: merchantData.avg_weekly_spending || 0,
-            avgMonthlySpending: merchantData.avg_monthly_spending || 0,
-            // FIX: Use actual count of transactions being displayed, not just spending transactions
-            totalMerchantTransactions: merchantTransactionCounts[rawMerchantKey] || 1,
-            // Calculated time-based analytics (same for all transactions)
-            totalTransactionsAllTime: totalTransactions,
-            avgTransactionsMonthly: avgTransactionsMonthly,
-            avgTransactionsWeekly: avgTransactionsWeekly,
-            daysSinceFirstTransaction: daysSinceFirst,
-            daysOfHistoricalData: daysOfData,
-            weeksOfHistoricalData: weeksOfData,
-            monthsOfHistoricalData: monthsOfData,
-          };
-        });
+        // SIMPLIFIED: Minimal processing for fast display
+        const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => ({
+          ...transaction,
+          id: transaction.id || transaction.plaid_transaction_id || Math.random().toString(),
+        }));
         
         setTransactions(enhancedTransactions);
         
-        // Fetch tagged merchants
-        await fetchTaggedMerchants();
-        
-        // DEBUG: Check merchant lookup success rate
-        const lookupSuccesses = enhancedTransactions.filter((t: TransactionWithAnalytics) => {
-          const rawKey = t.merchant_name || t.name;
-          const normalizedKey = normalizeTransactionMerchantName(rawKey);
-          return merchantLookup[normalizedKey]?.merchant_name;
-        }).length;
-        
-        console.log('=== MERCHANT LOOKUP ANALYSIS ===');
-        console.log('Total transactions:', enhancedTransactions.length);
-        console.log('Successful merchant lookups:', lookupSuccesses);
-        console.log('Failed lookups:', enhancedTransactions.length - lookupSuccesses);
-        console.log('Success rate:', ((lookupSuccesses / enhancedTransactions.length) * 100).toFixed(1) + '%');
-        
-        // Show examples of successful vs failed lookups
-        const exampleSuccess = enhancedTransactions.find((t: TransactionWithAnalytics) => {
-          const normalizedKey = normalizeTransactionMerchantName(t.merchant_name || t.name);
-          return merchantLookup[normalizedKey]?.total_spending > 0;
-        });
-        if (exampleSuccess) {
-          const rawKey = exampleSuccess.merchant_name || exampleSuccess.name;
-          const normalizedKey = normalizeTransactionMerchantName(rawKey);
-          console.log('✅ Example successful lookup:', {
-            raw: rawKey,
-            normalized: normalizedKey,
-            cachedSpending: merchantLookup[normalizedKey]?.total_spending
-          });
-        }
-        
-        // DEBUG: Analyze transaction amounts to verify spending vs income categorization
-        const positiveAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount > 0);
-        const negativeAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount < 0);
-        const zeroAmounts = enhancedTransactions.filter((t: TransactionWithAnalytics) => t.amount === 0);
-        
-        console.log('=== TRANSACTION AMOUNT ANALYSIS ===');
-        console.log('Total transactions:', enhancedTransactions.length);
-        console.log('Positive amounts (spending):', positiveAmounts.length);
-        console.log('Negative amounts (income):', negativeAmounts.length);
-        console.log('Zero amounts:', zeroAmounts.length);
-        
-        console.log('=== DATE RANGE ANALYSIS ===');
-        console.log('Earliest transaction date:', earliestDate.toLocaleDateString());
-        console.log('Latest transaction date:', latestDate.toLocaleDateString());
-        console.log('Days of historical data:', daysOfData);
-        console.log('Weeks of historical data:', weeksOfData.toFixed(1));
-        console.log('Months of historical data:', monthsOfData.toFixed(1));
-        console.log('Avg transactions per week:', avgTransactionsWeekly.toFixed(1));
-        console.log('Avg transactions per month:', avgTransactionsMonthly.toFixed(1));
-        
-        if (positiveAmounts.length > 0) {
-          console.log('Sample positive amounts (spending):');
-          positiveAmounts.slice(0, 3).forEach((t: TransactionWithAnalytics) => 
-            console.log(`  $${t.amount} - ${t.name} (${t.merchant_name || 'no merchant'})`)
-          );
-        }
-        
-        if (negativeAmounts.length > 0) {
-          console.log('Sample negative amounts (income):');
-          negativeAmounts.slice(0, 3).forEach((t: TransactionWithAnalytics) => 
-            console.log(`  $${t.amount} - ${t.name} (${t.merchant_name || 'no merchant'})`)
-          );
-        }
-        
-        // Calculate REAL analytics from actual transaction data instead of using stale cached summary
-        const realSpendingTransactions = positiveAmounts.length;
-        const realIncomeTransactions = negativeAmounts.length;
-        const realTotalSpending = positiveAmounts.reduce((sum: number, t: TransactionWithAnalytics) => sum + t.amount, 0);
-        
-        console.log('=== REAL VS CACHED ANALYTICS COMPARISON ===');
-        console.log('Real spending transactions:', realSpendingTransactions);
-        console.log('Cached spending transactions:', analyticsData.summary?.totalSpendingTransactions || 0);
-        console.log('Real total spending:', realTotalSpending.toFixed(2));
-        console.log('Cached total spending:', analyticsData.summary?.totalSpending || 0);
-        console.log('Real income transactions:', realIncomeTransactions);
-        console.log('Calculated income transactions (total - cached spending):', totalTransactions - (analyticsData.summary?.totalSpendingTransactions || 0));
-        
-        // Analytics calculated but not stored (was used for overall summary cards)
+        // Fetch tagged merchants in parallel (non-blocking)
+        fetchTaggedMerchants();
         
       } else {
-        console.error('API Responses:', { transactions: transactionsData, analytics: analyticsData });
+        console.error('Failed to fetch transactions:', transactionsData);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -654,15 +420,6 @@ export default function TransactionsPage() {
         </span>
       ),
     },
-    {
-      accessorKey: 'totalMerchantTransactions',
-      header: 'Merchant Transaction Count',
-      cell: ({ getValue }: { getValue: () => number }) => (
-        <span className="text-gray-600">
-          {getValue().toLocaleString()}
-        </span>
-      ),
-    },
   ], [taggedMerchants, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
   const table = useReactTable({
@@ -682,7 +439,7 @@ export default function TransactionsPage() {
     getSortedRowModel: getSortedRowModel(),
     initialState: {
       pagination: {
-        pageSize: 1000,
+        pageSize: 50, // OPTIMIZED: Reduced from 1000 to 50 for faster loading
       },
     },
   });
