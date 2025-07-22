@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Script from "next/script";
+import HomepageSlickTextForm from "@/components/homepage-slicktext-form";
 
 export default function Home() {
   return (
@@ -54,15 +54,8 @@ export default function Home() {
           </Button>
         </div>
 
-        {/* SlickText Form */}
-        <div className="mb-12 flex justify-center">
-          <div id="slicktext-form-container" className="w-full max-w-md">
-            <Script
-              src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ"
-              strategy="afterInteractive"
-            />
-          </div>
-        </div>
+        {/* SlickText Form - Homepage Only */}
+        <HomepageSlickTextForm />
 
         {/* Value Proposition Section */}
         <div className="grid md:grid-cols-3 gap-8 mt-12 mb-16">
