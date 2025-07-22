@@ -1,5 +1,5 @@
-import { ContentLoader } from "@/components/ui/content-loader";
+import { BouncingMoneyLoader } from "@/components/ui/bouncing-money-loader";
 
 export default function SubscriptionLoading() {
-  return <ContentLoader />;
+  return <BouncingMoneyLoader />;
 }

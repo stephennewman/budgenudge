@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ContentLoader } from '@/components/ui/content-loader';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 
 
 interface TaggedMerchant {
@@ -227,7 +227,7 @@ export default function RecurringBillsManager() {
   };
 
   if (loading) {
-    return <ContentLoader />;
+    return <BouncingMoneyLoader />;
   }
 
   // Filter and sort active merchants by upcoming date (soonest first, future dates only)
