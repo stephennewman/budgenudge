@@ -234,15 +234,15 @@ export default function TestAITagsPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold">🤖 AI Tagging System Test</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-8">
+      <div className="flex flex-col">
+        <h1 className="text-2xl font-medium">🤖 AI Tagging System Test</h1>
+        <p className="text-muted-foreground mt-2">
           Test the OpenAI-powered merchant normalization and category tagging system
         </p>
       </div>
 
-      <div className="grid gap-6 max-w-4xl mx-auto">
+      <div className="grid gap-6">
         
         {/* Test Controls */}
         <Card className="p-6">

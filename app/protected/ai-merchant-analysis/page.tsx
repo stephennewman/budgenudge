@@ -377,15 +377,18 @@ export default function AIMerchantAnalysisPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">🏪 Merchants</h1>
-          {lastUpdated && (
-            <p className="text-gray-600">
-              Last updated: {lastUpdated.toLocaleString()}
-            </p>
-          )}
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-medium">🏪 Merchants</h1>
+          <p className="text-muted-foreground mt-2">
+            AI-powered merchant analysis and spending tracking
+            {lastUpdated && (
+              <span className="block text-sm">
+                Last updated: {lastUpdated.toLocaleString()}
+              </span>
+            )}
+          </p>
         </div>
         <ManualRefreshButton onRefresh={fetchAIMerchantData} />
       </div>

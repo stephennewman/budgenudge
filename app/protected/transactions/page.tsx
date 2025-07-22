@@ -452,9 +452,9 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">💳 Transactions</h1>
-            <p className="text-gray-600 mt-1">
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-medium">💳 Transactions</h1>
+            <p className="text-muted-foreground mt-2">
               {transactions.length} total transactions
             </p>
           </div>
