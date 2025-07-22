@@ -128,19 +128,20 @@ export default function AIMerchantAnalysisPage() {
         return;
       }
 
-      // OPTIMIZED: Simplified query with limit for faster processing
+      // Get all spending transactions (including those pending AI processing)
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select(`
           amount,
           date,
           ai_category_tag,
-          ai_merchant_name
+          ai_merchant_name,
+          merchant_name,
+          name
         `)
         .in('plaid_item_id', itemIds)
         .gte('amount', 0) // Only spending transactions
-        .order('date', { ascending: false })
-        .limit(500); // OPTIMIZED: Limit to recent 500 transactions
+        .order('date', { ascending: false });
 
       if (transactionsError) {
         throw new Error(`Failed to fetch transactions: ${transactionsError.message}`);
@@ -152,77 +153,175 @@ export default function AIMerchantAnalysisPage() {
         return;
       }
 
-      console.log('Processing', transactions.length, 'transactions for AI merchant analysis');
+      // Calculate global date range
+      const allDates = transactions.map(t => t.date).sort();
+      const globalFirstDate = new Date(allDates[0]);
+      const globalLastDate = new Date(allDates[allDates.length - 1]);
+      const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
-      // SIMPLIFIED: Basic merchant grouping without heavy calculations
+      // Process transactions by AI merchant
       const merchantMap = new Map<string, {
         totalSpending: number;
         transactionCount: number;
-        categories: Set<string>;
+        amounts: number[];
+        categories: Map<string, { amount: number; count: number }>;
+        monthlySpending: Map<string, number>; // For trend analysis
+        transactionDates: string[]; // For frequency analysis
       }>();
 
       transactions.forEach(transaction => {
-        const aiMerchant = transaction.ai_merchant_name || 'Unknown';
+        // Use AI merchant name if available, fallback to original merchant name, then transaction name
+        const aiMerchant = transaction.ai_merchant_name || transaction.merchant_name || transaction.name || 'Unknown';
         const aiCategory = transaction.ai_category_tag || 'Uncategorized';
+        
+        // Try to parse date consistently - assume date is YYYY-MM-DD format
+        const dateStr = transaction.date;
+        const txDate = new Date(dateStr + 'T12:00:00'); // Add noon time to avoid timezone edge cases
+        const monthKey = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, '0')}`;
 
         if (!merchantMap.has(aiMerchant)) {
           merchantMap.set(aiMerchant, {
             totalSpending: 0,
             transactionCount: 0,
-            categories: new Set(),
+            amounts: [],
+            categories: new Map(),
+            monthlySpending: new Map(),
+            transactionDates: [],
           });
         }
 
         const merchantData = merchantMap.get(aiMerchant)!;
         merchantData.totalSpending += transaction.amount;
         merchantData.transactionCount += 1;
-        merchantData.categories.add(aiCategory);
+        merchantData.amounts.push(transaction.amount);
+        merchantData.transactionDates.push(dateStr); // Use original date string
+
+        // Track category spending
+        if (!merchantData.categories.has(aiCategory)) {
+          merchantData.categories.set(aiCategory, { amount: 0, count: 0 });
+        }
+        const categoryData = merchantData.categories.get(aiCategory)!;
+        categoryData.amount += transaction.amount;
+        categoryData.count += 1;
+
+        // Track monthly spending for trends
+        if (!merchantData.monthlySpending.has(monthKey)) {
+          merchantData.monthlySpending.set(monthKey, 0);
+        }
+        merchantData.monthlySpending.set(monthKey, merchantData.monthlySpending.get(monthKey)! + transaction.amount);
       });
 
-      // SIMPLIFIED: Convert to display format with basic calculations  
+      // Convert to array and calculate metrics
       const processedData: AIMerchantData[] = Array.from(merchantMap.entries()).map(([aiMerchant, data]) => {
+        const avgDailySpending = data.totalSpending / daysOfData;
+        const avgMonthlySpending = avgDailySpending * 30;
         const avgTransactionAmount = data.totalSpending / data.transactionCount;
+
+        // Calculate transaction frequency
+        const sortedDates = data.transactionDates.sort();
+        let totalDaysBetween = 0;
+        for (let i = 1; i < sortedDates.length; i++) {
+          const date1 = new Date(sortedDates[i-1] + 'T12:00:00');
+          const date2 = new Date(sortedDates[i] + 'T12:00:00');
+          const daysBetween = Math.ceil((date2.getTime() - date1.getTime()) / (1000 * 60 * 60 * 24));
+          totalDaysBetween += daysBetween;
+        }
+        const frequencyDays = sortedDates.length > 1 ? totalDaysBetween / (sortedDates.length - 1) : daysOfData;
+
+        // Determine merchant type based on frequency
+        let merchantType: 'frequent' | 'occasional' | 'rare';
+        if (frequencyDays <= 7) {
+          merchantType = 'frequent'; // Weekly or more
+        } else if (frequencyDays <= 30) {
+          merchantType = 'occasional'; // Monthly
+        } else {
+          merchantType = 'rare'; // Less than monthly
+        }
+
+        // Get top categories (top 3)
+        const categories = Array.from(data.categories.entries())
+          .sort((a, b) => b[1].amount - a[1].amount)
+          .slice(0, 3)
+          .map(([category, data]) => ({
+            category,
+            amount: data.amount,
+            count: data.count
+          }));
+
+        // Calculate current month spending
+        const now = new Date();
+        const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const currentMonthSpending = data.monthlySpending.get(currentMonthKey) || 0;
+
+        // Calculate pacing
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const dayOfMonth = now.getDate();
+        const monthProgress = dayOfMonth / daysInMonth;
+        const expectedSpendingAtThisPoint = avgMonthlySpending * monthProgress;
+        const pacingPercentage = expectedSpendingAtThisPoint > 0 ? currentMonthSpending / expectedSpendingAtThisPoint : 0;
+
+        let pacingStatus: 'under' | 'on-track' | 'over';
+        if (pacingPercentage < 0.9) {
+          pacingStatus = 'under';
+        } else if (pacingPercentage > 1.1) {
+          pacingStatus = 'over';
+        } else {
+          pacingStatus = 'on-track';
+        }
+
+        // Calculate spending trend (last 3 months)
+        const monthlyAmounts = Array.from(data.monthlySpending.values()).slice(-3);
+        let spendingTrend: 'increasing' | 'stable' | 'decreasing' = 'stable';
+        if (monthlyAmounts.length >= 2) {
+          const recent = monthlyAmounts[monthlyAmounts.length - 1];
+          const previous = monthlyAmounts[monthlyAmounts.length - 2];
+          const change = recent - previous;
+          const changePercent = Math.abs(change) / previous;
+          
+          if (changePercent > 0.1) { // More than 10% change
+            spendingTrend = change > 0 ? 'increasing' : 'decreasing';
+          }
+        }
 
         return {
           ai_merchant: aiMerchant,
           total_spending: data.totalSpending,
           transaction_count: data.transactionCount,
           unique_categories: data.categories.size,
-          first_transaction_date: transactions[transactions.length - 1]?.date || '',
-          last_transaction_date: transactions[0]?.date || '',
-          days_of_data: 30, // Simplified
-          avg_daily_spending: data.totalSpending / 30,
-          avg_monthly_spending: data.totalSpending,
+          first_transaction_date: allDates[0],
+          last_transaction_date: allDates[allDates.length - 1],
+          days_of_data: daysOfData,
+          avg_daily_spending: avgDailySpending,
+          avg_monthly_spending: avgMonthlySpending,
           avg_transaction_amount: avgTransactionAmount,
-          frequency_days: 30, // Simplified
-          categories: Array.from(data.categories).slice(0, 3).map(category => ({
-            category,
-            amount: 0, // Simplified
-            count: 0
-          })),
-          current_month_spending: data.totalSpending,
-          pacing_percentage: 1,
-          pacing_status: 'on-track' as 'under' | 'on-track' | 'over',
-          spending_trend: 'stable' as 'increasing' | 'stable' | 'decreasing',
-          merchant_type: 'occasional' as 'frequent' | 'occasional' | 'rare'
+          frequency_days: frequencyDays,
+          categories: categories,
+          current_month_spending: currentMonthSpending,
+          pacing_percentage: pacingPercentage,
+          pacing_status: pacingStatus,
+          spending_trend: spendingTrend,
+          merchant_type: merchantType
         };
       });
 
-      // Sort by total spending
+      // Sort data
       processedData.sort((a, b) => {
         let comparison = 0;
         switch (sortBy) {
           case 'spending':
-            comparison = a.total_spending - b.total_spending;
+            comparison = a.avg_monthly_spending - b.avg_monthly_spending;
             break;
           case 'transactions':
             comparison = a.transaction_count - b.transaction_count;
             break;
           case 'frequency':
-            comparison = a.frequency_days - b.frequency_days;
+            comparison = a.frequency_days - b.frequency_days; // Lower days = higher frequency
             break;
-          default:
-            comparison = a.total_spending - b.total_spending;
+          case 'remaining':
+            const aRemaining = a.avg_monthly_spending - a.current_month_spending;
+            const bRemaining = b.avg_monthly_spending - b.current_month_spending;
+            comparison = aRemaining - bRemaining;
+            break;
         }
         return sortOrder === 'desc' ? -comparison : comparison;
       });
