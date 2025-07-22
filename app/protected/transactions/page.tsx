@@ -16,7 +16,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
+import { ContentLoader } from '@/components/ui/content-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
 import AITagEditor from '@/components/ai-tag-editor';
 
@@ -688,7 +688,7 @@ export default function TransactionsPage() {
   });
 
   if (isLoading) {
-    return <BouncingMoneyLoader />;
+    return <ContentLoader />;
   }
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
+import { ContentLoader } from '@/components/ui/content-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
 
 interface AIMerchantData {
@@ -461,7 +461,7 @@ export default function AIMerchantAnalysisPage() {
   };
 
   if (loading) {
-    return <BouncingMoneyLoader />;
+    return <ContentLoader />;
   }
 
   if (error) {
