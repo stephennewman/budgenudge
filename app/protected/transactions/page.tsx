@@ -546,22 +546,8 @@ export default function TransactionsPage() {
         return date.toLocaleDateString();
       },
       sortDescFirst: true,
-    },
-    {
-      accessorKey: 'logo_url',
-      header: 'Logo',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
-        const logoUrl = getValue();
-        return logoUrl ? (
-          <img src={logoUrl} alt="Merchant Logo" className="h-6 w-6 object-contain" />
-        ) : (
-          <span className="text-gray-400">-</span>
-        );
-      },
-      enableSorting: false,
-      size: 60,
-    },
-    {
+          },
+      {
       accessorKey: 'name',
       header: 'Description',
       cell: ({ getValue }: { getValue: () => string }) => (
