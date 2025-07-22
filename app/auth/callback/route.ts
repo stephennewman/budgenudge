@@ -66,8 +66,10 @@ export async function GET(request: NextRequest) {
     await setupNewUser(session.user);
 
     // Successful verification - redirect to protected area with success message
-    const successUrl = `${origin}${next}?verified=true`;
+    const successUrl = `${origin}/protected?verified=true`;
     console.log('🚀 Redirecting to:', successUrl);
+    console.log('🔍 Origin:', origin);
+    console.log('🔍 Next param:', next);
     
     return NextResponse.redirect(successUrl);
 

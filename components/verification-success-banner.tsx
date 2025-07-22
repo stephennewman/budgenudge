@@ -13,10 +13,10 @@ export default function VerificationSuccessBanner() {
     if (verified === 'true') {
       setShowBanner(true);
       
-      // Auto-hide after 10 seconds
+      // Auto-hide after 15 seconds (longer for better visibility)
       const timer = setTimeout(() => {
         setShowBanner(false);
-      }, 10000);
+      }, 15000);
 
       return () => clearTimeout(timer);
     }
