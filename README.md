@@ -1,12 +1,12 @@
 # 💳 Krezzo - Intelligent Financial Wellness via SMS
 
-**🎉 MILESTONE ACHIEVED!** After 3+ months of development, Krezzo is now a fully operational intelligent financial wellness platform with multi-bank integration and AI-powered insights.
+**🎉 MILESTONE ACHIEVED!** After 3+ months of development, Krezzo is now a fully operational intelligent financial wellness platform with multi-bank integration and smart insights.
 
 ## ✅ System Status: LIVE & OPERATIONAL
 
 - **✅ Multi-bank integration** - Connect any bank supported by Plaid
 - **✅ Scheduled SMS insights** - Daily personalized financial intelligence  
-- **✅ AI-powered analytics** - Smart merchant tagging and spending categorization
+- **✅ Smart analytics** - Intelligent merchant tagging and spending categorization
 - **✅ 100+ transactions analyzed** - Complete transaction history with AI insights
 - **✅ Zero manual intervention** - Fully automated daily insights system
 
@@ -40,7 +40,7 @@ Krezzo connects to your financial accounts and sends intelligent daily SMS insig
 
 ### Intelligent Daily Insights
 - Scheduled SMS delivery with personalized financial intelligence
-- AI-powered spending analysis and merchant categorization
+- Intelligent spending analysis and merchant categorization
 - Predictive bill reminders and spending pattern recognition
 
 ### Professional SMS Delivery  

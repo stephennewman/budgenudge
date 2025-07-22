@@ -238,7 +238,7 @@ export default function TestAITagsPage() {
       <div className="flex flex-col">
         <h1 className="text-2xl font-medium">🤖 AI Tagging System Test</h1>
         <p className="text-muted-foreground mt-2">
-          Test the OpenAI-powered merchant normalization and category tagging system
+          Test the merchant normalization and category tagging system
         </p>
       </div>
 

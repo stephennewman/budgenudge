@@ -7,7 +7,7 @@
 ### Core Value Proposition
 **Intelligent Financial Wellness Through Daily SMS Insights**
 
-Krezzo helps users maintain healthy financial habits by providing personalized daily SMS insights about their spending patterns, recurring bills, and AI-powered financial intelligence across all their connected bank accounts.
+Krezzo helps users maintain healthy financial habits by providing personalized daily SMS insights about their spending patterns, recurring bills, and intelligent financial analysis across all their connected bank accounts.
 
 ## Current Feature Set
 
@@ -37,7 +37,7 @@ Krezzo helps users maintain healthy financial habits by providing personalized d
    - Consolidated view across checking, savings, and credit accounts
    - Account-specific insights and management
 
-5. **AI-Powered Analytics**
+5. **Smart Analytics**
    - Smart merchant normalization and categorization (99% coverage)
    - Spending pattern recognition and trend analysis
    - Predictive bill detection and amount forecasting
@@ -193,7 +193,7 @@ Krezzo helps users maintain healthy financial habits by providing personalized d
 ### 2026 (Future)
 - Multi-bank integration
 - Advanced analytics dashboard
-- AI-powered insights
+- Intelligent insights
 - Mobile app development
 
 ## Success Metrics

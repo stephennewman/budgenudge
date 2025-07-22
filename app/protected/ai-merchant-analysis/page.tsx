@@ -481,7 +481,7 @@ export default function AIMerchantAnalysisPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">🏪 Merchants</h1>
           <p className="text-muted-foreground mt-2">
-            AI-powered merchant analysis and spending tracking
+            Smart merchant analysis and spending tracking
             {lastUpdated && (
               <span className="block text-sm">
                 Last updated: {lastUpdated.toLocaleString()}

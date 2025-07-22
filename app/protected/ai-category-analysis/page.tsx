@@ -417,7 +417,7 @@ export default function AICategoryAnalysisPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">🗂️ Categories</h1>
           <p className="text-muted-foreground mt-2">
-            AI-powered category analysis and spending tracking
+            Smart category analysis and spending tracking
             {lastUpdated && (
               <span className="block text-sm">
                 Last updated: {lastUpdated.toLocaleString()}

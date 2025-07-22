@@ -15,7 +15,7 @@
 **Behavioral Changes Expected:**
 - Users will receive intelligent daily SMS notifications about their financial status
 - Increased awareness of recurring bills and upcoming payments through scheduled alerts
-- Better spending pattern recognition and adjustment via AI-powered insights
+- Better spending pattern recognition and adjustment via intelligent insights
 - More proactive financial planning through predictive analytics
 
 **Problems Solved:**
@@ -45,7 +45,7 @@
 
 ### Recurring Transactions System - FULLY OPERATIONAL ✅
 - **Database**: `tagged_merchants` table with comprehensive recurring bill tracking
-- **Auto-Detection**: AI-powered pattern recognition for recurring transactions
+- **Auto-Detection**: Intelligent pattern recognition for recurring transactions
 - **Manual Management**: Full CRUD operations for custom recurring bills
 - **Prediction Engine**: Smart date calculation based on transaction history
 - **SMS Integration**: Recurring bills included in daily SMS notifications
@@ -108,6 +108,20 @@
 6. **99% Coverage Achieved**: System now automatically tags 99% of all transactions
 
 ### Deployment History
+- **July 22, 2025, 3:55 PM EDT**: 🔧 FINAL FIX - Google SSO Domain Configuration (95/100 Impact Score)
+  - 🚨 **Root Cause**: Auth redirect URLs pointing to Vercel-generated URLs instead of custom domain
+  - ✅ **Solution**: Updated to use production domain https://get.krezzo.com/auth/callback
+  - 🔄 **Fixed Both**: signUpAction and googleSignInAction for proper custom domain support
+  - ⚡ **Deploy**: Git commit 9c90c42 successfully deployed
+  - 🎯 **User Impact**: Google SSO authentication now works with get.krezzo.com domain
+- **July 22, 2025, 3:43 PM EDT**: 🔧 SURGICAL FIX - Analysis Pages Data Restoration (95/100 Impact Score)
+  - 🚨 **Critical Fix**: Restored accurate merchant and category analysis calculations after "performance optimization" broke them
+  - ❌ **Removed**: Artificial 500 transaction limit and hardcoded fake values (pacing_status: 'on-track', etc.)
+  - ✅ **Restored**: Complex frequency, pacing, and trend calculations from working version (commit 69d0971^)
+  - 🔄 **Preserved**: All recent UI improvements, Krezzo rebranding, and header styling
+  - 📊 **Analysis Pages**: Now show real insights instead of placeholder data with meaningful calculations
+  - ⚡ **Build**: Clean deployment in 39 seconds, all API routes and pages functional
+  - 🎯 **User Impact**: Analysis pages fully operational with accurate data instead of fake hardcoded values
 - **July 21, 2025, 5:45 PM EDT**: ✨ NEW FEATURE - Sortable Budget Analysis System (85/100 Impact Score)
   - 🟩🟨🟥 **Visual Budget Indicators**: Spend remaining column with colored squares on analysis pages
   - 🔄 **Sortable Interface**: Click "Remaining" header to sort by budget status (ascending/descending)
@@ -162,7 +176,7 @@
 - **July 19, 2025, 10:00 PM EDT**: NEW FEATURE - AI Category Analysis Page (85/100 Impact Score)
   - 🤖 **Major Analytics Feature**: Comprehensive table-based AI category analysis
   - 📊 **User-Requested Format**: Table view with sortable columns (spending/transactions/merchants)
-  - 🧠 **AI-Powered Insights**: Leverages ai_category_tag system for normalized spending analysis
+  - 🧠 **Smart Insights**: Leverages ai_category_tag system for normalized spending analysis
   - 📈 **Advanced Analytics**: Pacing analysis, 3-month trend detection, merchant insights
   - 🎯 **Navigation Enhancement**: Added to sidebar menu for easy access
   - ⚡ **Technical Excellence**: 54s build, 5.04kB bundle, clean TypeScript compilation
@@ -261,7 +275,7 @@ The `tagged_merchants` table contains:
 4. Optimize SMS templates based on user engagement
 
 ### Future Opportunities
-1. Enhanced AI-powered spending categorization
+1. Enhanced intelligent spending categorization
 2. Budget goal setting and tracking with predictive insights
 3. Advanced merchant-specific analytics and insights
 4. Multi-bank account management and consolidated reporting
@@ -283,7 +297,7 @@ The `tagged_merchants` table contains:
 - **Spending Goal Setting**: 88 (High value, moderate effort - integrate with pacing systems)
 
 ### Recently Achieved Opportunities ✅
-- **AI-Powered Spending Insights**: 90 → COMPLETED (Merchant & Category Pacing Systems)
+- **Smart Spending Insights**: 90 → COMPLETED (Merchant & Category Pacing Systems)
 - **Category-Based Budgeting**: 88 → COMPLETED (Category Pacing with spending analysis)  
 - **Smart Spending Patterns**: 88 → COMPLETED (Dual-level pacing detection and alerts)
 
