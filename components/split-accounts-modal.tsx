@@ -357,7 +357,7 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
     try {
       // For editing, we need to:
       // 1. Deactivate all current split merchants for this merchant name
-      // 2. Create new split merchants based on current groups
+      // 2. Either create new split merchants OR restore original if unsplitting
       
       // First, deactivate existing splits
       const response = await fetch('/api/tagged-merchants', {
@@ -382,9 +382,34 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
         }
       }
 
-      // Then create new splits
-      onConfirm(validGroups);
-      onClose();
+      if (validGroups.length === 0) {
+        // Unsplit case - find and reactivate the original merchant
+        const originalMerchantResponse = await fetch('/api/tagged-merchants', {
+          method: 'GET'
+        });
+        const originalData = await originalMerchantResponse.json();
+        
+        if (originalData.success) {
+          const originalMerchant = originalData.taggedMerchants.find((m: TaggedMerchant) => 
+            m.merchant_name === merchant.merchant_name && 
+            !m.account_identifier && 
+            !m.is_active
+          );
+
+          if (originalMerchant) {
+            await fetch(`/api/tagged-merchants/${originalMerchant.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ is_active: true })
+            });
+          }
+        }
+        onClose();
+      } else {
+        // Normal split case - create new splits
+        onConfirm(validGroups);
+        onClose();
+      }
     } catch (error) {
       console.error('Error editing split:', error);
       alert('Error updating split configuration');
@@ -574,10 +599,12 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
                 <Button variant="outline" onClick={onClose}>Cancel</Button>
                 <Button 
                   onClick={handleSplit} 
-                  disabled={groups.filter(g => g.transactions.length > 0).length === 0}
+                  disabled={!merchant.account_identifier && groups.filter(g => g.transactions.length > 0).length === 0}
                 >
                   {merchant.account_identifier 
-                    ? `Update to ${groups.filter(g => g.transactions.length > 0).length} Separate Bills`
+                    ? (groups.filter(g => g.transactions.length > 0).length === 0 
+                        ? "Restore Original (Unsplit)" 
+                        : `Update to ${groups.filter(g => g.transactions.length > 0).length} Separate Bills`)
                     : `Create ${groups.filter(g => g.transactions.length > 0).length} Separate Bills`
                   }
                 </Button>
