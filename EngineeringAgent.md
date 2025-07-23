@@ -1,6 +1,124 @@
 # 🧭 ENGINEERING AGENT
 
-**Last Updated:** Wednesday, July 23, 2025, 11:45 AM EDT
+**Last Updated:** Wednesday, July 23, 2025, 3:45 PM EDT
+
+---
+
+## 🤖 **DEPLOYMENT #8: SPLIT MERCHANT UX ENHANCEMENTS & DEPLOYMENT FIXES**
+**Status**: ✅ **DEPLOYED & VERIFIED**
+
+### **🚀 Deployment Infrastructure Fixed**
+#### **Issue**: Multiple failed Vercel deployments
+```bash
+# Error Pattern
+./components/split-accounts-modal.tsx:83:39
+Type error: Parameter 'tx' implicitly has an 'any' type.
+
+./components/split-accounts-modal.tsx:120:52  
+Type error: Parameter 'm' implicitly has an 'any' type.
+```
+
+#### **Solution**: TypeScript Error Resolution
+```typescript
+// Fixed missing type annotations
+const normalizedTxs = txs.map((tx: Transaction) => ({
+  ...tx,
+  id: tx.plaid_transaction_id || tx.id
+}));
+
+const splitMerchants = allMerchants.filter((m: TaggedMerchant) => 
+  m.merchant_name === merchant.merchant_name
+);
+
+// Enhanced Transaction interface
+interface Transaction {
+  id: string;
+  date: string;
+  amount: number;
+  name: string;
+  merchant_name?: string;
+  ai_merchant_name?: string;
+  ai_category_tag?: string;
+  plaid_transaction_id?: string;
+  is_tracked_for_this_split?: boolean;
+}
+```
+
+### **🎯 Enhanced Split Merchant Logic**
+#### **Simplified Split API** (`app/api/tagged-merchants/split/route.ts`)
+```typescript
+// BEFORE: Complex deactivate/reactivate flow
+// 1. Deactivate original merchant
+// 2. Create splits  
+// 3. On unsplit: find + reactivate original
+
+// AFTER: Simple additive approach
+// 1. Keep original merchant active
+// 2. Create additional split accounts
+// 3. On unsplit: just delete splits
+```
+
+#### **Smart Starring System** (`app/api/transaction-starred-status/route.ts`)
+```typescript
+// New API for transaction-specific starring
+export async function POST(request: Request) {
+  // Get all active tagged merchants
+  // Check transaction links for split accounts  
+  // Check merchant name matches for regular accounts
+  // Return Map<transaction_id, boolean>
+}
+```
+
+### **🎨 UI Component Enhancements**
+#### **Recurring Bills Redesign** (`components/recurring-bills-manager.tsx`)
+```typescript
+// Category Tags (instead of repeated text)
+{merchant.ai_category_tag && (
+  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+    {merchant.ai_category_tag}
+  </span>
+)}
+
+// Compact 2-line layout
+<div className="text-sm text-gray-600">
+  <span className="text-red-600">Next: {formatNextDate}</span> • 
+  ${amount} • {frequency} • {confidence}% confidence
+</div>
+
+// Enhanced custom naming
+<Input
+  placeholder="API, Credit Card, etc."
+  className="w-40"
+  title="Custom name for this account"
+/>
+```
+
+#### **Success Feedback System** (`components/split-accounts-modal.tsx`)
+```typescript
+// Dynamic success messages
+{successGroups.length === 0 
+  ? 'Merchant Restored Successfully!' 
+  : 'Split Created Successfully!'
+}
+
+// Auto-close with timing
+setTimeout(() => {
+  setShowSuccess(false);
+  onClose();
+}, 2000);
+```
+
+### **✅ Technical Verification**
+```bash
+# Build Status
+npm run build
+# ✓ Compiled successfully
+# ✓ Linting and checking validity of types
+
+# Deployment Status  
+vercel ls | head -3
+# ● Ready     Production      57s
+```
 
 ---
 
