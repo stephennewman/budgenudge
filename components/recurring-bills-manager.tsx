@@ -142,8 +142,10 @@ export default function RecurringBillsManager() {
       
       if (data.success) {
         setEditingId(null);
+        console.log('✅ Merchant updated successfully, refreshing list...');
         fetchTaggedMerchants(); // Refresh the list
       } else {
+        console.error('❌ Failed to update merchant:', data.error);
         alert('Failed to update merchant: ' + data.error);
       }
     } catch (error) {
@@ -232,11 +234,11 @@ export default function RecurringBillsManager() {
     });
   };
 
-  const getConfidenceColor = (score: number): string => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+  // const getConfidenceColor = (score: number): string => {
+  //   if (score >= 80) return 'text-green-600';
+  //   if (score >= 60) return 'text-yellow-600';
+  //   return 'text-red-600';
+  // };
 
   const getDisplayName = (merchant: TaggedMerchant): string => {
     const baseName = merchant.ai_merchant_name || merchant.merchant_name;

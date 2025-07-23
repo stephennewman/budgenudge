@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const splitMerchants = taggedMerchants?.filter(m => m.account_identifier) || [];
     const splitMerchantIds = splitMerchants.map(m => m.id);
     
-    let transactionLinks = new Map<string, number>(); // transaction_id -> tagged_merchant_id
+    const transactionLinks = new Map<string, number>(); // transaction_id -> tagged_merchant_id
     
     if (splitMerchantIds.length > 0) {
       const { data: links, error: linkError } = await supabase

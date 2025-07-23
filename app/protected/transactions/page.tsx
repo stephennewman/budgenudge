@@ -55,7 +55,7 @@ export default function TransactionsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
-  const [taggedMerchants, setTaggedMerchants] = useState<Set<string>>(new Set());
+  const [, setTaggedMerchants] = useState<Set<string>>(new Set());
   const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   const [transactionStarredStatus, setTransactionStarredStatus] = useState<Map<string, boolean>>(new Map());
   
@@ -208,7 +208,7 @@ export default function TransactionsPage() {
       if (data.success) {
         await fetchTaggedMerchants();
         // Refresh starred status for current transactions
-        const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+        const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter((id): id is string => Boolean(id));
         fetchTransactionStarredStatus(transactionIds);
       } else {
         alert('Failed to analyze merchant: ' + data.error);
@@ -246,7 +246,7 @@ export default function TransactionsPage() {
           if (deleteData.success) {
             await fetchTaggedMerchants();
             // Refresh starred status for current transactions
-            const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+            const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter((id): id is string => Boolean(id));
             fetchTransactionStarredStatus(transactionIds);
           } else {
             alert('Failed to remove merchant: ' + deleteData.error);
@@ -289,7 +289,7 @@ export default function TransactionsPage() {
         setTransactions(enhancedTransactions);
         
         // Fetch starred status for loaded transactions
-        const transactionIds = enhancedTransactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+        const transactionIds = enhancedTransactions.map((tx) => (tx as { plaid_transaction_id?: string }).plaid_transaction_id).filter((id): id is string => Boolean(id));
         fetchTransactionStarredStatus(transactionIds);
         
         // Fetch tagged merchants in parallel (still needed for starring new merchants)

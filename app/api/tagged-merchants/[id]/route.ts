@@ -21,6 +21,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       account_identifier 
     } = body;
 
+    console.log(`🔄 Updating merchant ${merchantId} for user ${user.id}:`, {
+      expected_amount,
+      prediction_frequency,
+      confidence_score,
+      is_active,
+      account_identifier
+    });
+
     // Calculate next predicted date if frequency changed
     const updateData: Record<string, string | number | boolean> = {
       updated_at: new Date().toISOString()
@@ -78,8 +86,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     if (error) {
       console.error('Error updating tagged merchant:', error);
+      
+      // Handle specific error cases
+      if (error.code === '23505') {
+        return NextResponse.json({ 
+          error: 'An account with this name already exists for this merchant. Please choose a different name.' 
+        }, { status: 409 });
+      }
+      
       return NextResponse.json({ 
-        error: 'Failed to update tagged merchant' 
+        error: 'Failed to update tagged merchant: ' + (error.message || 'Unknown error')
       }, { status: 500 });
     }
 
@@ -88,6 +104,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         error: 'Tagged merchant not found or access denied' 
       }, { status: 404 });
     }
+
+    console.log(`✅ Successfully updated merchant ${merchantId}: ${data.merchant_name}`, {
+      account_identifier: data.account_identifier,
+      expected_amount: data.expected_amount,
+      is_active: data.is_active
+    });
 
     return NextResponse.json({ 
       success: true, 
