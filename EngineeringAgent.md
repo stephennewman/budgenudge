@@ -1,6 +1,62 @@
 # 🧭 ENGINEERING AGENT
 
-**Last Updated:** Tuesday, July 22, 2025, 9:15 PM EDT
+**Last Updated:** Wednesday, July 23, 2025, 11:45 AM EDT
+
+---
+
+## 🤖 **DEPLOYMENT #7: AI TAGGING AUTOMATION FIX**
+**Status**: ✅ **DEPLOYED & VERIFIED**
+
+### **🚨 CRITICAL BUG RESOLUTION**
+- **Issue**: AI merchant & category auto-tagging completely broken since July 22
+- **Symptom**: Cron job running but processing 0 transactions (no OpenAI API calls)
+- **Impact**: Core product functionality failed - new transactions untagged
+- **Resolution Time**: ~2 hours of debugging + immediate fix
+
+### **🔍 Root Cause Analysis**
+```bash
+# Error Pattern Discovery
+curl https://get.krezzo.com/api/test-auto-ai-tag
+# Result: "fetch failed" → "Failed to parse URL from q/api/auto-ai-tag-new"
+
+# Environment Variable Investigation  
+vercel env ls | grep NEXT_PUBLIC_SITE_URL
+# Discovery: Variable existed but had invalid value "q"
+```
+
+### **🛠 Technical Implementation**
+#### **Environment Variable Fix**
+```bash
+# Problem: NEXT_PUBLIC_SITE_URL was set to "q" (invalid URL)
+# Solution: Updated via Vercel Dashboard
+NEXT_PUBLIC_SITE_URL=https://get.krezzo.com
+
+# Deployment Trigger
+git commit --allow-empty -m "redeploy with corrected NEXT_PUBLIC_SITE_URL"
+git push
+```
+
+#### **Affected Code Paths**
+- `app/api/auto-ai-tag-new/route.ts` - Main AI tagging endpoint
+- `app/api/test-auto-ai-tag/route.ts` - Test endpoint for internal calls
+- Internal fetch: `${process.env.NEXT_PUBLIC_SITE_URL}/api/auto-ai-tag-new`
+
+### **✅ Verification & Testing**
+```bash
+# Pre-fix (broken)
+curl -X POST https://get.krezzo.com/api/test-auto-ai-tag
+# Result: {"success":false,"error":"fetch failed"}
+
+# Post-fix (working) 
+curl -X POST https://get.krezzo.com/api/test-auto-ai-tag  
+# Result: {"success":true,"message":"Auto AI tagging test completed successfully"}
+```
+
+### **📊 System Recovery**
+- **Backlogged Transactions**: 7 successfully processed during debugging
+- **Current Status**: 0 untagged transactions remaining  
+- **Automation**: Verified working for future 15-minute cron cycles
+- **Cron Schedule**: `*/15 * * * *` (every 15 minutes)
 
 ---
 

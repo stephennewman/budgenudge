@@ -2,9 +2,9 @@
 **Primary Agent & Task Orchestrator**
 
 ## 📅 **PROJECT STATUS**
-- **Current Date**: Tuesday, July 22, 2025, 8:59 PM EDT
+- **Current Date**: Wednesday, July 23, 2025, 11:45 AM EDT
 - **Project Phase**: Active Development & Optimization
-- **Last Updated**: Tuesday, July 22, 2025, 9:15 PM EDT
+- **Last Updated**: Wednesday, July 23, 2025, 11:45 AM EDT
 
 ---
 
@@ -16,7 +16,39 @@
 
 ---
 
-## 📱 **RECENT DEPLOYMENT: MOBILE RESPONSIVE OPTIMIZATION**
+## 🤖 **RECENT DEPLOYMENT: AI TAGGING AUTOMATION FIX**
+**Deployment #7 - July 23, 2025**
+
+### **🎯 CRITICAL BUG FIXED**
+- **Issue**: AI merchant & category tagging stopped working automatically on July 22
+- **Impact**: New transactions not getting auto-tagged, breaking core product functionality
+- **Root Cause**: Missing `NEXT_PUBLIC_SITE_URL` environment variable caused internal API calls to fail
+- **Result**: ✅ **Automation fully restored - ready for tomorrow's transactions**
+
+### **📋 Technical Resolution**
+1. **Environment Variable Fix** ✅
+   - Added missing `NEXT_PUBLIC_SITE_URL = https://get.krezzo.com`
+   - Fixed broken internal API calls in cron job automation
+   - Deployed via Vercel dashboard + redeploy
+
+2. **Verification Tests** ✅
+   - Manual trigger: Successfully processed 7 backlogged transactions
+   - Test endpoint: Confirmed internal API calls working (`test-auto-ai-tag`)
+   - Status check: 0 untagged transactions remaining
+
+3. **Automation Flow Restored** ✅
+   - Webhook stores transactions (no AI processing for speed)
+   - 15-minute cron job handles all AI tagging (`*/15 * * * *`)
+   - Internal API call: `${NEXT_PUBLIC_SITE_URL}/api/auto-ai-tag-new` now works
+
+### **🔍 Debugging Process**
+- **Investigation**: Cron job running but making 0 OpenAI API calls
+- **Discovery**: Internal fetch calls failing with "fetch failed" / "Failed to parse URL"
+- **Solution**: Environment variable was set to "q" instead of full domain URL
+
+---
+
+## 📱 **PREVIOUS DEPLOYMENT: MOBILE RESPONSIVE OPTIMIZATION**
 **Deployment #6 - July 22, 2025**
 
 ### **🎯 Objective Completed**

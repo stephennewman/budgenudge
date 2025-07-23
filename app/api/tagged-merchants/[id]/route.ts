@@ -17,7 +17,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       expected_amount, 
       prediction_frequency,
       confidence_score,
-      is_active 
+      is_active,
+      account_identifier 
     } = body;
 
     // Calculate next predicted date if frequency changed
@@ -60,6 +61,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     if (is_active !== undefined) {
       updateData.is_active = is_active;
+    }
+
+    if (account_identifier !== undefined) {
+      updateData.account_identifier = account_identifier;
     }
 
     // Update the tagged merchant

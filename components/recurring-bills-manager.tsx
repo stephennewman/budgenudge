@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
+import SplitAccountsModal from '@/components/split-accounts-modal';
 
 
 interface TaggedMerchant {
@@ -17,6 +18,7 @@ interface TaggedMerchant {
   is_active: boolean;
   auto_detected: boolean;
   next_predicted_date: string;
+  account_identifier?: string;
   created_at: string;
 }
 
@@ -40,6 +42,7 @@ export default function RecurringBillsManager() {
     expected_amount: '',
     prediction_frequency: '',
     next_predicted_date: '',
+    account_identifier: '',
     is_active: true
   });
 
@@ -54,6 +57,10 @@ export default function RecurringBillsManager() {
   // Historical transactions state
   const [merchantTransactions, setMerchantTransactions] = useState<{[key: number]: Transaction[]}>({});
   const [loadingTransactions, setLoadingTransactions] = useState<{[key: number]: boolean}>({});
+
+  // Split modal state
+  const [splitModalOpen, setSplitModalOpen] = useState(false);
+  const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
 
   useEffect(() => {
     fetchTaggedMerchants();
@@ -116,6 +123,7 @@ export default function RecurringBillsManager() {
       expected_amount: merchant.expected_amount.toString(),
       prediction_frequency: merchant.prediction_frequency,
       next_predicted_date: merchant.next_predicted_date,
+      account_identifier: merchant.account_identifier || '',
       is_active: merchant.is_active
     });
   };
@@ -228,6 +236,54 @@ export default function RecurringBillsManager() {
     return 'text-red-600';
   };
 
+  const getDisplayName = (merchant: TaggedMerchant): string => {
+    const baseName = merchant.ai_merchant_name || merchant.merchant_name;
+    
+    if (!merchant.account_identifier) {
+      return baseName; // "T-Mobile" (original, unsplit)
+    }
+    
+    // Check if numeric or custom name
+    if (/^\d+$/.test(merchant.account_identifier)) {
+      return `${baseName} ${merchant.account_identifier}`; // "T-Mobile 1"
+    } else {
+      return `${baseName} (${merchant.account_identifier})`; // "T-Mobile (Wife)"
+    }
+  };
+
+  const handleSplitAccounts = (merchant: TaggedMerchant) => {
+    setSplitMerchant(merchant);
+    setSplitModalOpen(true);
+  };
+
+  const handleConfirmSplit = async (groups: { id: string; transactions: Transaction[]; averageAmount: number; frequency: string; confidence: number; }[]) => {
+    if (!splitMerchant) return;
+
+    try {
+      const response = await fetch('/api/tagged-merchants/split', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          merchant_id: splitMerchant.id,
+          groups: groups
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSplitModalOpen(false);
+        setSplitMerchant(null);
+        fetchTaggedMerchants(); // Refresh the list
+      } else {
+        alert('Failed to split merchant: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error splitting merchant:', error);
+      alert('Error splitting merchant');
+    }
+  };
+
   if (loading) {
     return <BouncingMoneyLoader />;
   }
@@ -322,6 +378,13 @@ export default function RecurringBillsManager() {
                         onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
                         className="w-36"
                       />
+                      <Input
+                        type="text"
+                        placeholder="Account name"
+                        value={editForm.account_identifier}
+                        onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
+                        className="w-32"
+                      />
                       <select 
                         value={editForm.prediction_frequency}
                         onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
@@ -343,7 +406,7 @@ export default function RecurringBillsManager() {
                       <div className="flex items-center gap-4 flex-1">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{merchant.ai_merchant_name || merchant.merchant_name}</span>
+                            <span className="font-medium truncate">{getDisplayName(merchant)}</span>
                           </div>
                           <div className="text-sm text-gray-600 mb-1">
                             ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}
@@ -356,6 +419,14 @@ export default function RecurringBillsManager() {
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleSplitAccounts(merchant)}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          🔀 Split
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -443,6 +514,19 @@ export default function RecurringBillsManager() {
             ))}
           </div>
         </Card>
+      )}
+
+      {/* Split Accounts Modal */}
+      {splitMerchant && (
+        <SplitAccountsModal
+          merchant={splitMerchant}
+          isOpen={splitModalOpen}
+          onClose={() => {
+            setSplitModalOpen(false);
+            setSplitMerchant(null);
+          }}
+          onConfirm={handleConfirmSplit}
+        />
       )}
     </div>
   );
