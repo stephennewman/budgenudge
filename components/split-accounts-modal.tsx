@@ -64,14 +64,19 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
     
     setLoading(true);
     try {
-      // Use merchant name for matching
+      // Use merchant name for matching (don't pass merchantId here since we're fetching for splitting)
       const response = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(searchTerm)}`);
       const data = await response.json();
       
       if (data.success) {
         const txs = data.transactions || [];
-        setTransactions(txs);
-        setUngroupedTransactions(txs);
+        // Ensure each transaction has the plaid_transaction_id as the id
+        const normalizedTxs = txs.map(tx => ({
+          ...tx,
+          id: tx.plaid_transaction_id || tx.id // Use plaid_transaction_id if available
+        }));
+        setTransactions(normalizedTxs);
+        setUngroupedTransactions(normalizedTxs);
         setGroups([]);
       }
     } catch (error) {

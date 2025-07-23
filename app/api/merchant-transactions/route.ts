@@ -45,6 +45,8 @@ export async function GET(request: Request) {
 
     // If merchantId is provided, check if this merchant has specific transaction relationships
     if (merchantId) {
+      console.log(`🔍 Looking for specific transactions for merchant ID ${merchantId}`);
+      
       const { data: specificTransactions, error: specificError } = await supabase
         .from('tagged_merchant_transactions')
         .select(`
@@ -62,9 +64,16 @@ export async function GET(request: Request) {
       if (specificError) {
         console.error('Error fetching specific transactions:', specificError);
       } else if (specificTransactions && specificTransactions.length > 0) {
+        console.log(`✅ Found ${specificTransactions.length} specific transactions for split merchant`);
+      } else {
+        console.log(`ℹ️ No specific transactions found for merchant ID ${merchantId}, will use fallback`);
+      }
+      
+      if (specificTransactions && specificTransactions.length > 0) {
         // Use specific transactions linked to this split merchant
         transactions = specificTransactions.map(st => ({
           id: st.transactions.plaid_transaction_id,
+          plaid_transaction_id: st.transactions.plaid_transaction_id,
           date: st.transactions.date,
           merchant_name: st.transactions.merchant_name,
           name: st.transactions.name,
@@ -89,7 +98,8 @@ export async function GET(request: Request) {
 
       transactions = genericTransactions?.map(t => ({
         ...t,
-        id: t.plaid_transaction_id
+        id: t.plaid_transaction_id,
+        plaid_transaction_id: t.plaid_transaction_id
       }));
       txError = genericError;
     }

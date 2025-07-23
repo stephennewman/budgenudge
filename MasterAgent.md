@@ -16,7 +16,24 @@
 
 ---
 
-## 🤖 **RECENT DEPLOYMENT: AI TAGGING AUTOMATION FIX**
+## 🚀 **LATEST DEPLOYMENT: TRANSACTION-SPECIFIC DISPLAY FOR SPLIT MERCHANTS**
+**Deployment #8 - January 23, 2025, 1:15 PM EST**
+
+### **✨ KEY ENHANCEMENT DEPLOYED**
+**Transaction-Specific Display**: Split merchants now show only their grouped transactions
+
+**Technical Implementation**:
+- **Database Enhancement**: Added `tagged_merchant_transactions` table for exact transaction relationships
+- **Smart API Logic**: Enhanced merchant-transactions API to check for specific links first, fallback to generic matching
+- **Split API Enhancement**: Updated to store transaction relationships when merchants are split
+- **TypeScript Updates**: Added proper types for new database schema
+- **Backward Compatibility**: Non-split merchants continue working exactly as before
+
+**User Experience Improvement**: When merchants like T-Mobile or Chase are split into groups ($118 and $132), each split account's "Recent Transactions" section now shows only the transactions that were dragged into that specific group, making predictions much more accurate and meaningful.
+
+---
+
+## 🤖 **PREVIOUS DEPLOYMENT: AI TAGGING AUTOMATION FIX**
 **Deployment #7 - July 23, 2025**
 
 ### **🎯 CRITICAL BUG FIXED**
