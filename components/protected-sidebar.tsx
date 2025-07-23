@@ -8,51 +8,53 @@ export default async function ProtectedSidebar() {
   // const { data } = await client.entitlements.check("premium");
 
   return (
-    <InPageSidebar
-      basePath="/protected"
-      items={[
-        {
-          label: "🏠 Account",
-          href: "/",
-        },
-        {
-          label: "💳 Transactions",
-          href: "/transactions",
-        },
-        // {
-        //   label: "📊 Category Analysis",
-        //   href: "/category-analysis",
-        // },
-        {
-          label: "🗂️ Categories",
-          href: "/ai-category-analysis",
-        },
-        {
-          label: "🏪 Merchants",
-          href: "/ai-merchant-analysis",
-        },
-        // REMOVED FOR PERFORMANCE: Heavy analytics features
-        // {
-        //   label: "Analysis",
-        //   href: "/analysis",
-        // },
-        // {
-        //   label: "Weekly Spending",
-        //   href: "/weekly-spending",
-        // },
-        // {
-        //   label: "Predictive Calendar",
-        //   href: "/calendar",
-        // },
-        {
-          label: "⭐ Bills",
-          href: "/recurring-bills",
-        },
-        {
-          label: "📱 Texts",
-          href: "/sms-preferences",
-        },
-      ]}
-    />
+    <div className="hidden lg:block">
+      <InPageSidebar
+        basePath="/protected"
+        items={[
+          {
+            label: "🏠 Account",
+            href: "/",
+          },
+          {
+            label: "💳 Transactions",
+            href: "/transactions",
+          },
+          // {
+          //   label: "📊 Category Analysis",
+          //   href: "/category-analysis",
+          // },
+          {
+            label: "🗂️ Categories",
+            href: "/ai-category-analysis",
+          },
+          {
+            label: "🏪 Merchants",
+            href: "/ai-merchant-analysis",
+          },
+          // REMOVED FOR PERFORMANCE: Heavy analytics features
+          // {
+          //   label: "Analysis",
+          //   href: "/analysis",
+          // },
+          // {
+          //   label: "Weekly Spending",
+          //   href: "/weekly-spending",
+          // },
+          // {
+          //   label: "Predictive Calendar",
+          //   href: "/calendar",
+          // },
+          {
+            label: "⭐ Bills",
+            href: "/recurring-bills",
+          },
+          {
+            label: "📱 Texts",
+            href: "/sms-preferences",
+          },
+        ]}
+      />
+    </div>
   );
 }
