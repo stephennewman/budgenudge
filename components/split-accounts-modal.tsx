@@ -362,9 +362,18 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       // Note: The split API will handle deleting existing splits and creating new ones
 
       if (validGroups.length === 0) {
-        // Unsplit case - splits are already deleted, original merchant stays active
-        // No additional action needed since original merchant was never deactivated
-        onClose();
+        // Unsplit case - show success feedback
+        setSuccessGroups([]);
+        setShowSuccess(true);
+        
+        // Execute the unsplit (which just deletes split accounts)
+        onConfirm(validGroups);
+        
+        // Hide success feedback and close modal after 2 seconds
+        setTimeout(() => {
+          setShowSuccess(false);
+          onClose();
+        }, 2000);
       } else {
         // Normal split case - create new splits
         onConfirm(validGroups);
@@ -388,18 +397,23 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
             <div className="text-center">
               <div className="text-6xl mb-4">✅</div>
               <div className="text-xl font-semibold text-green-800 mb-2">
-                Split Created Successfully!
+                {successGroups.length === 0 ? 'Merchant Restored Successfully!' : 'Split Created Successfully!'}
               </div>
               <div className="text-green-600">
-                Created {successGroups.length} separate billing accounts
+                {successGroups.length === 0 
+                  ? `${merchant.ai_merchant_name || merchant.merchant_name} restored to original state`
+                  : `Created ${successGroups.length} separate billing accounts`
+                }
               </div>
-              <div className="mt-4 max-w-md">
-                {successGroups.map((group, index) => (
-                  <div key={index} className="text-sm bg-white rounded p-2 mb-2 shadow">
-                    <strong>{group.name}</strong>: {group.transactions.length} transactions tracked
-                  </div>
-                ))}
-              </div>
+              {successGroups.length > 0 && (
+                <div className="mt-4 max-w-md">
+                  {successGroups.map((group, index) => (
+                    <div key={index} className="text-sm bg-white rounded p-2 mb-2 shadow">
+                      <strong>{group.name}</strong>: {group.transactions.length} transactions tracked
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
