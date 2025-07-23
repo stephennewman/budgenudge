@@ -245,11 +245,12 @@ export default function RecurringBillsManager() {
       return baseName; // "Prudential" (original, unsplit)
     }
     
-    // Check if numeric or custom name
+    // Check if numeric identifier
     if (/^\d+$/.test(merchant.account_identifier)) {
-      return `${baseName} ${merchant.account_identifier}`; // "T-Mobile 1"
+      return `${baseName} ${merchant.account_identifier}`; // "OpenAI 1"
     } else {
-      return `${baseName} (${merchant.account_identifier})`; // "T-Mobile (Wife)"
+      // For custom names, use clean format without parentheses
+      return `${baseName} ${merchant.account_identifier}`; // "OpenAI API", "Chase Credit Card"
     }
   };
 
@@ -384,10 +385,11 @@ export default function RecurringBillsManager() {
                       />
                       <Input
                         type="text"
-                        placeholder="Account name"
+                        placeholder="API, Credit Card, etc."
                         value={editForm.account_identifier}
                         onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
-                        className="w-32"
+                        className="w-40"
+                        title="Custom name for this account (e.g., 'API', 'Credit Card', 'Personal')"
                       />
                       <select 
                         value={editForm.prediction_frequency}
