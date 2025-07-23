@@ -154,8 +154,8 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
               });
 
               // Remove these transactions from remaining
-              remainingTransactions = remainingTransactions.filter(tx => 
-                !groupTransactions.some(gtx => gtx.id === tx.id)
+              remainingTransactions = remainingTransactions.filter((tx: Transaction) => 
+                !groupTransactions.some((gtx: Transaction) => gtx.id === tx.id)
               );
             }
           }
