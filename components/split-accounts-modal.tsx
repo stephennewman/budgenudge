@@ -55,6 +55,10 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
   useEffect(() => {
     if (isOpen && merchant) {
       fetchMerchantTransactions();
+      if (merchant.account_identifier) {
+        // This is an edit operation - load existing splits
+        loadExistingSplits();
+      }
     }
   }, [isOpen, merchant]);
 
@@ -76,13 +80,75 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
           id: tx.plaid_transaction_id || tx.id // Use plaid_transaction_id if available
         }));
         setTransactions(normalizedTxs);
-        setUngroupedTransactions(normalizedTxs);
-        setGroups([]);
+        if (!merchant.account_identifier) {
+          // Only reset groups for new splits, not edits
+          setUngroupedTransactions(normalizedTxs);
+          setGroups([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadExistingSplits = async () => {
+    try {
+      // Fetch all split merchants for this merchant name
+      const response = await fetch(`/api/tagged-merchants`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const allMerchants = data.taggedMerchants || [];
+        const splitMerchants = allMerchants.filter(m => 
+          m.merchant_name === merchant.merchant_name && 
+          m.account_identifier && 
+          m.is_active
+        );
+
+        // Load existing groups and their tracked transactions
+        const existingGroups = [];
+        let remainingTransactions = [...transactions];
+
+        for (const splitMerchant of splitMerchants) {
+          // Get tracked transactions for this split
+          const txResponse = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(merchant.merchant_name)}&merchantId=${splitMerchant.id}`);
+          const txData = await txResponse.json();
+          
+          if (txData.success) {
+            const trackedTxs = (txData.transactions || [])
+              .filter(tx => tx.is_tracked_for_this_split)
+              .map(tx => ({
+                ...tx,
+                id: tx.plaid_transaction_id || tx.id
+              }));
+
+            if (trackedTxs.length > 0) {
+              const groupTransactions = trackedTxs.filter(tx => 
+                transactions.some(t => t.id === tx.id)
+              );
+
+              existingGroups.push({
+                id: splitMerchant.account_identifier,
+                name: `${merchant.merchant_name} ${splitMerchant.account_identifier}`,
+                transactions: groupTransactions,
+                ...calculateGroupPredictions(groupTransactions)
+              });
+
+              // Remove these transactions from remaining
+              remainingTransactions = remainingTransactions.filter(tx => 
+                !groupTransactions.some(gtx => gtx.id === tx.id)
+              );
+            }
+          }
+        }
+
+        setGroups(existingGroups);
+        setUngroupedTransactions(remainingTransactions);
+      }
+    } catch (error) {
+      console.error('Error loading existing splits:', error);
     }
   };
 
@@ -250,8 +316,53 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
   const handleSplit = () => {
     // Only send groups that have transactions
     const validGroups = groups.filter(g => g.transactions.length > 0);
-    onConfirm(validGroups);
-    onClose();
+    
+    if (merchant.account_identifier) {
+      // This is an edit operation - we need to handle it differently
+      handleEditSplit(validGroups);
+    } else {
+      // This is a new split operation
+      onConfirm(validGroups);
+      onClose();
+    }
+  };
+
+  const handleEditSplit = async (validGroups: TransactionGroup[]) => {
+    try {
+      // For editing, we need to:
+      // 1. Deactivate all current split merchants for this merchant name
+      // 2. Create new split merchants based on current groups
+      
+      // First, deactivate existing splits
+      const response = await fetch('/api/tagged-merchants', {
+        method: 'GET'
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        const existingSplits = data.taggedMerchants.filter(m => 
+          m.merchant_name === merchant.merchant_name && 
+          m.account_identifier && 
+          m.is_active
+        );
+
+        // Deactivate existing splits
+        for (const split of existingSplits) {
+          await fetch(`/api/tagged-merchants/${split.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: false })
+          });
+        }
+      }
+
+      // Then create new splits
+      onConfirm(validGroups);
+      onClose();
+    } catch (error) {
+      console.error('Error editing split:', error);
+      alert('Error updating split configuration');
+    }
   };
 
   if (!isOpen) return null;
@@ -261,7 +372,10 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       <div className="bg-white rounded-lg p-6 max-w-7xl w-full mx-4 max-h-[85vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">
-            Split {merchant.ai_merchant_name || merchant.merchant_name} into Multiple Accounts
+            {merchant.account_identifier 
+              ? `Edit ${merchant.ai_merchant_name || merchant.merchant_name} Split Configuration`
+              : `Split ${merchant.ai_merchant_name || merchant.merchant_name} into Multiple Accounts`
+            }
           </h2>
           <Button variant="outline" onClick={onClose}>✕</Button>
         </div>
@@ -273,7 +387,11 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
         ) : (
           <div className="space-y-6">
             <div className="text-sm text-gray-600 mb-4">
-              📋 <strong>{transactions.length} transactions found</strong> • Drag transactions from left to right to group them into separate recurring bills
+              📋 <strong>{transactions.length} transactions found</strong> • 
+              {merchant.account_identifier 
+                ? " Edit existing groups by dragging transactions between groups"
+                : " Drag transactions from left to right to group them into separate recurring bills"
+              }
             </div>
 
             <div className="grid grid-cols-2 gap-6">
@@ -401,7 +519,10 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
 
             <div className="flex justify-between items-center pt-4 border-t">
               <div className="text-sm text-gray-500">
-                Original &ldquo;{merchant.ai_merchant_name || merchant.merchant_name}&rdquo; will be deactivated • One-off transactions can be left ungrouped
+                {merchant.account_identifier 
+                  ? "Previous split configuration will be replaced • One-off transactions can be left ungrouped"
+                  : `Original "${merchant.ai_merchant_name || merchant.merchant_name}" will be deactivated • One-off transactions can be left ungrouped`
+                }
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={onClose}>Cancel</Button>
@@ -409,7 +530,10 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
                   onClick={handleSplit} 
                   disabled={groups.filter(g => g.transactions.length > 0).length === 0}
                 >
-                  Create {groups.filter(g => g.transactions.length > 0).length} Separate Bills
+                  {merchant.account_identifier 
+                    ? `Update to ${groups.filter(g => g.transactions.length > 0).length} Separate Bills`
+                    : `Create ${groups.filter(g => g.transactions.length > 0).length} Separate Bills`
+                  }
                 </Button>
               </div>
             </div>

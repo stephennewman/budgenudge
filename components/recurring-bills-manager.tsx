@@ -6,7 +6,6 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
-import SplitMerchantManager from '@/components/split-merchant-manager';
 
 
 interface TaggedMerchant {
@@ -63,10 +62,6 @@ export default function RecurringBillsManager() {
   // Split modal state
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
-
-  // Split management modal state
-  const [managementModalOpen, setManagementModalOpen] = useState(false);
-  const [managementMerchant, setManagementMerchant] = useState<string>('');
 
   useEffect(() => {
     fetchTaggedMerchants();
@@ -291,10 +286,7 @@ export default function RecurringBillsManager() {
     }
   };
 
-  const handleManageSplit = (merchantName: string) => {
-    setManagementMerchant(merchantName);
-    setManagementModalOpen(true);
-  };
+
 
   if (loading) {
     return <BouncingMoneyLoader />;
@@ -431,25 +423,14 @@ export default function RecurringBillsManager() {
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
-                        {merchant.account_identifier ? (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleManageSplit(merchant.merchant_name)}
-                            className="text-green-600 hover:text-green-700"
-                          >
-                            🔧 Manage
-                          </Button>
-                        ) : (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => handleSplitAccounts(merchant)}
-                            className="text-blue-600 hover:text-blue-700"
-                          >
-                            🔀 Split
-                          </Button>
-                        )}
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleSplitAccounts(merchant)}
+                          className={merchant.account_identifier ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
+                        >
+                          {merchant.account_identifier ? "✏️ Edit Split" : "🔀 Split"}
+                        </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -483,33 +464,23 @@ export default function RecurringBillsManager() {
                       </div>
                       <ul className="space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
-                          <li key={transaction.id} className={`text-sm p-2 rounded ${
+                          <li key={transaction.id} className={`text-sm p-2 rounded flex items-center justify-between ${
                             merchant.account_identifier && transaction.is_tracked_for_this_split 
                               ? 'bg-blue-50 border-l-3 border-l-blue-400' 
                               : merchant.account_identifier
                               ? 'bg-gray-50 opacity-75'
                               : ''
                           }`}>
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  {merchant.account_identifier && transaction.is_tracked_for_this_split && (
-                                    <span className="text-blue-600">🎯</span>
-                                  )}
-                                  <span className="font-medium">{transaction.ai_merchant_name || transaction.merchant_name || transaction.name}</span>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 ml-6">
-                                  {transaction.date}
-                                  {transaction.ai_category_tag && (
-                                    <>
-                                      {" • "}
-                                      <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded">{transaction.ai_category_tag}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                              <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
+                            <div className="flex items-center gap-2">
+                              {merchant.account_identifier && transaction.is_tracked_for_this_split && (
+                                <span className="text-blue-600">🎯</span>
+                              )}
+                              <span className="text-gray-500">{transaction.date}</span>
+                              {transaction.ai_category_tag && (
+                                <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">{transaction.ai_category_tag}</span>
+                              )}
                             </div>
+                            <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
                           </li>
                         ))}
                       </ul>
@@ -579,12 +550,7 @@ export default function RecurringBillsManager() {
         />
       )}
 
-      {/* Split Management Modal */}
-      <SplitMerchantManager
-        merchantName={managementMerchant}
-        isOpen={managementModalOpen}
-        onClose={() => setManagementModalOpen(false)}
-      />
+
     </div>
   );
 } 
