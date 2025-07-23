@@ -483,13 +483,8 @@ export default function RecurringBillsManager() {
                             </div>
                           </li>
                         ))}
-                      </ul>
-                      {merchant.account_identifier && (
-                        <div className="mt-3 pt-2 border-t text-xs text-gray-500">
-                          This split account tracks {merchantTransactions[merchant.id].filter(t => t.is_tracked_for_this_split).length} of {merchantTransactions[merchant.id].length} recent transactions for predictions.
-                        </div>
-                      )}
-                    </div>
+                                              </ul>
+                      </div>
                   </div>
                 ) : (
                   <div className="px-3 pb-3">
