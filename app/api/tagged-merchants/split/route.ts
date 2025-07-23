@@ -161,9 +161,6 @@ export async function POST(request: Request) {
         created_at: new Date().toISOString()
       }));
 
-      console.log(`🔗 Linking ${transactionLinks.length} transactions to merchant ${newMerchant.id}:`, 
-        transactionLinks.map(link => link.transaction_id));
-
       const { error: linkError } = await supabase
         .from('tagged_merchant_transactions')
         .insert(transactionLinks);
@@ -171,8 +168,6 @@ export async function POST(request: Request) {
       if (linkError) {
         console.error('Error linking transactions to split merchant:', linkError);
         // Continue even if linking fails - the split merchant is created
-      } else {
-        console.log(`✅ Successfully linked ${transactionLinks.length} transactions to split merchant`);
       }
 
       newMerchants.push(newMerchant);

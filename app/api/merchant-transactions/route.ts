@@ -45,28 +45,33 @@ export async function GET(request: Request) {
 
     // If merchantId is provided, check if this merchant has specific transaction relationships
     if (merchantId) {
-      console.log(`🔍 Looking for specific transactions for merchant ID ${merchantId}`);
-      
-      const { data: specificTransactions, error: specificError } = await supabase
+      // First, get the linked transaction IDs
+      const { data: transactionLinks, error: linkError } = await supabase
         .from('tagged_merchant_transactions')
-        .select(`
-          transaction_id,
-          transactions!inner(
-            id, date, merchant_name, name, amount, subcategory, 
-            ai_merchant_name, ai_category_tag, plaid_transaction_id
-          )
-        `)
+        .select('transaction_id')
         .eq('tagged_merchant_id', merchantId)
-        .eq('user_id', user.id)
-        .order('transactions(date)', { ascending: false })
-        .limit(20);
+        .eq('user_id', user.id);
+
+      let specificTransactions = null;
+      let specificError = null;
+
+      if (transactionLinks && transactionLinks.length > 0) {
+        const transactionIds = transactionLinks.map(link => link.transaction_id);
+
+        // Then get the actual transactions using the transaction IDs
+        const { data: txData, error: txError } = await supabase
+          .from('transactions')
+          .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag, plaid_transaction_id')
+          .in('plaid_transaction_id', transactionIds)
+          .order('date', { ascending: false })
+          .limit(20);
+
+        specificTransactions = txData?.map(tx => ({ transactions: tx }));
+        specificError = txError;
+      }
 
       if (specificError) {
         console.error('Error fetching specific transactions:', specificError);
-      } else if (specificTransactions && specificTransactions.length > 0) {
-        console.log(`✅ Found ${specificTransactions.length} specific transactions for split merchant`);
-      } else {
-        console.log(`ℹ️ No specific transactions found for merchant ID ${merchantId}, will use fallback`);
       }
       
       if (specificTransactions && specificTransactions.length > 0) {
