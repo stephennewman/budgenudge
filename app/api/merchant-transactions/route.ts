@@ -46,7 +46,7 @@ export async function GET(request: Request) {
       .in('plaid_item_id', itemIds)
       .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
       .order('date', { ascending: false })
-      .limit(5);
+      .limit(20);
 
     if (txError) {
       console.error('Error fetching transactions:', txError);
