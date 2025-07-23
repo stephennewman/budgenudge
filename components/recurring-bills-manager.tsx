@@ -240,16 +240,17 @@ export default function RecurringBillsManager() {
 
   const getDisplayName = (merchant: TaggedMerchant): string => {
     const baseName = merchant.ai_merchant_name || merchant.merchant_name;
+    const categoryTag = merchant.ai_category_tag ? ` - ${merchant.ai_category_tag}` : '';
     
     if (!merchant.account_identifier) {
-      return baseName; // "T-Mobile" (original, unsplit)
+      return `${baseName}${categoryTag}`; // "Prudential - Insurance" (original, unsplit)
     }
     
     // Check if numeric or custom name
     if (/^\d+$/.test(merchant.account_identifier)) {
-      return `${baseName} ${merchant.account_identifier}`; // "T-Mobile 1"
+      return `${baseName}${categoryTag} ${merchant.account_identifier}`; // "T-Mobile - Telecom 1"
     } else {
-      return `${baseName} (${merchant.account_identifier})`; // "T-Mobile (Wife)"
+      return `${baseName}${categoryTag} (${merchant.account_identifier})`; // "T-Mobile - Telecom (Wife)"
     }
   };
 
@@ -456,11 +457,6 @@ export default function RecurringBillsManager() {
                     <div className="bg-white border rounded-md p-3">
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="text-sm font-medium text-gray-700">📋 Recent Transactions</h4>
-                        {merchant.account_identifier && (
-                          <div className="text-xs text-gray-500">
-                            🎯 = Tracked for this split
-                          </div>
-                        )}
                       </div>
                       <ul className="space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
@@ -472,14 +468,8 @@ export default function RecurringBillsManager() {
                               : ''
                           }`}>
                             <div className="flex items-center gap-2">
-                              {merchant.account_identifier && transaction.is_tracked_for_this_split && (
-                                <span className="text-blue-600">🎯</span>
-                              )}
-                              <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
-                              <span className="text-gray-500">{transaction.date}</span>
-                              {transaction.ai_category_tag && (
-                                <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">{transaction.ai_category_tag}</span>
-                              )}
+                              <span className="text-gray-600">{transaction.date}</span>
+                              <span className="font-medium">${Math.abs(transaction.amount).toFixed(2)}</span>
                             </div>
                           </li>
                         ))}
