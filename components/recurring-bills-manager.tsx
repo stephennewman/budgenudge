@@ -464,7 +464,7 @@ export default function RecurringBillsManager() {
                       </div>
                       <ul className="space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
-                          <li key={transaction.id} className={`text-sm p-2 rounded flex items-center justify-between ${
+                          <li key={transaction.id} className={`text-sm p-2 rounded ${
                             merchant.account_identifier && transaction.is_tracked_for_this_split 
                               ? 'bg-blue-50 border-l-3 border-l-blue-400' 
                               : merchant.account_identifier
@@ -475,12 +475,12 @@ export default function RecurringBillsManager() {
                               {merchant.account_identifier && transaction.is_tracked_for_this_split && (
                                 <span className="text-blue-600">🎯</span>
                               )}
+                              <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
                               <span className="text-gray-500">{transaction.date}</span>
                               {transaction.ai_category_tag && (
                                 <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">{transaction.ai_category_tag}</span>
                               )}
                             </div>
-                            <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
                           </li>
                         ))}
                       </ul>

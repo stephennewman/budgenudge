@@ -51,16 +51,21 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
   const [ungroupedTransactions, setUngroupedTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [draggedTransaction, setDraggedTransaction] = useState<Transaction | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successGroups, setSuccessGroups] = useState<TransactionGroup[]>([]);
 
   useEffect(() => {
     if (isOpen && merchant) {
       fetchMerchantTransactions();
-      if (merchant.account_identifier) {
-        // This is an edit operation - load existing splits
-        loadExistingSplits();
-      }
     }
   }, [isOpen, merchant]);
+
+  // Separate effect for loading existing splits after transactions are loaded
+  useEffect(() => {
+    if (isOpen && merchant && merchant.account_identifier && transactions.length > 0) {
+      loadExistingSplits();
+    }
+  }, [isOpen, merchant, transactions]);
 
   const fetchMerchantTransactions = async () => {
     const searchTerm = merchant.ai_merchant_name || merchant.merchant_name;
@@ -83,7 +88,16 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
         if (!merchant.account_identifier) {
           // Only reset groups for new splits, not edits
           setUngroupedTransactions(normalizedTxs);
-          setGroups([]);
+          // Create one empty group by default for new splits
+          setGroups([{
+            id: '1',
+            name: `${merchant.merchant_name} 1`,
+            transactions: [],
+            averageAmount: 0,
+            frequency: 'monthly',
+            confidence: 0,
+            nextPredictedDate: ''
+          }]);
         }
       }
     } catch (error) {
@@ -95,6 +109,7 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
 
   const loadExistingSplits = async () => {
     try {
+
       // Fetch all split merchants for this merchant name
       const response = await fetch(`/api/tagged-merchants`);
       const data = await response.json();
@@ -321,9 +336,18 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       // This is an edit operation - we need to handle it differently
       handleEditSplit(validGroups);
     } else {
-      // This is a new split operation
+      // This is a new split operation - show success feedback first
+      setSuccessGroups(validGroups);
+      setShowSuccess(true);
+      
+      // Execute the split
       onConfirm(validGroups);
-      onClose();
+      
+      // Hide success feedback and close modal after 2 seconds
+      setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 2000);
     }
   };
 
@@ -369,7 +393,29 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-7xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+      <div className="bg-white rounded-lg p-6 max-w-7xl w-full mx-4 max-h-[85vh] overflow-y-auto relative">
+        
+        {/* Success Overlay */}
+        {showSuccess && (
+          <div className="absolute inset-0 bg-green-50 bg-opacity-95 flex items-center justify-center z-10 rounded-lg">
+            <div className="text-center">
+              <div className="text-6xl mb-4">✅</div>
+              <div className="text-xl font-semibold text-green-800 mb-2">
+                Split Created Successfully!
+              </div>
+              <div className="text-green-600">
+                Created {successGroups.length} separate billing accounts
+              </div>
+              <div className="mt-4 max-w-md">
+                {successGroups.map((group, index) => (
+                  <div key={index} className="text-sm bg-white rounded p-2 mb-2 shadow">
+                    <strong>{group.name}</strong>: {group.transactions.length} transactions tracked
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">
             {merchant.account_identifier 
@@ -508,9 +554,9 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
                     </Card>
                   ))}
                   
-                  {groups.length === 0 && (
+                  {groups.length === 0 && !merchant.account_identifier && (
                     <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-200 rounded">
-                      Click &ldquo;New Group&rdquo; to start grouping transactions
+                      A default group has been created - start dragging transactions from the left!
                     </div>
                   )}
                 </div>
