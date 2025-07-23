@@ -39,6 +39,7 @@ export default function RecurringBillsManager() {
   const [editForm, setEditForm] = useState({
     expected_amount: '',
     prediction_frequency: '',
+    next_predicted_date: '',
     is_active: true
   });
 
@@ -114,6 +115,7 @@ export default function RecurringBillsManager() {
     setEditForm({
       expected_amount: merchant.expected_amount.toString(),
       prediction_frequency: merchant.prediction_frequency,
+      next_predicted_date: merchant.next_predicted_date,
       is_active: merchant.is_active
     });
   };
@@ -313,6 +315,12 @@ export default function RecurringBillsManager() {
                         value={editForm.expected_amount}
                         onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
                         className="w-24"
+                      />
+                      <Input
+                        type="date"
+                        value={editForm.next_predicted_date}
+                        onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
+                        className="w-36"
                       />
                       <select 
                         value={editForm.prediction_frequency}
