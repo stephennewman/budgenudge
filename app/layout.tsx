@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ConditionalHeader from "@/components/conditional-header";
-import { Manrope } from "next/font/google";
+import { Manrope, EB_Garamond } from "next/font/google";
 
 const manrope = Manrope({ subsets: ["latin"] });
+const ebGaramond = EB_Garamond({ 
+  subsets: ["latin"],
+  variable: "--font-eb-garamond"
+});
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -22,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={manrope.className}>
+      <body className={`${manrope.className} ${ebGaramond.variable}`}>
         <ConditionalHeader />
         {children}
       </body>

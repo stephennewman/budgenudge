@@ -21,22 +21,22 @@ export default function Home() {
         </div>
         
         {/* New Hero - Showcase Achievement */}
-        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold !leading-tight mb-6">
+        <h1 className="font-eb-garamond text-4xl sm:text-5xl lg:text-7xl font-bold !leading-tight mb-6">
           AI-Powered Financial Intelligence<br/>
           <span className="text-blue-600">Via Daily SMS</span>
         </h1>
         
-        <p className="text-xl sm:text-2xl text-muted-foreground mb-4 max-w-4xl mx-auto leading-relaxed">
+        <p className="font-eb-garamond text-xl sm:text-2xl text-muted-foreground mb-4 max-w-4xl mx-auto leading-relaxed">
           After 3+ months of intensive development, Krezzo is now a fully operational intelligent financial wellness platform with real-time transaction monitoring and smart insights.
         </p>
 
-        <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
+        <p className="font-eb-garamond text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
           Experience enterprise-grade financial monitoring with 99% automatic AI merchant tagging, professional SMS delivery, and multi-bank integration through Plaid&apos;s production environment.
         </p>
 
         {/* Production Metrics Banner */}
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-2xl p-6 sm:p-8 mb-8 max-w-5xl mx-auto">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-6">Production Platform Metrics</h2>
+          <h2 className="font-eb-garamond text-xl sm:text-2xl font-bold text-gray-800 mb-6">Production Platform Metrics</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
             <div>
               <div className="text-2xl sm:text-3xl font-bold text-blue-600 mb-2">99%</div>

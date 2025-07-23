@@ -3,6 +3,8 @@
 @plugin 'tailwindcss-animate';
 
 @theme {
+  --font-eb-garamond: var(--font-eb-garamond), serif;
+  
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
 
@@ -145,4 +147,9 @@
   button {
     @apply cursor-pointer;
   }
+}
+
+/* Custom utility for EB Garamond font */
+.font-eb-garamond {
+  font-family: var(--font-eb-garamond);
 }
