@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { merchant_id, groups }: { merchant_id: number; groups: TransactionGroup[] } = body;
 
-    if (!merchant_id || !groups || groups.length === 0) {
+    if (!merchant_id || !groups) {
       return NextResponse.json({ 
         error: 'merchant_id and groups are required' 
       }, { status: 400 });
@@ -121,18 +121,16 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    // Deactivate the original merchant
-    const { error: deactivateError } = await supabase
-      .from('tagged_merchants')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', merchant_id)
-      .eq('user_id', user.id);
+    // Note: We keep the original merchant active - splits are additional accounts
 
-    if (deactivateError) {
-      console.error('Error deactivating original merchant:', deactivateError);
+    // If no groups provided, this is an unsplit operation - just return success
+    if (groups.length === 0) {
       return NextResponse.json({ 
-        error: 'Failed to deactivate original merchant' 
-      }, { status: 500 });
+        success: true, 
+        message: `Successfully restored ${originalMerchant.merchant_name} to original state`,
+        originalMerchant,
+        newMerchants: []
+      });
     }
 
     // Create new split accounts

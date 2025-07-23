@@ -359,51 +359,11 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       // 1. Deactivate all current split merchants for this merchant name
       // 2. Either create new split merchants OR restore original if unsplitting
       
-      // First, deactivate existing splits
-      const response = await fetch('/api/tagged-merchants', {
-        method: 'GET'
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        const existingSplits = data.taggedMerchants.filter((m: TaggedMerchant) => 
-          m.merchant_name === merchant.merchant_name && 
-          m.account_identifier && 
-          m.is_active
-        );
-
-        // Deactivate existing splits
-        for (const split of existingSplits) {
-          await fetch(`/api/tagged-merchants/${split.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ is_active: false })
-          });
-        }
-      }
+      // Note: The split API will handle deleting existing splits and creating new ones
 
       if (validGroups.length === 0) {
-        // Unsplit case - find and reactivate the original merchant
-        const originalMerchantResponse = await fetch('/api/tagged-merchants', {
-          method: 'GET'
-        });
-        const originalData = await originalMerchantResponse.json();
-        
-        if (originalData.success) {
-          const originalMerchant = originalData.taggedMerchants.find((m: TaggedMerchant) => 
-            m.merchant_name === merchant.merchant_name && 
-            !m.account_identifier && 
-            !m.is_active
-          );
-
-          if (originalMerchant) {
-            await fetch(`/api/tagged-merchants/${originalMerchant.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ is_active: true })
-            });
-          }
-        }
+        // Unsplit case - splits are already deleted, original merchant stays active
+        // No additional action needed since original merchant was never deactivated
         onClose();
       } else {
         // Normal split case - create new splits
