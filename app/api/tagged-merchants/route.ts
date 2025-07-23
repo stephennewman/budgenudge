@@ -11,10 +11,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all tagged merchants for the user
+    // Get all tagged merchants for the user with AI merchant names
     const { data: taggedMerchants, error } = await supabase
       .from('tagged_merchants')
-      .select('*')
+      .select(`
+        *,
+        merchant_ai_tags!left(ai_merchant_name, ai_category_tag)
+      `)
       .eq('user_id', user.id)
       .order('confidence_score', { ascending: false });
 
@@ -23,9 +26,17 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch tagged merchants' }, { status: 500 });
     }
 
+    // Flatten the joined data
+    const processedMerchants = taggedMerchants?.map(merchant => ({
+      ...merchant,
+      ai_merchant_name: merchant.merchant_ai_tags?.ai_merchant_name || null,
+      ai_category_tag: merchant.merchant_ai_tags?.ai_category_tag || null,
+      merchant_ai_tags: undefined // Remove the nested object
+    })) || [];
+
     return NextResponse.json({ 
       success: true, 
-      taggedMerchants: taggedMerchants || [] 
+      taggedMerchants: processedMerchants
     });
 
   } catch (error) {

@@ -38,10 +38,13 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Get the original merchant
+    // Get the original merchant with AI merchant name
     const { data: originalMerchant, error: fetchError } = await supabase
       .from('tagged_merchants')
-      .select('*')
+      .select(`
+        *,
+        merchant_ai_tags!left(ai_merchant_name, ai_category_tag)
+      `)
       .eq('id', merchant_id)
       .eq('user_id', user.id)
       .single();
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
         .insert({
           user_id: user.id,
           merchant_name: originalMerchant.merchant_name,
-          ai_merchant_name: originalMerchant.ai_merchant_name,
+          merchant_pattern: originalMerchant.merchant_pattern,
           account_identifier: accountIdentifier,
           expected_amount: parseFloat(group.averageAmount.toFixed(2)),
           prediction_frequency: group.frequency,
@@ -156,9 +159,11 @@ export async function POST(request: Request) {
       newMerchants.push(newMerchant);
     }
 
+    const aiMerchantName = originalMerchant.merchant_ai_tags?.ai_merchant_name || originalMerchant.merchant_name;
+    
     return NextResponse.json({ 
       success: true, 
-      message: `Successfully split ${originalMerchant.ai_merchant_name || originalMerchant.merchant_name} into ${groups.length} accounts`,
+      message: `Successfully split ${aiMerchantName} into ${groups.length} accounts`,
       originalMerchant,
       newMerchants
     });
