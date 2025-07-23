@@ -12,6 +12,7 @@ interface TaggedMerchant {
   id: number;
   merchant_name: string;
   ai_merchant_name?: string;
+  ai_category_tag?: string;
   expected_amount: number;
   prediction_frequency: string;
   confidence_score: number;

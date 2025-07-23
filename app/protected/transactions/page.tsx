@@ -289,7 +289,7 @@ export default function TransactionsPage() {
         setTransactions(enhancedTransactions);
         
         // Fetch starred status for loaded transactions
-        const transactionIds = enhancedTransactions.map((tx) => (tx as { plaid_transaction_id?: string }).plaid_transaction_id).filter((id): id is string => Boolean(id));
+        const transactionIds = enhancedTransactions.map((tx: { plaid_transaction_id?: string }) => tx.plaid_transaction_id).filter((id: string | undefined): id is string => Boolean(id));
         fetchTransactionStarredStatus(transactionIds);
         
         // Fetch tagged merchants in parallel (still needed for starring new merchants)
@@ -318,7 +318,7 @@ export default function TransactionsPage() {
         const transaction = row.original;
         const merchantName = transaction.merchant_name || transaction.name;
         const transactionId = transaction.plaid_transaction_id;
-        const isTagged = transactionStarredStatus.get(transactionId) || false;
+        const isTagged = transactionId ? (transactionStarredStatus.get(transactionId) || false) : false;
         const isStarring = starringMerchant === merchantName;
         
         return (

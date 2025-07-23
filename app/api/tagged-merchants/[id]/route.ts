@@ -18,7 +18,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       prediction_frequency,
       confidence_score,
       is_active,
-      account_identifier 
+      account_identifier,
+      next_predicted_date
     } = body;
 
     console.log(`🔄 Updating merchant ${merchantId} for user ${user.id}:`, {
@@ -26,7 +27,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       prediction_frequency,
       confidence_score,
       is_active,
-      account_identifier
+      account_identifier,
+      next_predicted_date
     });
 
     // Calculate next predicted date if frequency changed
@@ -73,6 +75,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     if (account_identifier !== undefined) {
       updateData.account_identifier = account_identifier;
+    }
+
+    if (next_predicted_date !== undefined && next_predicted_date !== '') {
+      updateData.next_predicted_date = next_predicted_date;
     }
 
     // Update the tagged merchant
