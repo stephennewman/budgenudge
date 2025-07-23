@@ -366,7 +366,7 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       const data = await response.json();
       
       if (data.success) {
-        const existingSplits = data.taggedMerchants.filter(m => 
+        const existingSplits = data.taggedMerchants.filter((m: TaggedMerchant) => 
           m.merchant_name === merchant.merchant_name && 
           m.account_identifier && 
           m.is_active
