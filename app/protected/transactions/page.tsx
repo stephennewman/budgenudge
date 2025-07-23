@@ -57,6 +57,7 @@ export default function TransactionsPage() {
   const [globalFilter, setGlobalFilter] = useState('');
   const [taggedMerchants, setTaggedMerchants] = useState<Set<string>>(new Set());
   const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
+  const [transactionStarredStatus, setTransactionStarredStatus] = useState<Map<string, boolean>>(new Map());
   
   // AI Tag Editor state
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
@@ -147,7 +148,32 @@ export default function TransactionsPage() {
     }
   };
 
-  // Fetch tagged merchants
+  // Fetch starred status for transactions
+  async function fetchTransactionStarredStatus(transactionIds: string[]) {
+    if (transactionIds.length === 0) return;
+    
+    try {
+      const response = await fetch('/api/transaction-starred-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_ids: transactionIds })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success && data.starred_status) {
+        const statusMap = new Map<string, boolean>();
+        Object.entries(data.starred_status).forEach(([txId, isStarred]) => {
+          statusMap.set(txId, isStarred as boolean);
+        });
+        setTransactionStarredStatus(statusMap);
+      }
+    } catch (error) {
+      console.error('Error fetching transaction starred status:', error);
+    }
+  }
+
+  // Fetch tagged merchants (still needed for starring new merchants)
   async function fetchTaggedMerchants() {
     try {
       const response = await fetch('/api/tagged-merchants');
@@ -181,6 +207,9 @@ export default function TransactionsPage() {
       
       if (data.success) {
         await fetchTaggedMerchants();
+        // Refresh starred status for current transactions
+        const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+        fetchTransactionStarredStatus(transactionIds);
       } else {
         alert('Failed to analyze merchant: ' + data.error);
       }
@@ -216,6 +245,9 @@ export default function TransactionsPage() {
           
           if (deleteData.success) {
             await fetchTaggedMerchants();
+            // Refresh starred status for current transactions
+            const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+            fetchTransactionStarredStatus(transactionIds);
           } else {
             alert('Failed to remove merchant: ' + deleteData.error);
           }
@@ -256,7 +288,11 @@ export default function TransactionsPage() {
         
         setTransactions(enhancedTransactions);
         
-        // Fetch tagged merchants in parallel (non-blocking)
+        // Fetch starred status for loaded transactions
+        const transactionIds = enhancedTransactions.map(tx => tx.plaid_transaction_id).filter(Boolean);
+        fetchTransactionStarredStatus(transactionIds);
+        
+        // Fetch tagged merchants in parallel (still needed for starring new merchants)
         fetchTaggedMerchants();
         
       } else {
@@ -281,7 +317,8 @@ export default function TransactionsPage() {
       cell: ({ row }: { row: { original: TransactionWithAnalytics } }) => {
         const transaction = row.original;
         const merchantName = transaction.merchant_name || transaction.name;
-        const isTagged = taggedMerchants.has(merchantName.toLowerCase());
+        const transactionId = transaction.plaid_transaction_id;
+        const isTagged = transactionStarredStatus.get(transactionId) || false;
         const isStarring = starringMerchant === merchantName;
         
         return (
@@ -420,7 +457,7 @@ export default function TransactionsPage() {
         </span>
       ),
     },
-  ], [taggedMerchants, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
+  ], [transactionStarredStatus, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
   const table = useReactTable({
     data: transactions,
