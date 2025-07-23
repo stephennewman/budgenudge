@@ -106,7 +106,22 @@ export async function POST(request: Request) {
       return nextDate.toISOString().split('T')[0];
     };
 
-    // Start transaction
+    // Start transaction - first delete any existing splits for this merchant
+    const { error: deleteError } = await supabase
+      .from('tagged_merchants')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('merchant_name', originalMerchant.merchant_name)
+      .not('account_identifier', 'is', null); // Only delete splits, not the original
+
+    if (deleteError) {
+      console.error('Error deleting existing splits:', deleteError);
+      return NextResponse.json({ 
+        error: 'Failed to clean up existing splits' 
+      }, { status: 500 });
+    }
+
+    // Deactivate the original merchant
     const { error: deactivateError } = await supabase
       .from('tagged_merchants')
       .update({ is_active: false, updated_at: new Date().toISOString() })
