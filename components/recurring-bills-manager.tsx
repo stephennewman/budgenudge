@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
+import SplitMerchantManager from '@/components/split-merchant-manager';
 
 
 interface TaggedMerchant {
@@ -32,6 +33,7 @@ interface Transaction {
   subcategory?: string;
   ai_merchant_name?: string;
   ai_category_tag?: string;
+  is_tracked_for_this_split?: boolean;
 }
 
 export default function RecurringBillsManager() {
@@ -61,6 +63,10 @@ export default function RecurringBillsManager() {
   // Split modal state
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
+
+  // Split management modal state
+  const [managementModalOpen, setManagementModalOpen] = useState(false);
+  const [managementMerchant, setManagementMerchant] = useState<string>('');
 
   useEffect(() => {
     fetchTaggedMerchants();
@@ -285,6 +291,11 @@ export default function RecurringBillsManager() {
     }
   };
 
+  const handleManageSplit = (merchantName: string) => {
+    setManagementMerchant(merchantName);
+    setManagementModalOpen(true);
+  };
+
   if (loading) {
     return <BouncingMoneyLoader />;
   }
@@ -420,14 +431,25 @@ export default function RecurringBillsManager() {
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleSplitAccounts(merchant)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          🔀 Split
-                        </Button>
+                        {merchant.account_identifier ? (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleManageSplit(merchant.merchant_name)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            🔧 Manage
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => handleSplitAccounts(merchant)}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            🔀 Split
+                          </Button>
+                        )}
                         <Button 
                           variant="outline" 
                           size="sm" 
@@ -451,24 +473,51 @@ export default function RecurringBillsManager() {
                 ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
                   <div className="px-3 pb-3">
                     <div className="bg-white border rounded-md p-3">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">📋 Recent Transactions</h4>
-                      <ul className="list-disc pl-5 space-y-1">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-sm font-medium text-gray-700">📋 Recent Transactions</h4>
+                        {merchant.account_identifier && (
+                          <div className="text-xs text-gray-500">
+                            🎯 = Tracked for this split
+                          </div>
+                        )}
+                      </div>
+                      <ul className="space-y-1">
                         {merchantTransactions[merchant.id].map((transaction) => (
-                          <li key={transaction.id} className="text-sm">
-                            <span className="font-medium">{transaction.ai_merchant_name || transaction.merchant_name || transaction.name}</span>
-                            {" — "}
-                            <span className="text-gray-500">{transaction.date}</span>
-                            {" — "}
-                            <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
-                            {transaction.ai_category_tag && (
-                              <>
-                                {" — "}
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">{transaction.ai_category_tag}</span>
-                              </>
-                            )}
+                          <li key={transaction.id} className={`text-sm p-2 rounded ${
+                            merchant.account_identifier && transaction.is_tracked_for_this_split 
+                              ? 'bg-blue-50 border-l-3 border-l-blue-400' 
+                              : merchant.account_identifier
+                              ? 'bg-gray-50 opacity-75'
+                              : ''
+                          }`}>
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  {merchant.account_identifier && transaction.is_tracked_for_this_split && (
+                                    <span className="text-blue-600">🎯</span>
+                                  )}
+                                  <span className="font-medium">{transaction.ai_merchant_name || transaction.merchant_name || transaction.name}</span>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1 ml-6">
+                                  {transaction.date}
+                                  {transaction.ai_category_tag && (
+                                    <>
+                                      {" • "}
+                                      <span className="bg-green-100 text-green-700 px-1 py-0.5 rounded">{transaction.ai_category_tag}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="font-medium text-red-600">${Math.abs(transaction.amount).toFixed(2)}</span>
+                            </div>
                           </li>
                         ))}
                       </ul>
+                      {merchant.account_identifier && (
+                        <div className="mt-3 pt-2 border-t text-xs text-gray-500">
+                          This split account tracks {merchantTransactions[merchant.id].filter(t => t.is_tracked_for_this_split).length} of {merchantTransactions[merchant.id].length} recent transactions for predictions.
+                        </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -529,6 +578,13 @@ export default function RecurringBillsManager() {
           onConfirm={handleConfirmSplit}
         />
       )}
+
+      {/* Split Management Modal */}
+      <SplitMerchantManager
+        merchantName={managementMerchant}
+        isOpen={managementModalOpen}
+        onClose={() => setManagementModalOpen(false)}
+      />
     </div>
   );
 } 

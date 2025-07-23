@@ -40,74 +40,37 @@ export async function GET(request: Request) {
       });
     }
 
-    let transactions = null;
-    let txError = null;
+    // Always get ALL transactions for this merchant (better UX as suggested)
+    const { data: allTransactions, error: txError } = await supabase
+      .from('transactions')
+      .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag, plaid_transaction_id')
+      .in('plaid_item_id', itemIds)
+      .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
+      .order('date', { ascending: false })
+      .limit(20);
 
-    // If merchantId is provided, check if this merchant has specific transaction relationships
+    let trackedTransactionIds = new Set<string>();
+
+    // If merchantId is provided, get which transactions are tracked for this specific split
     if (merchantId) {
-      // First, get the linked transaction IDs
       const { data: transactionLinks, error: linkError } = await supabase
         .from('tagged_merchant_transactions')
         .select('transaction_id')
         .eq('tagged_merchant_id', merchantId)
         .eq('user_id', user.id);
 
-      let specificTransactions = null;
-      let specificError = null;
-
-      if (transactionLinks && transactionLinks.length > 0) {
-        const transactionIds = transactionLinks.map(link => link.transaction_id);
-
-        // Then get the actual transactions using the transaction IDs
-        const { data: txData, error: txError } = await supabase
-          .from('transactions')
-          .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag, plaid_transaction_id')
-          .in('plaid_transaction_id', transactionIds)
-          .order('date', { ascending: false })
-          .limit(20);
-
-        specificTransactions = txData?.map(tx => ({ transactions: tx }));
-        specificError = txError;
-      }
-
-      if (specificError) {
-        console.error('Error fetching specific transactions:', specificError);
-      }
-      
-      if (specificTransactions && specificTransactions.length > 0) {
-        // Use specific transactions linked to this split merchant
-        transactions = specificTransactions.map(st => ({
-          id: st.transactions.plaid_transaction_id,
-          plaid_transaction_id: st.transactions.plaid_transaction_id,
-          date: st.transactions.date,
-          merchant_name: st.transactions.merchant_name,
-          name: st.transactions.name,
-          amount: st.transactions.amount,
-          subcategory: st.transactions.subcategory,
-          ai_merchant_name: st.transactions.ai_merchant_name,
-          ai_category_tag: st.transactions.ai_category_tag
-        }));
-        txError = null;
+      if (!linkError && transactionLinks) {
+        trackedTransactionIds = new Set(transactionLinks.map(link => link.transaction_id));
       }
     }
 
-    // Fallback to generic merchant name matching if no specific transactions found
-    if (!transactions) {
-      const { data: genericTransactions, error: genericError } = await supabase
-        .from('transactions')
-        .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag, plaid_transaction_id')
-        .in('plaid_item_id', itemIds)
-        .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
-        .order('date', { ascending: false })
-        .limit(20);
-
-      transactions = genericTransactions?.map(t => ({
-        ...t,
-        id: t.plaid_transaction_id,
-        plaid_transaction_id: t.plaid_transaction_id
-      }));
-      txError = genericError;
-    }
+    // Add tracking information to each transaction
+    const transactions = allTransactions?.map(t => ({
+      ...t,
+      id: t.plaid_transaction_id,
+      plaid_transaction_id: t.plaid_transaction_id,
+      is_tracked_for_this_split: merchantId ? trackedTransactionIds.has(t.plaid_transaction_id) : false
+    }));
 
     if (txError) {
       console.error('Error fetching transactions:', txError);
