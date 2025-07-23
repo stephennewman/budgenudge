@@ -80,7 +80,7 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       if (data.success) {
         const txs = data.transactions || [];
         // Ensure each transaction has the plaid_transaction_id as the id
-        const normalizedTxs = txs.map(tx => ({
+        const normalizedTxs = txs.map((tx: any) => ({
           ...tx,
           id: tx.plaid_transaction_id || tx.id // Use plaid_transaction_id if available
         }));
