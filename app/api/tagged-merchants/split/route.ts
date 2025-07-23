@@ -38,13 +38,10 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // Get the original merchant with AI merchant name
+    // Get the original merchant
     const { data: originalMerchant, error: fetchError } = await supabase
       .from('tagged_merchants')
-      .select(`
-        *,
-        merchant_ai_tags!left(ai_merchant_name, ai_category_tag)
-      `)
+      .select('*')
       .eq('id', merchant_id)
       .eq('user_id', user.id)
       .single();
@@ -159,7 +156,19 @@ export async function POST(request: Request) {
       newMerchants.push(newMerchant);
     }
 
-    const aiMerchantName = originalMerchant.merchant_ai_tags?.ai_merchant_name || originalMerchant.merchant_name;
+    // Get AI merchant name if available
+    let aiMerchantName = originalMerchant.merchant_name;
+    if (originalMerchant.merchant_pattern) {
+      const { data: aiData } = await supabase
+        .from('merchant_ai_tags')
+        .select('ai_merchant_name')
+        .eq('merchant_pattern', originalMerchant.merchant_pattern)
+        .single();
+      
+      if (aiData?.ai_merchant_name) {
+        aiMerchantName = aiData.ai_merchant_name;
+      }
+    }
     
     return NextResponse.json({ 
       success: true, 

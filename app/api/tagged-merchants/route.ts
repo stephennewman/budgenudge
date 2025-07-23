@@ -11,13 +11,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all tagged merchants for the user with AI merchant names
+    // Get all tagged merchants for the user
     const { data: taggedMerchants, error } = await supabase
       .from('tagged_merchants')
-      .select(`
-        *,
-        merchant_ai_tags!left(ai_merchant_name, ai_category_tag)
-      `)
+      .select('*')
       .eq('user_id', user.id)
       .order('confidence_score', { ascending: false });
 
@@ -26,13 +23,36 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch tagged merchants' }, { status: 500 });
     }
 
-    // Flatten the joined data
-    const processedMerchants = taggedMerchants?.map(merchant => ({
-      ...merchant,
-      ai_merchant_name: merchant.merchant_ai_tags?.ai_merchant_name || null,
-      ai_category_tag: merchant.merchant_ai_tags?.ai_category_tag || null,
-      merchant_ai_tags: undefined // Remove the nested object
-    })) || [];
+    // Get AI merchant names separately if we have merchants
+    let processedMerchants = taggedMerchants || [];
+    
+    if (processedMerchants.length > 0) {
+      // Get unique merchant patterns
+      const patterns = [...new Set(processedMerchants.map(m => m.merchant_pattern).filter(Boolean))];
+      
+      if (patterns.length > 0) {
+        // Fetch AI merchant data
+        const { data: aiData } = await supabase
+          .from('merchant_ai_tags')
+          .select('merchant_pattern, ai_merchant_name, ai_category_tag')
+          .in('merchant_pattern', patterns);
+        
+        // Create a lookup map
+        const aiLookup = new Map();
+        if (aiData) {
+          aiData.forEach(ai => {
+            aiLookup.set(ai.merchant_pattern, ai);
+          });
+        }
+        
+        // Add AI data to merchants
+        processedMerchants = processedMerchants.map(merchant => ({
+          ...merchant,
+          ai_merchant_name: aiLookup.get(merchant.merchant_pattern)?.ai_merchant_name || null,
+          ai_category_tag: aiLookup.get(merchant.merchant_pattern)?.ai_category_tag || null
+        }));
+      }
+    }
 
     return NextResponse.json({ 
       success: true, 
