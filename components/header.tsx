@@ -6,6 +6,7 @@ import { createSupabaseClient } from "@/utils/supabase/client";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { User } from "@supabase/supabase-js";
+import Logo from "@/components/logo";
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -36,8 +37,8 @@ export default function Header() {
   return (
     <nav className="border-b w-full h-16 shrink-0 flex items-center">
       <div className="px-6 w-full flex items-center justify-between mx-auto">
-        <Link href="/" className="text-sm font-medium">
-          💰 Krezzo
+        <Link href="/" className="flex items-center">
+          <Logo size="sm" />
         </Link>
         <div className="flex items-center gap-2">
           {!loading && user == null && !isAuthPage && (

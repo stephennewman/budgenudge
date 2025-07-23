@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { createSupabaseClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import Logo from "@/components/logo";
 
 type Item = {
   label: string;
@@ -27,8 +28,8 @@ export default function InPageSidebar({
     <div className="flex flex-col min-w-[250px] h-screen border-r bg-background">
       {/* Header */}
       <div className="p-4 border-b">
-        <Link href="/" className="text-lg font-semibold">
-                      💰 Krezzo
+        <Link href="/" className="flex items-center">
+          <Logo size="md" />
         </Link>
       </div>
       

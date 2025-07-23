@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import HomepageSlickTextForm from "@/components/homepage-slicktext-form";
+import Logo from "@/components/logo";
 
 export default function Home() {
   return (
@@ -16,9 +17,7 @@ export default function Home() {
 
         {/* Logo */}
         <div className="flex justify-center items-center mb-6 sm:mb-8">
-          <div className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            💰 Krezzo
-          </div>
+          <Logo size="xl" className="h-16 sm:h-20" />
         </div>
         
         {/* New Hero - Showcase Achievement */}

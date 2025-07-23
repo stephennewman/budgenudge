@@ -1,4 +1,4 @@
-# 💳 Krezzo - Intelligent Financial Wellness via SMS
+# Krezzo - Intelligent Financial Wellness via SMS
 
 **🎉 MILESTONE ACHIEVED!** After 3+ months of development, Krezzo is now a fully operational intelligent financial wellness platform with multi-bank integration and smart insights.
 

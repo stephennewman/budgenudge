@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
+import Logo from "@/components/logo";
 
 interface NavItem {
   label: string;
@@ -26,9 +27,9 @@ export default function MobileNavMenu({ basePath, items }: MobileNavMenuProps) {
     <>
       {/* Mobile Header Bar */}
       <div className="lg:hidden bg-white border-b px-4 py-3 flex items-center justify-between sticky top-0 z-40">
-        <div className="text-lg font-semibold">
-          💰 Krezzo
-        </div>
+        <Link href="/" className="flex items-center">
+          <Logo size="sm" />
+        </Link>
         <Button
           variant="ghost"
           size="sm"
