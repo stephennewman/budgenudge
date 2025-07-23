@@ -421,8 +421,8 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-semibold">
             {merchant.account_identifier 
-              ? `Edit ${merchant.ai_merchant_name || merchant.merchant_name} Split Configuration`
-              : `Split ${merchant.ai_merchant_name || merchant.merchant_name} into Multiple Accounts`
+              ? `Edit ${merchant.ai_merchant_name || merchant.merchant_name}${transactions[0]?.ai_category_tag ? ` - ${transactions[0].ai_category_tag}` : ''} Split Configuration`
+              : `Split ${merchant.ai_merchant_name || merchant.merchant_name}${transactions[0]?.ai_category_tag ? ` - ${transactions[0].ai_category_tag}` : ''} into Multiple Accounts`
             }
           </h2>
           <Button variant="outline" onClick={onClose}>✕</Button>
@@ -464,15 +464,14 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
                           onDragStart={() => setDraggedTransaction(tx)}
                           className="bg-white p-3 rounded border cursor-move hover:shadow-md transition-shadow"
                         >
-                          <div className="flex justify-between items-start">
+                          <div className="flex justify-between items-center">
                             <div className="flex-1">
+                              <div className="text-xs text-gray-600 mb-1">
+                                {tx.date} • ${Math.abs(tx.amount).toFixed(2)}
+                              </div>
                               <div className="font-medium text-sm truncate">
                                 {tx.ai_merchant_name || tx.merchant_name || tx.name}
                               </div>
-                              <div className="text-xs text-gray-500">{tx.date}</div>
-                            </div>
-                            <div className="font-medium text-sm">
-                              ${Math.abs(tx.amount).toFixed(2)}
                             </div>
                           </div>
                         </div>
@@ -532,18 +531,17 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
                                 className="bg-blue-50 p-2 rounded text-sm flex justify-between items-center"
                               >
                                 <div className="flex-1">
+                                  <div className="text-xs text-gray-600 mb-1">
+                                    {tx.date} • ${Math.abs(tx.amount).toFixed(2)}
+                                  </div>
                                   <div className="font-medium truncate text-xs">
                                     {tx.ai_merchant_name || tx.merchant_name || tx.name}
                                   </div>
-                                  <div className="text-xs text-gray-500">{tx.date}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-xs">
-                                    ${Math.abs(tx.amount).toFixed(2)}
-                                  </span>
                                   <button
                                     onClick={() => removeTransactionFromGroup(tx, group.id)}
-                                    className="text-red-500 hover:text-red-700 text-xs"
+                                    className="text-gray-400 hover:text-gray-600 text-xs"
                                   >
                                     ✕
                                   </button>
