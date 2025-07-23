@@ -13,6 +13,7 @@ interface Transaction {
   ai_merchant_name?: string;
   ai_category_tag?: string;
   plaid_transaction_id?: string;
+  is_tracked_for_this_split?: boolean;
 }
 
 interface TransactionGroup {
@@ -134,14 +135,14 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
           
           if (txData.success) {
             const trackedTxs = (txData.transactions || [])
-              .filter(tx => tx.is_tracked_for_this_split)
-              .map(tx => ({
+              .filter((tx: Transaction) => tx.is_tracked_for_this_split)
+              .map((tx: Transaction) => ({
                 ...tx,
                 id: tx.plaid_transaction_id || tx.id
               }));
 
             if (trackedTxs.length > 0) {
-              const groupTransactions = trackedTxs.filter(tx => 
+              const groupTransactions = trackedTxs.filter((tx: Transaction) => 
                 transactions.some(t => t.id === tx.id)
               );
 
