@@ -432,6 +432,45 @@ export type Database = {
         }
         Relationships: []
       }
+      tagged_merchant_transactions: {
+        Row: {
+          id: string
+          tagged_merchant_id: number
+          transaction_id: string
+          user_id: string
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          tagged_merchant_id: number
+          transaction_id: string
+          user_id: string
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          tagged_merchant_id?: number
+          transaction_id?: string
+          user_id?: string
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tagged_merchant_transactions_tagged_merchant_id_fkey"
+            columns: ["tagged_merchant_id"]
+            isOneToOne: false
+            referencedRelation: "tagged_merchants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tagged_merchant_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       tagged_merchants: {
         Row: {
           auto_detected: boolean | null
@@ -448,6 +487,7 @@ export type Database = {
           type: string | null
           updated_at: string | null
           user_id: string | null
+          account_identifier: string | null
         }
         Insert: {
           auto_detected?: boolean | null
@@ -464,6 +504,7 @@ export type Database = {
           type?: string | null
           updated_at?: string | null
           user_id?: string | null
+          account_identifier?: string | null
         }
         Update: {
           auto_detected?: boolean | null
@@ -480,6 +521,7 @@ export type Database = {
           type?: string | null
           updated_at?: string | null
           user_id?: string | null
+          account_identifier?: string | null
         }
         Relationships: []
       }

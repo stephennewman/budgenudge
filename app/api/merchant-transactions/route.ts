@@ -5,6 +5,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const merchantName = url.searchParams.get('merchant');
+    const merchantId = url.searchParams.get('merchantId'); // Optional: for specific tagged merchant
     
     if (!merchantName) {
       return NextResponse.json({ error: 'merchant parameter is required' }, { status: 400 });
@@ -39,14 +40,59 @@ export async function GET(request: Request) {
       });
     }
 
-    // Query transactions for this merchant
-    const { data: transactions, error: txError } = await supabase
-      .from('transactions')
-      .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag')
-      .in('plaid_item_id', itemIds)
-      .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
-      .order('date', { ascending: false })
-      .limit(20);
+    let transactions = null;
+    let txError = null;
+
+    // If merchantId is provided, check if this merchant has specific transaction relationships
+    if (merchantId) {
+      const { data: specificTransactions, error: specificError } = await supabase
+        .from('tagged_merchant_transactions')
+        .select(`
+          transaction_id,
+          transactions!inner(
+            id, date, merchant_name, name, amount, subcategory, 
+            ai_merchant_name, ai_category_tag, plaid_transaction_id
+          )
+        `)
+        .eq('tagged_merchant_id', merchantId)
+        .eq('user_id', user.id)
+        .order('transactions(date)', { ascending: false })
+        .limit(20);
+
+      if (specificError) {
+        console.error('Error fetching specific transactions:', specificError);
+      } else if (specificTransactions && specificTransactions.length > 0) {
+        // Use specific transactions linked to this split merchant
+        transactions = specificTransactions.map(st => ({
+          id: st.transactions.plaid_transaction_id,
+          date: st.transactions.date,
+          merchant_name: st.transactions.merchant_name,
+          name: st.transactions.name,
+          amount: st.transactions.amount,
+          subcategory: st.transactions.subcategory,
+          ai_merchant_name: st.transactions.ai_merchant_name,
+          ai_category_tag: st.transactions.ai_category_tag
+        }));
+        txError = null;
+      }
+    }
+
+    // Fallback to generic merchant name matching if no specific transactions found
+    if (!transactions) {
+      const { data: genericTransactions, error: genericError } = await supabase
+        .from('transactions')
+        .select('id, date, merchant_name, name, amount, subcategory, ai_merchant_name, ai_category_tag, plaid_transaction_id')
+        .in('plaid_item_id', itemIds)
+        .or(`merchant_name.ilike.%${merchantName}%,name.ilike.%${merchantName}%`)
+        .order('date', { ascending: false })
+        .limit(20);
+
+      transactions = genericTransactions?.map(t => ({
+        ...t,
+        id: t.plaid_transaction_id
+      }));
+      txError = genericError;
+    }
 
     if (txError) {
       console.error('Error fetching transactions:', txError);

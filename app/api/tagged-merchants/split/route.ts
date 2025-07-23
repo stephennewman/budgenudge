@@ -153,6 +153,23 @@ export async function POST(request: Request) {
         }, { status: 500 });
       }
 
+      // Store the specific transactions for this split merchant
+      const transactionLinks = group.transactions.map(transaction => ({
+        tagged_merchant_id: newMerchant.id,
+        transaction_id: transaction.id,
+        user_id: user.id,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error: linkError } = await supabase
+        .from('tagged_merchant_transactions')
+        .insert(transactionLinks);
+
+      if (linkError) {
+        console.error('Error linking transactions to split merchant:', linkError);
+        // Continue even if linking fails - the split merchant is created
+      }
+
       newMerchants.push(newMerchant);
     }
 

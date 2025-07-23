@@ -101,7 +101,8 @@ export default function RecurringBillsManager() {
     setLoadingTransactions(prev => ({ ...prev, [merchantId]: true }));
     try {
       // Use server-side API endpoint to fetch transactions
-      const response = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(merchantName)}`);
+      // Include merchantId for split accounts to get specific grouped transactions
+      const response = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(merchantName)}&merchantId=${merchantId}`);
       const data = await response.json();
       
       if (!response.ok) {
