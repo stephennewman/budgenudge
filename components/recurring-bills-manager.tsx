@@ -240,17 +240,16 @@ export default function RecurringBillsManager() {
 
   const getDisplayName = (merchant: TaggedMerchant): string => {
     const baseName = merchant.ai_merchant_name || merchant.merchant_name;
-    const categoryTag = merchant.ai_category_tag ? ` - ${merchant.ai_category_tag}` : '';
     
     if (!merchant.account_identifier) {
-      return `${baseName}${categoryTag}`; // "Prudential - Insurance" (original, unsplit)
+      return baseName; // "Prudential" (original, unsplit)
     }
     
     // Check if numeric or custom name
     if (/^\d+$/.test(merchant.account_identifier)) {
-      return `${baseName}${categoryTag} ${merchant.account_identifier}`; // "T-Mobile - Telecom 1"
+      return `${baseName} ${merchant.account_identifier}`; // "T-Mobile 1"
     } else {
-      return `${baseName}${categoryTag} (${merchant.account_identifier})`; // "T-Mobile - Telecom (Wife)"
+      return `${baseName} (${merchant.account_identifier})`; // "T-Mobile (Wife)"
     }
   };
 
@@ -410,15 +409,16 @@ export default function RecurringBillsManager() {
                     <>
                       <div className="flex items-center gap-4 flex-1">
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium truncate">{getDisplayName(merchant)}</span>
-                          </div>
-                          <div className="text-sm text-gray-600 mb-1">
-                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}
+                            {merchant.ai_category_tag && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{merchant.ai_category_tag}</span>
+                            )}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Next: {formatNextDate(merchant.next_predicted_date)} • 
-                            <span className={getConfidenceColor(merchant.confidence_score)}> {merchant.confidence_score}% confidence</span>
+                            <span className="text-red-600">Next: {formatNextDate(merchant.next_predicted_date)}</span> • 
+                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency} • 
+                            <span className="text-gray-600">{merchant.confidence_score}% confidence</span>
                           </div>
                         </div>
                       </div>
@@ -458,11 +458,11 @@ export default function RecurringBillsManager() {
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="text-sm font-medium text-gray-700">📋 Recent Transactions</h4>
                       </div>
-                      <ul className="space-y-1">
+                      <ul className="space-y-0.5">
                         {merchantTransactions[merchant.id].map((transaction) => (
-                          <li key={transaction.id} className={`text-sm p-2 rounded ${
+                          <li key={transaction.id} className={`text-xs py-1 px-2 rounded ${
                             merchant.account_identifier && transaction.is_tracked_for_this_split 
-                              ? 'bg-blue-50 border-l-3 border-l-blue-400' 
+                              ? 'bg-blue-50 border-l-2 border-l-blue-400' 
                               : merchant.account_identifier
                               ? 'bg-gray-50 opacity-75'
                               : ''
