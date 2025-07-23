@@ -12,6 +12,7 @@ interface Transaction {
   merchant_name?: string;
   ai_merchant_name?: string;
   ai_category_tag?: string;
+  plaid_transaction_id?: string;
 }
 
 interface TransactionGroup {
@@ -80,7 +81,7 @@ export default function SplitAccountsModal({ merchant, isOpen, onClose, onConfir
       if (data.success) {
         const txs = data.transactions || [];
         // Ensure each transaction has the plaid_transaction_id as the id
-        const normalizedTxs = txs.map((tx: any) => ({
+        const normalizedTxs = txs.map((tx: Transaction) => ({
           ...tx,
           id: tx.plaid_transaction_id || tx.id // Use plaid_transaction_id if available
         }));
