@@ -42,9 +42,13 @@ class FluidSimulation {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const gl = canvas.getContext('webgl2', { alpha: true, depth: false, stencil: false, antialias: false, preserveDrawingBuffer: false });
-    if (!gl) throw new Error('WebGL2 not supported');
+    if (!gl) {
+      console.error('WebGL2 not supported, falling back to simple animation');
+      throw new Error('WebGL2 not supported');
+    }
     this.gl = gl;
     
+    console.log('WebGL2 context created successfully');
     this.resizeCanvas();
     this.init();
   }
@@ -194,32 +198,40 @@ class FluidSimulation {
   }
 
   private update() {
-    const gl = this.gl;
     this.resizeCanvas();
     
-    // Clear
-    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0, 0, 0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    // Clear with animated colors
+    const time = Date.now() * 0.001;
+    const r = Math.sin(time * 0.3) * 0.5 + 0.5;
+    const g = Math.sin(time * 0.3 + 2) * 0.5 + 0.5;
+    const b = Math.sin(time * 0.3 + 4) * 0.5 + 0.5;
     
-    // Simple animated pattern
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.gl.clearColor(r * 0.2, g * 0.2, b * 0.2, 1);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    
+    // Create simple animated gradient
     const program = this.programs.get('color');
     if (program) {
-      gl.useProgram(program);
+      this.gl.useProgram(program);
       
       // Set time uniform for animation
-      const timeLocation = gl.getUniformLocation(program, 'time');
+      const timeLocation = this.gl.getUniformLocation(program, 'time');
       if (timeLocation) {
-        gl.uniform1f(timeLocation, Date.now() * 0.001);
+        this.gl.uniform1f(timeLocation, time);
       }
       
       // Set up vertex attributes
-      const aPosition = gl.getAttribLocation(program, 'aPosition');
-      gl.enableVertexAttribArray(aPosition);
-      gl.vertexAttribPointer(aPosition, 2, gl.FLOAT, false, 0, 0);
-      
-      // Draw
-      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);
+      const aPosition = this.gl.getAttribLocation(program, 'aPosition');
+      if (aPosition >= 0) {
+        this.gl.enableVertexAttribArray(aPosition);
+        this.gl.vertexAttribPointer(aPosition, 2, this.gl.FLOAT, false, 0, 0);
+        
+        // Draw fullscreen quad
+        this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
+        
+        this.gl.disableVertexAttribArray(aPosition);
+      }
     }
     
     requestAnimationFrame(() => this.update());
@@ -247,13 +259,50 @@ export default function FluidLanding() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulationRef = useRef<FluidSimulation | null>(null);
 
+  // Add CSS for fallback animation
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes fluid-fallback {
+        0% { 
+          filter: hue-rotate(0deg) brightness(1); 
+          transform: scale(1); 
+        }
+        50% { 
+          filter: hue-rotate(90deg) brightness(1.2); 
+          transform: scale(1.1); 
+        }
+        100% { 
+          filter: hue-rotate(180deg) brightness(0.9); 
+          transform: scale(1); 
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!canvasRef.current) return;
 
     try {
       simulationRef.current = new FluidSimulation(canvasRef.current);
+      console.log('Fluid simulation initialized successfully');
     } catch (error) {
       console.error('Failed to initialize fluid simulation:', error);
+      // Fallback: Create a simple CSS animation background
+      if (canvasRef.current) {
+        canvasRef.current.style.background = `
+          radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3), transparent 50%),
+          radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.3), transparent 50%),
+          radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.3), transparent 50%)
+        `;
+        canvasRef.current.style.animation = 'fluid-fallback 8s ease-in-out infinite alternate';
+      }
     }
 
     const handleMouseMove = (e: MouseEvent) => {
