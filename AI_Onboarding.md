@@ -107,6 +107,29 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Git Commit**: `5bd55cd` - Complete homepage rebuild with 271 insertions, 152 deletions
 - **User Impact**: **🎯 MAJOR POSITIONING UPGRADE** - Platform now showcases true sophistication and technical excellence
 
+### 🔧 July 24, 2025 - CRITICAL FIX: AI Tagging 414 Request-URI Too Large Error ✅ RESOLVED
+- **12:50 AM EST**: Successfully resolved critical 414 Request-URI Too Large error in AI tagging automation
+- **Problem Identified**: AI tagging cron job failing with Cloudflare 414 errors when processing many untagged transactions
+- **Root Cause Discovered**: Cache lookup trying to fetch all merchant patterns at once, creating extremely long URLs
+  - Original code: `.in('merchant_pattern', merchantPatterns)` with potentially hundreds of patterns
+  - Cloudflare URL length limit exceeded, causing 414 Request-URI Too Large errors
+  - Broke AI tagging automation entirely at 2025-07-24T00:42:47.925Z
+- **Complete Resolution Implemented**:
+  - ✅ **Batched Cache Lookups**: Process merchant patterns in batches of 50 to avoid URL length issues
+  - ✅ **Maintained Performance**: Same functionality and caching efficiency with proper error handling
+  - ✅ **Enhanced Logging**: Added batch processing logs for better monitoring
+  - ✅ **TypeScript Fixes**: Proper type annotations for cache map structures
+- **Technical Implementation**:
+  - Replaced single large cache query with batched queries (50 patterns per batch)
+  - Added comprehensive error handling for failed cache batches
+  - Maintained same performance with accumulated cache results
+  - Zero functional changes - purely architectural improvement
+- **Final Verification**: `curl -X POST https://get.krezzo.com/api/test-auto-ai-tag` returns success
+- **Git Commits**: `3043cbe` + `8c0697c` - Batched cache lookups + TypeScript fixes
+- **User Impact**: **🎯 CRITICAL AI SYSTEM RESTORED** - AI tagging automation now handles high transaction volumes without URL length issues
+- **Technical Insight**: Large batch operations need URL length considerations even with modern APIs
+- **Future Prevention**: Batching strategy now handles any volume of untagged transactions efficiently
+
 ### 🤖 July 23, 2025 - AI AGENT COMPREHENSIVE ONBOARDING & PROJECT MASTERY ✅ COMPLETE
 - **8:44 PM EDT**: AI agent successfully onboarded and achieved complete project understanding and system mastery
 - **Current Time Confirmed**: Wednesday, July 23, 2025, 8:44 PM EDT (system validated via timeanddate.com)

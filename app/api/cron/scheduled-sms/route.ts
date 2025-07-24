@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/utils/supabase/server';
+import { createClient } from '@supabase/supabase-js';
 import { generateSMSMessage } from '@/utils/sms/templates';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
@@ -30,8 +30,11 @@ export async function GET(request: NextRequest) {
   let smsFailed = 0;
   const logDetails: Array<Record<string, unknown>> = [];
 
-  // Initialize supabase client at the top
-  const supabase: SupabaseClient = await createSupabaseClient();
+  // ✅ FIX: Use service role authentication for cron jobs (no user sessions)
+  const supabase: SupabaseClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   try {
     // Insert cron_log row (status: started)
