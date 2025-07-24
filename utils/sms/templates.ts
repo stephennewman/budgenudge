@@ -29,6 +29,31 @@ interface MerchantPacing {
 // ===================================
 export async function generateRecurringTransactionsMessage(userId: string): Promise<string> {
   try {
+    // Get user's item IDs
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', userId);
+
+    if (!userItems || userItems.length === 0) {
+      return '💳 RECURRING BILLS\n\nNo bank accounts connected.';
+    }
+
+    const itemDbIds = userItems.map(item => item.id);
+
+    // Get user's account balances
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('name, type, current_balance, available_balance')
+      .in('item_id', itemDbIds);
+
+    // Calculate total available balance from depository accounts
+    const depositoryAccounts = accounts?.filter(acc => acc.type === 'depository') || [];
+    const totalAvailableBalance = depositoryAccounts.reduce(
+      (sum, acc) => sum + (acc.available_balance || 0), 
+      0
+    );
+
     // Fetch all active, upcoming recurring bills from tagged_merchants
     const { data: taggedMerchants, error } = await supabase
       .from('tagged_merchants')
@@ -50,10 +75,10 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     });
 
     if (upcoming.length === 0) {
-      return '💳 RECURRING BILLS\n\nNo upcoming recurring bills found.';
+      return `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n💳 RECURRING BILLS\n\nNo upcoming recurring bills found.`;
     }
 
-    let message = `⭐ Recurring Bills\n${upcoming.length} upcoming\n\n`;
+    let message = `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n⭐ Recurring Bills\n${upcoming.length} upcoming\n\n`;
     upcoming.slice(0, 20).forEach(tm => {
       const date = new Date(tm.next_predicted_date + 'T12:00:00');
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -72,9 +97,21 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     const total7 = sumInDays(7);
     const total14 = sumInDays(14);
     const total30 = sumInDays(30);
+    
     message += `\nNEXT 7 DAYS: $${total7.toFixed(2)}`;
     message += `\nNEXT 14 DAYS: $${total14.toFixed(2)}`;
     message += `\nNEXT 30 DAYS: $${total30.toFixed(2)}`;
+    
+    // Add balance coverage insight
+    if (total30 > 0) {
+      const coverageMonths = totalAvailableBalance / total30;
+      if (coverageMonths >= 1) {
+        message += `\n\n💡 Balance covers ${coverageMonths.toFixed(1)} months of bills`;
+      } else {
+        message += `\n\n⚠️ Balance covers ${(coverageMonths * 30).toFixed(0)} days of bills`;
+      }
+    }
+    
     return message.trim();
   } catch (error) {
     console.error('Error generating recurring transactions message:', error);
