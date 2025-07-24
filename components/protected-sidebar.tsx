@@ -33,7 +33,7 @@ export default async function ProtectedSidebar() {
             href: "/ai-merchant-analysis",
           },
           {
-            label: "📊 Spend Grid",
+            label: "📊 Bubble Chart",
             href: "/merchant-spend-grid",
           },
           // REMOVED FOR PERFORMANCE: Heavy analytics features

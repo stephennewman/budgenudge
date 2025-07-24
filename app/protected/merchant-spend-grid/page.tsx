@@ -98,10 +98,6 @@ export default function MerchantSpendGrid() {
       setLoading(true);
       const supabase = createSupabaseClient();
 
-      // Get current date for default month
-      const now = new Date();
-      const currentMonth = now.toISOString().slice(0, 7); // YYYY-MM format
-
       // First, get available months
       const { data: monthsData } = await supabase
         .from('transactions')
@@ -112,12 +108,15 @@ export default function MerchantSpendGrid() {
         const months = [...new Set(monthsData.map(t => t.date.slice(0, 7)))].sort().reverse();
         setAvailableMonths(months);
         
+        // Default to June 2025 for full month of data, fallback to most recent
         if (!selectedMonth && months.length > 0) {
-          setSelectedMonth(months[0]); // Use most recent month
+          const juneMonth = '2025-06';
+          const defaultMonth = months.includes(juneMonth) ? juneMonth : months[0];
+          setSelectedMonth(defaultMonth);
         }
       }
 
-      const targetMonth = selectedMonth || currentMonth;
+      const targetMonth = selectedMonth || '2025-06'; // Default to June for full month
       const startDate = `${targetMonth}-01`;
       const endDate = `${targetMonth}-31`;
 
@@ -167,8 +166,8 @@ export default function MerchantSpendGrid() {
         quadrant: getQuadrant(merchant.monthlySpend, merchant.transactionCount)
       }));
 
-      // Filter out merchants with very small amounts (less than $5) to reduce noise
-      const filteredData = processedData.filter(merchant => merchant.monthlySpend >= 5);
+      // Filter out merchants with very small amounts (less than $10) to reduce noise
+      const filteredData = processedData.filter(merchant => merchant.monthlySpend >= 10);
 
       setData(filteredData);
     } catch (error) {
@@ -198,8 +197,8 @@ export default function MerchantSpendGrid() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Merchant Spend Grid</h1>
-          <p className="text-gray-600 mt-1">2x2 quadrant analysis of monthly merchant spending patterns</p>
+          <h1 className="text-3xl font-bold text-gray-900">Merchant Spend Bubble Chart</h1>
+          <p className="text-gray-600 mt-1">Visual spending analysis - bubble size shows total spend, position shows frequency vs amount</p>
         </div>
         
         {availableMonths.length > 0 && (
@@ -229,11 +228,11 @@ export default function MerchantSpendGrid() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-center">
-            Monthly Merchant Spend vs Transaction Frequency
+            Monthly Merchant Spending Patterns (Bubble Chart)
           </CardTitle>
           <div className="text-sm text-gray-600 text-center space-y-1">
-            <p><strong>Intersection:</strong> $1,250 spend × 25 transactions</p>
-            <p><strong>Quadrants:</strong> Foundational (bottom-right) • Frequent (top-left) • High-Value (top-right) • One-time (bottom-left)</p>
+            <p><strong>Bubble Size = Total Monthly Spend</strong> • <strong>Position = Frequency vs Amount</strong></p>
+            <p><strong>Cross Intersection:</strong> $1,250 spend × 25 transactions • <strong>Default:</strong> June 2025 data</p>
           </div>
         </CardHeader>
         <CardContent>
@@ -269,18 +268,50 @@ export default function MerchantSpendGrid() {
                   data={data}
                   fill="#8884d8"
                 >
-                  {data.map((entry, index) => (
-                    <circle 
-                      key={`cell-${index}`} 
-                      r={8}
-                      fill={entry.color}
-                      stroke="#fff"
-                      strokeWidth={2}
-                    />
-                  ))}
+                  {data.map((entry, index) => {
+                    // Calculate bubble size based on monthly spend (min 6, max 40)
+                    const minSize = 6;
+                    const maxSize = 40;
+                    const maxSpend = Math.max(...data.map(d => d.monthlySpend));
+                    const spendRatio = entry.monthlySpend / maxSpend;
+                    const bubbleSize = minSize + (spendRatio * (maxSize - minSize));
+                    
+                    return (
+                      <circle 
+                        key={`bubble-${index}`} 
+                        r={bubbleSize}
+                        fill={entry.color}
+                        stroke="#fff"
+                        strokeWidth={2}
+                        opacity={0.8}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    );
+                  })}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
+          </div>
+          
+          {/* Legend for bubble sizes */}
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <h4 className="font-semibold text-gray-700 mb-2">💡 Bubble Chart Guide</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p><strong>Bubble Size:</strong> Represents total monthly spend</p>
+                <p><strong>Position:</strong> X = Monthly spend, Y = Transaction frequency</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full opacity-80"></div>
+                  <span>Small spend</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-blue-500 rounded-full opacity-80"></div>
+                  <span>Large spend</span>
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Quadrant Labels */}
@@ -289,27 +320,32 @@ export default function MerchantSpendGrid() {
               <div className="font-semibold text-blue-800">Frequent</div>
               <div className="text-blue-600">Low Spend, High Activity</div>
               <div className="text-xs text-blue-500 mt-1">&lt; $1,250, &gt; 25 transactions</div>
+              <div className="text-xs text-blue-400">Coffee shops, gas stations</div>
             </div>
             <div className="text-center p-3 bg-purple-50 rounded-lg">
               <div className="font-semibold text-purple-800">High-Value</div>
               <div className="text-purple-600">High Spend, High Activity</div>
               <div className="text-xs text-purple-500 mt-1">&gt; $1,250, &gt; 25 transactions</div>
+              <div className="text-xs text-purple-400">Grocery stores, major retailers</div>
             </div>
             <div className="text-center p-3 bg-gray-50 rounded-lg">
               <div className="font-semibold text-gray-800">One-time</div>
               <div className="text-gray-600">Low Spend, Low Activity</div>
               <div className="text-xs text-gray-500 mt-1">&lt; $1,250, &lt; 25 transactions</div>
+              <div className="text-xs text-gray-400">Small purchases, subscriptions</div>
             </div>
             <div className="text-center p-3 bg-green-50 rounded-lg">
               <div className="font-semibold text-green-800">Foundational</div>
               <div className="text-green-600">High Spend, Low Activity</div>
               <div className="text-xs text-green-500 mt-1">&gt; $1,250, &lt; 25 transactions</div>
+              <div className="text-xs text-green-400">Rent, mortgage, insurance</div>
             </div>
           </div>
 
           {data.length === 0 && (
             <div className="text-center py-12">
               <p className="text-gray-500">No transaction data available for the selected month.</p>
+              <p className="text-gray-400 text-sm mt-2">Try selecting a different month from the dropdown above.</p>
             </div>
           )}
         </CardContent>
