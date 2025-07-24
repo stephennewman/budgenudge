@@ -8,7 +8,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -46,6 +46,12 @@ const smsTypeInfo = {
     description: 'Spending pacing analysis for your tracked spending categories (configure on Categories page)',
     icon: '📊',
     example: `📊 CATEGORY PACING\nJuly 2025\nMonth Progress: 68% (Day 21)\n\n🟢 Groceries:\n   Month to date: $287.50\n   Expected by now: $210.45\n   Avg monthly: $325.00\n   Pacing: 90%\n   Status: Under pace\n\n🔴 Restaurant:\n   Month to date: $156.00\n   Expected by now: $142.35\n   Avg monthly: $180.00\n   Pacing: 137%\n   Status: Over pace`
+  },
+  'weekly-summary': {
+    title: 'Weekly Spending Summary',
+    description: 'Comprehensive weekly spending analysis sent every Sunday at 7:00 AM EST',
+    icon: '📊',
+    example: `📊 WEEKLY SPENDING SUMMARY\nJul 13 - Jul 19\n\n💰 Available Balance: $3,083.26\n\n💳 Total Spent: $3,962.93\n📈 Transactions: 73\n📈 98% more than prev week\n\n🏷️ Top Categories:\n1. Tithe: $1,065.00 (27%)\n2. Utilities: $398.79 (10%)\n3. Restaurant: $358.36 (9%)\n\n🏪 Top Merchants:\n1. Generations: $1,065.00\n2. Venmo: $355.00\n3. Duke Energy: $258.98\n4. Publix: $250.80\n\n📅 Daily Breakdown:\nSun: $1,712.40  Mon: $357.29  Tue: $206.13  Wed: $758.23  Thu: $615.59  Fri: $144.98  Sat: $168.31`
   }
 };
 
@@ -100,7 +106,9 @@ export default function SMSPreferencesPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">📱 Texts</h1>
           <p className="text-muted-foreground mt-2">
-            All SMS will be sent daily at <span className="font-semibold">7:00 AM EST</span>.
+            Daily SMS will be sent at <span className="font-semibold">7:00 AM EST</span>.
+            <br />
+            Weekly summaries are sent every <span className="font-semibold">Sunday at 7:00 AM EST</span>.
           </p>
         </div>
       </div>

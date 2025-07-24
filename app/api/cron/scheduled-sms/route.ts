@@ -165,6 +165,20 @@ export async function GET(request: NextRequest) {
 
         // Handle weekly summary scheduling (Sunday 7am EST)
         if (templatesToSend.includes('weekly-summary')) {
+          // Check if user has enabled weekly-summary preference
+          const { data: weeklyPref } = await supabase
+            .from('user_sms_preferences')
+            .select('enabled')
+            .eq('user_id', userId)
+            .eq('sms_type', 'weekly-summary')
+            .single();
+          
+          if (!weeklyPref || !weeklyPref.enabled) {
+            logDetails.push({ userId, skipped: true, reason: 'Weekly summary disabled in preferences' });
+            console.log(`📊 Skipping user ${userId} (weekly summary disabled in preferences)`);
+            continue;
+          }
+          
           console.log(`📊 Sending weekly summary to user ${userId} (Sunday 7am EST)`);
         } else {
           // Only send daily templates if current time is within 10 minutes of user's preferred send_time
@@ -191,6 +205,40 @@ export async function GET(request: NextRequest) {
         // Send each template type
         for (const templateType of templatesToSend) {
           try {
+            // Check if user has enabled this specific SMS type
+            let preferenceType: string;
+            switch (templateType) {
+              case 'recurring':
+                preferenceType = 'bills';
+                break;
+              case 'recent':
+                preferenceType = 'activity';
+                break;
+              case 'merchant-pacing':
+                preferenceType = 'merchant-pacing';
+                break;
+              case 'category-pacing':
+                preferenceType = 'category-pacing';
+                break;
+              case 'weekly-summary':
+                preferenceType = 'weekly-summary';
+                break;
+              default:
+                preferenceType = templateType;
+            }
+
+            const { data: templatePref } = await supabase
+              .from('user_sms_preferences')
+              .select('enabled')
+              .eq('user_id', userId)
+              .eq('sms_type', preferenceType)
+              .single();
+            
+            if (!templatePref || !templatePref.enabled) {
+              console.log(`📭 Skipping ${templateType} for user ${userId} (disabled in preferences)`);
+              continue;
+            }
+
             console.log(`📝 Generating ${templateType} SMS for user ${userId}`);
             
             // Generate message using new template system
