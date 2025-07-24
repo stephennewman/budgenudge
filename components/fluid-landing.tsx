@@ -11,6 +11,7 @@ class FluidSimulation {
   private programs: Map<string, WebGLProgram> = new Map();
   private framebuffers: WebGLFramebuffer[] = [];
   private textures: WebGLTexture[] = [];
+  private vertexBuffer: WebGLBuffer | null = null;
   private config = {
     SIM_RESOLUTION: 128,
     DYE_RESOLUTION: 1024,
@@ -96,7 +97,6 @@ class FluidSimulation {
       precision highp float;
       in vec2 vUv;
       out vec4 fragColor;
-      uniform sampler2D uTexture;
       uniform float time;
       
       vec3 hsv2rgb(vec3 c) {
@@ -106,17 +106,37 @@ class FluidSimulation {
       }
       
       void main () {
-          vec4 color = texture(uTexture, vUv);
+          vec2 p = vUv - 0.5;
+          float len = length(p);
           
-          // Add some color cycling based on position and time
-          float hue = atan(vUv.y - 0.5, vUv.x - 0.5) / 6.28318 + time * 0.1;
-          vec3 rainbow = hsv2rgb(vec3(hue, 0.8, 1.0));
+          // Create flowing colors based on position and time
+          float hue = time * 0.1 + len * 2.0 + atan(p.y, p.x);
+          float sat = 0.6 + 0.4 * sin(time * 0.8 + len * 5.0);
+          float val = 0.7 + 0.3 * sin(time * 1.2 + len * 3.0);
           
-          // Mix with fluid simulation
-          color.rgb = mix(color.rgb, rainbow * color.a, 0.3);
-          color.rgb += rainbow * 0.1;
+          vec3 color = hsv2rgb(vec3(hue, sat, val));
           
-          fragColor = vec4(color.rgb, 1.0);
+          // Add flowing smoky effect with more contrast
+          float noise1 = sin(time * 0.8 + p.x * 12.0 + p.y * 8.0) * 0.5 + 0.5;
+          float noise2 = cos(time * 1.2 + p.y * 10.0 + p.x * 6.0) * 0.5 + 0.5;
+          float smoke = noise1 * noise2;
+          smoke *= exp(-len * 1.5); // Fade from center
+          
+          // Create more visible turbulent flow patterns
+          vec2 flow = vec2(
+              sin(time * 0.5 + p.x * 8.0 + p.y * 3.0),
+              cos(time * 0.7 + p.y * 6.0 + p.x * 4.0)
+          ) * 0.5;
+          
+          // Apply flow to the position for distortion
+          vec2 distorted = p + flow * 0.1;
+          float distortedLen = length(distorted);
+          
+          // More vibrant smoke colors
+          vec3 smokeColor = vec3(0.9, 0.7, 1.0) * smoke * 2.0;
+          color = mix(color, smokeColor, min(smoke * 0.8, 1.0));
+          
+          fragColor = vec4(color, 1.0);
       }
     `;
 
@@ -176,11 +196,16 @@ class FluidSimulation {
   }
 
   private initFramebuffers() {
+    // Create vertex buffer for full-screen quad
+    const vertices = new Float32Array([
+      -1, -1,
+       1, -1,
+       1,  1,
+      -1,  1
+    ]);
     
-    // Create a simple quad for rendering
-    const vertices = new Float32Array([-1, -1, -1, 1, 1, 1, 1, -1]);
-    const vertexBuffer = this.gl.createBuffer();
-    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vertexBuffer);
+    this.vertexBuffer = this.gl.createBuffer()!;
+    this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
     this.gl.bufferData(this.gl.ARRAY_BUFFER, vertices, this.gl.STATIC_DRAW);
     
     // Create texture for fluid simulation
@@ -221,16 +246,20 @@ class FluidSimulation {
         this.gl.uniform1f(timeLocation, time);
       }
       
-      // Set up vertex attributes
-      const aPosition = this.gl.getAttribLocation(program, 'aPosition');
-      if (aPosition >= 0) {
-        this.gl.enableVertexAttribArray(aPosition);
-        this.gl.vertexAttribPointer(aPosition, 2, this.gl.FLOAT, false, 0, 0);
+      // Bind vertex buffer and set up attributes
+      if (this.vertexBuffer) {
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.vertexBuffer);
         
-        // Draw fullscreen quad
-        this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
-        
-        this.gl.disableVertexAttribArray(aPosition);
+        const aPosition = this.gl.getAttribLocation(program, 'aPosition');
+        if (aPosition >= 0) {
+          this.gl.enableVertexAttribArray(aPosition);
+          this.gl.vertexAttribPointer(aPosition, 2, this.gl.FLOAT, false, 0, 0);
+          
+          // Draw fullscreen quad
+          this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
+          
+          this.gl.disableVertexAttribArray(aPosition);
+        }
       }
     }
     
@@ -305,33 +334,49 @@ export default function FluidLanding() {
       }
     }
 
+    // Add mouse interaction
+    let lastInteractionTime = 0;
+    const throttleDelay = 50;
+    
     const handleMouseMove = (e: MouseEvent) => {
-      if (simulationRef.current && canvasRef.current) {
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = (e.clientX - rect.left) / rect.width;
-        const y = 1 - (e.clientY - rect.top) / rect.height;
-        simulationRef.current.addSplat(x, y);
+      const now = Date.now();
+      if (simulationRef.current && now - lastInteractionTime > throttleDelay) {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          simulationRef.current.addSplat(x, y);
+          lastInteractionTime = now;
+        }
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault();
-      if (simulationRef.current && canvasRef.current && e.touches.length > 0) {
-        const rect = canvasRef.current.getBoundingClientRect();
+      const now = Date.now();
+      if (simulationRef.current && e.touches.length > 0 && now - lastInteractionTime > throttleDelay) {
         const touch = e.touches[0];
-        const x = (touch.clientX - rect.left) / rect.width;
-        const y = 1 - (touch.clientY - rect.top) / rect.height;
-        simulationRef.current.addSplat(x, y);
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (rect) {
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          simulationRef.current.addSplat(x, y);
+          lastInteractionTime = now;
+        }
       }
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    if (canvasRef.current) {
+      canvasRef.current.addEventListener('mousemove', handleMouseMove);
+      canvasRef.current.addEventListener('touchmove', handleTouchMove, { passive: false });
+    }
 
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('touchmove', handleTouchMove);
-    };
+         return () => {
+       if (canvasRef.current) {
+         canvasRef.current.removeEventListener('mousemove', handleMouseMove);
+         canvasRef.current.removeEventListener('touchmove', handleTouchMove);
+       }
+     };
   }, []);
 
   return (
