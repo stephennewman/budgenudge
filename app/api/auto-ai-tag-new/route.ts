@@ -50,15 +50,6 @@ export async function POST(request: Request) {
 
     console.log(`🤖 Found ${untaggedTransactions.length} untagged transactions to process`);
 
-    // Check cache for existing merchant patterns first
-    const merchantPatterns = untaggedTransactions.map(tx => tx.merchant_name || tx.name);
-    const { data: cachedTags } = await supabaseService
-      .from('merchant_ai_tags')
-      .select('merchant_pattern, ai_merchant_name, ai_category_tag')
-      .in('merchant_pattern', merchantPatterns);
-
-    const cacheMap = new Map(cachedTags?.map(tag => [tag.merchant_pattern, tag]) || []);
-
     // Group transactions by merchant for efficient processing
     const merchantGroups = new Map<string, typeof untaggedTransactions>();
     untaggedTransactions.forEach(tx => {
@@ -68,6 +59,31 @@ export async function POST(request: Request) {
       }
       merchantGroups.get(merchantKey)!.push(tx);
     });
+
+    // ✅ FIX: Batch cache lookups to avoid 414 errors
+    const merchantPatterns = Array.from(merchantGroups.keys());
+    const cacheMap = new Map<string, any>();
+    
+    // Process merchant patterns in batches of 50 to avoid URL length issues
+    const batchSize = 50;
+    for (let i = 0; i < merchantPatterns.length; i += batchSize) {
+      const batch = merchantPatterns.slice(i, i + batchSize);
+      
+      const { data: cachedTags, error: cacheError } = await supabaseService
+        .from('merchant_ai_tags')
+        .select('merchant_pattern, ai_merchant_name, ai_category_tag')
+        .in('merchant_pattern', batch);
+
+      if (cacheError) {
+        console.error(`🤖⚠️ Warning: Failed to fetch cache batch ${i / batchSize + 1}:`, cacheError);
+      } else if (cachedTags) {
+        cachedTags.forEach(tag => {
+          cacheMap.set(tag.merchant_pattern, tag);
+        });
+      }
+    }
+
+    console.log(`🤖💾 Loaded ${cacheMap.size} cached merchant patterns from ${Math.ceil(merchantPatterns.length / batchSize)} batches`);
 
     const updates: Array<{id: string, ai_merchant_name: string, ai_category_tag: string}> = [];
     const newMerchantTags: Array<{merchant_pattern: string, ai_merchant_name: string, ai_category_tag: string}> = [];
