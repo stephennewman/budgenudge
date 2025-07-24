@@ -349,58 +349,10 @@ export default function TransactionsPage() {
         return date.toLocaleDateString();
       },
       sortDescFirst: true,
-          },
-      {
-      accessorKey: 'name',
-      header: 'Description',
-      cell: ({ getValue }: { getValue: () => string }) => (
-        <div className="font-medium max-w-[200px] truncate">
-          {getValue()}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'merchant_name',
-      header: 'Merchant',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => getValue() || '-',
-    },
-    {
-      accessorKey: 'amount',
-      header: 'Amount',
-      cell: ({ getValue }: { getValue: () => number }) => {
-        const amount = getValue();
-        return (
-          <span className={`font-medium ${amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
-            ${Math.abs(amount).toFixed(2)}
-          </span>
-        );
-      },
-    },
-    {
-      accessorKey: 'category',
-      header: 'Category',
-      cell: ({ getValue }: { getValue: () => string[] }) => {
-        const categories = getValue();
-        return categories?.[0] || 'Other';
-      },
-    },
-    {
-      accessorKey: 'subcategory',
-      header: 'Subcategory',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
-        const subcategory = getValue();
-        return subcategory ? (
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-            {subcategory}
-          </span>
-        ) : (
-          <span className="text-gray-400">-</span>
-        );
-      },
     },
     {
       accessorKey: 'ai_merchant_name',
-      header: 'AI Merchant',
+      header: 'Merchant',
       cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiMerchant = getValue();
         const transaction = row.original;
@@ -424,8 +376,29 @@ export default function TransactionsPage() {
       },
     },
     {
+      accessorKey: 'amount',
+      header: 'Amount',
+      cell: ({ getValue }: { getValue: () => number }) => {
+        const amount = getValue();
+        return (
+          <span className={`font-medium ${amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+            ${Math.abs(amount).toFixed(2)}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'name',
+      header: 'Description',
+      cell: ({ getValue }: { getValue: () => string }) => (
+        <div className="font-medium max-w-[200px] truncate">
+          {getValue()}
+        </div>
+      ),
+    },
+    {
       accessorKey: 'ai_category_tag',
-      header: 'AI Category',
+      header: 'Category',
       cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiCategory = getValue();
         const transaction = row.original;
@@ -449,6 +422,20 @@ export default function TransactionsPage() {
       },
     },
     {
+      accessorKey: 'subcategory',
+      header: 'Subcategory',
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const subcategory = getValue();
+        return subcategory ? (
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+            {subcategory}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        );
+      },
+    },
+    {
       accessorKey: 'pending',
       header: 'Status',
       cell: ({ getValue }: { getValue: () => boolean }) => (
@@ -456,6 +443,27 @@ export default function TransactionsPage() {
           {getValue() ? 'Pending' : 'Posted'}
         </span>
       ),
+    },
+    {
+      accessorKey: 'logo_url',
+      header: 'Logo',
+      cell: ({ getValue }: { getValue: () => string | undefined }) => {
+        const logoUrl = getValue();
+        return logoUrl ? (
+          <img 
+            src={logoUrl} 
+            alt="Logo" 
+            className="w-6 h-6 rounded"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <span className="text-gray-400 text-xs">-</span>
+        );
+      },
+      enableSorting: false,
+      size: 60,
     },
   ], [transactionStarredStatus, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
