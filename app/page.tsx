@@ -19,7 +19,7 @@ export default function Home() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg" className="text-lg px-8 py-4 h-auto">
-              <Link href="/sign-up">Start Getting Daily Texts - $20</Link>
+              <Link href="/sign-up">Try for free (for now)</Link>
             </Button>
             <Button variant="outline" asChild size="lg" className="text-lg px-8 py-4 h-auto">
               <Link href="/sign-in">I&apos;m Already Smart</Link>
@@ -96,114 +96,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 3: IDEAL FUTURE (NO PRODUCT MENTION) */}
-      <section className="bg-green-50 py-16 px-4 sm:px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl sm:text-4xl font-bold text-green-800 mb-4">Imagine If You Actually Knew</h2>
-            <p className="text-lg text-green-700">What if financial awareness was just... automatic?</p>
-          </div>
-          
-          <div className="bg-white border-2 border-green-300 rounded-xl p-6 sm:p-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left">
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🧠</span>
-                <span className="text-green-700">Wake up every morning knowing exactly where you stand financially</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">😌</span>
-                <span className="text-green-700">Never get surprised by bills or unexpected charges again</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🎯</span>
-                <span className="text-green-700">Make confident spending decisions because you have the facts</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">😎</span>
-                <span className="text-green-700">Be the person who&apos;s &quot;on top of their finances&quot;</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">💪</span>
-                <span className="text-green-700">Actually impress your parents with your financial responsibility</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🚀</span>
-                <span className="text-green-700">Stop money from mysteriously disappearing into thin air</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🛡️</span>
-                <span className="text-green-700">Feel secure knowing you&apos;re not missing anything important</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">⚡</span>
-                <span className="text-green-700">Get financial insights without any effort or apps to remember</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🎉</span>
-                <span className="text-green-700">Catch spending patterns before they become problems</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-green-600 mt-1 text-xl">🧘</span>
-                <span className="text-green-700">Experience actual peace of mind about money</span>
-              </div>
-            </div>
-            
-            <div className="mt-8 text-center bg-green-100 border border-green-300 rounded-lg p-6">
-              <p className="text-green-800 font-bold text-xl mb-2">This isn&apos;t fantasy. This is totally possible.</p>
-              <p className="text-green-700">You don&apos;t need to become a financial expert. You just need the right information at the right time.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 4: PRODUCT INTRODUCTION */}
-      <section className="bg-blue-50 py-16 px-4 sm:px-6">
-        <div className="mx-auto max-w-4xl text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-blue-800 mb-6">Meet Krezzo</h2>
-          <p className="text-xl text-blue-700 mb-8">Finally, financial awareness that actually fits into your life.</p>
-          
-          <div className="bg-white border-2 border-blue-300 rounded-xl p-6 sm:p-8">
-            <p className="text-lg mb-6">
-              One daily text message at 7 AM. That&apos;s it. No apps to check, no spreadsheets to maintain, no complex budgets to follow.
-            </p>
-            <p className="text-lg font-semibold text-blue-800">
-              Just the financial awareness you&apos;ve been missing, delivered when you need it most.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 5: HOW IT WORKS */}
-      <section className="bg-gray-50 py-16 px-4 sm:px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold mb-4">How It Works (It&apos;s Stupid Simple)</h2>
-            <p className="text-lg text-gray-600">Three steps. That&apos;s literally it.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
-              <h3 className="text-xl font-semibold mb-3">Sign up</h3>
-              <p className="text-gray-600">Takes 2 minutes. We&apos;re not going to spam you with a million questions.</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">2</div>
-              <h3 className="text-xl font-semibold mb-3">Connect your bank</h3>
-              <p className="text-gray-600">Secure Plaid integration. Same thing your bank uses. We can&apos;t touch your money.</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">3</div>
-              <h3 className="text-xl font-semibold mb-3">Get daily texts</h3>
-              <p className="text-gray-600">Every morning at 7 AM. What you spent. What&apos;s coming up. Done.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 6: COMPETITOR DESTRUCTION */}
+      {/* SECTION 3: COMPETITOR DESTRUCTION (MOVED HERE) */}
       <section className="bg-red-50 py-16 px-4 sm:px-6">
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-12">
@@ -287,6 +180,113 @@ export default function Home() {
         </div>
       </section>
 
+      {/* SECTION 4: IDEAL FUTURE (NO PRODUCT MENTION) */}
+      <section className="bg-green-50 py-16 px-4 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl sm:text-4xl font-bold text-green-800 mb-4">Imagine If You Actually Knew</h2>
+            <p className="text-lg text-green-700">What if financial awareness was just... automatic?</p>
+          </div>
+          
+          <div className="bg-white border-2 border-green-300 rounded-xl p-6 sm:p-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left">
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🧠</span>
+                <span className="text-green-700">Wake up every morning knowing exactly where you stand financially</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">😌</span>
+                <span className="text-green-700">Never get surprised by bills or unexpected charges again</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🎯</span>
+                <span className="text-green-700">Make confident spending decisions because you have the facts</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">😎</span>
+                <span className="text-green-700">Be the person who&apos;s &quot;on top of their finances&quot;</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">💪</span>
+                <span className="text-green-700">Actually impress your parents with your financial responsibility</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🚀</span>
+                <span className="text-green-700">Stop money from mysteriously disappearing into thin air</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🛡️</span>
+                <span className="text-green-700">Feel secure knowing you&apos;re not missing anything important</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">⚡</span>
+                <span className="text-green-700">Get financial insights without any effort or apps to remember</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🎉</span>
+                <span className="text-green-700">Catch spending patterns before they become problems</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-green-600 mt-1 text-xl">🧘</span>
+                <span className="text-green-700">Experience actual peace of mind about money</span>
+              </div>
+            </div>
+            
+            <div className="mt-8 text-center bg-green-100 border border-green-300 rounded-lg p-6">
+              <p className="text-green-800 font-bold text-xl mb-2">This isn&apos;t fantasy. This is totally possible.</p>
+              <p className="text-green-700">You don&apos;t need to become a financial expert. You just need the right information at the right time.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5: PRODUCT INTRODUCTION */}
+      <section className="bg-blue-50 py-16 px-4 sm:px-6">
+        <div className="mx-auto max-w-4xl text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-blue-800 mb-6">Meet Krezzo</h2>
+          <p className="text-xl text-blue-700 mb-8">Finally, financial awareness that actually fits into your life.</p>
+          
+          <div className="bg-white border-2 border-blue-300 rounded-xl p-6 sm:p-8">
+            <p className="text-lg mb-6">
+              One daily text message at 7 AM. That&apos;s it. No apps to check, no spreadsheets to maintain, no complex budgets to follow.
+            </p>
+            <p className="text-lg font-semibold text-blue-800">
+              Just the financial awareness you&apos;ve been missing, delivered when you need it most.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 6: HOW IT WORKS */}
+      <section className="bg-gray-50 py-16 px-4 sm:px-6">
+        <div className="mx-auto max-w-5xl">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold mb-4">How It Works (It&apos;s Stupid Simple)</h2>
+            <p className="text-lg text-gray-600">Three steps. That&apos;s literally it.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">1</div>
+              <h3 className="text-xl font-semibold mb-3">Sign up</h3>
+              <p className="text-gray-600">Takes 2 minutes. We&apos;re not going to spam you with a million questions.</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">2</div>
+              <h3 className="text-xl font-semibold mb-3">Connect your bank</h3>
+              <p className="text-gray-600">Secure Plaid integration. Same thing your bank uses. We can&apos;t touch your money.</p>
+            </div>
+            
+            <div className="text-center">
+              <div className="w-16 h-16 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">3</div>
+              <h3 className="text-xl font-semibold mb-3">Get daily texts</h3>
+              <p className="text-gray-600">Every morning at 7 AM. What you spent. What&apos;s coming up. Done.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* SECTION 7: WHAT YOU ACTUALLY GET */}
       <section className="bg-green-50 py-16 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
@@ -363,12 +363,11 @@ export default function Home() {
         <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-3xl sm:text-4xl font-bold text-white mb-6">Stop Flying Blind With Your Money</h2>
           <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto">
-            Twenty bucks. One time. Daily financial awareness that actually works. 
-            No subscriptions, no upsells, no nonsense.
+            Simple daily financial awareness that actually works. Start free, see if it changes your life.
           </p>
           
           <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-xl px-12 py-6 h-auto font-bold">
-            <Link href="/sign-up">Get Financial Awareness - $20</Link>
+            <Link href="/sign-up">Try for free (for now)</Link>
           </Button>
           
           <p className="text-blue-200 text-sm mt-6">
