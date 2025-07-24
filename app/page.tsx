@@ -17,9 +17,68 @@ export default function Home() {
           Stop wondering where your money went.
         </h1>
         
-        <p className="text-xl text-muted-foreground mb-4 max-w-3xl mx-auto">
+        <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
           Get a daily text at 7 AM with exactly what you spent yesterday and what bills are coming up. No apps. No spreadsheets. No bullshit.
         </p>
+
+        {/* Financial Pain Points - OVERKILL */}
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-6 mb-8 max-w-4xl mx-auto">
+          <h2 className="text-2xl font-bold text-red-800 mb-4">Sound Familiar?</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left text-sm">
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">💸</span>
+              <span className="text-red-700">Check your bank account and wonder &quot;WTF happened to my money?&quot;</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">😰</span>
+              <span className="text-red-700">Get hit with surprise bills when you&apos;re already broke</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">🤯</span>
+              <span className="text-red-700">Open 5 different banking apps just to see what&apos;s happening</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">📱</span>
+              <span className="text-red-700">Download budgeting apps that you forget to use after 3 days</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">📊</span>
+              <span className="text-red-700">Stare at overwhelming spreadsheets that make you want to cry</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">🔥</span>
+              <span className="text-red-700">Live in constant low-level financial anxiety</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">💳</span>
+              <span className="text-red-700">Death by a thousand subscriptions you forgot about</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">🤦</span>
+              <span className="text-red-700">Feel like an idiot for not being &quot;good with money&quot;</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">⏰</span>
+              <span className="text-red-700">Spend hours trying to figure out where you stand financially</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">😩</span>
+              <span className="text-red-700">Make financial decisions based on guesswork and hope</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">🎢</span>
+              <span className="text-red-700">Ride the emotional rollercoaster of financial surprises</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-red-500 mt-1 text-lg">🤷</span>
+              <span className="text-red-700">Live paycheck to paycheck not by choice, but by ignorance</span>
+            </div>
+          </div>
+          <div className="mt-6 text-center">
+            <p className="text-red-800 font-semibold text-lg">This is exhausting. And it&apos;s not your fault.</p>
+            <p className="text-red-600 text-sm mt-1">The tools available are garbage. The system is broken. You need something that actually works.</p>
+          </div>
+        </div>
 
         <p className="text-lg mb-8 font-semibold">
           Finally, financial awareness that actually fits into your life.
@@ -58,34 +117,65 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Competitive Objection Handling */}
+        {/* Competitive Objection Handling - EXPANDED BRUTALITY */}
         <div className="bg-red-50 border border-red-200 rounded-xl p-8 mb-12">
-          <h2 className="text-2xl font-bold text-red-800 mb-6">Why Everything Else Sucks</h2>
+          <h2 className="text-2xl font-bold text-red-800 mb-4">Why Everything Else Sucks (And You Know It)</h2>
+          <p className="text-red-700 text-sm mb-6 text-center italic">Let&apos;s be honest about why you&apos;re still financially stressed despite trying everything...</p>
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-left text-sm">
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">📊 Tiller</h3>
-                             <p className="text-red-600">Who wants to deal with spreadsheets? It&apos;s 2025, not 1995.</p>
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">📊 Tiller - &quot;Excel Hell&quot;</h3>
+              <p className="text-red-600 mb-2">Who wants to deal with spreadsheets? It&apos;s 2025, not 1995.</p>
+              <p className="text-red-500 text-xs">• Requires Excel expertise most people don&apos;t have<br/>• Hours of setup for basic functionality<br/>• One wrong formula breaks everything<br/>• Your data gets corrupted, you&apos;re screwed</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">🏦 Mint</h3>
-                             <p className="text-red-600">Intuit killed it. RIP. Hope you didn&apos;t get too attached.</p>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">🏦 Mint - &quot;Dead & Buried&quot;</h3>
+              <p className="text-red-600 mb-2">Intuit killed it. RIP. Hope you didn&apos;t get too attached.</p>
+              <p className="text-red-500 text-xs">• Millions of users left homeless overnight<br/>• Years of financial data just... gone<br/>• &quot;Use Credit Karma instead&quot; - seriously?<br/>• Proof that free isn&apos;t really free</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">🚀 Rocket Money</h3>
-                             <p className="text-red-600">Don&apos;t fund their executive space explorations with your $12/month.</p>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">🚀 Rocket Money - &quot;Space Cadet Pricing&quot;</h3>
+              <p className="text-red-600 mb-2">Don&apos;t fund their executive space explorations with your $12/month.</p>
+              <p className="text-red-500 text-xs">• $144/year to cancel subscriptions manually<br/>• Features you can do yourself in 5 minutes<br/>• Aggressive upselling at every turn<br/>• More expensive than most subscriptions you&apos;re trying to cancel</p>
             </div>
-            <div>
-                             <h3 className="font-semibold text-red-700 mb-2">📝 YNAB</h3>
-               <p className="text-red-600">Eff budgets! Life&apos;s too short for that kind of micromanagement.</p>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">📝 YNAB - &quot;Budget Bootcamp&quot;</h3>
+              <p className="text-red-600 mb-2">Eff budgets! Life&apos;s too short for that kind of micromanagement.</p>
+              <p className="text-red-500 text-xs">• 40-hour learning curve just to get started<br/>• Requires religious daily maintenance<br/>• Miss one day, everything falls apart<br/>• Makes you feel guilty about buying coffee</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">👑 Monarch Money</h3>
-                             <p className="text-red-600">They&apos;ll use your money to buy more Reddit ads. How meta.</p>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">👑 Monarch Money - &quot;Reddit Ad Kings&quot;</h3>
+              <p className="text-red-600 mb-2">They&apos;ll use your money to buy more Reddit ads. How meta.</p>
+              <p className="text-red-500 text-xs">• Everywhere you look, another Monarch ad<br/>• $99/year for features that barely work<br/>• Connection issues with every bank update<br/>• More time marketing than building</p>
             </div>
-            <div>
-              <h3 className="font-semibold text-red-700 mb-2">📱 Banking Apps</h3>
-              <p className="text-red-600">Good luck remembering to check 47 different apps every day.</p>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">📱 Banking Apps - &quot;App Juggling Circus&quot;</h3>
+              <p className="text-red-600 mb-2">Good luck remembering to check 47 different apps every day.</p>
+              <p className="text-red-500 text-xs">• Every bank has their own terrible app<br/>• Credit cards in different apps<br/>• Savings accounts somewhere else<br/>• By the time you check them all, you&apos;ve forgotten what you learned</p>
             </div>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">💳 Credit Card Apps - &quot;Notification Hell&quot;</h3>
+              <p className="text-red-600 mb-2">Spam notifications for every $3 coffee purchase.</p>
+              <p className="text-red-500 text-xs">• 47 notifications per day about nothing<br/>• Important stuff gets buried<br/>• Turn off notifications, miss important alerts<br/>• Each bank formats data differently</p>
+            </div>
+            
+            <div className="border-l-4 border-red-400 pl-4">
+              <h3 className="font-semibold text-red-700 mb-2">🔔 Financial &quot;Gurus&quot; - &quot;Podcast Warriors&quot;</h3>
+              <p className="text-red-600 mb-2">&quot;Just track everything manually!&quot; Easy for you to say, Dave.</p>
+              <p className="text-red-500 text-xs">• Advice from people with assistants<br/>• &quot;Just budget&quot; isn&apos;t helpful<br/>• Shame-based financial advice<br/>• Solutions that work if you have infinite time</p>
+            </div>
+          </div>
+          
+          <div className="mt-8 text-center bg-red-100 border border-red-300 rounded-lg p-4">
+            <p className="text-red-800 font-bold text-lg mb-2">The Pattern Is Clear</p>
+            <p className="text-red-700 text-sm">Everything requires too much work, costs too much money, or just doesn&apos;t work. You&apos;ve tried them all. They all suck.</p>
+            <p className="text-red-800 text-sm font-semibold mt-2">You don&apos;t need another app. You need something that actually fits your life.</p>
           </div>
         </div>
 
