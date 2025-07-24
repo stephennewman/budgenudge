@@ -48,6 +48,22 @@ interface TransactionWithAnalytics extends Transaction {
   id: string | number;
 }
 
+// Function to get consistent color for merchant based on first letter
+const getMerchantColor = (merchantName: string) => {
+  const colors = [
+    'bg-red-500', 'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500', 'bg-pink-500',
+    'bg-indigo-500', 'bg-orange-500', 'bg-teal-500', 'bg-cyan-500', 'bg-rose-500', 'bg-violet-500',
+    'bg-emerald-500', 'bg-amber-500', 'bg-lime-500', 'bg-sky-500', 'bg-fuchsia-500', 'bg-slate-500',
+    'bg-red-600', 'bg-blue-600', 'bg-green-600', 'bg-yellow-600', 'bg-purple-600', 'bg-pink-600',
+    'bg-indigo-600', 'bg-orange-600'
+  ];
+  
+  const firstLetter = merchantName.charAt(0).toUpperCase();
+  const letterIndex = firstLetter.charCodeAt(0) - 65; // A=0, B=1, etc.
+  const colorIndex = letterIndex % colors.length;
+  return colors[colorIndex];
+};
+
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionWithAnalytics[]>([]);
   // Removed merchantAnalytics state and overallAnalytics state - data is now used directly in fetchData
@@ -356,22 +372,64 @@ export default function TransactionsPage() {
       cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiMerchant = getValue();
         const transaction = row.original;
-        return aiMerchant ? (
-          <button
-            onClick={() => handleEditTags(transaction)}
-            className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer"
-            title="Click to edit AI tags"
-          >
-            {aiMerchant}
-          </button>
-        ) : (
-          <button
-            onClick={() => handleEditTags(transaction)}
-            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
-            title="Click to add AI tags"
-          >
-            Not tagged
-          </button>
+        const merchantName = aiMerchant || transaction.merchant_name || transaction.name;
+        const firstLetter = merchantName.charAt(0).toUpperCase();
+        const colorClass = getMerchantColor(merchantName);
+        
+        return (
+          <div className="flex items-center gap-2">
+            {/* Logo or colored placeholder */}
+            <div className="flex-shrink-0">
+              {transaction.logo_url ? (
+                <div className="relative">
+                  <img 
+                    src={transaction.logo_url} 
+                    alt="Logo" 
+                    className="w-8 h-8 rounded-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                      const placeholder = (e.target as HTMLImageElement).nextElementSibling as HTMLDivElement;
+                      if (placeholder) {
+                        placeholder.style.display = 'flex';
+                      }
+                    }}
+                  />
+                  <div 
+                    className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white text-sm font-bold hidden`}
+                  >
+                    {firstLetter}
+                  </div>
+                </div>
+              ) : (
+                <div 
+                  className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white text-sm font-bold`}
+                >
+                  {firstLetter}
+                </div>
+              )}
+            </div>
+            
+            {/* Merchant name */}
+            <div>
+              {aiMerchant ? (
+                <button
+                  onClick={() => handleEditTags(transaction)}
+                  className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer"
+                  title="Click to edit AI tags"
+                >
+                  {aiMerchant}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleEditTags(transaction)}
+                  className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
+                  title="Click to add AI tags"
+                >
+                  Not tagged
+                </button>
+              )}
+            </div>
+          </div>
         );
       },
     },
@@ -443,27 +501,6 @@ export default function TransactionsPage() {
           {getValue() ? 'Pending' : 'Posted'}
         </span>
       ),
-    },
-    {
-      accessorKey: 'logo_url',
-      header: 'Logo',
-      cell: ({ getValue }: { getValue: () => string | undefined }) => {
-        const logoUrl = getValue();
-        return logoUrl ? (
-          <img 
-            src={logoUrl} 
-            alt="Logo" 
-            className="w-6 h-6 rounded"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          <span className="text-gray-400 text-xs">-</span>
-        );
-      },
-      enableSorting: false,
-      size: 60,
     },
   ], [transactionStarredStatus, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
