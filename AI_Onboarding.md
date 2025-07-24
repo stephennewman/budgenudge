@@ -107,6 +107,28 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Git Commit**: `5bd55cd` - Complete homepage rebuild with 271 insertions, 152 deletions
 - **User Impact**: **🎯 MAJOR POSITIONING UPGRADE** - Platform now showcases true sophistication and technical excellence
 
+### 🔧 July 24, 2025 - CRITICAL FIX: SMS Cron Authentication Error ✅ RESOLVED
+- **1:00 AM EST**: Successfully resolved critical Supabase refresh token errors in SMS cron job
+- **Problem Identified**: SMS cron job failing with "Invalid Refresh Token: Refresh Token Not Found" errors
+- **Root Cause Discovered**: SMS cron using user authentication instead of service role authentication in server context
+  - SMS cron: `createSupabaseClient()` (user auth with cookies/sessions)
+  - AI cron: `createClient(URL, SERVICE_ROLE_KEY)` (service role auth) ✅
+  - Cron jobs have no user sessions, causing refresh token failures
+- **Complete Resolution Implemented**:
+  - ✅ **Service Role Authentication**: Changed SMS cron to use service role like AI tagging cron
+  - ✅ **No User Dependencies**: Eliminated cookie/session dependencies in server context
+  - ✅ **Consistent Architecture**: Both cron jobs now use same authentication pattern
+  - ✅ **Build Verification**: Clean compilation and successful deployment
+- **Technical Implementation**:
+  - Replaced `createSupabaseClient()` with `createClient(URL, SERVICE_ROLE_KEY)`
+  - Maintained all existing functionality with proper server-side authentication
+  - Zero functional changes - purely authentication improvement
+- **Impact Prevention**: SMS cron jobs will no longer fail with refresh token errors
+- **Git Commit**: `b03c730` - SMS cron authentication fix with service role
+- **User Impact**: **🎯 SMS SYSTEM STABILIZED** - Daily SMS delivery restored without authentication issues
+- **Technical Insight**: Server-side cron jobs must use service role auth, not user session auth
+- **Future Prevention**: All cron jobs now follow consistent service role authentication pattern
+
 ### 🔧 July 24, 2025 - CRITICAL FIX: AI Tagging 414 Request-URI Too Large Error ✅ RESOLVED
 - **12:50 AM EST**: Successfully resolved critical 414 Request-URI Too Large error in AI tagging automation
 - **Problem Identified**: AI tagging cron job failing with Cloudflare 414 errors when processing many untagged transactions
