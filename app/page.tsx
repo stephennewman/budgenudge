@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import HomepageSlickTextForm from "@/components/homepage-slicktext-form";
-import Logo from "@/components/logo";
 
 export default function Home() {
   return (
@@ -10,10 +9,6 @@ export default function Home() {
       {/* SECTION 1: HERO - DIRECT PAIN */}
       <section className="bg-white py-20 px-4 sm:px-6">
         <div className="mx-auto max-w-4xl text-center">
-          <div className="flex justify-center items-center mb-8">
-            <Logo size="xl" />
-          </div>
-          
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold !leading-tight mb-8">
             Stop wondering where your money went.
           </h1>
