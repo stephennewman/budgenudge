@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
     // ✅ FIX: Batch cache lookups to avoid 414 errors
     const merchantPatterns = Array.from(merchantGroups.keys());
-    const cacheMap = new Map<string, any>();
+    const cacheMap = new Map<string, {merchant_pattern: string, ai_merchant_name: string, ai_category_tag: string}>();
     
     // Process merchant patterns in batches of 50 to avoid URL length issues
     const batchSize = 50;
