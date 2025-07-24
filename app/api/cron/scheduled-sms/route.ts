@@ -5,7 +5,7 @@ import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing';
+type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary';
 
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
@@ -101,12 +101,26 @@ export async function GET(request: NextRequest) {
 
     console.log(`👥 Found ${itemsWithUsers.length} users with bank connections`);
 
-    // Send all 4 templates to all users (simplified approach)
-    // Later this can be controlled by user preferences
-    const templatesToSend: NewSMSTemplateType[] = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
-    
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');
+    
+    // Determine which templates to send based on day and time
+    let templatesToSend: NewSMSTemplateType[] = [];
+    
+    // Weekly Summary: Send on Sunday at 7am EST (±10 minutes)
+    const isWeeklySummaryTime = nowEST.weekday === 7 && // Sunday (Luxon uses 7 for Sunday)
+                               nowEST.hour === 7 && 
+                               nowEST.minute <= 10; // Within first 10 minutes of 7am
+    
+    if (isWeeklySummaryTime) {
+      console.log('📊 Sunday 7am: Sending weekly summary to all users');
+      templatesToSend = ['weekly-summary'];
+    } else {
+      // Daily templates (existing behavior)
+      templatesToSend = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
+    }
+
+    console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
 
     // Process each user
     for (const userItem of itemsWithUsers) {
@@ -149,25 +163,30 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Only send if current time is within 10 minutes of user's preferred send_time
-        const [sendHour, sendMinute] = sendTime.split(':').map(Number);
-        const sendTimeMinutes = sendHour * 60 + sendMinute;
-        const nowMinutes = nowEST.hour * 60 + nowEST.minute;
-        const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
+        // Handle weekly summary scheduling (Sunday 7am EST)
+        if (templatesToSend.includes('weekly-summary')) {
+          console.log(`📊 Sending weekly summary to user ${userId} (Sunday 7am EST)`);
+        } else {
+          // Only send daily templates if current time is within 10 minutes of user's preferred send_time
+          const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+          const sendTimeMinutes = sendHour * 60 + sendMinute;
+          const nowMinutes = nowEST.hour * 60 + nowEST.minute;
+          const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
 
-        // Handle day boundary (e.g., if send time is 23:50 and current is 00:05)
-        const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
-        const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
+          // Handle day boundary (e.g., if send time is 23:50 and current is 00:05)
+          const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
+          const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
 
-        if (actualTimeDifference > 10) {
-          logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
-          console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
-          continue;
+          if (actualTimeDifference > 10) {
+            logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
+            console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
+            continue;
+          }
+
+          console.log(`⏰ ✅ Time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`)
         }
 
-        console.log(`⏰ ✅ Time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`)
-
-        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) at preferred send time (${sendTime} EST)`);
+        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - Templates: ${templatesToSend.join(', ')}`);
 
         // Send each template type
         for (const templateType of templatesToSend) {

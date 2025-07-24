@@ -1,36 +1,39 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { generateSMSMessage } from '@/utils/sms/templates';
 
-// Split into three separate routes for debugging
-// 1. /api/test-sms-pacing
-// 2. /api/test-sms-recurring
-// 3. /api/test-sms-recent
-// Each should be a separate file in app/api/
-
-// POST /api/test-sms-templates/recurring
-export async function POST(request: NextRequest) {
+export async function GET() {
   try {
-    const { userId, templateType } = await request.json();
-    if (!userId || !templateType) {
-      return NextResponse.json({
-        success: false,
-        error: 'userId and templateType are required',
-        apiRoute: '/api/test-sms-templates'
-      }, { status: 400 });
-    }
-    const message = await generateSMSMessage(userId, templateType);
+    console.log('🧪 Testing Weekly Summary SMS Template...');
+    
+    // Test with a real user ID (you can replace this)
+    const testUserId = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
+    
+    console.log(`📝 Generating weekly-summary SMS for user: ${testUserId}`);
+    
+    // Generate the weekly summary message
+    const weeklyMessage = await generateSMSMessage(testUserId, 'weekly-summary');
+    
+    console.log('📊 Weekly Summary Message Generated:');
+    console.log('---');
+    console.log(weeklyMessage);
+    console.log('---');
+    console.log(`📏 Message length: ${weeklyMessage.length} characters`);
+    
     return NextResponse.json({
       success: true,
-      apiRoute: '/api/test-sms-templates',
-      templateType,
-      message,
-      messageLength: message.length
+      template: 'weekly-summary',
+      userId: testUserId,
+      message: weeklyMessage,
+      messageLength: weeklyMessage.length,
+      timestamp: new Date().toISOString()
     });
+    
   } catch (error) {
+    console.error('❌ Weekly Summary SMS Test Failed:', error);
     return NextResponse.json({
       success: false,
-      apiRoute: '/api/test-sms-templates',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 } 
