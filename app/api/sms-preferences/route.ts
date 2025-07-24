@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Ensure all SMS types exist for the user
-    const allSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary'];
+    const allSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary'];
     const existingTypes = new Set(preferences?.map(p => p.sms_type) || []);
     const missingTypes = allSmsTypes.filter(type => !existingTypes.has(type));
 

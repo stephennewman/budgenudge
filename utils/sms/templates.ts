@@ -738,9 +738,174 @@ export async function generateWeeklySpendingSummaryMessage(userId: string): Prom
 }
 
 // ===================================
+// 7. MONTHLY SPENDING SUMMARY TEMPLATE (NEW)
+// ===================================
+export async function generateMonthlySpendingSummaryMessage(userId: string): Promise<string> {
+  try {
+    // Get user's item IDs
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', userId);
+
+    if (!userItems || userItems.length === 0) {
+      return '📊 MONTHLY SPENDING SUMMARY\n\nNo bank accounts connected.';
+    }
+
+    const itemDbIds = userItems.map(item => item.id);
+    const itemIds = userItems.map(item => item.plaid_item_id);
+
+    // Get user's account balances
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('name, type, current_balance, available_balance')
+      .in('item_id', itemDbIds);
+
+    // Calculate total available balance from depository accounts
+    const depositoryAccounts = accounts?.filter(acc => acc.type === 'depository') || [];
+    const totalAvailableBalance = depositoryAccounts.reduce(
+      (sum, acc) => sum + (acc.available_balance || 0), 
+      0
+    );
+
+    // Calculate previous month boundaries
+    const now = new Date();
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
+    const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    // Calculate month before last for comparison
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const twoMonthsAgoStart = new Date(twoMonthsAgo.getFullYear(), twoMonthsAgo.getMonth(), 1);
+    const twoMonthsAgoEnd = new Date(twoMonthsAgo.getFullYear(), twoMonthsAgo.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // Get previous month's transactions
+    const lastMonthStartStr = lastMonthStart.toISOString().split('T')[0];
+    const lastMonthEndStr = lastMonthEnd.toISOString().split('T')[0];
+
+    const { data: lastMonthTransactions } = await supabase
+      .from('transactions')
+      .select('date, merchant_name, name, amount, ai_category_tag, ai_merchant_name')
+      .in('plaid_item_id', itemIds)
+      .gte('date', lastMonthStartStr)
+      .lte('date', lastMonthEndStr)
+      .gt('amount', 0) // Only spending transactions
+      .order('amount', { ascending: false });
+
+    // Get month before last for comparison
+    const twoMonthsAgoStartStr = twoMonthsAgoStart.toISOString().split('T')[0];
+    const twoMonthsAgoEndStr = twoMonthsAgoEnd.toISOString().split('T')[0];
+
+    const { data: twoMonthsAgoTransactions } = await supabase
+      .from('transactions')
+      .select('amount')
+      .in('plaid_item_id', itemIds)
+      .gte('date', twoMonthsAgoStartStr)
+      .lte('date', twoMonthsAgoEndStr)
+      .gt('amount', 0);
+
+    const lastMonthTotal = lastMonthTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
+    const twoMonthsAgoTotal = twoMonthsAgoTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
+    const monthOverMonthChange = lastMonthTotal - twoMonthsAgoTotal;
+    const monthOverMonthPercent = twoMonthsAgoTotal > 0 ? ((monthOverMonthChange / twoMonthsAgoTotal) * 100) : 0;
+
+    // Format month name for display
+    const monthName = lastMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    let message = `📊 MONTHLY SPENDING SUMMARY\n${monthName}\n\n`;
+    message += `💰 Current Balance: $${totalAvailableBalance.toFixed(2)}\n\n`;
+
+    if (!lastMonthTransactions || lastMonthTransactions.length === 0) {
+      message += `🎉 Zero spending in ${monthName}!\n\nNo transactions found for the month.`;
+      return message;
+    }
+
+    // Month overview
+    message += `💳 Total Spent: $${lastMonthTotal.toFixed(2)}\n`;
+    message += `📈 Transactions: ${lastMonthTransactions.length}\n`;
+    
+    // Month-over-month comparison
+    if (twoMonthsAgoTotal > 0) {
+      const changeIcon = monthOverMonthChange > 0 ? '📈' : monthOverMonthChange < 0 ? '📉' : '➡️';
+      const changeText = monthOverMonthChange > 0 ? 'more' : 'less';
+      message += `${changeIcon} ${Math.abs(monthOverMonthPercent).toFixed(0)}% ${changeText} than prev month\n\n`;
+    } else {
+      message += '\n';
+    }
+
+    // Top spending categories
+    const categoryTotals = new Map<string, number>();
+    lastMonthTransactions.forEach(t => {
+      const category = t.ai_category_tag || 'Uncategorized';
+      categoryTotals.set(category, (categoryTotals.get(category) || 0) + t.amount);
+    });
+
+    const topCategories = Array.from(categoryTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+
+    if (topCategories.length > 0) {
+      message += `🏷️ Top Categories:\n`;
+      topCategories.forEach(([category, amount], index) => {
+        const percentage = ((amount / lastMonthTotal) * 100).toFixed(0);
+        message += `${index + 1}. ${category}: $${amount.toFixed(0)} (${percentage}%)\n`;
+      });
+      message += '\n';
+    }
+
+    // Top merchants
+    const merchantTotals = new Map<string, number>();
+    lastMonthTransactions.forEach(t => {
+      const merchant = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+      merchantTotals.set(merchant, (merchantTotals.get(merchant) || 0) + t.amount);
+    });
+
+    const topMerchants = Array.from(merchantTotals.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4);
+
+    if (topMerchants.length > 0) {
+      message += `🏪 Top Merchants:\n`;
+      topMerchants.forEach(([merchant, amount], index) => {
+        const shortMerchant = merchant.length > 14 ? merchant.substring(0, 11) + '...' : merchant;
+        message += `${index + 1}. ${shortMerchant}: $${amount.toFixed(0)}\n`;
+      });
+      message += '\n';
+    }
+
+    // Weekly breakdown within the month
+    const weeklyTotals = new Map<number, number>();
+    lastMonthTransactions.forEach(t => {
+      const date = new Date(t.date + 'T12:00:00');
+      const weekOfMonth = Math.ceil(date.getDate() / 7);
+      weeklyTotals.set(weekOfMonth, (weeklyTotals.get(weekOfMonth) || 0) + t.amount);
+    });
+
+    message += `📅 Weekly Breakdown:\n`;
+    for (let week = 1; week <= 5; week++) {
+      const amount = weeklyTotals.get(week) || 0;
+      if (amount > 0) {
+        message += `Week ${week}: $${amount.toFixed(0)}  `;
+      }
+    }
+
+    // Daily average
+    const daysInMonth = lastMonthEnd.getDate();
+    const dailyAverage = lastMonthTotal / daysInMonth;
+    message += `\n\n📊 Daily Average: $${dailyAverage.toFixed(0)}`;
+
+    return message.trim();
+
+  } catch (error) {
+    console.error('Error generating monthly spending summary:', error);
+    return '📊 MONTHLY SPENDING SUMMARY\n\nError loading monthly spending data.';
+  }
+}
+
+// ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -752,6 +917,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateCategoryPacingMessage(userId);
     case 'weekly-summary':
       return await generateWeeklySpendingSummaryMessage(userId);
+    case 'monthly-summary':
+      return await generateMonthlySpendingSummaryMessage(userId);
     default:
       return "📱 Krezzo\n\nInvalid template type.";
   }

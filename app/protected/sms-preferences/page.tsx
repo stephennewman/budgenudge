@@ -8,7 +8,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -52,6 +52,12 @@ const smsTypeInfo = {
     description: 'Comprehensive weekly spending analysis sent every Sunday at 7:00 AM EST',
     icon: '📊',
     example: `📊 WEEKLY SPENDING SUMMARY\nJul 13 - Jul 19\n\n💰 Available Balance: $3,083.26\n\n💳 Total Spent: $3,962.93\n📈 Transactions: 73\n📈 98% more than prev week\n\n🏷️ Top Categories:\n1. Tithe: $1,065.00 (27%)\n2. Utilities: $398.79 (10%)\n3. Restaurant: $358.36 (9%)\n\n🏪 Top Merchants:\n1. Generations: $1,065.00\n2. Venmo: $355.00\n3. Duke Energy: $258.98\n4. Publix: $250.80\n\n📅 Daily Breakdown:\nSun: $1,712.40  Mon: $357.29  Tue: $206.13  Wed: $758.23  Thu: $615.59  Fri: $144.98  Sat: $168.31`
+  },
+  'monthly-summary': {
+    title: 'Monthly Spending Summary',
+    description: 'Comprehensive monthly spending recap sent on the 1st of each month at 7:00 AM EST',
+    icon: '🗓️',
+    example: `📊 MONTHLY SPENDING SUMMARY\nJune 2025\n\n💰 Current Balance: $3,083.26\n\n💳 Total Spent: $12,547.89\n📈 Transactions: 234\n📉 15% less than prev month\n\n🏷️ Top Categories:\n1. Groceries: $2,847 (23%)\n2. Restaurant: $1,965 (16%)\n3. Utilities: $1,234 (10%)\n4. Transportation: $987 (8%)\n\n🏪 Top Merchants:\n1. Publix: $1,456\n2. Amazon: $1,234\n3. Duke Energy: $798\n4. Shell: $634\n\n📅 Weekly Breakdown:\nWeek 1: $3,124  Week 2: $2,987  Week 3: $3,456  Week 4: $2,981\n\n📊 Daily Average: $405`
   }
 };
 
@@ -109,6 +115,8 @@ export default function SMSPreferencesPage() {
             Daily SMS will be sent at <span className="font-semibold">7:00 AM EST</span>.
             <br />
             Weekly summaries are sent every <span className="font-semibold">Sunday at 7:00 AM EST</span>.
+            <br />
+            Monthly summaries are sent on the <span className="font-semibold">1st of each month at 7:00 AM EST</span>.
           </p>
         </div>
       </div>

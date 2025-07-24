@@ -5,7 +5,7 @@ import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary';
+type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary';
 
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
@@ -107,12 +107,20 @@ export async function GET(request: NextRequest) {
     // Determine which templates to send based on day and time
     let templatesToSend: NewSMSTemplateType[] = [];
     
+    // Monthly Summary: Send on the 1st of the month at 7am EST (±10 minutes)
+    const isMonthlySummaryTime = nowEST.day === 1 && // 1st of the month
+                                nowEST.hour === 7 && 
+                                nowEST.minute <= 10; // Within first 10 minutes of 7am
+    
     // Weekly Summary: Send on Sunday at 7am EST (±10 minutes)
     const isWeeklySummaryTime = nowEST.weekday === 7 && // Sunday (Luxon uses 7 for Sunday)
                                nowEST.hour === 7 && 
                                nowEST.minute <= 10; // Within first 10 minutes of 7am
     
-    if (isWeeklySummaryTime) {
+    if (isMonthlySummaryTime) {
+      console.log('📊 1st of month 7am: Sending monthly summary to all users');
+      templatesToSend = ['monthly-summary'];
+    } else if (isWeeklySummaryTime) {
       console.log('📊 Sunday 7am: Sending weekly summary to all users');
       templatesToSend = ['weekly-summary'];
     } else {
@@ -163,8 +171,24 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Handle weekly summary scheduling (Sunday 7am EST)
-        if (templatesToSend.includes('weekly-summary')) {
+        // Handle monthly and weekly summary scheduling (1st of month / Sunday 7am EST)
+        if (templatesToSend.includes('monthly-summary')) {
+          // Check if user has enabled monthly-summary preference
+          const { data: monthlyPref } = await supabase
+            .from('user_sms_preferences')
+            .select('enabled')
+            .eq('user_id', userId)
+            .eq('sms_type', 'monthly-summary')
+            .single();
+          
+          if (!monthlyPref || !monthlyPref.enabled) {
+            logDetails.push({ userId, skipped: true, reason: 'Monthly summary disabled in preferences' });
+            console.log(`📊 Skipping user ${userId} (monthly summary disabled in preferences)`);
+            continue;
+          }
+          
+          console.log(`📊 Sending monthly summary to user ${userId} (1st of month 7am EST)`);
+        } else if (templatesToSend.includes('weekly-summary')) {
           // Check if user has enabled weekly-summary preference
           const { data: weeklyPref } = await supabase
             .from('user_sms_preferences')
@@ -222,6 +246,9 @@ export async function GET(request: NextRequest) {
                 break;
               case 'weekly-summary':
                 preferenceType = 'weekly-summary';
+                break;
+              case 'monthly-summary':
+                preferenceType = 'monthly-summary';
                 break;
               default:
                 preferenceType = templateType;
