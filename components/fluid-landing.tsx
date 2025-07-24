@@ -49,7 +49,8 @@ class FluidSimulation {
     }
     this.gl = gl;
     
-    console.log('WebGL2 context created successfully');
+    console.log('WebGL2 context created successfully', 'Canvas size:', canvas.width, 'x', canvas.height);
+    console.log('Starting fluid simulation with enhanced smoke effects...');
     this.resizeCanvas();
     this.init();
   }
@@ -225,17 +226,18 @@ class FluidSimulation {
   private update() {
     this.resizeCanvas();
     
-    // Clear with animated colors
+    // Clear with darker background for better contrast
     const time = Date.now() * 0.001;
-    const r = Math.sin(time * 0.3) * 0.5 + 0.5;
-    const g = Math.sin(time * 0.3 + 2) * 0.5 + 0.5;
-    const b = Math.sin(time * 0.3 + 4) * 0.5 + 0.5;
     
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    this.gl.clearColor(r * 0.2, g * 0.2, b * 0.2, 1);
+    this.gl.clearColor(0.02, 0.02, 0.03, 1); // Very dark background
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     
-    // Create simple animated gradient
+    // Enable blending for smoke effects
+    this.gl.enable(this.gl.BLEND);
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+    
+    // Create animated smoke effects
     const program = this.programs.get('color');
     if (program) {
       this.gl.useProgram(program);
@@ -255,7 +257,7 @@ class FluidSimulation {
           this.gl.enableVertexAttribArray(aPosition);
           this.gl.vertexAttribPointer(aPosition, 2, this.gl.FLOAT, false, 0, 0);
           
-          // Draw fullscreen quad
+          // Draw fullscreen quad with smoke effect
           this.gl.drawArrays(this.gl.TRIANGLE_FAN, 0, 4);
           
           this.gl.disableVertexAttribArray(aPosition);
