@@ -44,14 +44,18 @@ export default function TransactionDashboard() {
       if (!session) return;
 
       const response = await fetch('/api/plaid/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'getAccounts' })
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.ok) {
         const data = await response.json();
         setAccounts(data.accounts || []);
+      } else {
+        console.error('Failed to fetch accounts:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
