@@ -1,27 +1,71 @@
-import { createSupabaseClient } from "@/utils/supabase/server";
+"use client";
+
+import { createSupabaseClient } from "@/utils/supabase/client";
+import { useEffect, useState } from "react";
 import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
+import { ContentAreaLoader } from "@/components/ui/content-area-loader";
+import type { User } from "@supabase/supabase-js";
 
-export default async function AccountPage() {
-  const client = await createSupabaseClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
+export default function AccountPage() {
+  const [user, setUser] = useState<User | null>(null);
+  const [hasConnectedAccount, setHasConnectedAccount] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const supabase = createSupabaseClient();
+
+  useEffect(() => {
+    async function fetchUserAndAccounts() {
+      try {
+        const {
+          data: { user },
+          error: userError
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setError("There was an error loading your account. Please try again.");
+          return;
+        }
+
+        setUser(user);
+
+        // Check if user has connected a Plaid account
+        const { data: items } = await supabase
+          .from('items')
+          .select('*')
+          .eq('user_id', user.id);
+
+        setHasConnectedAccount(!!(items && items.length > 0));
+      } catch (err) {
+        console.error('Error fetching user data:', err);
+        setError("There was an error loading your account. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchUserAndAccounts();
+  }, [supabase]);
+
+  if (isLoading) {
+    return (
+      <div className="relative min-h-[600px]">
+        <ContentAreaLoader />
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div>{error}</div>;
+  }
 
   if (!user) {
     return (
       <div>There was an error loading your account. Please try again.</div>
     );
   }
-
-  // Check if user has connected a Plaid account
-  const { data: items } = await client
-    .from('items')
-    .select('*')
-    .eq('user_id', user.id);
-
-  const hasConnectedAccount = !!(items && items.length > 0);
 
   // If no connected account, show onboarding flow
   if (!hasConnectedAccount) {
@@ -39,7 +83,7 @@ export default async function AccountPage() {
         <div className="border rounded-lg p-6 sm:p-8 text-center space-y-6">
           <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100">
             <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
           </div>
           
@@ -56,7 +100,9 @@ export default async function AccountPage() {
     );
   }
 
-  // Account management for connected users
+  // Account management for connected users  
+  const items = []; // We'll need to fetch this if needed for display
+
   return (
     <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
       <VerificationSuccessBanner />
@@ -116,7 +162,7 @@ export default async function AccountPage() {
               <div className="text-muted-foreground">Providers</div>
               <div className="font-medium">
                 {user.identities
-                  ?.map(identity => identity.provider)
+                  ?.map((identity) => identity.provider)
                   .join(", ") || "Email"}
               </div>
             </div>

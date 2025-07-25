@@ -4,7 +4,6 @@ import { createSupabaseClient } from '@/utils/supabase/client';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import PlaidLinkButton from './plaid-link-button';
-import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
 interface Account {
   account_id: string;
@@ -16,7 +15,6 @@ interface Account {
 export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const supabase = createSupabaseClient();
 
   async function checkConnection() {
@@ -37,8 +35,6 @@ export default function TransactionDashboard() {
       }
     } catch (error) {
       console.error('Error checking connection:', error);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -48,14 +44,13 @@ export default function TransactionDashboard() {
       if (!session) return;
 
       const response = await fetch('/api/plaid/transactions', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-        }
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'getAccounts' })
       });
-      
-      const data = await response.json();
-      
+
       if (response.ok) {
+        const data = await response.json();
         setAccounts(data.accounts || []);
       }
     } catch (error) {
@@ -72,16 +67,6 @@ export default function TransactionDashboard() {
     fetchAccounts();
   };
 
-
-
-  if (isLoading) {
-    return (
-      <div className="relative min-h-[400px]">
-        <ContentAreaLoader />
-      </div>
-    );
-  }
-
   if (!isConnected) {
     return (
       <div className="flex justify-center">
@@ -91,34 +76,42 @@ export default function TransactionDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-
-      {/* Connected Bank Accounts */}
-      {accounts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your Accounts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-2">
-              {accounts.map((account, index) => (
-                <div key={`account-${account.account_id}-${index}`} className="flex justify-between items-center p-2 border rounded">
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>🏦 Connected Accounts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {accounts.length > 0 ? (
+            <div className="space-y-3">
+              {accounts.map((account) => (
+                <div 
+                  key={account.account_id} 
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
                   <div>
                     <div className="font-medium">{account.name}</div>
                     <div className="text-sm text-muted-foreground">
-                      {account.type} - {account.subtype}
+                      {account.type} • {account.subtype}
                     </div>
                   </div>
-                  <div className="text-green-600">✅ Connected</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-sm text-green-700">Connected</span>
+                  </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-
-
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground mb-4">
+                No accounts found. Try reconnecting your bank.
+              </p>
+              <PlaidLinkButton onSuccess={handleConnectionSuccess} />
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 } 
