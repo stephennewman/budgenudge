@@ -8,7 +8,7 @@ import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway';
   enabled: boolean;
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
@@ -58,6 +58,18 @@ const smsTypeInfo = {
     description: 'Comprehensive monthly spending recap sent on the 1st of each month at 7:00 AM EST',
     icon: '🗓️',
     example: `📊 MONTHLY SPENDING SUMMARY\nJune 2025\n\n💰 Current Balance: $3,083.26\n\n💳 Total Spent: $12,547.89\n📈 Transactions: 234\n📉 15% less than prev month\n\n🏷️ Top Categories:\n1. Groceries: $2,847 (23%)\n2. Restaurant: $1,965 (16%)\n3. Utilities: $1,234 (10%)\n4. Transportation: $987 (8%)\n\n🏪 Top Merchants:\n1. Publix: $1,456\n2. Amazon: $1,234\n3. Duke Energy: $798\n4. Shell: $634\n\n📅 Weekly Breakdown:\nWeek 1: $3,124  Week 2: $2,987  Week 3: $3,456  Week 4: $2,981\n\n📊 Daily Average: $405`
+  },
+  'paycheck-efficiency': {
+    title: 'Paycheck Efficiency Analysis',
+    description: 'Paycheck-period insights sent on Tuesdays & Fridays at 9 AM EST analyzing spending vs income timing',
+    icon: '💰',
+    example: `💰 PAYCHECK EFFICIENCY\n6 days into current period\n\n🏦 Period Income: $5,820\n💸 Spent So Far: $2,140 (37%)\n📊 On track for $3,680 total\n\n🏷️ Top Categories:\n1. Groceries: $847 (40%)\n2. Restaurant: $456 (21%)\n3. Gas: $234 (11%)\n\n⏰ Next CHECKIT paycheck: Jul 29\n🎯 Projected balance: $2,963`
+  },
+  'cash-flow-runway': {
+    title: 'Cash Flow Runway',
+    description: 'Financial runway analysis sent on Tuesdays & Fridays at 9 AM EST showing how long current balance will last',
+    icon: '🛤️',
+    example: `🛤️ CASH FLOW RUNWAY\nCurrent Balance: $3,083\n\n⏰ Next Income: 11 days\n💰 Expected: $4,020 (CHECKIT)\n💸 Known Bills: $847\n📊 Runway: 18 days at current pace\n\n🔄 Income Sources:\n• CHECKIT LLC: $4,020 bi-weekly\n• GCA PAY: $1,800 bi-weekly\n\n🎯 Projected after next paycheck: $6,256`
   }
 };
 

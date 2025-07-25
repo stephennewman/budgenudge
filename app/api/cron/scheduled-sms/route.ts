@@ -5,7 +5,7 @@ import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
 import { SupabaseClient } from '@supabase/supabase-js';
 
-type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary';
+type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway';
 
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
@@ -117,12 +117,21 @@ export async function GET(request: NextRequest) {
                                nowEST.hour === 7 && 
                                nowEST.minute <= 10; // Within first 10 minutes of 7am
     
+    // Paycheck Analysis: Send on Tuesdays and Fridays at 9am EST (±10 minutes)
+    // This catches most bi-weekly patterns (15th/30th, every Friday, etc.)
+    const isPaycheckAnalysisTime = (nowEST.weekday === 2 || nowEST.weekday === 5) && // Tuesday or Friday
+                                   nowEST.hour === 9 && 
+                                   nowEST.minute <= 10; // Within first 10 minutes of 9am
+    
     if (isMonthlySummaryTime) {
       console.log('📊 1st of month 7am: Sending monthly summary to all users');
       templatesToSend = ['monthly-summary'];
     } else if (isWeeklySummaryTime) {
       console.log('📊 Sunday 7am: Sending weekly summary to all users');
       templatesToSend = ['weekly-summary'];
+    } else if (isPaycheckAnalysisTime) {
+      console.log('💰 Tuesday/Friday 9am: Sending paycheck analysis to users with income patterns');
+      templatesToSend = ['paycheck-efficiency', 'cash-flow-runway'];
     } else {
       // Daily templates (existing behavior)
       templatesToSend = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
@@ -249,6 +258,12 @@ export async function GET(request: NextRequest) {
                 break;
               case 'monthly-summary':
                 preferenceType = 'monthly-summary';
+                break;
+              case 'paycheck-efficiency':
+                preferenceType = 'paycheck-efficiency';
+                break;
+              case 'cash-flow-runway':
+                preferenceType = 'cash-flow-runway';
                 break;
               default:
                 preferenceType = templateType;

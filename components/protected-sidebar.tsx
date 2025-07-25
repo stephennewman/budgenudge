@@ -32,10 +32,11 @@ export default async function ProtectedSidebar() {
             label: "🏪 Merchants",
             href: "/ai-merchant-analysis",
           },
-          {
-            label: "📊 Bubble Chart",
-            href: "/merchant-spend-grid",
-          },
+          // ARCHIVED: Bubble Chart (merchant-spend-grid)
+          // {
+          //   label: "📊 Bubble Chart", 
+          //   href: "/merchant-spend-grid",
+          // },
           // REMOVED FOR PERFORMANCE: Heavy analytics features
           // {
           //   label: "Analysis",
@@ -57,6 +58,11 @@ export default async function ProtectedSidebar() {
             label: "📱 Texts",
             href: "/sms-preferences",
           },
+          // ARCHIVED: Income Setup
+          // {
+          //   label: "💰 Income Setup",
+          //   href: "/income-setup",
+          // },
         ]}
       />
     </div>

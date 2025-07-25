@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { generateSMSMessageForUser } from './paycheck-templates';
 
 // Create Supabase client for server-side operations
 const supabase = createClient(
@@ -905,7 +906,7 @@ export async function generateMonthlySpendingSummaryMessage(userId: string): Pro
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -919,6 +920,10 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateWeeklySpendingSummaryMessage(userId);
     case 'monthly-summary':
       return await generateMonthlySpendingSummaryMessage(userId);
+    case 'paycheck-efficiency':
+      return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
+    case 'cash-flow-runway':
+      return await generateSMSMessageForUser(userId, 'cash-flow-runway');
     default:
       return "📱 Krezzo\n\nInvalid template type.";
   }
