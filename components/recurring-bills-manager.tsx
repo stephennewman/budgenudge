@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
+import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
 
 
@@ -293,7 +293,11 @@ export default function RecurringBillsManager() {
 
 
   if (loading) {
-    return <BouncingMoneyLoader />;
+    return (
+      <div className="relative min-h-[400px]">
+        <ContentAreaLoader />
+      </div>
+    );
   }
 
   // Filter and sort active merchants by upcoming date (soonest first, future dates only)

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card } from '@/components/ui/card';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
+import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
 interface SMSPreference {
   id?: number;
@@ -115,7 +115,11 @@ export default function SMSPreferencesPage() {
   };
 
   if (loading) {
-    return <BouncingMoneyLoader />;
+    return (
+      <div className="relative min-h-[600px]">
+        <ContentAreaLoader />
+      </div>
+    );
   }
 
   return (

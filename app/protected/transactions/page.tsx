@@ -16,9 +16,9 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
 import AITagEditor from '@/components/ai-tag-editor';
+import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
 // Transaction interface - using flexible approach to handle API response
 interface Transaction {
@@ -527,7 +527,11 @@ export default function TransactionsPage() {
   });
 
   if (isLoading) {
-    return <BouncingMoneyLoader />;
+    return (
+      <div className="relative min-h-[600px]">
+        <ContentAreaLoader />
+      </div>
+    );
   }
 
   return (

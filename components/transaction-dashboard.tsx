@@ -1,11 +1,10 @@
 'use client';
 
 import { createSupabaseClient } from '@/utils/supabase/client';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useState, useEffect } from 'react';
-import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
-
 import PlaidLinkButton from './plaid-link-button';
+import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
 interface Account {
   account_id: string;
@@ -76,7 +75,11 @@ export default function TransactionDashboard() {
 
 
   if (isLoading) {
-    return <BouncingMoneyLoader />;
+    return (
+      <div className="relative min-h-[400px]">
+        <ContentAreaLoader />
+      </div>
+    );
   }
 
   if (!isConnected) {
