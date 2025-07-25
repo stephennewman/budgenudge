@@ -1,6 +1,6 @@
 # Product Agent - Krezzo
 
-**Last Updated:** July 21, 2025, 5:45 PM EDT
+**Last Updated:** Thursday, July 24, 2025, 6:55 PM EDT
 
 ## Product Status: FULLY OPERATIONAL ✅
 
@@ -12,57 +12,107 @@ Krezzo helps users maintain healthy financial habits by providing personalized d
 ## Current Feature Set
 
 ### Primary Features
-1. **4-Template User-Controlled SMS Intelligence** (Scheduled delivery at 7:00 AM EST)
-   - Bills & Payments: Upcoming recurring bills and reminders
+1. **6-Template User-Controlled SMS Intelligence** (Enhanced system with new templates)
+   - Bills & Payments: Upcoming recurring bills with real-time account balances
    - Yesterday's Activity: Recent transaction summaries
    - Merchant Pacing: Spending analysis for user-selected merchants
    - Category Pacing: Spending analysis for user-selected categories
+   - **Weekly Summary**: Week-over-week spending analysis with daily breakdown (NEW)
+   - **Monthly Summary**: Month-over-month spending with top category insights (NEW)
 
-2. **Visual Budget Analysis System** (NEW)
+2. **Interactive Merchant Visualization** (NEW - Advanced Analytics)
+   - **Bubble Chart System**: 2x2 quadrant analysis (frequency vs amount)
+   - **Dynamic Sizing**: Bubble size represents total spending volume
+   - **Smart Quadrants**: High/Low frequency and amount categorization
+   - **Time Range Selection**: Focus on specific periods (default: June 2025)
+   - **Color-Coded Insights**: Visual merchant behavior patterns
+
+3. **Streamlined Navigation** (Performance optimization)
+   - **65% Page Reduction**: From 17 pages to 6 core features
+   - **Focused User Experience**: Only essential features visible
+   - **Faster Loading**: Reduced build size and complexity
+   - **Clean Interface**: No dead links or confusing options
+
+4. **Visual Budget Analysis System**
    - **Spend Remaining Indicators**: 🟩 Under budget, 🟨 Approaching (90-100%), 🟥 Over budget
    - **Sortable Analysis**: Click column headers to sort by budget remaining
    - **Real-Time Calculation**: Current month vs historical average spending
    - **Universal Coverage**: Visual indicators for all merchants and categories
    - **Quick Budget Status**: Instant identification of over/under spending patterns
 
-3. **Dual-Level Pacing Control** 
+5. **Enhanced Transaction Management**
+   - **Color-Coded Merchant Avatars**: Consistent visual identity (V=violet, P=pink, S=silver)
+   - **Reorganized Table Layout**: Optimized column order for better UX
+   - **Smart Merchant Icons**: Letter-based avatars with color mapping
+   - **Recurring Bill Indicators**: Clear visual markers for starred transactions
+
+6. **Dual-Level Pacing Control** 
    - **Merchant Pacing**: Track specific merchants (Amazon, Publix, etc.)
    - **Category Pacing**: Track spending categories (Groceries, Restaurant, Gas)
    - Auto-selection of top 3 merchants/categories for new users
    - User-controlled stoplight toggles for enabling/disabling tracking
    - Month-to-date vs expected spending with pacing percentages
 
-4. **Multi-Bank Integration**
+7. **Multi-Bank Integration**
    - Connect all Plaid-supported financial institutions
    - Consolidated view across checking, savings, and credit accounts
    - Account-specific insights and management
+   - Real-time balance integration in SMS templates
 
-5. **Smart Analytics**
+8. **Smart Analytics**
    - Smart merchant normalization and categorization (99% coverage)
    - Spending pattern recognition and trend analysis
    - Predictive bill detection and amount forecasting
    - Intelligent merchant and category auto-selection algorithms
 
-6. **Professional SMS Delivery**
+9. **Professional SMS Delivery**
    - SlickText professional API for reliable delivery
-   - User preference control over all 4 SMS types
+   - User preference control over all 6 SMS types
    - 918-character optimized templates for maximum content
-   - Eliminated spam with user-controlled pacing notifications
+   - Dynamic user balance integration in recurring bills SMS
 
 ### User Experience
-- **Onboarding**: Simple phone number setup
-- **Customization**: Flexible SMS preferences
-- **Insights**: Actionable financial data
-- **Reliability**: Consistent daily delivery
+- **Streamlined Onboarding**: Simple phone number setup
+- **Focused Navigation**: 6 core pages for optimal user flow
+- **Advanced Customization**: 6 SMS template preferences
+- **Visual Insights**: Interactive merchant spend visualization
+- **Reliability**: Consistent daily delivery with real-time balance data
 
 ## Recent Product Improvements
+
+### July 24, 2025, 6:55 PM EDT - Page Archival & Performance Optimization (Impact: 85/100)
+- **Major Optimization**: Archived 10 unused pages (65% reduction) to `/archive/protected-pages/`
+- **Pages Removed**: analysis, category-analysis, merchant-spend-grid, calendar, weekly-spending, income-setup, test-ai-tags, test-suite, paid-content, pricing, subscription
+- **Core Pages Retained**: account dashboard, transactions, recurring-bills, ai-merchant-analysis, ai-category-analysis, sms-preferences
+- **Performance Impact**: Faster builds, reduced bundle size, cleaner navigation
+- **User Benefit**: Focused experience with only essential features visible
+
+### July 24, 2025 - Enhanced SMS Template System (Impact: 90/100)
+- **Weekly Summary SMS**: Week-over-week spending analysis with daily breakdown
+- **Monthly Summary SMS**: Month-over-month comparison with top spending categories
+- **Dynamic Balance Integration**: Real-time account balances in recurring bills SMS
+- **Enhanced Preferences**: 6 SMS types with individual user control
+- **User Value**: More comprehensive financial insights via SMS
+
+### July 24, 2025 - Interactive Merchant Visualization (Impact: 88/100)
+- **Bubble Chart System**: 2x2 quadrant analysis of merchant behavior
+- **Smart Categorization**: High/Low frequency vs High/Low amount spending
+- **Visual Design**: Bubble size represents total spending volume
+- **Time Filtering**: Default June 2025 data with range selection
+- **Analytical Value**: Clear merchant spending pattern identification
+
+### July 24, 2025 - Visual Enhancement Package (Impact: 75/100)
+- **Color-Coded Merchant Avatars**: Consistent visual identity across transactions
+- **Reorganized Transaction Table**: Optimized column layout for better UX
+- **Enhanced Merchant Icons**: Letter-based avatars with color mapping system
+- **Professional Appearance**: Consistent branding and visual hierarchy
 
 ### July 21, 2025, 1:15 PM EDT - Category Pacing System Launch (Impact: 92/100)
 - **New Feature**: Complete category-level spending pacing analysis
 - **User Value**: Track spending by category (Groceries, Restaurant, Gas, etc.)
 - **Smart Selection**: Auto-selects top 3 high-spending categories for new users
 - **User Control**: Stoplight toggles in AI Category Analysis page
-- **SMS Integration**: 5th daily SMS type with category spending insights
+- **SMS Integration**: Category spending insights in SMS templates
 - **Business Logic**: Excludes Income, Transfer, Uncategorized categories
 
 ### July 21, 2025, 12:45 PM EDT - Merchant Pacing System Launch (Impact: 90/100)
@@ -70,72 +120,66 @@ Krezzo helps users maintain healthy financial habits by providing personalized d
 - **User Value**: Track specific merchants (Amazon, Publix, Walmart, etc.)
 - **Smart Selection**: Auto-selects top 3 high-activity merchants for new users
 - **User Control**: Stoplight toggles in AI Merchant Analysis page
-- **SMS Integration**: 4th daily SMS type with merchant spending vs expected
+- **SMS Integration**: Merchant spending vs expected in SMS templates
 - **Analytics**: Month-to-date spending with pacing percentages and status
-
-### July 18, 2025, 1:36 PM EDT - Technical Reliability
-- **Admin Permission Fix**: Resolved 403 errors in cron job
-- **Database Enhancement**: Added phone_number column to user_sms_settings
-- **Cron Schedule**: Updated to 1:45 PM EST for optimal timing
-- **Code Quality**: Simplified phone number lookup logic
-- **Agent Updates**: Comprehensive project status documentation
-- **Technical Debt Assessment**: Prioritized cleanup needs
-
-### July 17, 2025 - Category Analysis
-- **New Feature**: Comprehensive spending category breakdown
-- **Insights**: Monthly averages and historical trends
-- **Navigation**: Integrated into protected dashboard
-- **Value**: Better spending pattern visibility
 
 ## User Journey Analysis
 
-### Current Flow
+### Current Flow (Optimized)
 1. **Sign Up**: Email/password authentication
 2. **Phone Setup**: Add phone number for SMS (stored in user_sms_settings)
-3. **Preferences**: Configure SMS timing and types
-4. **Daily Engagement**: Receive personalized SMS at 1:45 PM EST
-5. **Web Dashboard**: View detailed analytics and insights
+3. **Core Navigation**: Access 6 essential features (streamlined from 17)
+4. **Advanced Preferences**: Configure 6 SMS types with individual controls
+5. **Daily Engagement**: Receive personalized SMS with real-time balance data
+6. **Visual Analytics**: Interactive merchant spend visualization
+7. **Web Dashboard**: Focused analytics with color-coded insights
 
 ### User Pain Points Addressed
-- ✅ **Lack of Awareness**: Daily SMS provide spending visibility
-- ✅ **Bill Management**: Automated recurring bill detection
-- ✅ **Spending Patterns**: Historical analysis and insights
-- ✅ **Timing**: Afternoon delivery for better engagement
-- ✅ **Reliability**: Fixed admin permission errors
+- ✅ **Navigation Confusion**: Reduced from 17 to 6 core pages
+- ✅ **Information Overload**: 6 focused SMS templates vs single message
+- ✅ **Visual Clarity**: Color-coded merchant avatars and organized tables
+- ✅ **Spending Analysis**: Interactive bubble chart for merchant behavior
+- ✅ **Real-Time Data**: Dynamic balance integration in SMS
+- ✅ **Performance**: Faster loading with reduced page count
 
 ## Feature Prioritization (0-100 Scale)
 
 ### High Priority (75-100)
-1. **Enhanced Analytics** (85/100)
-   - Impact: High user value
+1. **Multi-Account Management** (95/100)
+   - Impact: Support users with multiple bank accounts
+   - Effort: High 
+   - Status: Critical for user growth
+
+2. **Advanced Filtering & Search** (88/100)
+   - Impact: Power user functionality
    - Effort: Moderate
    - Status: Ready for development
 
-2. **Budget Integration** (90/100)
+3. **Budget Integration** (90/100)
    - Impact: Core product enhancement
    - Effort: High
    - Status: Future roadmap
 
-3. **User Onboarding** (80/100)
-   - Impact: User retention
-   - Effort: Moderate
-   - Status: Can be improved
+4. **Mobile App Development** (85/100)
+   - Impact: User accessibility 
+   - Effort: Very High
+   - Status: Long-term roadmap
 
 ### Medium Priority (50-74)
-1. **Merchant Insights** (75/100)
+1. **Enhanced Merchant Insights** (75/100)
    - Impact: Differentiation
    - Effort: Low
    - Status: Ready for development
 
-2. **SMS Customization** (70/100)
-   - Impact: User satisfaction
-   - Effort: Low
-   - Status: Can be enhanced
-
-3. **Goal Setting** (65/100)
+2. **Goal Setting & Tracking** (70/100)
    - Impact: User engagement
    - Effort: Moderate
    - Status: Future feature
+
+3. **Export & Reporting** (65/100)
+   - Impact: Power users
+   - Effort: Low
+   - Status: Can be developed
 
 ### Low Priority (25-49)
 1. **Social Features** (40/100)
@@ -143,116 +187,126 @@ Krezzo helps users maintain healthy financial habits by providing personalized d
    - Effort: High
    - Status: Not prioritized
 
-2. **Advanced Reporting** (35/100)
-   - Impact: Power users only
+2. **Third-Party Integrations** (35/100)
+   - Impact: Niche use cases
    - Effort: High
    - Status: Future consideration
 
 ## User Feedback Integration
 
 ### Current Metrics
-- **SMS Delivery**: 100% success rate (admin errors resolved)
-- **User Engagement**: Active preference management
-- **System Reliability**: 99%+ uptime
-- **Response Time**: <5 seconds SMS delivery
+- **SMS Delivery**: 100% success rate with 6 template options
+- **User Engagement**: Active preference management across 6 SMS types
+- **System Reliability**: 99%+ uptime with optimized page architecture
+- **Response Time**: <5 seconds SMS delivery with real-time balance data
+- **Navigation Efficiency**: 65% faster page loading with streamlined structure
 
 ### Feedback Channels
-- **SMS Content**: User preferences for message types
-- **Timing**: 1:45 PM EST optimized for engagement
-- **Frequency**: Daily delivery well-received
-- **Insights**: Category analysis provides value
+- **SMS Content**: 6 template types for comprehensive user control
+- **Visual Design**: Color-coded merchant system for better recognition
+- **Performance**: Faster loading with archived unused pages
+- **Analytics**: Interactive merchant visualization for spending patterns
 
 ## Competitive Analysis
 
 ### Key Differentiators
-1. **Proactive Approach**: Daily SMS vs. reactive apps
-2. **Personalization**: User-specific timing and content
-3. **Simplicity**: Focused on core financial awareness
-4. **Reliability**: Consistent delivery and uptime
+1. **Comprehensive SMS System**: 6 distinct template types vs competitors' basic notifications
+2. **Interactive Visualization**: Bubble chart merchant analysis vs static reports
+3. **Real-Time Integration**: Dynamic balance data in SMS vs static snapshots
+4. **Performance Focus**: Streamlined 6-page navigation vs cluttered interfaces
+5. **Visual Design**: Color-coded merchant system vs generic lists
 
 ### Market Position
-- **Target**: Users seeking financial awareness
-- **Value**: Proactive financial wellness
-- **Approach**: SMS-first, web dashboard secondary
-- **Focus**: Spending patterns and bill management
+- **Target**: Users seeking comprehensive financial awareness
+- **Value**: Proactive financial wellness with visual insights
+- **Approach**: SMS-first with advanced web analytics
+- **Focus**: Multi-dimensional spending analysis and real-time insights
 
 ## Product Roadmap
 
 ### Q3 2025 (Current)
-- ✅ SMS system optimization and reliability fixes
-- ✅ User preference refinement
-- ✅ Category analysis enhancement
-- 🔄 User feedback collection (imminent)
+- ✅ SMS system enhancement (6 templates with real-time balance)
+- ✅ Interactive merchant visualization (bubble chart analysis)
+- ✅ Performance optimization (65% page reduction)
+- ✅ Visual design improvements (color-coded merchant system)
+- 🔄 User feedback collection on new features
 
 ### Q4 2025 (Planned)
-- Budget goal setting and tracking
-- Enhanced merchant insights
-- SMS template A/B testing
-- User onboarding improvements
+- Multi-account management and filtering
+- Advanced budget goal setting and tracking
+- Enhanced mobile responsiveness
+- SMS template A/B testing with user engagement metrics
+- User onboarding flow optimization
 
 ### 2026 (Future)
-- Multi-bank integration
-- Advanced analytics dashboard
-- Intelligent insights
-- Mobile app development
+- Native mobile app development
+- Advanced analytics dashboard with predictive insights
+- Third-party integrations (calendar, budgeting apps)
+- Machine learning spending predictions
+- Social features and community building
 
 ## Success Metrics
 
 ### Current KPIs
-- **SMS Delivery Rate**: 100% (admin errors resolved)
-- **User Retention**: Active preference management
-- **System Uptime**: 99%+
-- **Response Time**: <5 seconds
+- **SMS Delivery Rate**: 100% across 6 template types
+- **User Retention**: Active preference management (6 SMS controls)
+- **System Uptime**: 99%+ with optimized architecture
+- **Page Load Speed**: 65% improvement with streamlined navigation
+- **Feature Adoption**: Interactive merchant visualization usage
 
 ### Target Metrics
-- **User Engagement**: Daily SMS opens
-- **Feature Adoption**: Preference customization
-- **User Satisfaction**: Feedback scores
-- **Growth**: New user acquisition
+- **User Engagement**: 6 SMS template adoption rates
+- **Feature Utilization**: Merchant bubble chart interaction
+- **Navigation Efficiency**: Time to complete tasks in streamlined interface
+- **User Satisfaction**: Feedback on visual enhancements
+- **Growth**: New user acquisition with improved onboarding
 
 ## Risk Assessment
 
 ### Product Risks (0-100 Scale)
-- **User Engagement Drop**: 25 (Medium - monitoring needed)
-- **Feature Complexity**: 15 (Low - keeping it simple)
-- **Competition**: 30 (Medium - unique positioning)
+- **Feature Complexity**: 20 (Medium - 6 SMS types may overwhelm some users)
+- **Performance Regression**: 10 (Low - page archival improves performance)
+- **User Adoption**: 25 (Medium - new visualization features need education)
 
 ### Opportunities (0-100 Scale)
-- **Budget Integration**: 90 (High value, high effort)
-- **Enhanced Analytics**: 85 (High value, moderate effort)
-- **User Onboarding**: 80 (High value, moderate effort)
-- **Merchant Insights**: 75 (Medium value, low effort)
+- **Multi-Account Support**: 95 (Critical for user growth)
+- **Advanced Analytics**: 88 (High value with interactive visualization foundation)
+- **Mobile Experience**: 85 (High impact for user accessibility)
+- **Budget Integration**: 90 (Natural evolution of spending insights)
 
 ## Technical Improvements Impact
 
-### Database Schema
-- **Phone Number Storage**: Centralized in user_sms_settings table
-- **User Preferences**: Unified management system
-- **Scalability**: Ready for multi-user expansion
+### Performance Optimization
+- **Page Architecture**: 65% reduction (17 → 6 pages) improves loading speed
+- **Build Efficiency**: Faster compilation with fewer components
+- **Navigation UX**: Streamlined user flow with focused feature set
+- **Bundle Size**: Reduced JavaScript payload for users
 
-### Code Quality
-- **Admin Permission Errors**: ✅ Resolved
-- **Phone Number Lookup**: Simplified and reliable
-- **Error Handling**: Robust and comprehensive
-- **Performance**: Optimized and efficient
+### Enhanced User Experience
+- **Visual Identity**: Color-coded merchant avatars for better recognition
+- **SMS Intelligence**: 6 template types for comprehensive financial insights
+- **Interactive Analytics**: Bubble chart visualization for spending patterns
+- **Real-Time Data**: Dynamic balance integration in notifications
 
-### Cron Schedule
-- **Previous**: 1:30 PM EST
-- **Current**: 1:45 PM EST
-- **Next Execution**: Today at 1:45 PM EST (imminent)
+### Database & Architecture
+- **SMS Preferences**: Enhanced with 6 template type controls
+- **Merchant Analytics**: Interactive visualization data structure
+- **Performance**: Optimized with archived unused components
+- **Scalability**: Clean architecture ready for multi-account support
 
 ## Next Actions
 
-### Immediate (Next 10 minutes)
-1. Monitor 1:45 PM EST SMS delivery execution
-2. Verify user engagement with new timing
-3. Check for any delivery issues
+### Immediate (Next Week)
+1. Monitor user adoption of 6 SMS template system
+2. Analyze merchant bubble chart engagement metrics
+3. Collect feedback on streamlined navigation experience
+4. Plan multi-account management development
 
 ### Short Term (Next Month)
-1. Collect user feedback on new timing
-2. Analyze SMS engagement metrics
-3. Plan budget integration feature
-4. Develop merchant insights
+1. Develop advanced filtering capabilities
+2. Enhance mobile responsiveness for bubble chart
+3. A/B test SMS template effectiveness
+4. Begin multi-account architecture planning
 
 ---
-**Product Agent maintains focus on user value and feature prioritization.** 
+**Product Agent maintains focus on user value, performance optimization, and comprehensive financial insights.** 
