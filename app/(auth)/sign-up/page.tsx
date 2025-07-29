@@ -28,17 +28,6 @@ export default async function SignUp(props: {
           className="h-12 sm:h-10 text-base"
         />
         
-        <Label htmlFor="phone" className="text-base sm:text-sm">Phone Number</Label>
-        <Input 
-          name="phone" 
-          type="tel" 
-          placeholder="(555) 123-4567" 
-          required 
-          pattern="[0-9\s\-\(\)]{10,}"
-          title="Please enter a valid phone number"
-          className="h-12 sm:h-10 text-base"
-        />
-        
         <div className="flex justify-between items-center">
           <Label htmlFor="password" className="text-base sm:text-sm">Password</Label>
         </div>
