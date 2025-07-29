@@ -6,11 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
+import CategoryTransactionModal from '@/components/category-transaction-modal';
 
 interface AICategoryData {
   ai_category: string;
   total_spending: number;
   transaction_count: number;
+  current_month_transaction_count: number; // NEW: Current month transaction count
   unique_merchants: number;
   first_transaction_date: string;
   last_transaction_date: string;
@@ -34,6 +36,10 @@ export default function AICategoryAnalysisPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedCategories, setTrackedCategories] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
+  
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<AICategoryData | null>(null);
 
   const supabase = createSupabaseClient();
 
@@ -123,6 +129,17 @@ export default function AICategoryAnalysisPage() {
     }
   };
 
+  // Open transaction verification modal
+  const openTransactionModal = (category: AICategoryData) => {
+    setSelectedCategory(category);
+    setModalOpen(true);
+  };
+
+  const closeTransactionModal = () => {
+    setModalOpen(false);
+    setSelectedCategory(null);
+  };
+
   // OPTIMIZED: Simplified data fetching for better performance  
   const fetchAICategoryData = async () => {
     try {
@@ -180,10 +197,15 @@ export default function AICategoryAnalysisPage() {
       const globalLastDate = new Date(allDates[allDates.length - 1] + 'T12:00:00');
       const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
+      // Calculate current month key for consistent filtering
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
       // Process transactions by AI category
       const categoryMap = new Map<string, {
         totalSpending: number;
         transactionCount: number;
+        currentMonthTransactionCount: number; // NEW: Track current month count separately
         amounts: number[];
         merchants: Map<string, { amount: number; count: number }>;
         monthlySpending: Map<string, number>; // For trend analysis
@@ -201,6 +223,7 @@ export default function AICategoryAnalysisPage() {
           categoryMap.set(aiCategory, {
             totalSpending: 0,
             transactionCount: 0,
+            currentMonthTransactionCount: 0, // NEW: Initialize current month count
             amounts: [],
             merchants: new Map(),
             monthlySpending: new Map(),
@@ -211,6 +234,11 @@ export default function AICategoryAnalysisPage() {
         categoryData.totalSpending += transaction.amount;
         categoryData.transactionCount += 1;
         categoryData.amounts.push(transaction.amount);
+
+        // NEW: Count current month transactions separately
+        if (monthKey === currentMonthKey) {
+          categoryData.currentMonthTransactionCount += 1;
+        }
 
         // Track merchant spending
         if (!categoryData.merchants.has(merchantName)) {
@@ -278,10 +306,14 @@ export default function AICategoryAnalysisPage() {
           }
         }
 
+        // Debug logging for transaction count comparison
+        console.log(`${aiCategory}: All-time: ${data.transactionCount}, Current month: ${data.currentMonthTransactionCount}`);
+
         return {
           ai_category: aiCategory,
           total_spending: data.totalSpending,
           transaction_count: data.transactionCount,
+          current_month_transaction_count: data.currentMonthTransactionCount, // NEW: Current month count
           unique_merchants: data.merchants.size,
           first_transaction_date: allDates[0],
           last_transaction_date: allDates[allDates.length - 1],
@@ -573,8 +605,14 @@ export default function AICategoryAnalysisPage() {
                         <td className="py-3 px-2 text-center">
                           <span className="text-lg">{getTrendIcon(category.spending_trend)}</span>
                         </td>
-                        <td className="py-3 px-2 text-right text-gray-600">
-                          {category.transaction_count}
+                        <td className="py-3 px-2 text-right">
+                          <button
+                            onClick={() => openTransactionModal(category)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                            title="View current month transactions for this category"
+                          >
+                            {category.current_month_transaction_count} transactions
+                          </button>
                         </td>
                         <td className="py-3 px-2 text-right text-gray-600">
                           {category.unique_merchants}
@@ -620,6 +658,17 @@ export default function AICategoryAnalysisPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Transaction Verification Modal */}
+      {selectedCategory && (
+        <CategoryTransactionModal
+          isOpen={modalOpen}
+          onClose={closeTransactionModal}
+          categoryName={selectedCategory.ai_category}
+          expectedTotal={selectedCategory.current_month_spending}
+          timeRange="This Month"
+        />
       )}
     </div>
   );

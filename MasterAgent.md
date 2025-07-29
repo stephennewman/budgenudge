@@ -1,5 +1,5 @@
 # 🧠 MASTER AGENT - PROJECT OVERSIGHT
-*Last Updated: January 25, 2025 - 2:15 PM EST*
+*Last Updated: July 28, 2025 - 10:23 PM EDT*
 
 ## 📋 PROJECT STATUS SUMMARY
 
@@ -10,6 +10,7 @@
 **USER EXPERIENCE**: ✅ ENHANCED  
 
 **Recent Achievements:**
+- 🚨 CRITICAL FIX: AI tagging cron job now fully operational (Vercel GET method issue resolved)
 - ✅ Navigation-aware loading states implemented
 - ✅ Account page loading behavior fixed  
 - ✅ Page archival optimization (65% page reduction)
@@ -36,6 +37,41 @@
 ---
 
 ## 📅 DEPLOYMENT LOG - CHRONOLOGICAL HISTORY
+
+### **Deployment #12: CRITICAL AI CRON FIX** 
+*July 28, 2025 - 10:23 PM EDT*
+
+**CRITICAL ISSUE RESOLVED:**  
+AI merchant and category tagging automation had silently failed - cron job was not executing AI tagging logic.
+
+**Root Cause Identified:**  
+Vercel cron jobs call endpoints via HTTP GET method, but AI tagging logic was only implemented in POST method. GET method was returning documentation instead of executing tagging.
+
+**Solution Implemented:**  
+- Created shared `executeAITagging()` function containing all AI tagging logic
+- Updated GET method to execute actual AI tagging (for Vercel cron)
+- Preserved POST method for manual testing with authorization
+- Both methods now use identical logic ensuring consistency
+
+**Technical Details:**
+```typescript
+// Before: GET returned docs, POST had logic
+export async function GET() { return docs; } // ❌ Silent failure
+export async function POST() { /* AI logic */ } // ✅ Only for manual
+
+// After: Both methods execute AI tagging
+export async function GET() { return executeAITagging(); } // ✅ For cron
+export async function POST() { return executeAITagging(request); } // ✅ For manual
+```
+
+**Impact:**
+- ✅ Automatic AI tagging resumed (15-minute intervals)
+- ✅ Manual testing still functional
+- ✅ 52 previously untagged transactions immediately processed
+- ✅ ai_merchant_name and ai_category_tag fields now updating automatically
+
+**Files Modified:**
+- `app/api/auto-ai-tag-new/route.ts` - Restructured for cron compatibility
 
 ### **Deployment #11: LOADING STATE ENHANCEMENT** 
 *January 25, 2025 - 2:15 PM EST*
