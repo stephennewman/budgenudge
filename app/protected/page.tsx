@@ -46,12 +46,12 @@ export default function AccountPage() {
       }
     }
 
-    const handleDashboardLoadingComplete = () => {
-      setIsDashboardLoading(false);
-    };
-
     fetchUserAndAccounts();
   }, [supabase]);
+
+  const handleDashboardLoadingComplete = () => {
+    setIsDashboardLoading(false);
+  };
 
   if (isLoading || isDashboardLoading) {
     return (

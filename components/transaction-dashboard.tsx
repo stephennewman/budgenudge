@@ -19,14 +19,12 @@ interface TransactionDashboardProps {
 export default function TransactionDashboard({ onLoadingComplete }: TransactionDashboardProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const supabase = createSupabaseClient();
 
   async function checkConnection() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setIsLoading(false);
         onLoadingComplete?.();
         return;
       }
@@ -42,12 +40,10 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
       if (items && items.length > 0) {
         await fetchAccounts();
       } else {
-        setIsLoading(false);
         onLoadingComplete?.();
       }
     } catch (error) {
       console.error('Error checking connection:', error);
-      setIsLoading(false);
       onLoadingComplete?.();
     }
   }
@@ -56,7 +52,6 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setIsLoading(false);
         onLoadingComplete?.();
         return;
       }
@@ -78,7 +73,6 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
     } catch (error) {
       console.error('Error fetching accounts:', error);
     } finally {
-      setIsLoading(false);
       onLoadingComplete?.();
     }
   }
@@ -89,7 +83,6 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
 
   const handleConnectionSuccess = () => {
     setIsConnected(true);
-    setIsLoading(true);
     fetchAccounts();
   };
 
