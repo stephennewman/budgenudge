@@ -11,6 +11,7 @@ export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
   const [hasConnectedAccount, setHasConnectedAccount] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createSupabaseClient();
@@ -45,10 +46,14 @@ export default function AccountPage() {
       }
     }
 
+    const handleDashboardLoadingComplete = () => {
+      setIsDashboardLoading(false);
+    };
+
     fetchUserAndAccounts();
   }, [supabase]);
 
-  if (isLoading) {
+  if (isLoading || isDashboardLoading) {
     return (
       <div className="relative min-h-[600px]">
         <ContentAreaLoader />
@@ -93,7 +98,7 @@ export default function AccountPage() {
             </p>
           </div>
 
-          <TransactionDashboard />
+          <TransactionDashboard onLoadingComplete={handleDashboardLoadingComplete} />
         </div>
       </div>
     );
@@ -113,7 +118,7 @@ export default function AccountPage() {
       </div>
 
       {/* Connected Bank Accounts */}
-      <TransactionDashboard />
+      <TransactionDashboard onLoadingComplete={handleDashboardLoadingComplete} />
 
       {/* Account Settings Grid */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
