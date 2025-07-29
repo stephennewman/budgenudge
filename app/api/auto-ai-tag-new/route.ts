@@ -2,19 +2,21 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { tagMerchantWithAI, type MerchantTaggingInput } from '@/utils/ai/merchant-tagging';
 
-// This endpoint can be called by cron jobs or manually to tag new transactions
-export async function POST(request: Request) {
+// Shared AI tagging logic for both GET (cron) and POST (manual) calls
+async function executeAITagging(request?: Request) {
   try {
-    // Verify cron secret for automated calls (allow Vercel cron or Bearer token)
-    const isVercelCron = request.headers.get('x-vercel-cron');
-    const authHeader = request.headers.get('authorization');
-    const cronSecret = process.env.CRON_SECRET;
-    
-    if (!isVercelCron && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Verify authorization for manual calls (POST) or allow Vercel cron (GET)
+    if (request) {
+      const isVercelCron = request.headers.get('x-vercel-cron');
+      const authHeader = request.headers.get('authorization');
+      const cronSecret = process.env.CRON_SECRET;
+      
+      if (!isVercelCron && authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
     }
 
-    console.log(`🤖 Auto AI Tagging: Starting scheduled AI tagging process`);
+    console.log(`🤖 Auto AI Tagging: Starting AI tagging process`);
 
     const supabaseService = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -222,15 +224,14 @@ export async function POST(request: Request) {
   }
 }
 
+// ✅ GET method for Vercel cron jobs (calls every 15 minutes)
 export async function GET() {
-  return NextResponse.json({
-    message: 'Auto AI Tagging Endpoint - Use POST with proper authorization',
-    description: 'Automatically tags untagged transactions from the last 7 days',
-    auth: 'Requires Bearer token with CRON_SECRET',
-    stats: {
-      max_transactions: 500,
-      max_days_back: 7,
-      rate_limiting: '1 second delay every 5 API calls'
-    }
-  });
+  console.log('🤖⏰ CRON: Auto AI tagging triggered by Vercel cron');
+  return await executeAITagging();
+}
+
+// POST method for manual testing and API calls
+export async function POST(request: Request) {
+  console.log('🤖🔧 MANUAL: Auto AI tagging triggered manually');
+  return await executeAITagging(request);
 } 
