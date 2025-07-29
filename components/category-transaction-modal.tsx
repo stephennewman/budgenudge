@@ -262,6 +262,33 @@ export default function CategoryTransactionModal({
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
+                    {(() => {
+                      // Debug: Log exactly what transactions are being rendered
+                      console.log(`📋 RENDERING ${filteredTransactions.length} TRANSACTIONS IN UI:`);
+                      const juneInRender = filteredTransactions.filter(tx => tx.date.includes('2025-06-30'));
+                      if (juneInRender.length > 0) {
+                        console.log(`🚨 RENDERING ${juneInRender.length} JUNE 30TH TRANSACTIONS:`);
+                        juneInRender.forEach((tx, i) => {
+                          console.log(`  RENDER-JUNE[${i}]: ${tx.date} | ${tx.name} | $${tx.amount}`);
+                        });
+                      } else {
+                        console.log(`✅ NO JUNE TRANSACTIONS IN RENDER DATA`);
+                      }
+                      
+                      // Show first 3 and last 3 transactions being rendered
+                      filteredTransactions.slice(0, 3).forEach((tx, i) => {
+                        console.log(`  RENDER[${i}]: ${tx.date} | ${tx.name}`);
+                      });
+                      if (filteredTransactions.length > 6) {
+                        console.log(`  ... ${filteredTransactions.length - 6} more transactions ...`);
+                        filteredTransactions.slice(-3).forEach((tx, i) => {
+                          const actualIndex = filteredTransactions.length - 3 + i;
+                          console.log(`  RENDER[${actualIndex}]: ${tx.date} | ${tx.name}`);
+                        });
+                      }
+                      
+                      return null; // This is just for debugging, return null
+                    })()}
                     {filteredTransactions.map((transaction, index) => (
                       <tr key={transaction.id || index} className="hover:bg-gray-50">
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
