@@ -161,7 +161,9 @@ export default function CategoryTransactionModal({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Add noon time to avoid timezone conversion issues
+    const dateWithTime = dateString.includes('T') ? dateString : dateString + 'T12:00:00';
+    return new Date(dateWithTime).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
