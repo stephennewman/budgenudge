@@ -175,7 +175,9 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Account Actions */}
+{/* COMMENTED OUT: Redundant sections as requested
+        
+        Account Actions
         <div className="border rounded-lg p-4 sm:p-6 space-y-4">
           <h2 className="font-medium flex items-center gap-2">
             ⚙️ Account Actions
@@ -188,7 +190,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Account Summary */}
+        Account Summary
         <div className="border rounded-lg p-4 sm:p-6 space-y-4">
           <h2 className="font-medium flex items-center gap-2">
             📈 Account Summary
@@ -214,6 +216,7 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+        */}
       </div>
     </div>
   );
