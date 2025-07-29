@@ -22,13 +22,16 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
   const supabase = createSupabaseClient();
 
   async function checkConnection() {
+    console.log('TransactionDashboard: Starting checkConnection');
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        console.log('TransactionDashboard: No user found, calling onLoadingComplete');
         onLoadingComplete?.();
         return;
       }
 
+      console.log('TransactionDashboard: User found, checking items');
       // Check if user has any connected items
       const { data: items } = await supabase
         .from('items')
@@ -38,24 +41,30 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
       setIsConnected(!!(items && items.length > 0));
       
       if (items && items.length > 0) {
+        console.log('TransactionDashboard: Items found, fetching accounts');
         await fetchAccounts();
       } else {
+        console.log('TransactionDashboard: No items found, calling onLoadingComplete');
         onLoadingComplete?.();
       }
     } catch (error) {
       console.error('Error checking connection:', error);
+      console.log('TransactionDashboard: Error in checkConnection, calling onLoadingComplete');
       onLoadingComplete?.();
     }
   }
 
   async function fetchAccounts() {
+    console.log('TransactionDashboard: Starting fetchAccounts');
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.log('TransactionDashboard: No session, calling onLoadingComplete');
         onLoadingComplete?.();
         return;
       }
 
+      console.log('TransactionDashboard: Session found, fetching from API');
       const response = await fetch('/api/plaid/transactions', {
         method: 'GET',
         headers: { 
@@ -66,6 +75,7 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
 
       if (response.ok) {
         const data = await response.json();
+        console.log('TransactionDashboard: API response successful, accounts:', data.accounts?.length || 0);
         setAccounts(data.accounts || []);
       } else {
         console.error('Failed to fetch accounts:', response.status, response.statusText);
@@ -73,11 +83,13 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
     } catch (error) {
       console.error('Error fetching accounts:', error);
     } finally {
+      console.log('TransactionDashboard: fetchAccounts finally block, calling onLoadingComplete');
       onLoadingComplete?.();
     }
   }
 
   useEffect(() => {
+    console.log('TransactionDashboard: useEffect triggered, calling checkConnection');
     checkConnection();
   }, []);
 

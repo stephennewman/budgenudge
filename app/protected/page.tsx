@@ -50,8 +50,19 @@ export default function AccountPage() {
   }, [supabase]);
 
   const handleDashboardLoadingComplete = () => {
+    console.log('Dashboard loading complete callback fired');
     setIsDashboardLoading(false);
   };
+
+  // Safety timeout to prevent infinite loading
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      console.log('Dashboard loading timeout - forcing completion');
+      setIsDashboardLoading(false);
+    }, 10000); // 10 second timeout
+
+    return () => clearTimeout(timeout);
+  }, []);
 
   if (isLoading || isDashboardLoading) {
     return (
