@@ -44,6 +44,13 @@ export default function CategoryTransactionModal({
 
   useEffect(() => {
     if (isOpen && categoryName) {
+      // Clear previous data to avoid stale state
+      console.log(`🔄 MODAL OPENING: Clearing previous data for ${categoryName}`);
+      setTransactions([]);
+      setFilteredTransactions([]);
+      setSearchTerm('');
+      setActualTotal(0);
+      
       fetchCategoryTransactions();
     }
   }, [isOpen, categoryName]);
@@ -56,6 +63,18 @@ export default function CategoryTransactionModal({
              transaction.date.includes(searchTerm) ||
              transaction.amount.toString().includes(searchTerm);
     });
+    
+    // Debug: Check for June transactions in final filtered list
+    const juneTransactions = filtered.filter(tx => tx.date.includes('2025-06-30'));
+    if (juneTransactions.length > 0) {
+      console.log(`🚨 FOUND ${juneTransactions.length} JUNE 30TH TRANSACTIONS IN FINAL FILTERED LIST:`);
+      juneTransactions.forEach(tx => {
+        console.log(`  JUNE TX: ${tx.date} | ${tx.name} | ${tx.amount}`);
+      });
+    }
+    
+    console.log(`FINAL UI DISPLAY: ${filtered.length} transactions (from ${transactions.length} base transactions)`);
+    
     setFilteredTransactions(filtered);
     
     // Calculate actual total
@@ -117,6 +136,14 @@ export default function CategoryTransactionModal({
       }) || [];
 
       console.log(`After client-side filtering: ${filteredData.length} transactions remain`);
+
+      // Debug: Log what we're actually setting in state
+      console.log(`SETTING STATE with ${filteredData.length} transactions:`);
+      filteredData.forEach((tx: Transaction, index: number) => {
+        if (index < 5 || tx.date.includes('2025-06-30')) {
+          console.log(`  STATE[${index}]: ${tx.date} | ${tx.name}`);
+        }
+      });
 
       setTransactions(filteredData);
     } catch (error) {
