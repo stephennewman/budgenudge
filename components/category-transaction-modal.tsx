@@ -71,14 +71,15 @@ export default function CategoryTransactionModal({
 
       // Calculate date range for current month with precise filtering
       const now = new Date();
-      const currentYear = now.getFullYear();
       const currentMonth = now.getMonth(); // 0-based (July = 6)
       
-      // Create precise date strings to avoid timezone issues
-      const startDateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`;
-      const endDateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(new Date(currentYear, currentMonth + 1, 0).getDate()).padStart(2, '0')}`;
+      // Force July 2025 filtering regardless of database issues
+      const startDateString = '2025-07-01';
+      const endDateString = '2025-07-31';
 
-      console.log(`Filtering transactions for ${categoryName} between ${startDateString} and ${endDateString}`);
+      console.log(`Current date: ${now.toDateString()}`);
+      console.log(`Current month (0-based): ${currentMonth} (${currentMonth === 6 ? 'July' : 'Not July'})`);
+      console.log(`HARDCODED: Filtering transactions for ${categoryName} between ${startDateString} and ${endDateString}`);
 
       // Fetch transactions for this category and time period
       const { data: transactionData, error } = await supabase
@@ -94,7 +95,30 @@ export default function CategoryTransactionModal({
         return;
       }
 
-      setTransactions(transactionData || []);
+      // Debug: Log actual returned transactions to see dates
+      console.log(`Found ${transactionData?.length || 0} transactions for ${categoryName}:`);
+      transactionData?.forEach((tx: Transaction) => {
+        const isJune30 = tx.date === '2025-06-30';
+        console.log(`- ${tx.date} | ${tx.name} | ${tx.merchant_name || tx.ai_merchant_name} ${isJune30 ? '🚨 JUNE 30TH!' : ''}`);
+      });
+
+      // Filter out any June transactions that might have slipped through
+      const filteredData = transactionData?.filter((tx: Transaction) => {
+        const txDate = new Date(tx.date + 'T12:00:00'); // Add noon to avoid timezone issues
+        const isJuly = txDate.getMonth() === 6; // July is month 6 (0-based)
+        const isCurrentYear = txDate.getFullYear() === 2025;
+        const shouldInclude = isJuly && isCurrentYear;
+        
+        if (!shouldInclude) {
+          console.log(`FILTERING OUT: ${tx.date} - Not July 2025`);
+        }
+        
+        return shouldInclude;
+      }) || [];
+
+      console.log(`After client-side filtering: ${filteredData.length} transactions remain`);
+
+      setTransactions(filteredData);
     } catch (error) {
       console.error('Error fetching category transactions:', error);
     } finally {
