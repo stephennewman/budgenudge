@@ -2,7 +2,6 @@
 
 import { createSupabaseClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
-import AuthPageSignOutButton from "@/components/auth-sign-out-button";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
@@ -100,8 +99,7 @@ export default function AccountPage() {
     );
   }
 
-  // Account management for connected users  
-  const items = []; // We'll need to fetch this if needed for display
+  // Account management for connected users
 
   return (
     <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
@@ -198,7 +196,7 @@ export default function AccountPage() {
           <div className="grid gap-3 text-sm">
             <div className="grid grid-cols-[120px_1fr] sm:grid-cols-[140px_1fr] gap-2">
               <div className="text-muted-foreground">Connected Banks</div>
-              <div className="font-medium">{items?.length || 0} account(s)</div>
+              <div className="font-medium">0 account(s)</div>
             </div>
             <div className="grid grid-cols-[120px_1fr] sm:grid-cols-[140px_1fr] gap-2">
               <div className="text-muted-foreground">SMS Notifications</div>
