@@ -261,8 +261,8 @@ export default function Home() {
             {/* Personal Finance App Interface */}
             <div className="relative max-w-2xl mx-auto">
               <Image
-                src="/assets/pictures/krezzo_money_texts.png"
-                alt="Krezzo money texts showing daily notifications"
+                src="/assets/pictures/krezzo_alerts-min.png"
+                alt="Krezzo alerts showing daily money notifications"
                 width={600}
                 height={400}
                 className="rounded-xl"
@@ -277,7 +277,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold mb-6">How it works</h2>
-            <p className="text-xl text-gray-600">Just a few steps and you're in.</p>
+            <p className="text-xl text-gray-600">Just a few steps and you&apos;re in.</p>
           </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-12 mb-16">
@@ -363,7 +363,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold mb-6">Choose your money awareness level</h2>
-            <p className="text-xl text-gray-600">Start free, upgrade when you're ready</p>
+            <p className="text-xl text-gray-600">Start free, upgrade when you&apos;re ready</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -374,7 +374,7 @@ export default function Home() {
               <ul className="text-gray-600 space-y-3 mb-8">
                 <li className="flex items-center justify-center gap-2">
                   <span className="text-green-500">✓</span>
-                  We'll send you a sample text
+                  We&apos;ll send you a sample text
                 </li>
               </ul>
               <Button asChild className="w-full bg-green-600 hover:bg-green-700">
@@ -513,7 +513,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">Is this really secure? I'm giving you access to my bank account.</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">Is this really secure? I&apos;m giving you access to my bank account.</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -521,7 +521,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  Absolutely. We use Plaid, the same secure connection your bank uses. We sync your transactions but can't touch your money, make transfers, or access your account details. It's read-only access, just like when you check your balance online.
+                  Absolutely. We use Plaid, the same secure connection your bank uses. We sync your transactions but can&apos;t touch your money, make transfers, or access your account details. It&apos;s read-only access, just like when you check your balance online.
                 </p>
               </div>
             </details>
@@ -530,7 +530,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I don't want to be spammed with texts all day. How often do you send them?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I don&apos;t want to be spammed with texts all day. How often do you send them?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -547,7 +547,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">What if I don't like it? Can I cancel?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">What if I don&apos;t like it? Can I cancel?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -555,7 +555,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  Yes, cancel anytime with one click. No contracts, no hidden fees, no hassle. We want you to love it, but if you don't, we'll make it easy to leave. Your data is deleted when you cancel.
+                  Yes, cancel anytime with one click. No contracts, no hidden fees, no hassle. We want you to love it, but if you don&apos;t, we&apos;ll make it easy to leave. Your data is deleted when you cancel.
                 </p>
               </div>
             </details>
@@ -564,7 +564,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">My bank isn't listed. Can I still use this?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">My bank isn&apos;t listed. Can I still use this?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -572,7 +572,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  We support over 11,000 banks and credit unions through Plaid. If your bank isn't supported, we'll help you find an alternative or work with you to add it. Most major banks, credit unions, and even some international banks are covered.
+                  We support over 11,000 banks and credit unions through Plaid. If your bank isn&apos;t supported, we&apos;ll help you find an alternative or work with you to add it. Most major banks, credit unions, and even some international banks are covered.
                 </p>
               </div>
             </details>
@@ -615,7 +615,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I'm not good with money. Will this actually help me?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I&apos;m not good with money. Will this actually help me?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -623,7 +623,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  That's exactly why we built this. You don't need to be "good with money" - you just need awareness. Our texts show you patterns you didn't see before, like "You spent $200 on coffee this month" or "Your subscription costs are up 30%." Knowledge is power.
+                  That&apos;s exactly why we built this. You don&apos;t need to be &quot;good with money&quot; - you just need awareness. Our texts show you patterns you didn&apos;t see before, like &quot;You spent $200 on coffee this month&quot; or &quot;Your subscription costs are up 30%.&quot; Knowledge is power.
                 </p>
               </div>
             </details>
@@ -632,7 +632,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">What if I get charged for something I didn't buy?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">What if I get charged for something I didn&apos;t buy?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -640,7 +640,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  We'll flag unusual spending patterns and unknown merchants. If you see a charge you don't recognize, you'll know immediately instead of finding out weeks later. Early detection can save you hundreds in fraudulent charges.
+                  We&apos;ll flag unusual spending patterns and unknown merchants. If you see a charge you don&apos;t recognize, you&apos;ll know immediately instead of finding out weeks later. Early detection can save you hundreds in fraudulent charges.
                 </p>
               </div>
             </details>
@@ -649,7 +649,7 @@ export default function Home() {
             <details className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
               <summary className="p-8 hover:bg-gray-100 transition-colors">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I'm worried about privacy. What data do you collect?</h3>
+                  <h3 className="text-xl font-bold text-gray-800 cursor-pointer">I&apos;m worried about privacy. What data do you collect?</h3>
                   <svg className="w-6 h-6 text-gray-400 flex-shrink-0 ml-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
@@ -657,7 +657,7 @@ export default function Home() {
               </summary>
               <div className="px-8 pb-8">
                 <p className="text-gray-600 leading-relaxed">
-                  We only collect transaction data to send you insights. We don't sell your data, share it with third parties, or use it for advertising. Your financial information stays private and secure. We're in the awareness business, not the data business.
+                  We only collect transaction data to send you insights. We don&apos;t sell your data, share it with third parties, or use it for advertising. Your financial information stays private and secure. We&apos;re in the awareness business, not the data business.
                 </p>
               </div>
             </details>
