@@ -261,8 +261,8 @@ export default function Home() {
             {/* Personal Finance App Interface */}
             <div className="relative max-w-2xl mx-auto">
               <Image
-                src="/assets/pictures/krezzo_alerts.png"
-                alt="Krezzo alerts showing daily money notifications"
+                src="/assets/pictures/krezzo_money_texts.png"
+                alt="Krezzo money texts showing daily notifications"
                 width={600}
                 height={400}
                 className="rounded-xl"
