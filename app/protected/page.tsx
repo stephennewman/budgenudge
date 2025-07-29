@@ -11,7 +11,6 @@ export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
   const [hasConnectedAccount, setHasConnectedAccount] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createSupabaseClient();
@@ -43,25 +42,11 @@ export default function AccountPage() {
         setError("There was an error loading your account. Please try again.");
       } finally {
         setIsLoading(false);
-        // Dashboard loading will be handled by the actual rendered component
       }
     }
 
     fetchUserAndAccounts();
   }, [supabase]);
-
-  const handleDashboardLoadingComplete = () => {
-    setIsDashboardLoading(false);
-  };
-
-  // Safety timeout to prevent infinite loading
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setIsDashboardLoading(false);
-    }, 10000); // 10 second timeout
-
-    return () => clearTimeout(timeout);
-  }, []);
 
   if (isLoading) {
     return (
@@ -83,14 +68,6 @@ export default function AccountPage() {
 
   // If no connected account, show onboarding flow
   if (!hasConnectedAccount) {
-    if (isDashboardLoading) {
-      return (
-        <div className="relative min-h-[600px]">
-          <ContentAreaLoader />
-        </div>
-      );
-    }
-    
     return (
       <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
         <VerificationSuccessBanner />
@@ -116,20 +93,13 @@ export default function AccountPage() {
             </p>
           </div>
 
-          <TransactionDashboard onLoadingComplete={handleDashboardLoadingComplete} />
+          <TransactionDashboard />
         </div>
       </div>
     );
   }
 
   // Account management for connected users
-  if (isDashboardLoading) {
-    return (
-      <div className="relative min-h-[600px]">
-        <ContentAreaLoader />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
@@ -143,7 +113,7 @@ export default function AccountPage() {
       </div>
 
       {/* Connected Bank Accounts */}
-      <TransactionDashboard onLoadingComplete={handleDashboardLoadingComplete} />
+      <TransactionDashboard />
 
       {/* Account Settings Grid */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">

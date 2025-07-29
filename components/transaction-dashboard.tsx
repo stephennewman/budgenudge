@@ -12,11 +12,7 @@ interface Account {
   subtype: string;
 }
 
-interface TransactionDashboardProps {
-  onLoadingComplete?: () => void;
-}
-
-export default function TransactionDashboard({ onLoadingComplete }: TransactionDashboardProps) {
+export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const supabase = createSupabaseClient();
@@ -24,10 +20,7 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
   async function checkConnection() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        onLoadingComplete?.();
-        return;
-      }
+      if (!user) return;
 
       // Check if user has any connected items
       const { data: items } = await supabase
@@ -39,22 +32,16 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
       
       if (items && items.length > 0) {
         await fetchAccounts();
-      } else {
-        onLoadingComplete?.();
       }
     } catch (error) {
       console.error('Error checking connection:', error);
-      onLoadingComplete?.();
     }
   }
 
   async function fetchAccounts() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        onLoadingComplete?.();
-        return;
-      }
+      if (!session) return;
 
       const response = await fetch('/api/plaid/transactions', {
         method: 'GET',
@@ -72,8 +59,6 @@ export default function TransactionDashboard({ onLoadingComplete }: TransactionD
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
-    } finally {
-      onLoadingComplete?.();
     }
   }
 
