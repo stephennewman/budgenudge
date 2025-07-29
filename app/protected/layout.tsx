@@ -1,5 +1,12 @@
 import ProtectedSidebar from "@/components/protected-sidebar";
 import MobileNavMenu from "@/components/mobile-nav-menu";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Money Texts Dashboard | Your Financial Overview | Krezzo",
+  description: "View your money texts dashboard with transaction history, account balances, and upcoming financial alerts.",
+  keywords: "money texts dashboard, financial overview, transaction history, Krezzo account",
+};
 
 export default function ProtectedLayout({
   children,

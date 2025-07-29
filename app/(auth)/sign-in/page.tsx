@@ -5,6 +5,13 @@ import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Access Your Money Texts | Sign In to Krezzo",
+  description: "Sign in to your Krezzo account to access your money texts dashboard and financial alerts.",
+  keywords: "money texts login, Krezzo sign in, financial dashboard access",
+};
 
 export default async function SignIn(props: {
   searchParams: Promise<Message>;

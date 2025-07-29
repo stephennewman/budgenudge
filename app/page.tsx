@@ -1,6 +1,13 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import HomepageSlickTextForm from "@/components/homepage-slicktext-form";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Money Texts | Daily Financial Alerts | Krezzo",
+  description: "Get daily money texts showing exactly what you spent yesterday and what bills are coming up. No apps, no spreadsheets - just simple SMS alerts that keep you financially aware.",
+  keywords: "money texts, daily financial alerts, SMS spending alerts, financial awareness, money tracking",
+};
 
 export default function Home() {
   return (

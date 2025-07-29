@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Verify Your Email | Complete Money Texts Setup | Krezzo",
+  description: "Verify your email to complete your money texts setup. Check your inbox for the verification link from Krezzo.",
+  keywords: "email verification, money texts setup, Krezzo account verification",
+};
 
 export default function CheckEmail() {
   return (

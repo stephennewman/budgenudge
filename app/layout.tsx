@@ -11,8 +11,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Krezzo - Real-Time Transaction Monitoring",
-  description: "Get instant SMS alerts for all your financial transactions with automated Plaid webhook integration",
+  title: "Krezzo - Daily Money Texts | Stop Wondering Where Your Money Went",
+  description: "Get daily money texts with your spending summary and upcoming bills. No apps needed - just simple SMS alerts that keep you financially aware.",
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',

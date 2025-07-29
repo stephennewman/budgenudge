@@ -5,6 +5,13 @@ import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Start Getting Money Texts | Sign Up for Krezzo",
+  description: "Sign up for Krezzo and start receiving daily money texts. Get instant SMS alerts about your spending and upcoming bills.",
+  keywords: "money texts sign up, financial alerts registration, Krezzo account",
+};
 
 export default async function SignUp(props: {
   searchParams: Promise<Message>;
