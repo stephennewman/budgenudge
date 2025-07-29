@@ -94,7 +94,7 @@ Key features:
 - Recurring bill tracking
 - Calendar view of transactions
 
-Respond helpfully but keep responses under 300 characters for SMS. Direct users to https://budgenudge.vercel.app for detailed account access. Be friendly and professional.`
+Respond helpfully but keep responses under 300 characters for SMS. Direct users to https://get.krezzo.com for detailed account access. Be friendly and professional.`
           },
           {
             role: 'user',
@@ -149,23 +149,23 @@ function getKeywordResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('spend') || lowerMessage.includes('money') || lowerMessage.includes('transaction')) {
-                return "💰 To view your spending and transactions, please log into Krezzo at https://budgenudge.vercel.app. Text HELP for more options!";
+                return "💰 To view your spending and transactions, please log into Krezzo at https://get.krezzo.com. Text HELP for more options!";
   }
-  
+
   if (lowerMessage.includes('balance') || lowerMessage.includes('account')) {
-                return "💳 Check your account balance and recent activity on the Krezzo dashboard: https://budgenudge.vercel.app";
+                return "💳 Check your account balance and recent activity on the Krezzo dashboard: https://get.krezzo.com";
   }
   
   if (lowerMessage.includes('alert') || lowerMessage.includes('notification')) {
-                return "🔔 Krezzo sends real-time alerts when you spend money. Manage alerts at https://budgenudge.vercel.app or text STOP to unsubscribe.";
+                return "🔔 Krezzo sends real-time alerts when you spend money. Manage alerts at https://get.krezzo.com or text STOP to unsubscribe.";
   }
   
   if (lowerMessage.includes('help')) {
-                return "Krezzo Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://budgenudge.vercel.app";
+                return "Krezzo Financial Alerts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://get.krezzo.com";
   }
   
   // Default helpful response
-              return "Hi! I'm Krezzo's assistant. I help with financial monitoring questions. Visit https://budgenudge.vercel.app or text HELP for commands!";
+              return "Hi! I'm Krezzo's assistant. I help with financial monitoring questions. Visit https://get.krezzo.com or text HELP for commands!";
 }
 
 export async function GET() {

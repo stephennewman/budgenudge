@@ -44,12 +44,12 @@ export async function POST(request: NextRequest) {
         break;
         
       case 'HELP':
-                  responseMessage = "Krezzo Financial Alerts 💰\n\nCommands: BALANCE, STOP, START\n\nVisit: https://budgenudge.vercel.app";
+                  responseMessage = "Krezzo Financial Alerts 💰\n\nCommands: BALANCE, STOP, START\n\nVisit: https://get.krezzo.com";
         responseType = 'command:HELP';
         break;
         
       case 'BALANCE':
-        responseMessage = "💰 Check your account at https://budgenudge.vercel.app";
+        responseMessage = "💰 Check your account at https://get.krezzo.com";
         responseType = 'command:BALANCE';
         break;
         
@@ -171,12 +171,12 @@ function getKeywordResponseDebug(message: string): string {
   console.log('🔍 DEBUG: Using keyword fallback for:', lowerMessage);
   
   if (lowerMessage.includes('spend') || lowerMessage.includes('money') || lowerMessage.includes('groceries')) {
-    return "💰 Check your spending at https://budgenudge.vercel.app";
+    return "💰 Check your spending at https://get.krezzo.com";
   }
   
   if (lowerMessage.includes('balance') || lowerMessage.includes('account')) {
-    return "💳 View account balance at https://budgenudge.vercel.app";
+    return "💳 View account balance at https://get.krezzo.com";
   }
   
-              return "Hi! I'm Krezzo's assistant. Visit https://budgenudge.vercel.app or text HELP!";
+              return "Hi! I'm Krezzo's assistant. Visit https://get.krezzo.com or text HELP!";
 } 
