@@ -172,7 +172,11 @@ export default function CategoryTransactionModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden relative">
+      <div className="bg-white rounded-lg max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden relative" id="debug-modal-unique-2025">
+        {/* DEBUG: Modal identifier */}
+        <div style={{position: 'absolute', top: '5px', right: '5px', fontSize: '10px', color: 'red', zIndex: 9999}}>
+          MODAL-ID: {Date.now()}
+        </div>
         
         {/* Header */}
         <CardHeader className="border-b bg-gray-50">
@@ -273,6 +277,18 @@ export default function CategoryTransactionModal({
                         });
                       } else {
                         console.log(`✅ NO JUNE TRANSACTIONS IN RENDER DATA`);
+                      }
+                      
+                      // Check for specific June 30th amounts user reported
+                      const specificJuneAmounts = [4.49, 70.82, 38.50];
+                      const foundSpecific = filteredTransactions.filter(tx => 
+                        specificJuneAmounts.includes(tx.amount) && tx.date.includes('2025-06-30')
+                      );
+                      if (foundSpecific.length > 0) {
+                        console.log(`🚨 FOUND SPECIFIC JUNE 30TH AMOUNTS: $4.49, $70.82, $38.50`);
+                        foundSpecific.forEach(tx => console.log(`  SPECIFIC: ${tx.date} | ${tx.name} | $${tx.amount}`));
+                      } else {
+                        console.log(`✅ SPECIFIC JUNE 30TH AMOUNTS NOT IN RENDER DATA`);
                       }
                       
                       // Show first 3 and last 3 transactions being rendered
