@@ -43,6 +43,7 @@ export default function AccountPage() {
         setError("There was an error loading your account. Please try again.");
       } finally {
         setIsLoading(false);
+        // Dashboard loading will be handled by the actual rendered component
       }
     }
 
@@ -64,7 +65,7 @@ export default function AccountPage() {
     return () => clearTimeout(timeout);
   }, []);
 
-  if (isLoading || isDashboardLoading) {
+  if (isLoading) {
     return (
       <div className="relative min-h-[600px]">
         <ContentAreaLoader />
@@ -84,6 +85,14 @@ export default function AccountPage() {
 
   // If no connected account, show onboarding flow
   if (!hasConnectedAccount) {
+    if (isDashboardLoading) {
+      return (
+        <div className="relative min-h-[600px]">
+          <ContentAreaLoader />
+        </div>
+      );
+    }
+    
     return (
       <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
         <VerificationSuccessBanner />
@@ -116,6 +125,13 @@ export default function AccountPage() {
   }
 
   // Account management for connected users
+  if (isDashboardLoading) {
+    return (
+      <div className="relative min-h-[600px]">
+        <ContentAreaLoader />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
