@@ -11,8 +11,13 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-      title: "Krezzo - Real-Time Transaction Monitoring",
+  title: "Krezzo - Real-Time Transaction Monitoring",
   description: "Get instant SMS alerts for all your financial transactions with automated Plaid webhook integration",
+  icons: {
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 };
 
 export default function RootLayout({
