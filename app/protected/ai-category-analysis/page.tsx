@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
-import CategoryTransactionModal from '@/components/category-transaction-modal';
+import TransactionVerificationModal from '@/components/transaction-verification-modal';
 
 interface AICategoryData {
   ai_category: string;
@@ -662,10 +662,11 @@ export default function AICategoryAnalysisPage() {
 
       {/* Transaction Verification Modal */}
       {selectedCategory && (
-        <CategoryTransactionModal
+        <TransactionVerificationModal
           isOpen={modalOpen}
           onClose={closeTransactionModal}
-          categoryName={selectedCategory.ai_category}
+          filterType="category"
+          filterValue={selectedCategory.ai_category}
           expectedTotal={selectedCategory.current_month_spending}
           timeRange="This Month"
         />

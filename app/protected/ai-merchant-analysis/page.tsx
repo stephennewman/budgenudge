@@ -6,11 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import ManualRefreshButton from '@/components/manual-refresh-button';
+import TransactionVerificationModal from '@/components/transaction-verification-modal';
 
 interface AIMerchantData {
   ai_merchant: string;
   total_spending: number;
   transaction_count: number;
+  current_month_transaction_count: number; // NEW: Current month transaction count
   unique_categories: number;
   first_transaction_date: string;
   last_transaction_date: string;
@@ -36,6 +38,10 @@ export default function AIMerchantAnalysisPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedMerchants, setTrackedMerchants] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
+  
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedMerchant, setSelectedMerchant] = useState<AIMerchantData | null>(null);
 
   const supabase = createSupabaseClient();
 
@@ -159,10 +165,15 @@ export default function AIMerchantAnalysisPage() {
       const globalLastDate = new Date(allDates[allDates.length - 1]);
       const daysOfData = Math.max(1, Math.ceil((globalLastDate.getTime() - globalFirstDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
+      // Calculate current month key for consistent filtering
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
       // Process transactions by AI merchant
       const merchantMap = new Map<string, {
         totalSpending: number;
         transactionCount: number;
+        currentMonthTransactionCount: number; // NEW: Track current month separately
         amounts: number[];
         categories: Map<string, { amount: number; count: number }>;
         monthlySpending: Map<string, number>; // For trend analysis
@@ -183,6 +194,7 @@ export default function AIMerchantAnalysisPage() {
           merchantMap.set(aiMerchant, {
             totalSpending: 0,
             transactionCount: 0,
+            currentMonthTransactionCount: 0, // NEW: Initialize current month count
             amounts: [],
             categories: new Map(),
             monthlySpending: new Map(),
@@ -195,6 +207,11 @@ export default function AIMerchantAnalysisPage() {
         merchantData.transactionCount += 1;
         merchantData.amounts.push(transaction.amount);
         merchantData.transactionDates.push(dateStr); // Use original date string
+
+        // NEW: Count current month transactions separately
+        if (monthKey === currentMonthKey) {
+          merchantData.currentMonthTransactionCount += 1;
+        }
 
         // Track category spending
         if (!merchantData.categories.has(aiCategory)) {
@@ -287,6 +304,7 @@ export default function AIMerchantAnalysisPage() {
           ai_merchant: aiMerchant,
           total_spending: data.totalSpending,
           transaction_count: data.transactionCount,
+          current_month_transaction_count: data.currentMonthTransactionCount, // NEW: Current month count
           unique_categories: data.categories.size,
           first_transaction_date: allDates[0],
           last_transaction_date: allDates[allDates.length - 1],
@@ -374,6 +392,17 @@ export default function AIMerchantAnalysisPage() {
 
     initializePage();
   }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Open transaction verification modal
+  const openTransactionModal = (merchant: AIMerchantData) => {
+    setSelectedMerchant(merchant);
+    setModalOpen(true);
+  };
+
+  const closeTransactionModal = () => {
+    setModalOpen(false);
+    setSelectedMerchant(null);
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -646,8 +675,14 @@ export default function AIMerchantAnalysisPage() {
                         <td className="py-3 px-2 text-center text-sm text-gray-600">
                           {formatFrequency(merchant.frequency_days)}
                         </td>
-                        <td className="py-3 px-2 text-right text-gray-600">
-                          {merchant.transaction_count}
+                        <td className="py-3 px-2 text-right">
+                          <button
+                            onClick={() => openTransactionModal(merchant)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                            title="View current month transactions for this merchant"
+                          >
+                            {merchant.current_month_transaction_count} transactions
+                          </button>
                         </td>
                         <td className="py-3 px-2 text-right text-gray-600">
                           {formatCurrency(merchant.avg_transaction_amount)}
@@ -689,6 +724,18 @@ export default function AIMerchantAnalysisPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Transaction Verification Modal */}
+      {selectedMerchant && (
+        <TransactionVerificationModal
+          isOpen={modalOpen}
+          onClose={closeTransactionModal}
+          filterType="merchant"
+          filterValue={selectedMerchant.ai_merchant}
+          expectedTotal={selectedMerchant.current_month_spending}
+          timeRange="This Month"
+        />
       )}
     </div>
   );

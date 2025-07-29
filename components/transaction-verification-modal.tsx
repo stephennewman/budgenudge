@@ -19,21 +19,23 @@ interface Transaction {
   account_id?: string;
 }
 
-interface CategoryTransactionModalProps {
+interface TransactionVerificationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  categoryName: string;
+  filterType: 'category' | 'merchant';
+  filterValue: string; // category name or merchant name
   expectedTotal: number;
   timeRange: string;
 }
 
-export default function CategoryTransactionModal({ 
+export default function TransactionVerificationModal({ 
   isOpen, 
   onClose, 
-  categoryName, 
+  filterType,
+  filterValue,
   expectedTotal,
   timeRange 
-}: CategoryTransactionModalProps) {
+}: TransactionVerificationModalProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,16 +45,16 @@ export default function CategoryTransactionModal({
   const supabase = createSupabaseClient();
 
   useEffect(() => {
-    if (isOpen && categoryName) {
+    if (isOpen && filterValue) {
       // Clear previous data to avoid stale state
       setTransactions([]);
       setFilteredTransactions([]);
       setSearchTerm('');
       setActualTotal(0);
       
-      fetchCategoryTransactions();
+      fetchTransactions();
     }
-  }, [isOpen, categoryName]);
+  }, [isOpen, filterValue, filterType]);
 
   useEffect(() => {
     // Filter transactions based on search term
@@ -63,13 +65,16 @@ export default function CategoryTransactionModal({
              transaction.amount.toString().includes(searchTerm);
     });
     
-    // Debug: Check for June transactions in final filtered list
-    const juneTransactions = filtered.filter(tx => tx.date.includes('2025-06-30'));
-    if (juneTransactions.length > 0) {
-      console.log(`🚨 FOUND ${juneTransactions.length} JUNE 30TH TRANSACTIONS IN FINAL FILTERED LIST:`);
-      juneTransactions.forEach(tx => {
-        console.log(`  JUNE TX: ${tx.date} | ${tx.name} | ${tx.amount}`);
-      });
+    // Debug: Check for specific amounts in final filtered list
+    const specificJuneAmounts = [4.49, 70.82, 38.50];
+    const foundSpecific = filtered.filter(tx => 
+      specificJuneAmounts.includes(tx.amount) && tx.date.includes('2025-06-30')
+    );
+    if (foundSpecific.length > 0) {
+      console.log(`🚨 FOUND SPECIFIC JUNE 30TH AMOUNTS: $4.49, $70.82, $38.50`);
+      foundSpecific.forEach(tx => console.log(`  SPECIFIC: ${tx.date} | ${tx.name} | $${tx.amount}`));
+    } else {
+      console.log(`✅ SPECIFIC JUNE 30TH AMOUNTS NOT IN RENDER DATA`);
     }
     
     console.log(`FINAL UI DISPLAY: ${filtered.length} transactions (from ${transactions.length} base transactions)`);
@@ -81,7 +86,7 @@ export default function CategoryTransactionModal({
     setActualTotal(total);
   }, [transactions, searchTerm]);
 
-  const fetchCategoryTransactions = async () => {
+  const fetchTransactions = async () => {
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -98,24 +103,33 @@ export default function CategoryTransactionModal({
 
       console.log(`Current date: ${now.toDateString()}`);
       console.log(`Current month (0-based): ${currentMonth} (${new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long' })})`);
-      console.log(`Filtering transactions for ${categoryName} between ${startDateString} and ${endDateString}`);
+      console.log(`Filtering transactions for ${filterValue} (${filterType}) between ${startDateString} and ${endDateString}`);
 
-      // Fetch transactions for this category and time period
-      const { data: transactionData, error } = await supabase
+      // Fetch transactions based on filter type
+      let query = supabase
         .from('transactions')
         .select('*')
-        .eq('ai_category_tag', categoryName)
         .gte('date', startDateString)
         .lte('date', endDateString)
         .order('date', { ascending: false });
 
+      // Apply appropriate filter based on type
+      if (filterType === 'category') {
+        query = query.eq('ai_category_tag', filterValue);
+      } else if (filterType === 'merchant') {
+        // For merchants, check both ai_merchant_name and merchant_name
+        query = query.or(`ai_merchant_name.eq.${filterValue},merchant_name.eq.${filterValue}`);
+      }
+
+      const { data: transactionData, error } = await query;
+
       if (error) {
-        console.error('Error fetching category transactions:', error);
+        console.error('Error fetching transactions:', error);
         return;
       }
 
       // Debug: Log actual returned transactions to see dates
-      console.log(`Found ${transactionData?.length || 0} transactions for ${categoryName}:`);
+      console.log(`Found ${transactionData?.length || 0} transactions for ${filterValue}:`);
       transactionData?.forEach((tx: Transaction) => {
         const isJune30 = tx.date === '2025-06-30';
         console.log(`- ${tx.date} | ${tx.name} | ${tx.merchant_name || tx.ai_merchant_name} ${isJune30 ? '🚨 JUNE 30TH!' : ''}`);
@@ -147,7 +161,7 @@ export default function CategoryTransactionModal({
 
       setTransactions(filteredData);
     } catch (error) {
-      console.error('Error fetching category transactions:', error);
+      console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
     }
@@ -172,17 +186,18 @@ export default function CategoryTransactionModal({
 
   if (!isOpen) return null;
 
+  const modalTitle = filterType === 'category' ? `${filterValue} Transactions` : `${filterValue} Transactions`;
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden relative" id="debug-modal-unique-2025">
-
         
         {/* Header */}
         <CardHeader className="border-b bg-gray-50">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">
-                {categoryName} Transactions
+                {modalTitle}
               </h2>
               <p className="text-sm text-gray-600 mt-1">
                 {timeRange} • Verifying spending total
