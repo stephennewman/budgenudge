@@ -312,8 +312,8 @@ export default function TransactionsPage() {
           console.log('Number of accounts:', balanceData.accounts.length);
           
           // Calculate total available balance across all accounts
-          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number }) => {
-            console.log('Account:', account.name, 'Available balance:', account.available_balance, 'Type:', typeof account.available_balance);
+          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number; name?: string }) => {
+            console.log('Account:', account.name || 'Unknown', 'Available balance:', account.available_balance, 'Type:', typeof account.available_balance);
             return sum + (account.available_balance || 0);
           }, 0);
           
