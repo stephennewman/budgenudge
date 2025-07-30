@@ -477,12 +477,197 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 12: FINAL CTA */}
+      {/* SECTION 10: PLATFORM FEATURES */}
+      <section className="bg-white py-20 px-4 sm:px-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl sm:text-5xl font-bold mb-6">Powerful platform features</h2>
+            <p className="text-xl text-gray-600">Everything you need to master your money, delivered via text</p>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+            {/* Platform Features */}
+            <div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-8">Platform Intelligence</h3>
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-blue-600 mt-2 text-2xl">🔍</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Automated Bill Analysis</h4>
+                    <p className="text-gray-600">AI-powered detection of recurring bills, subscriptions, and payment patterns</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-green-600 mt-2 text-2xl">✂️</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Bill Splitting</h4>
+                    <p className="text-gray-600">Split shared expenses and track who owes what with intelligent merchant detection</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-purple-600 mt-2 text-2xl">🏷️</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Normalized Merchant/Category Tagging</h4>
+                    <p className="text-gray-600">Consistent categorization across all your accounts with smart merchant recognition</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-orange-600 mt-2 text-2xl">📊</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Track Merchant/Categories for Pacing</h4>
+                    <p className="text-gray-600">Monitor spending trends and get alerts when you&apos;re ahead of your usual patterns</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-red-600 mt-2 text-2xl">📈</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Sort by Activity</h4>
+                    <p className="text-gray-600">View your transactions by frequency, amount, or merchant to spot patterns</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-indigo-600 mt-2 text-2xl">🔗</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Connect Your Account</h4>
+                    <p className="text-gray-600">Secure bank integration with more connections coming soon</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-teal-600 mt-2 text-2xl">🔐</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Single Sign-On</h4>
+                    <p className="text-gray-600">Secure authentication with your existing accounts</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-pink-600 mt-2 text-2xl">🔍</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Sorting and Search</h4>
+                    <p className="text-gray-600">Find any transaction instantly with powerful search and filtering</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-yellow-600 mt-2 text-2xl">💰</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Remaining &quot;Spend&quot; Budget</h4>
+                    <p className="text-gray-600">Track your discretionary spending against your monthly budget</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Text Features */}
+            <div>
+              <h3 className="text-3xl font-bold text-gray-800 mb-8">Smart Text Intelligence</h3>
+              <div className="space-y-6">
+                <div className="flex items-start gap-4">
+                  <span className="text-blue-600 mt-2 text-2xl">📱</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Subscribe to Templates</h4>
+                    <p className="text-gray-600">Choose from pre-built text templates or create your own custom alerts</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-green-600 mt-2 text-2xl">⏰</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Set Schedules</h4>
+                    <p className="text-gray-600">Get texts when you want them - daily, weekly, or on specific days</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-purple-600 mt-2 text-2xl">📅</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Yesterday&apos;s Transactions</h4>
+                    <p className="text-gray-600">Daily digest of what you spent, categorized and analyzed</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-orange-600 mt-2 text-2xl">📋</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Upcoming Bills</h4>
+                    <p className="text-gray-600">Never miss a payment with intelligent bill detection and reminders</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-red-600 mt-2 text-2xl">📊</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Merchant/Category Pacing</h4>
+                    <p className="text-gray-600">Get alerts when you&apos;re spending faster than usual in specific categories</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-indigo-600 mt-2 text-2xl">📈</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Weekly Summaries</h4>
+                    <p className="text-gray-600">End-of-week overview of your spending patterns and insights</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-teal-600 mt-2 text-2xl">📊</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Monthly Summaries</h4>
+                    <p className="text-gray-600">Comprehensive monthly analysis with trends and recommendations</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-pink-600 mt-2 text-2xl">🤖</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Conversational Intelligence</h4>
+                    <p className="text-gray-600">Ask questions about your money and get intelligent, contextual answers</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-yellow-600 mt-2 text-2xl">🛫</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Cash Flow Runway Analysis</h4>
+                    <p className="text-gray-600">See how long your money will last at current spending rates</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-4">
+                  <span className="text-cyan-600 mt-2 text-2xl">💼</span>
+                  <div>
+                    <h4 className="text-xl font-bold text-gray-800 mb-2">Paycheck Efficiency Analysis</h4>
+                    <p className="text-gray-600">Optimize your spending to make the most of each paycheck</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-16 text-center">
+            <p className="text-gray-600 text-lg mb-8">
+              All these features work together to give you complete financial awareness without the effort
+            </p>
+            <Button asChild size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4">
+              <Link href="/sign-up">Start with platform features</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 11: FINAL CTA */}
       <section className="bg-blue-600 py-20 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl text-center">
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-8">Stop flying blind with your money</h2>
           <p className="text-2xl text-blue-100 mb-12 max-w-4xl mx-auto">
-            Start gettingaily financial awareness that actually works. 
+            Start getting daily financial awareness that actually works. 
             No apps, no spreadsheets, no nonsense.
           </p>
           
@@ -500,7 +685,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 11: FAQ */}
+      {/* SECTION 12: FAQ */}
       <section className="bg-gray-50 py-20 px-4 sm:px-6">
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-16">
