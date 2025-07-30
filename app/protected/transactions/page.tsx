@@ -299,12 +299,12 @@ export default function TransactionsPage() {
         const balanceData = await balanceResponse.json();
         if (balanceData.success && balanceData.accounts) {
           // Calculate total available balance across all accounts
-          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: any) => {
+          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number }) => {
             return sum + (account.available_balance || 0);
           }, 0);
           
           // Get the most recent balance update time
-          const mostRecentUpdate = balanceData.accounts.reduce((latest: string | null, account: any) => {
+          const mostRecentUpdate = balanceData.accounts.reduce((latest: string | null, account: { balance_last_updated?: string }) => {
             if (!account.balance_last_updated) return latest;
             if (!latest) return account.balance_last_updated;
             return new Date(account.balance_last_updated) > new Date(latest) 
