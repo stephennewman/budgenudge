@@ -4,6 +4,7 @@
 
 @theme {
   --font-eb-garamond: var(--font-eb-garamond), serif;
+  --font-outfit: var(--font-outfit), system-ui, sans-serif;
   
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -152,4 +153,9 @@
 /* Custom utility for EB Garamond font */
 .font-eb-garamond {
   font-family: var(--font-eb-garamond);
+}
+
+/* Custom utility for Outfit font */
+.font-outfit {
+  font-family: var(--font-outfit);
 }

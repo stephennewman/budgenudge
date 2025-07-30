@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ConditionalHeader from "@/components/conditional-header";
-import { Manrope } from "next/font/google";
+import { Outfit } from "next/font/google";
 
-const manrope = Manrope({ subsets: ["latin"] });
+const outfit = Outfit({ 
+  subsets: ["latin"],
+  weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-outfit"
+});
 
 const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
@@ -27,7 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={manrope.className}>
+      <body className={outfit.className}>
         <ConditionalHeader />
         {children}
       </body>
