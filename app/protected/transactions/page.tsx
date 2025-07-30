@@ -288,12 +288,20 @@ export default function TransactionsPage() {
   async function fetchBalanceData() {
     try {
       setBalanceLoading(true);
+      console.log('Starting balance fetch...');
+      
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        console.log('No session found, skipping balance fetch');
+        return;
+      }
 
+      console.log('Making balance API request...');
       const balanceResponse = await fetch('/api/plaid/balances', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
+      
+      console.log('Balance response status:', balanceResponse.status);
       
       if (balanceResponse.ok) {
         const balanceData = await balanceResponse.json();
@@ -301,10 +309,11 @@ export default function TransactionsPage() {
         
         if (balanceData.success && balanceData.accounts) {
           console.log('Accounts data:', balanceData.accounts);
+          console.log('Number of accounts:', balanceData.accounts.length);
           
           // Calculate total available balance across all accounts
           const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number }) => {
-            console.log('Account:', account.name, 'Available balance:', account.available_balance);
+            console.log('Account:', account.name, 'Available balance:', account.available_balance, 'Type:', typeof account.available_balance);
             return sum + (account.available_balance || 0);
           }, 0);
           
@@ -325,7 +334,8 @@ export default function TransactionsPage() {
           console.log('No accounts found or API error:', balanceData);
         }
       } else {
-        console.error('Failed to fetch balance data');
+        const errorText = await balanceResponse.text();
+        console.error('Failed to fetch balance data. Status:', balanceResponse.status, 'Response:', errorText);
       }
     } catch (error) {
       console.error('Error fetching balance data:', error);
