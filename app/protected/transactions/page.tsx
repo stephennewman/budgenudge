@@ -297,11 +297,18 @@ export default function TransactionsPage() {
       
       if (balanceResponse.ok) {
         const balanceData = await balanceResponse.json();
+        console.log('Balance API response:', balanceData);
+        
         if (balanceData.success && balanceData.accounts) {
+          console.log('Accounts data:', balanceData.accounts);
+          
           // Calculate total available balance across all accounts
           const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number }) => {
+            console.log('Account:', account.name, 'Available balance:', account.available_balance);
             return sum + (account.available_balance || 0);
           }, 0);
+          
+          console.log('Total available balance:', totalAvailableBalance);
           
           // Get the most recent balance update time
           const mostRecentUpdate = balanceData.accounts.reduce((latest: string | null, account: { balance_last_updated?: string }) => {
@@ -314,6 +321,8 @@ export default function TransactionsPage() {
           
           setAvailableBalance(totalAvailableBalance);
           setBalanceLastUpdated(mostRecentUpdate);
+        } else {
+          console.log('No accounts found or API error:', balanceData);
         }
       } else {
         console.error('Failed to fetch balance data');
@@ -605,18 +614,54 @@ export default function TransactionsPage() {
                     </span>
                   )}
                 </div>
-              ) : null}
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="text-muted-foreground">
+                    No balance data available
+                  </p>
+                </div>
+              )}
               <p className="text-muted-foreground">
                 {transactions.length} total transactions
               </p>
             </div>
           </div>
-          <ManualRefreshButton 
-            onRefresh={() => {
-              fetchData();
-              fetchBalanceData();
-            }}
-          />
+          <div className="flex items-center gap-2">
+            <ManualRefreshButton 
+              onRefresh={() => {
+                fetchData();
+                fetchBalanceData();
+              }}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  
+                  // Refresh balances from Plaid
+                  const refreshResponse = await fetch('/api/plaid/balances', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${session.access_token}` }
+                  });
+                  
+                  if (refreshResponse.ok) {
+                    console.log('Balance refresh successful');
+                    // Fetch updated balance data
+                    fetchBalanceData();
+                  } else {
+                    console.error('Failed to refresh balances');
+                  }
+                } catch (error) {
+                  console.error('Error refreshing balances:', error);
+                }
+              }}
+            >
+              Refresh Balance
+            </Button>
+          </div>
         </div>
 
 
