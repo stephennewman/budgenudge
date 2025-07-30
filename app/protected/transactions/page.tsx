@@ -75,6 +75,11 @@ export default function TransactionsPage() {
   const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   const [transactionStarredStatus, setTransactionStarredStatus] = useState<Map<string, boolean>>(new Map());
   
+  // Balance state
+  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
+  const [balanceLastUpdated, setBalanceLastUpdated] = useState<string | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
+  
   // AI Tag Editor state
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<{
@@ -279,6 +284,47 @@ export default function TransactionsPage() {
 
   // Analytics are now fetched from cached merchant_analytics table for performance
 
+  // Fetch balance data
+  async function fetchBalanceData() {
+    try {
+      setBalanceLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const balanceResponse = await fetch('/api/plaid/balances', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
+      
+      if (balanceResponse.ok) {
+        const balanceData = await balanceResponse.json();
+        if (balanceData.success && balanceData.accounts) {
+          // Calculate total available balance across all accounts
+          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: any) => {
+            return sum + (account.available_balance || 0);
+          }, 0);
+          
+          // Get the most recent balance update time
+          const mostRecentUpdate = balanceData.accounts.reduce((latest: string | null, account: any) => {
+            if (!account.balance_last_updated) return latest;
+            if (!latest) return account.balance_last_updated;
+            return new Date(account.balance_last_updated) > new Date(latest) 
+              ? account.balance_last_updated 
+              : latest;
+          }, null as string | null);
+          
+          setAvailableBalance(totalAvailableBalance);
+          setBalanceLastUpdated(mostRecentUpdate);
+        }
+      } else {
+        console.error('Failed to fetch balance data');
+      }
+    } catch (error) {
+      console.error('Error fetching balance data:', error);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }
+
   // OPTIMIZED: Simplified data fetching for faster loading
   async function fetchData() {
     try {
@@ -323,6 +369,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchData();
+    fetchBalanceData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Column definitions
@@ -540,12 +587,35 @@ export default function TransactionsPage() {
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
             <h1 className="text-2xl font-medium">💳 Transactions</h1>
-            <p className="text-muted-foreground mt-2">
-              {transactions.length} total transactions
-            </p>
+            <div className="flex items-center gap-6 mt-2">
+              {balanceLoading ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-green-600 font-bold">
+                    Available: Loading...
+                  </p>
+                </div>
+              ) : availableBalance !== null ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-green-600 font-bold">
+                    Available: ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                  {balanceLastUpdated && (
+                    <span className="text-xs text-muted-foreground">
+                      (updated {new Date(balanceLastUpdated).toLocaleDateString()})
+                    </span>
+                  )}
+                </div>
+              ) : null}
+              <p className="text-muted-foreground">
+                {transactions.length} total transactions
+              </p>
+            </div>
           </div>
           <ManualRefreshButton 
-            onRefresh={() => fetchData()}
+            onRefresh={() => {
+              fetchData();
+              fetchBalanceData();
+            }}
           />
         </div>
 
