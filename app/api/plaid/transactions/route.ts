@@ -46,7 +46,9 @@ export async function GET(request: Request) {
     const itemDbIds = items.map(item => item.id);
 
     // Phase 2: Try optimal stored function approach first, fallback to chunking
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allTransactions: any[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allAccounts: any[] = [];
 
     try {
