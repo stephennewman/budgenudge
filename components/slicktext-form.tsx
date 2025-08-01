@@ -8,32 +8,62 @@ export default function SlickTextForm() {
   
   // Load SlickText form script when component mounts
   useEffect(() => {
-    setFormLoading(true);
+    let timeoutId: NodeJS.Timeout;
     
-    // Clear any existing form first
-    const container = document.getElementById('slicktext-inline-form');
-    if (container) {
-      container.innerHTML = '';
-    }
-    
-    // Add script with load handler
-    const script = document.createElement('script');
-    script.src = 'https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ';
-    script.async = true;
-    
-    script.onload = () => {
-      console.log('SlickText script loaded for inline form');
-      setTimeout(() => setFormLoading(false), 2000); // Give form time to render
+    const loadScript = () => {
+      try {
+        setFormLoading(true);
+        
+        // Wait for DOM to be ready
+        const container = document.getElementById('slicktext-inline-form');
+        if (!container) {
+          console.warn('SlickText container not found, retrying...');
+          timeoutId = setTimeout(loadScript, 100);
+          return;
+        }
+        
+        // Clear any existing content
+        container.innerHTML = '';
+        
+        // Check if script already exists globally to avoid duplicates
+        if (document.querySelector('script[src*="slicktext.com"]')) {
+          console.log('SlickText script already loaded');
+          setFormLoading(false);
+          return;
+        }
+        
+        // Create and load script
+        const script = document.createElement('script');
+        script.src = 'https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ';
+        script.async = true;
+        
+        script.onload = () => {
+          console.log('SlickText script loaded successfully');
+          timeoutId = setTimeout(() => setFormLoading(false), 2000);
+        };
+        
+        script.onerror = (error) => {
+          console.error('Failed to load SlickText script:', error);
+          setFormLoading(false);
+        };
+        
+        container.appendChild(script);
+        
+      } catch (error) {
+        console.error('Error in SlickText script loading:', error);
+        setFormLoading(false);
+      }
     };
     
-    script.onerror = () => {
-      console.error('Failed to load SlickText script');
-      setFormLoading(false);
-    };
+    // Start loading after a short delay to ensure DOM is ready
+    timeoutId = setTimeout(loadScript, 100);
     
-    if (container) {
-      container.appendChild(script);
-    }
+    // Cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, []);
 
   return (
@@ -48,10 +78,24 @@ export default function SlickTextForm() {
 
       {/* SlickText Embedded Form */}
       <div className="border border-gray-200 rounded-lg p-4 min-h-[200px]" id="slicktext-inline-form">
-        {formLoading && (
+        {formLoading ? (
           <div className="flex flex-col items-center justify-center py-8">
             <LoaderIcon className="h-8 w-8 animate-spin text-blue-600 mb-4" />
             <p className="text-gray-600">Loading subscription form...</p>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-gray-600 mb-4">
+              If the form doesn&apos;t appear, you can subscribe directly at:
+            </p>
+            <a 
+              href="https://forms.co/5a3faad110fb2397e9605c9f136293c3" 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Subscribe Now
+            </a>
           </div>
         )}
         {/* SlickText form will load here via useEffect */}
