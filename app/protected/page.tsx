@@ -31,25 +31,10 @@ export default function AccountPage() {
         setUser(user);
 
         // Check if user has connected a Plaid account
-        const { data: items, error: itemsError } = await supabase
+        const { data: items } = await supabase
           .from('items')
           .select('*')
           .eq('user_id', user.id);
-
-        console.log('🔍 Account Detection Debug:');
-        console.log('User ID:', user.id);
-        console.log('Items query result:', items);
-        console.log('Items query error:', itemsError);
-        console.log('Items count:', items?.length || 0);
-
-        // TEMPORARY: Also check transactions to compare
-        const { data: transactions, error: txError } = await supabase
-          .from('transactions')
-          .select('plaid_item_id')
-          .limit(5);
-        
-        console.log('Transactions query result:', transactions);
-        console.log('Transactions query error:', txError);
 
         setHasConnectedAccount(!!(items && items.length > 0));
       } catch (err) {
