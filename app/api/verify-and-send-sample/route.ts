@@ -28,7 +28,7 @@ July 2025
 3. Shell: $67
 
 Want to see YOUR real data? 
-👉 budgenudge.vercel.app/sign-up
+👉 get.krezzo.com/sign-up
 
 Reply STOP to opt-out`;
 

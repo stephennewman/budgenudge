@@ -139,7 +139,7 @@ export default function Home() {
                 2. Starbucks: $89<br/>
                 3. Shell: $67<br/><br/>
                 <span className="text-blue-600">Want to see YOUR real data?<br/>
-                👉 krezzo.com/signup</span>
+                👉 get.krezzo.com/sign-up</span>
               </div>
             </div>
           </div>
