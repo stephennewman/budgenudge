@@ -97,6 +97,32 @@ export async function POST(request: NextRequest) {
     // Store transactions in database
     if (transactionsResponse.data.transactions.length > 0) {
       await storeTransactions(transactionsResponse.data.transactions, item_id);
+      
+      // 🆕 PHASE 1: Trigger AI tagging for all historical transactions
+      // This ensures new users see clean merchant names from day 1
+      try {
+        console.log('🤖 Triggering historical AI tagging for new account...');
+        const tagResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tag-all-transactions`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Pass through user's auth token
+          },
+          body: JSON.stringify({ 
+            max_transactions: 1000 // Process up to 1000 historical transactions
+          })
+        });
+
+        if (tagResponse.ok) {
+          const tagResult = await tagResponse.json();
+          console.log('✅ Historical AI tagging initiated:', tagResult.tagged || 0, 'transactions processed');
+        } else {
+          console.log('⚠️ Historical AI tagging failed (non-blocking):', tagResponse.status);
+        }
+      } catch (tagError) {
+        console.log('⚠️ Historical AI tagging error (non-blocking):', tagError);
+        // Non-blocking: Account setup continues even if AI tagging fails
+      }
     }
 
     return NextResponse.json({ 

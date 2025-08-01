@@ -23,15 +23,16 @@ async function executeAITagging(request?: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Find all untagged transactions from the last 7 days
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // 🆕 PHASE 2: Find all untagged transactions from the last 90 days (extended coverage)
+    // This catches any historical transactions that might have been missed
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
     const { data: untaggedTransactions, error: fetchError } = await supabaseService
       .from('transactions')
       .select('id, merchant_name, name, amount, category, subcategory, ai_merchant_name, ai_category_tag, date')
       .is('ai_merchant_name', null)
-      .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+      .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
       .order('date', { ascending: false })
       .limit(500); // Process up to 500 transactions
 
@@ -41,7 +42,7 @@ async function executeAITagging(request?: Request) {
     }
 
     if (!untaggedTransactions || untaggedTransactions.length === 0) {
-      console.log('🤖✅ No untagged transactions found in the last 7 days');
+      console.log('🤖✅ No untagged transactions found in the last 90 days');
       return NextResponse.json({ 
         success: true, 
         message: 'No untagged transactions found',
@@ -50,7 +51,7 @@ async function executeAITagging(request?: Request) {
       });
     }
 
-    console.log(`🤖 Found ${untaggedTransactions.length} untagged transactions to process`);
+    console.log(`🤖 Found ${untaggedTransactions.length} untagged transactions in last 90 days to process`);
 
     // Group transactions by merchant for efficient processing
     const merchantGroups = new Map<string, typeof untaggedTransactions>();
