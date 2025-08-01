@@ -56,7 +56,8 @@ Msg&data rates apply. Reply STOP to opt-out.`,
     });
 
     if (!smsResult.success) {
-      console.error('Failed to send SMS:', smsResult.error);
+      console.error('Failed to send SMS to', cleanPhone, ':', smsResult.error);
+      console.error('Full SlickText response:', smsResult);
       return NextResponse.json({ 
         error: 'Invalid phone number or SMS delivery failed. Please check your number and try again.' 
       }, { status: 400 });
