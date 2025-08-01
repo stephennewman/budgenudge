@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
+import { BouncingMoneyLoader } from '@/components/ui/bouncing-money-loader';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation';
 
@@ -25,10 +26,10 @@ interface SpendingAnalysis {
   timeframe: string;
 }
 
-type AnalysisState = 'ready' | 'processing' | 'complete' | 'error';
+type AnalysisState = 'loading' | 'ready' | 'processing' | 'complete' | 'error';
 
 export default function PlaidSuccessPage() {
-  const [analysisState, setAnalysisState] = useState<AnalysisState>('ready');
+  const [analysisState, setAnalysisState] = useState<AnalysisState>('loading');
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [analysis, setAnalysis] = useState<SpendingAnalysis | null>(null);
@@ -37,13 +38,19 @@ export default function PlaidSuccessPage() {
   const router = useRouter();
   const supabase = createSupabaseClient();
 
-  // Check if user is authenticated
+  // Check if user is authenticated and show initial loading
   useEffect(() => {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/sign-in');
+        return;
       }
+      
+      // Show loading screen for 2 seconds before showing success screen
+      setTimeout(() => {
+        setAnalysisState('ready');
+      }, 2000);
     }
     checkAuth();
   }, [supabase, router]);
@@ -113,10 +120,19 @@ export default function PlaidSuccessPage() {
     router.push('/protected/transactions');
   };
 
+  // Initial loading screen with money bag loader
+  if (analysisState === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-100 to-green-200">
+        <BouncingMoneyLoader className="bg-gradient-to-br from-green-100 to-green-200" />
+      </div>
+    );
+  }
+
   if (analysisState === 'ready') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-2xl shadow-2xl">
           <CardHeader className="text-center">
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
               <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,7 +176,7 @@ export default function PlaidSuccessPage() {
   if (analysisState === 'processing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-2xl shadow-2xl">
           <CardContent className="text-center py-12 space-y-6">
             <ContentAreaLoader />
             
@@ -192,7 +208,7 @@ export default function PlaidSuccessPage() {
   if (analysisState === 'error') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-2xl shadow-2xl">
           <CardContent className="text-center py-12 space-y-6">
             <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100">
               <svg className="h-8 w-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -235,7 +251,7 @@ export default function PlaidSuccessPage() {
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 p-4">
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Header */}
-          <Card>
+          <Card className="shadow-xl">
             <CardHeader className="text-center">
               <CardTitle className="text-3xl font-bold text-green-800">
                 🎉 Your Financial Analysis
@@ -247,7 +263,7 @@ export default function PlaidSuccessPage() {
           </Card>
 
           {/* Category Breakdown */}
-          <Card>
+          <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-semibold">📊 Spending by Category</CardTitle>
             </CardHeader>
@@ -275,7 +291,7 @@ export default function PlaidSuccessPage() {
           </Card>
 
           {/* Top Merchants */}
-          <Card>
+          <Card className="shadow-xl">
             <CardHeader>
               <CardTitle className="text-xl font-semibold">🏪 Your Top Merchants</CardTitle>
             </CardHeader>
@@ -305,7 +321,7 @@ export default function PlaidSuccessPage() {
           </Card>
 
           {/* Continue Button */}
-          <Card>
+          <Card className="shadow-xl">
             <CardContent className="text-center py-8">
               <Button 
                 onClick={continueToTransactions}

@@ -11,5 +11,10 @@ export default function ConditionalHeader() {
     return null;
   }
   
+  // Hide header for plaid success page for clean onboarding experience
+  if (pathname === '/plaid-success') {
+    return null;
+  }
+  
   return <Header />;
 } 
