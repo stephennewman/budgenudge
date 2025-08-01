@@ -107,32 +107,46 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
                 <span className="text-2xl">📱</span>
               </div>
               <h2 className="text-2xl font-bold mb-2">Get Your Sample Financial Text</h2>
-              <p className="text-gray-600">See exactly what Krezzo&apos;s SMS alerts look like</p>
+              <p className="text-gray-600">Step 1: Subscribe to receive SMS alerts</p>
             </div>
             
-            <form onSubmit={handleSendCode}>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input 
-                    id="phone"
-                    name="phone" 
-                    placeholder="(555) 123-4567" 
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={handlePhoneChange}
-                    maxLength={14}
-                    required 
-                    className="text-lg h-12"
-                  />
-                </div>
-                
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                    By submitting, you consent to receive a sample text and future 
-                    financial insights from Krezzo. Msg&amp;data rates apply. Reply STOP to opt-out.
-                  </p>
-                </div>
+            {/* SlickText Embedded Opt-in Form */}
+            <div className="space-y-4">
+              <div className="border border-gray-200 rounded-lg p-4">
+                <script 
+                  async 
+                  src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ"
+                ></script>
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm text-green-800">
+                  ✅ Official SMS subscription through SlickText<br/>
+                  ✅ TCPA compliant opt-in process<br/>
+                  ✅ Required for SMS delivery
+                </p>
+              </div>
+              
+              <div className="text-center">
+                <p className="text-sm text-gray-600 mb-4">
+                  After subscribing above, click here to get your verification code:
+                </p>
+                <form onSubmit={handleSendCode}>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="phone">Phone Number (same as above)</Label>
+                      <Input 
+                        id="phone"
+                        name="phone" 
+                        placeholder="(555) 123-4567" 
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={handlePhoneChange}
+                        maxLength={14}
+                        required 
+                        className="text-lg h-12"
+                      />
+                    </div>
                 
                 {error && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-3">
@@ -150,8 +164,10 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
                   ) : null}
                   Send Verification Code
                 </Button>
+                  </div>
+                </form>
               </div>
-            </form>
+            </div>
           </>
         )}
 
