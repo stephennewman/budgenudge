@@ -195,10 +195,15 @@ export async function generatePacingAnalysisMessage(userId: string): Promise<str
 
     const itemIds = userItems.map(item => item.plaid_item_id);
     const targetMerchants = ['Amazon', 'Publix', 'Walmart'];
+    
+    // ✅ FIX: Use yesterday's date for pacing calculations to account for transaction lag
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
-    const dayOfMonth = now.getDate();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const currentMonth = yesterday.getMonth() + 1;
+    const currentYear = yesterday.getFullYear();
+    const dayOfMonth = yesterday.getDate();
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const monthProgress = (dayOfMonth / daysInMonth) * 100;
 
@@ -224,14 +229,16 @@ export async function generatePacingAnalysisMessage(userId: string): Promise<str
         const avgDailySpend = totalSpend / totalDays;
         const avgMonthlySpend = avgDailySpend * 30;
 
-        // Get this month's spending
+        // Get this month's spending (through yesterday)
         const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+        const yesterdayStr = yesterday.toISOString().split('T')[0];
         const { data: currentMonthTxns } = await supabase
           .from('transactions')
           .select('amount')
           .in('plaid_item_id', itemIds)
           .or(`merchant_name.ilike.%${targetMerchant}%,name.ilike.%${targetMerchant}%`)
           .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+          .lte('date', yesterdayStr)
           .gt('amount', 0);
         const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
 
@@ -251,10 +258,12 @@ export async function generatePacingAnalysisMessage(userId: string): Promise<str
     }
 
     if (pacingResults.length === 0) {
-      return "📊 SPENDING PACING\nJuly " + currentYear + "\n\nNo spending data found for Amazon, Publix, or Walmart.";
+      const monthName = yesterday.toLocaleDateString('en-US', { month: 'long' });
+      return `📊 SPENDING PACING\n${monthName} ${currentYear}\n\nNo spending data found for Amazon, Publix, or Walmart.`;
     }
 
-    let message = `📊 SPENDING PACING\nJuly ${currentYear}\nMonth Progress: ${monthProgress.toFixed(0)}% (Day ${dayOfMonth})\n\n`;
+    const monthName = yesterday.toLocaleDateString('en-US', { month: 'long' });
+    let message = `📊 SPENDING PACING\n${monthName} ${currentYear}\nMonth Progress: ${monthProgress.toFixed(0)}% (Day ${dayOfMonth})\n\n`;
 
     pacingResults.forEach(pacing => {
       let status = '';
@@ -436,11 +445,14 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
       return "📱 Krezzo\n\n📊 CATEGORY PACING\n\nNo accounts connected.";
     }
 
-    // Get current date info
+    // ✅ FIX: Use yesterday's date for pacing calculations to account for transaction lag
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    const dayOfMonth = now.getDate();
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const currentYear = yesterday.getFullYear();
+    const currentMonth = yesterday.getMonth() + 1;
+    const dayOfMonth = yesterday.getDate();
     const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
     const monthProgress = Math.round((dayOfMonth / daysInMonth) * 100);
 
@@ -449,6 +461,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const analysisStartDate = `${threeMonthsAgo.getFullYear()}-${String(threeMonthsAgo.getMonth() + 1).padStart(2, '0')}-01`;
     const currentMonthStart = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
 
     const trackedCategoryNames = trackedCategories.map(t => t.ai_category);
 
@@ -473,7 +486,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
 
     transactions.forEach(transaction => {
       const category = transaction.ai_category_tag;
-      const isCurrentMonth = transaction.date >= currentMonthStart;
+      const isCurrentMonth = transaction.date >= currentMonthStart && transaction.date <= yesterdayStr;
 
       if (!categoryAnalysis.has(category)) {
         categoryAnalysis.set(category, {
@@ -493,7 +506,7 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
     });
 
     // Build SMS content
-    const monthName = new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long' });
+    const monthName = yesterday.toLocaleDateString('en-US', { month: 'long' });
     let smsContent = `📊 CATEGORY PACING\n${monthName} ${currentYear}\nMonth Progress: ${monthProgress}% (Day ${dayOfMonth})\n\n`;
 
     // Process categories and sort by spending
