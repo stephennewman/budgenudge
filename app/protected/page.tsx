@@ -3,6 +3,7 @@
 import { createSupabaseClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
+import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
 import type { User } from "@supabase/supabase-js";
@@ -79,8 +80,21 @@ export default function AccountPage() {
           </p>
         </div>
 
-        <div className="border rounded-lg p-6 sm:p-8">
-          <TransactionDashboard />
+        <div className="border rounded-lg p-6 sm:p-8 text-center space-y-6">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100">
+            <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
+          </div>
+          
+          <div>
+            <h2 className="text-xl font-medium mb-3 sm:mb-2">🏦 Connect Your Bank Account</h2>
+            <p className="text-muted-foreground mb-6 leading-relaxed">
+              Securely connect your bank account to start receiving intelligent financial insights via SMS.
+            </p>
+          </div>
+
+          <PlaidLinkButton redirectToAnalysis={true} />
         </div>
       </div>
     );

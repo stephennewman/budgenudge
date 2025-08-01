@@ -4,15 +4,18 @@ import { usePlaidLink } from 'react-plaid-link';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
+import { useRouter } from 'next/navigation';
 
 interface PlaidLinkButtonProps {
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  redirectToAnalysis?: boolean; // New prop to control redirect behavior
 }
 
-export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
+export default function PlaidLinkButton({ onSuccess, redirectToAnalysis = false }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createSupabaseClient();
+  const router = useRouter();
 
   // Fetch link token when component mounts
   useEffect(() => {
@@ -67,7 +70,13 @@ export default function PlaidLinkButton({ onSuccess }: PlaidLinkButtonProps) {
           });
 
         if (response.ok) {
-          onSuccess();
+          if (redirectToAnalysis) {
+            // Redirect to analysis screen for new user flow
+            router.push('/plaid-success');
+          } else if (onSuccess) {
+            // Use callback for existing dashboard flow
+            onSuccess();
+          }
         }
       } catch (error) {
         console.error('Error exchanging token:', error);
