@@ -77,9 +77,9 @@ export async function POST(request: Request) {
       userItemIds.has(tx.plaid_item_id)
     ) || [];
 
-    // Create lookup for regular (non-split) merchants
-    const regularMerchants = new Set(
-      (taggedMerchants?.filter(m => !m.account_identifier) || [])
+    // Create lookup for merchants belonging to this user
+    const userMerchants = new Set(
+      (taggedMerchants?.filter(m => userItemIds.has(m.account_identifier)) || [])
         .map(m => m.merchant_name.toLowerCase())
     );
 
@@ -94,8 +94,8 @@ export async function POST(request: Request) {
       if (transactionLinks.has(transactionId)) {
         starredStatus.set(transactionId, true);
       }
-      // Check if transaction matches a regular (non-split) merchant
-      else if (regularMerchants.has(merchantName)) {
+      // Check if transaction matches a user's starred merchant
+      else if (userMerchants.has(merchantName)) {
         starredStatus.set(transactionId, true);
       }
       else {
