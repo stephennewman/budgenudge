@@ -328,6 +328,7 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
     const itemIds = userItems.map(item => item.plaid_item_id);
     
     // ✅ FIX: Use yesterday's date for pacing calculations to account for transaction lag
+    // DEBUG: Merchant pacing - Aug 1st should show July 2025, not August 2025
     const now = new Date();
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
