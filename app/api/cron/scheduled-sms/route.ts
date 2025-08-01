@@ -250,39 +250,7 @@ export async function GET(request: NextRequest) {
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - User Templates: ${userTemplatesToSend.join(', ')}`);
 
-        // ✅ GUARDRAIL: Check if user already received SMS today to prevent multiple texts
-        const today = nowEST.toFormat('yyyy-MM-dd');
-        const { data: todaySMS, error: smsCheckError } = await supabase
-          .from('cron_log')
-          .select('log_details')
-          .eq('job_name', 'scheduled-sms')
-          .gte('started_at', `${today}T00:00:00-05:00`)
-          .lt('started_at', `${today}T23:59:59-05:00`);
-
-        if (!smsCheckError && todaySMS) {
-          const userSentToday = todaySMS.some(log => {
-            const details = log.log_details as Array<Record<string, unknown>>;
-            return details?.some(detail => detail.userId === userId && detail.sent === true);
-          });
-
-          if (userSentToday) {
-            logDetails.push({ userId, skipped: true, reason: 'Already received SMS today (daily rate limit)' });
-            console.log(`🚫 Rate limit: User ${userId} already received SMS today - skipping`);
-            continue;
-          }
-        }
-
-        // ✅ CONSOLIDATION: Combine all templates into one SMS instead of sending separately
-        if (userTemplatesToSend.length === 0) {
-          console.log(`📭 No templates to send for user ${userId}`);
-          continue;
-        }
-
-        console.log(`📱 Consolidating ${userTemplatesToSend.length} templates into one SMS for user ${userId}`);
-        let consolidatedMessage = '';
-        const templateResults: Record<string, string> = {};
-
-        // Generate all template messages and consolidate into one SMS
+        // Send each template type for this user
         for (const templateType of userTemplatesToSend) {
           try {
             // Check if user has enabled this specific SMS type
@@ -328,87 +296,56 @@ export async function GET(request: NextRequest) {
               continue;
             }
 
-            console.log(`📝 Generating ${templateType} template for consolidation`);
+            console.log(`📝 Generating ${templateType} SMS for user ${userId}`);
             
             // Generate message using new template system
             const smsMessage = await generateSMSMessage(userId, templateType);
 
             // Skip if message is too short or indicates an error
             if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
-              console.log(`📭 ${templateType} template too short or error - skipping from consolidation`);
+              logDetails.push({ userId, templateType, skipped: true, reason: 'Too short or error', preview: smsMessage });
+              console.log(`📭 ${templateType} SMS too short or error for user ${userId} - skipping`);
+              smsFailed++;
               continue;
             }
+            smsAttempted++;
 
-            // Store template message for consolidation
-            templateResults[templateType] = smsMessage;
-            console.log(`✅ ${templateType} template generated successfully (${smsMessage.length} chars)`);
+            console.log(`📱 Sending ${templateType} SMS to user ${userId}`);
+            console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
-          } catch (templateError) {
-            console.error(`❌ Error generating ${templateType} template:`, templateError);
+            // Send SMS using user's phone number
+            const smsResult = await sendEnhancedSlickTextSMS({
+              phoneNumber: userPhoneNumber,
+              message: smsMessage,
+              userId: userId
+            });
+
+            if (smsResult.success) {
+              smsSent++;
+              logDetails.push({ userId, templateType, sent: true, preview: smsMessage.substring(0, 100) });
+              console.log(`✅ ${templateType} SMS sent successfully to user ${userId}`);
+            } else {
+              smsFailed++;
+              logDetails.push({ userId, templateType, sent: false, error: smsResult.error });
+              console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
+            }
+
+            // Add small delay between SMS sends to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+          } catch (smsError) {
+            smsFailed++;
+            let errorMsg = '';
+            if (smsError instanceof Error) {
+              errorMsg = smsError.message;
+            } else if (hasMessage(smsError)) {
+              errorMsg = smsError.message;
+            } else {
+              errorMsg = String(smsError);
+            }
+            logDetails.push({ userId, templateType, error: errorMsg });
+            console.error(`❌ Error processing ${templateType} SMS for user ${userId}:`, smsError);
           }
-        }
-
-        // ✅ CONSOLIDATE: Combine all successful templates into one SMS
-        const validTemplates = Object.keys(templateResults);
-        if (validTemplates.length === 0) {
-          logDetails.push({ userId, skipped: true, reason: 'No valid templates generated' });
-          console.log(`📭 No valid templates for user ${userId} - skipping SMS`);
-          continue;
-        }
-
-        // Build consolidated message with Krezzo header
-        consolidatedMessage = '📱 Krezzo\n\n';
-        
-        // Add each template section
-        validTemplates.forEach((templateType, index) => {
-          const message = templateResults[templateType];
-          // Remove any existing headers from individual templates
-          const cleanMessage = message.replace(/^📱 Krezzo\n\n/, '').trim();
-          consolidatedMessage += cleanMessage;
-          
-          // Add separator between templates (except for last one)
-          if (index < validTemplates.length - 1) {
-            consolidatedMessage += '\n\n---\n\n';
-          }
-        });
-
-        // Check SMS length limit (918 characters for SlickText)
-        if (consolidatedMessage.length > 918) {
-          console.log(`⚠️ Consolidated message too long (${consolidatedMessage.length} chars) - truncating`);
-          consolidatedMessage = consolidatedMessage.substring(0, 915) + '...';
-        }
-
-        console.log(`📱 Sending consolidated SMS (${validTemplates.length} templates, ${consolidatedMessage.length} chars) to user ${userId}`);
-        console.log(`📄 Consolidated preview: ${consolidatedMessage.substring(0, 150)}...`);
-
-        smsAttempted++;
-
-        // Send single consolidated SMS
-        const smsResult = await sendEnhancedSlickTextSMS({
-          phoneNumber: userPhoneNumber,
-          message: consolidatedMessage,
-          userId: userId
-        });
-
-        if (smsResult.success) {
-          smsSent++;
-          logDetails.push({ 
-            userId, 
-            templates: validTemplates, 
-            sent: true, 
-            messageLength: consolidatedMessage.length,
-            preview: consolidatedMessage.substring(0, 100) 
-          });
-          console.log(`✅ Consolidated SMS sent successfully to user ${userId} (${validTemplates.join(', ')})`);
-        } else {
-          smsFailed++;
-          logDetails.push({ 
-            userId, 
-            templates: validTemplates, 
-            sent: false, 
-            error: smsResult.error 
-          });
-          console.log(`❌ Failed to send consolidated SMS to user ${userId}:`, smsResult.error);
         }
 
       } catch (userError) {
