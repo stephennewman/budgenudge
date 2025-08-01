@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import SampleSMSModal from '@/components/sample-sms-modal';
-import SlickTextCTAModal from '@/components/slicktext-cta-modal';
+import SlickTextForm from '@/components/slicktext-form';
 
 export default function SampleSMSSection() {
   const [showSampleModal, setShowSampleModal] = useState(false);
-  const [showCTAModal, setShowCTAModal] = useState(false);
 
   return (
     <>
@@ -56,28 +55,23 @@ export default function SampleSMSSection() {
               📱 Send Me This Sample Text
             </button>
             
-            <button 
-              onClick={() => setShowCTAModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg transform hover:scale-105 transition-all duration-200 ml-4"
-            >
-              💬 Subscribe to SMS Alerts
-            </button>
-            
             <p className="text-sm text-gray-500">
-              Sample: 30 seconds, no signup • Subscribe: Get ongoing SMS insights
+              Takes 30 seconds • No signup required • See how it works
             </p>
           </div>
+        </div>
+      </section>
+      
+      {/* SECTION 3: SLICKTEXT SUBSCRIPTION FORM */}
+      <section className="bg-white py-20 px-4 sm:px-6">
+        <div className="mx-auto max-w-2xl">
+          <SlickTextForm />
         </div>
       </section>
       
       <SampleSMSModal 
         isOpen={showSampleModal}
         onClose={() => setShowSampleModal(false)}
-      />
-      
-      <SlickTextCTAModal 
-        isOpen={showCTAModal}
-        onClose={() => setShowCTAModal(false)}
       />
     </>
   );
