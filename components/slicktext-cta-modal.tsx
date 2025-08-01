@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { X } from 'lucide-react';
+import { X, LoaderIcon } from 'lucide-react';
 
 interface SlickTextCTAModalProps {
   isOpen: boolean;
@@ -10,15 +10,35 @@ interface SlickTextCTAModalProps {
 }
 
 export default function SlickTextCTAModal({ isOpen, onClose }: SlickTextCTAModalProps) {
+  const [formLoading, setFormLoading] = useState(true);
   
   // Load SlickText form script when modal opens
   useEffect(() => {
     if (isOpen) {
+      setFormLoading(true);
+      
+      // Clear any existing form first
+      const container = document.getElementById('slicktext-cta-form');
+      if (container) {
+        container.innerHTML = '';
+      }
+      
+      // Add script with load handler
       const script = document.createElement('script');
       script.src = 'https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ';
       script.async = true;
-      const container = document.getElementById('slicktext-cta-container');
-      if (container && !container.querySelector('script')) {
+      
+      script.onload = () => {
+        console.log('SlickText script loaded for CTA modal');
+        setTimeout(() => setFormLoading(false), 2000); // Give form time to render
+      };
+      
+      script.onerror = () => {
+        console.error('Failed to load SlickText script');
+        setFormLoading(false);
+      };
+      
+      if (container) {
         container.appendChild(script);
       }
     }
@@ -47,7 +67,13 @@ export default function SlickTextCTAModal({ isOpen, onClose }: SlickTextCTAModal
 
           {/* SlickText Embedded Form */}
           <div className="space-y-4">
-            <div className="border border-gray-200 rounded-lg p-4" id="slicktext-cta-container">
+            <div className="border border-gray-200 rounded-lg p-4 min-h-[200px]" id="slicktext-cta-form">
+              {formLoading && (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <LoaderIcon className="h-8 w-8 animate-spin text-blue-600 mb-4" />
+                  <p className="text-gray-600">Loading subscription form...</p>
+                </div>
+              )}
               {/* SlickText form will load here via useEffect */}
             </div>
             
