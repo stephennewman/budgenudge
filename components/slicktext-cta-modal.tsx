@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { X } from 'lucide-react';
 
@@ -61,7 +61,7 @@ export default function SlickTextCTAModal({ isOpen, onClose }: SlickTextCTAModal
             
             <div className="text-center">
               <p className="text-sm text-gray-600">
-                After subscribing, you'll get a welcome text and can{' '}
+                After subscribing, you&apos;ll get a welcome text and can{' '}
                 <a href="/sign-up" className="text-blue-600 hover:underline">
                   sign up for full access
                 </a>
