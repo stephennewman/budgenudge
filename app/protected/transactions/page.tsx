@@ -218,10 +218,27 @@ export default function TransactionsPage() {
     setStarringMerchant(merchantName);
     
     try {
-      const response = await fetch('/api/tagged-merchants/analyze', {
+      // Find a recent transaction for this merchant to estimate amount
+      const merchantTransactions = transactions.filter(tx => 
+        (tx.merchant_name && tx.merchant_name.toLowerCase() === merchantName.toLowerCase()) ||
+        (tx.name && tx.name.toLowerCase() === merchantName.toLowerCase())
+      );
+      
+      // Use most recent transaction amount as default, or fallback to $50
+      const estimatedAmount = merchantTransactions.length > 0 
+        ? Math.abs(merchantTransactions[0].amount)
+        : 50;
+
+      const response = await fetch('/api/tagged-merchants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ merchant_name: merchantName })
+        body: JSON.stringify({ 
+          merchant_name: merchantName,
+          expected_amount: estimatedAmount,
+          prediction_frequency: 'monthly', // Default to monthly
+          confidence_score: 75,
+          auto_detected: false
+        })
       });
 
       const data = await response.json();
@@ -232,7 +249,7 @@ export default function TransactionsPage() {
         const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter((id): id is string => Boolean(id));
         fetchTransactionStarredStatus(transactionIds);
       } else {
-        alert('Failed to analyze merchant: ' + data.error);
+        alert('Failed to star merchant: ' + data.error);
       }
     } catch (error) {
       console.error('Error starring merchant:', error);
@@ -240,7 +257,7 @@ export default function TransactionsPage() {
     } finally {
       setStarringMerchant(null);
     }
-  }, []);
+  }, [transactions]);
 
   // Handle unstarring a merchant
   const handleUnstarMerchant = useCallback(async (merchantName: string) => {

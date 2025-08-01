@@ -100,6 +100,16 @@ export async function POST(request: Request) {
       }
     }
 
+    // Get user's plaid_item_id for account_identifier
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+
+    const account_identifier = userItems?.plaid_item_id || null;
+
     // Add to tagged merchants
     const { data: newMerchant, error: insertError } = await supabase
       .from('tagged_merchants')
@@ -112,6 +122,7 @@ export async function POST(request: Request) {
         confidence_score: analysis.confidence_score,
         auto_detected: false, // User-triggered analysis
         is_active: true, // ✅ FIXED: Ensure starred merchants are active by default
+        account_identifier, // ✅ FIXED: Set proper plaid_item_id for star system
         last_transaction_date: lastTransaction.toISOString().split('T')[0],
         next_predicted_date: nextPredictedDate.toISOString().split('T')[0],
         created_at: new Date().toISOString(),

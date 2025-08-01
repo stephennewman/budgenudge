@@ -114,6 +114,16 @@ export async function POST(request: Request) {
         next_predicted_date = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
     }
 
+    // Get user's plaid_item_id for account_identifier
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+
+    const account_identifier = userItems?.plaid_item_id || null;
+
     // Insert new tagged merchant
     const { data, error } = await supabase
       .from('tagged_merchants')
@@ -126,6 +136,7 @@ export async function POST(request: Request) {
         confidence_score: parseInt(confidence_score),
         auto_detected,
         is_active: true, // ✅ FIXED: Ensure manually added merchants are active by default
+        account_identifier, // ✅ FIXED: Set proper plaid_item_id for star system
         next_predicted_date: next_predicted_date.toISOString().split('T')[0],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
