@@ -109,8 +109,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    // Use service role for database queries to bypass RLS
+    const supabaseService = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // First get the user's item IDs
-    const { data: userItems } = await supabase
+    const { data: userItems } = await supabaseService
       .from('items')
       .select('id')
       .eq('user_id', user.id);
@@ -125,7 +131,7 @@ export async function GET(request: NextRequest) {
     const itemIds = userItems.map((item: { id: number }) => item.id);
 
     // Get user's account balances from database
-    const { data: accounts } = await supabase
+    const { data: accounts } = await supabaseService
       .from('accounts')
       .select(`
         plaid_account_id,
