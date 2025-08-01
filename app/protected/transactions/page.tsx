@@ -173,6 +173,8 @@ export default function TransactionsPage() {
   async function fetchTransactionStarredStatus(transactionIds: string[]) {
     if (transactionIds.length === 0) return;
     
+    console.log('🌟 Fetching starred status for transactions:', transactionIds.length);
+    
     try {
       const response = await fetch('/api/transaction-starred-status', {
         method: 'POST',
@@ -181,13 +183,17 @@ export default function TransactionsPage() {
       });
       
       const data = await response.json();
+      console.log('🌟 Starred status API response:', data);
       
       if (data.success && data.starred_status) {
         const statusMap = new Map<string, boolean>();
         Object.entries(data.starred_status).forEach(([txId, isStarred]) => {
           statusMap.set(txId, isStarred as boolean);
         });
+        console.log('🌟 Setting starred status map:', statusMap);
         setTransactionStarredStatus(statusMap);
+      } else {
+        console.error('🌟 Failed to get starred status:', data);
       }
     } catch (error) {
       console.error('Error fetching transaction starred status:', error);
@@ -687,6 +693,18 @@ export default function TransactionsPage() {
               }}
             >
               Refresh Balance
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                console.log('🌟 Manual refresh stars triggered');
+                const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter((id): id is string => Boolean(id));
+                await fetchTransactionStarredStatus(transactionIds);
+              }}
+            >
+              🌟 Refresh Stars
             </Button>
           </div>
         </div>
