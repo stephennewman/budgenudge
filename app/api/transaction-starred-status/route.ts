@@ -50,16 +50,32 @@ export async function POST(request: Request) {
       }
     }
 
-    // Get the actual transactions to check merchant names
+    // Get the actual transactions to check merchant names (filtered by user)
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
-      .select('id, plaid_transaction_id, merchant_name, name')
+      .select(`
+        id, 
+        plaid_transaction_id, 
+        merchant_name, 
+        name,
+        plaid_item_id
+      `)
       .in('plaid_transaction_id', transaction_ids);
 
     if (txError) {
       console.error('Error fetching transactions:', txError);
       return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 });
     }
+
+    // Filter transactions to only those belonging to this user's items
+    const userItemIds = new Set((await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', user.id)).data?.map(item => item.plaid_item_id) || []);
+    
+    const userTransactions = transactions?.filter(tx => 
+      userItemIds.has(tx.plaid_item_id)
+    ) || [];
 
     // Create lookup for regular (non-split) merchants
     const regularMerchants = new Set(
@@ -70,7 +86,7 @@ export async function POST(request: Request) {
     // Determine starred status for each transaction
     const starredStatus = new Map<string, boolean>();
     
-    transactions?.forEach(tx => {
+    userTransactions.forEach(tx => {
       const transactionId = tx.plaid_transaction_id;
       const merchantName = (tx.merchant_name || tx.name || '').toLowerCase();
       
