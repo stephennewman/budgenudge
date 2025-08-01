@@ -250,6 +250,9 @@ export async function GET(request: NextRequest) {
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - User Templates: ${userTemplatesToSend.join(', ')}`);
 
+        // ✅ GUARDRAIL: Track sent templates to prevent duplicates within this run
+        const todayKey = nowEST.toFormat('yyyy-MM-dd');
+        
         // Send each template type for this user
         for (const templateType of userTemplatesToSend) {
           try {
@@ -293,6 +296,33 @@ export async function GET(request: NextRequest) {
             
             if (!templatePref || !templatePref.enabled) {
               console.log(`📭 Skipping ${templateType} for user ${userId} (disabled in preferences)`);
+              continue;
+            }
+
+            // ✅ GUARDRAIL: Check if this user already received this template type today
+            const dedupeKey = `${userId}-${templateType}-${todayKey}`;
+            
+            // Check recent cron logs to see if this user+template was already sent today
+            const { data: todayLogs } = await supabase
+              .from('cron_log')
+              .select('log_details')
+              .eq('job_name', 'scheduled-sms')
+              .gte('started_at', `${todayKey}T00:00:00-05:00`)
+              .lte('started_at', `${todayKey}T23:59:59-05:00`);
+            
+            // Check if this user+template combination was already sent today
+            const alreadySent = todayLogs?.some(log => {
+              if (!log.log_details || !Array.isArray(log.log_details)) return false;
+              return log.log_details.some((detail: any) => 
+                detail.userId === userId && 
+                detail.templateType === templateType && 
+                detail.sent === true
+              );
+            });
+            
+            if (alreadySent) {
+              logDetails.push({ userId, templateType, skipped: true, reason: 'Already sent today (deduplication)' });
+              console.log(`🚫 Skipping ${templateType} for user ${userId} - already sent today`);
               continue;
             }
 
