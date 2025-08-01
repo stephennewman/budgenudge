@@ -65,13 +65,25 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Get the database item ID for proper foreign key relationship
+    const { data: storedItem, error: itemLookupError } = await supabaseService
+      .from('items')
+      .select('id')
+      .eq('plaid_item_id', item_id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (itemLookupError || !storedItem) {
+      throw new Error(`Failed to find stored item for linking accounts: ${itemLookupError?.message || 'Item not found'}`);
+    }
+
     for (const account of accountsResponse.data.accounts) {
       const balance = account.balances;
       await supabaseService
         .from('accounts')
         .upsert({
+          item_id: storedItem.id, // ✅ CORRECT: Use database item ID for foreign key
           plaid_account_id: account.account_id,
-          plaid_item_id: item_id,
           name: account.name,
           official_name: account.official_name,
           type: account.type,
