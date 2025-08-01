@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +20,19 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
   const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Load SlickText form script when modal opens
+  useEffect(() => {
+    if (isOpen && step === 'phone') {
+      const script = document.createElement('script');
+      script.src = 'https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ';
+      script.async = true;
+      const container = document.getElementById('slicktext-form-container');
+      if (container && !container.querySelector('script')) {
+        container.appendChild(script);
+      }
+    }
+  }, [isOpen, step]);
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,11 +125,8 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
             
             {/* SlickText Embedded Opt-in Form */}
             <div className="space-y-4">
-              <div className="border border-gray-200 rounded-lg p-4">
-                <script 
-                  async 
-                  src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvNWEzZmFhZDExMGZiMjM5N2U5NjA1YzlmMTM2MjkzYzMifQ"
-                ></script>
+              <div className="border border-gray-200 rounded-lg p-4" id="slicktext-form-container">
+                {/* SlickText form will load here via useEffect */}
               </div>
               
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
