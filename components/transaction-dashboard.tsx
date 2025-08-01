@@ -28,6 +28,10 @@ export default function TransactionDashboard() {
         .select('*')
         .eq('user_id', user.id);
 
+      console.log('🏦 TransactionDashboard Debug:');
+      console.log('Items found:', items?.length || 0);
+      console.log('Items data:', items);
+
       setIsConnected(!!(items && items.length > 0));
       
       if (items && items.length > 0) {
@@ -43,6 +47,8 @@ export default function TransactionDashboard() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      console.log('🔍 Fetching accounts from API...');
+
       const response = await fetch('/api/plaid/transactions', {
         method: 'GET',
         headers: { 
@@ -53,9 +59,14 @@ export default function TransactionDashboard() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 API Response:', data);
+        console.log('🏦 Accounts returned:', data.accounts?.length || 0);
+        console.log('💳 Accounts data:', data.accounts);
         setAccounts(data.accounts || []);
       } else {
         console.error('Failed to fetch accounts:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
