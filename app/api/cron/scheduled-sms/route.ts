@@ -227,7 +227,7 @@ export async function GET(request: NextRequest) {
         }
 
         // ✅ FIX: Filter templates for this specific user based on timing
-        let userTemplatesToSend: NewSMSTemplateType[] = [];
+        const userTemplatesToSend: NewSMSTemplateType[] = [];
         
         // Add special templates if they're scheduled (monthly/weekly summaries at 7am EST)
         if (hasSpecialTemplates) {
@@ -300,8 +300,6 @@ export async function GET(request: NextRequest) {
             }
 
             // ✅ GUARDRAIL: Check if this user already received this template type today
-            const dedupeKey = `${userId}-${templateType}-${todayKey}`;
-            
             // Check recent cron logs to see if this user+template was already sent today
             const { data: todayLogs } = await supabase
               .from('cron_log')
@@ -313,7 +311,7 @@ export async function GET(request: NextRequest) {
             // Check if this user+template combination was already sent today
             const alreadySent = todayLogs?.some(log => {
               if (!log.log_details || !Array.isArray(log.log_details)) return false;
-              return log.log_details.some((detail: any) => 
+              return log.log_details.some((detail: { userId?: string; templateType?: string; sent?: boolean }) => 
                 detail.userId === userId && 
                 detail.templateType === templateType && 
                 detail.sent === true
