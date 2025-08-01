@@ -34,12 +34,13 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
       });
 
       if (!response.ok) {
-        throw new Error('Failed to send verification code');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send verification code');
       }
 
       setStep('verification');
-    } catch {
-      setError('Failed to send code. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send code. Please try again.');
     } finally {
       setLoading(false);
     }

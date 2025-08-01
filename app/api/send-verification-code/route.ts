@@ -57,7 +57,9 @@ Msg&data rates apply. Reply STOP to opt-out.`,
 
     if (!smsResult.success) {
       console.error('Failed to send SMS:', smsResult.error);
-      return NextResponse.json({ error: 'Failed to send verification code' }, { status: 500 });
+      return NextResponse.json({ 
+        error: 'Invalid phone number or SMS delivery failed. Please check your number and try again.' 
+      }, { status: 400 });
     }
 
     console.log('✅ Verification code sent successfully to:', cleanPhone);
