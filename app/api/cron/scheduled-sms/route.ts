@@ -123,18 +123,24 @@ export async function GET(request: NextRequest) {
                                    nowEST.hour === 9 && 
                                    nowEST.minute <= 10; // Within first 10 minutes of 9am
     
+    // ✅ FIX: Make templates additive instead of exclusive
+    // Always include daily templates - they'll be filtered by user send_time later
+    templatesToSend = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
+    
+    // Add special templates when appropriate
     if (isMonthlySummaryTime) {
-      console.log('📊 1st of month 7am: Sending monthly summary to all users');
-      templatesToSend = ['monthly-summary'];
-    } else if (isWeeklySummaryTime) {
-      console.log('📊 Sunday 7am: Sending weekly summary to all users');
-      templatesToSend = ['weekly-summary'];
-    } else if (isPaycheckAnalysisTime) {
-      console.log('💰 Tuesday/Friday 9am: Sending paycheck analysis to users with income patterns');
-      templatesToSend = ['paycheck-efficiency', 'cash-flow-runway'];
-    } else {
-      // Daily templates (existing behavior)
-      templatesToSend = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
+      console.log('📊 1st of month 7am: Adding monthly summary to template list');
+      templatesToSend.push('monthly-summary');
+    }
+    
+    if (isWeeklySummaryTime) {
+      console.log('📊 Sunday 7am: Adding weekly summary to template list');
+      templatesToSend.push('weekly-summary');
+    }
+    
+    if (isPaycheckAnalysisTime) {
+      console.log('💰 Tuesday/Friday 9am: Adding paycheck analysis to template list');
+      templatesToSend.push('paycheck-efficiency', 'cash-flow-runway');
     }
 
     console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
@@ -180,41 +186,23 @@ export async function GET(request: NextRequest) {
           continue;
         }
 
-        // Handle monthly and weekly summary scheduling (1st of month / Sunday 7am EST)
-        if (templatesToSend.includes('monthly-summary')) {
-          // Check if user has enabled monthly-summary preference
-          const { data: monthlyPref } = await supabase
-            .from('user_sms_preferences')
-            .select('enabled')
-            .eq('user_id', userId)
-            .eq('sms_type', 'monthly-summary')
-            .single();
-          
-          if (!monthlyPref || !monthlyPref.enabled) {
-            logDetails.push({ userId, skipped: true, reason: 'Monthly summary disabled in preferences' });
-            console.log(`📊 Skipping user ${userId} (monthly summary disabled in preferences)`);
-            continue;
-          }
-          
-          console.log(`📊 Sending monthly summary to user ${userId} (1st of month 7am EST)`);
-        } else if (templatesToSend.includes('weekly-summary')) {
-          // Check if user has enabled weekly-summary preference
-          const { data: weeklyPref } = await supabase
-            .from('user_sms_preferences')
-            .select('enabled')
-            .eq('user_id', userId)
-            .eq('sms_type', 'weekly-summary')
-            .single();
-          
-          if (!weeklyPref || !weeklyPref.enabled) {
-            logDetails.push({ userId, skipped: true, reason: 'Weekly summary disabled in preferences' });
-            console.log(`📊 Skipping user ${userId} (weekly summary disabled in preferences)`);
-            continue;
-          }
-          
-          console.log(`📊 Sending weekly summary to user ${userId} (Sunday 7am EST)`);
-        } else {
-          // Only send daily templates if current time is within 10 minutes of user's preferred send_time
+        // ✅ FIX: Handle both special templates (monthly/weekly) and daily templates
+        const specialTemplates = ['monthly-summary', 'weekly-summary', 'paycheck-efficiency', 'cash-flow-runway'];
+        const dailyTemplates = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
+        
+        const hasSpecialTemplates = templatesToSend.some(t => specialTemplates.includes(t));
+        const hasDailyTemplates = templatesToSend.some(t => dailyTemplates.includes(t));
+        
+        let shouldProcessUser = false;
+        
+        // Check if we should send special templates (monthly/weekly summaries - sent at 7am EST regardless of user preference)
+        if (hasSpecialTemplates) {
+          console.log(`📊 Processing special templates for user ${userId}`);
+          shouldProcessUser = true;
+        }
+        
+        // Check if we should send daily templates (based on user's preferred send_time)
+        if (hasDailyTemplates) {
           const [sendHour, sendMinute] = sendTime.split(':').map(Number);
           const sendTimeMinutes = sendHour * 60 + sendMinute;
           const nowMinutes = nowEST.hour * 60 + nowEST.minute;
@@ -224,19 +212,46 @@ export async function GET(request: NextRequest) {
           const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes; // 1440 = minutes in a day
           const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
 
-          if (actualTimeDifference > 10) {
-            logDetails.push({ userId, skipped: true, reason: `Not their send time: ${sendTime} EST (current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST)` });
-            console.log(`⏰ Skipping user ${userId} (not their send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
-            continue;
+          if (actualTimeDifference <= 10) {
+            console.log(`⏰ ✅ Daily template time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
+            shouldProcessUser = true;
+          } else {
+            console.log(`⏰ Daily templates not at send time for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
           }
-
-          console.log(`⏰ ✅ Time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`)
+        }
+        
+        if (!shouldProcessUser) {
+          logDetails.push({ userId, skipped: true, reason: `No templates ready: daily templates not at send time (${sendTime} EST), no special templates scheduled` });
+          console.log(`⏰ Skipping user ${userId} - no templates ready to send`);
+          continue;
         }
 
-        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - Templates: ${templatesToSend.join(', ')}`);
+        // ✅ FIX: Filter templates for this specific user based on timing
+        let userTemplatesToSend: NewSMSTemplateType[] = [];
+        
+        // Add special templates if they're scheduled (monthly/weekly summaries at 7am EST)
+        if (hasSpecialTemplates) {
+          userTemplatesToSend.push(...templatesToSend.filter(t => specialTemplates.includes(t)));
+        }
+        
+        // Add daily templates only if it's the user's send time
+        if (hasDailyTemplates) {
+          const [sendHour, sendMinute] = sendTime.split(':').map(Number);
+          const sendTimeMinutes = sendHour * 60 + sendMinute;
+          const nowMinutes = nowEST.hour * 60 + nowEST.minute;
+          const timeDifferenceMinutes = Math.abs(nowMinutes - sendTimeMinutes);
+          const timeDifferenceMinutesAlt = 1440 - timeDifferenceMinutes;
+          const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
+          
+          if (actualTimeDifference <= 10) {
+            userTemplatesToSend.push(...templatesToSend.filter(t => dailyTemplates.includes(t)));
+          }
+        }
 
-        // Send each template type
-        for (const templateType of templatesToSend) {
+        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - User Templates: ${userTemplatesToSend.join(', ')}`);
+
+        // Send each template type for this user
+        for (const templateType of userTemplatesToSend) {
           try {
             // Check if user has enabled this specific SMS type
             let preferenceType: string;
