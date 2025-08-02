@@ -69,11 +69,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to send sample SMS' }, { status: 500 });
     }
 
-    // Store lead in database
+    // Generate tracking token for this lead
+    const trackingToken = crypto.randomUUID();
+    
+    // Store lead in database with tracking token
     const { error: leadError } = await supabase
       .from('sample_sms_leads')
       .insert({
         phone_number: cleanPhone,
+        tracking_token: trackingToken,
         source: 'sample_sms_demo',
         opted_in_at: new Date().toISOString(),
         verified: true,
@@ -94,7 +98,8 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Sample SMS sent successfully' 
+      message: 'Sample SMS sent successfully',
+      trackingToken // Return token to set in browser
     });
 
   } catch (error) {

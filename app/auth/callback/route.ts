@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
 /**
  * Set up new user data after successful email verification
  */
-async function setupNewUser(user: { id: string; user_metadata?: { phone?: string } }) {
+async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken?: string } }) {
   try {
     console.log('🛠️ Setting up new user:', user.id);
     
@@ -100,7 +100,7 @@ async function setupNewUser(user: { id: string; user_metadata?: { phone?: string
       .insert({
         user_id: user.id,
         send_time: '14:00', // 2:00 PM EST default
-        phone_number: user.user_metadata?.phone || null
+        phone_number: null // No phone number collected during signup
       })
       .select()
       .single();
@@ -129,14 +129,12 @@ async function setupNewUser(user: { id: string; user_metadata?: { phone?: string
       console.log('✅ SMS preferences created for user');
     }
 
-    // 3. Check for sample SMS lead conversion (simple phone to email match)
-    if (user.user_metadata?.phone) {
-      const cleanPhone = user.user_metadata.phone.replace(/\D/g, '');
-      
+    // 3. Check for sample SMS lead conversion (tracking token match)
+    if (user.user_metadata?.sampleSmsToken) {
       const { data: lead, error: leadError } = await supabase
         .from('sample_sms_leads')
         .select('*')
-        .eq('phone_number', cleanPhone)
+        .eq('tracking_token', user.user_metadata.sampleSmsToken)
         .eq('converted_to_signup', false)
         .single();
 
@@ -151,10 +149,11 @@ async function setupNewUser(user: { id: string; user_metadata?: { phone?: string
           })
           .eq('id', lead.id);
 
-        console.log('✅ Sample SMS lead converted:', {
+        console.log('✅ Sample SMS lead converted via tracking token:', {
           leadId: lead.id,
           userId: user.id,
-          phoneNumber: cleanPhone,
+          trackingToken: user.user_metadata.sampleSmsToken,
+          phoneNumber: lead.phone_number,
           daysToConversion: Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
         });
       }

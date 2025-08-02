@@ -75,6 +75,13 @@ export default function SampleSMSModal({ isOpen, onClose }: SampleSMSModalProps)
         throw new Error('Invalid verification code');
       }
 
+      const data = await response.json();
+      
+      // Store tracking token in localStorage for later attribution
+      if (data.trackingToken) {
+        localStorage.setItem('sampleSmsToken', data.trackingToken);
+      }
+
       setStep('success');
     } catch {
       setError('Invalid code. Please try again.');
