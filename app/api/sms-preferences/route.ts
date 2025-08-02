@@ -84,11 +84,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID and preferences are required' }, { status: 400 });
     }
 
-    // Check if any preference has a phone number for lead matching
-    const phoneNumbers = preferences
-      .map((pref: { phone_number?: string }) => pref.phone_number)
-      .filter(Boolean);
-    
     // Update each preference
     const updatePromises = preferences.map(async (pref: { sms_type: string; enabled: boolean; frequency: string; phone_number?: string }) => {
       const { data, error } = await supabase
@@ -113,47 +108,6 @@ export async function POST(request: NextRequest) {
     });
 
     await Promise.all(updatePromises);
-
-    // If phone numbers were provided, try to match with sample SMS leads
-    if (phoneNumbers.length > 0) {
-      for (const phoneNumber of phoneNumbers) {
-        try {
-          // Clean phone number
-          const cleanPhone = phoneNumber.replace(/\D/g, '');
-          
-          // Check if there's a sample SMS lead for this phone number
-          const { data: lead, error: leadError } = await supabase
-            .from('sample_sms_leads')
-            .select('*')
-            .eq('phone_number', cleanPhone)
-            .eq('converted_to_signup', false)
-            .single();
-
-          if (!leadError && lead) {
-            // Update the lead to mark as converted
-            const { error: updateError } = await supabase
-              .from('sample_sms_leads')
-              .update({
-                converted_to_signup: true,
-                conversion_date: new Date().toISOString(),
-                user_id: userId
-              })
-              .eq('id', lead.id);
-
-            if (!updateError) {
-              console.log('✅ Sample SMS lead matched to user:', {
-                leadId: lead.id,
-                userId,
-                phoneNumber: cleanPhone,
-                daysToConversion: Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
-              });
-            }
-          }
-        } catch (error) {
-          console.warn('Lead matching failed (non-blocking):', error);
-        }
-      }
-    }
 
     return NextResponse.json({ success: true, message: 'Preferences updated successfully' });
 

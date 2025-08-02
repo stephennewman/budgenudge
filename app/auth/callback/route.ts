@@ -129,6 +129,37 @@ async function setupNewUser(user: { id: string; user_metadata?: { phone?: string
       console.log('✅ SMS preferences created for user');
     }
 
+    // 3. Check for sample SMS lead conversion (simple phone to email match)
+    if (user.user_metadata?.phone) {
+      const cleanPhone = user.user_metadata.phone.replace(/\D/g, '');
+      
+      const { data: lead, error: leadError } = await supabase
+        .from('sample_sms_leads')
+        .select('*')
+        .eq('phone_number', cleanPhone)
+        .eq('converted_to_signup', false)
+        .single();
+
+      if (!leadError && lead) {
+        // Update the lead to mark as converted
+        await supabase
+          .from('sample_sms_leads')
+          .update({
+            converted_to_signup: true,
+            conversion_date: new Date().toISOString(),
+            user_id: user.id
+          })
+          .eq('id', lead.id);
+
+        console.log('✅ Sample SMS lead converted:', {
+          leadId: lead.id,
+          userId: user.id,
+          phoneNumber: cleanPhone,
+          daysToConversion: Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
+        });
+      }
+    }
+
     console.log('🎉 New user setup completed successfully');
 
   } catch (error) {
