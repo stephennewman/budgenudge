@@ -31,7 +31,7 @@ Krezzo connects to your financial accounts and sends intelligent daily SMS insig
 
 ## 📊 Current Metrics
 
-- **Webhook URL**: `https://budgenudge.vercel.app/api/plaid/webhook`
+- **Webhook URL**: `https://get.krezzo.com/api/plaid/webhook` *(Updated: August 3, 2025)*
 - **Total Transactions**: 100+ and growing
 - **SMS Delivery**: Active
 - **Response Time**: < 5 seconds from transaction to SMS
@@ -102,6 +102,13 @@ Required environment variables:
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 - `SLICKTEXT_API_KEY` - SlickText API key for professional SMS delivery
 - `SLICKTEXT_BRAND_ID` - SlickText brand ID for SMS campaigns
+
+## 📝 Production Updates
+
+### August 3, 2025 - Webhook URL Migration
+- **Updated production webhook URL** from `https://budgenudge.vercel.app/api/plaid/webhook` to `https://get.krezzo.com/api/plaid/webhook`
+- **Environment variable**: `PLAID_WEBHOOK_URL` now points to custom domain
+- **Impact**: Improved reliability and branding with custom domain routing
 
 ## 🎉 Success Story
 

@@ -58,8 +58,8 @@ Complete PostgreSQL schema with 15+ core tables:
 ## 🚀 CURRENT SYSTEM STATUS
 
 ### Production Environment ✅ LIVE
-**Webhook URL**: `https://budgenudge.vercel.app/api/plaid/webhook`
-**Transaction Flow**: Bank → Plaid → BudgeNudge → Database + SMS → User
+**Webhook URL**: `https://get.krezzo.com/api/plaid/webhook` *(Updated: August 3, 2025)*
+**Transaction Flow**: Bank → Plaid → Krezzo → Database + SMS → User
 
 ### Active Integrations ✅ OPERATIONAL
 - **Multi-Bank Support**: All Plaid-supported financial institutions available

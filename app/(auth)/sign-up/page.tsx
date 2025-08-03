@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 
-export default function SignUp() {
+function SignUpForm() {
   const searchParams = useSearchParams();
   const [trackingToken, setTrackingToken] = useState<string>('');
   
@@ -21,12 +21,11 @@ export default function SignUp() {
   }, []);
   
   // Convert searchParams to Message format for compatibility
-  const message: Message = {};
+  let message: Message | undefined;
   if (searchParams.get('message')) {
-    message.message = searchParams.get('message') || '';
-  }
-  if (searchParams.get('error')) {
-    message.error = searchParams.get('error') || '';
+    message = { message: searchParams.get('message') || '' };
+  } else if (searchParams.get('error')) {
+    message = { error: searchParams.get('error') || '' };
   }
 
   return (
@@ -64,7 +63,7 @@ export default function SignUp() {
           loadingText="Creating account..." 
           className="h-12 sm:h-10 mt-2"
         />
-        <FormMessage message={message} />
+        {message && <FormMessage message={message} />}
       </div>
       
       {/* Navigation Link */}
@@ -87,5 +86,13 @@ export default function SignUp() {
         <GoogleSignInButton text="Sign up with Google" className="h-12 sm:h-10" />
       </div>
     </form>
+  );
+}
+
+export default function SignUp() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignUpForm />
+    </Suspense>
   );
 }

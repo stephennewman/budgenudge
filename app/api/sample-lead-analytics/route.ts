@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Create admin Supabase client
@@ -35,7 +35,7 @@ export async function GET() {
       .filter(lead => lead.converted_to_signup && lead.user_id)
       .map(lead => lead.user_id);
 
-    let userEmails: { [key: string]: string } = {};
+    const userEmails: { [key: string]: string } = {};
     
     if (convertedLeadUserIds.length > 0) {
       // Get user emails from auth.users
