@@ -53,46 +53,10 @@ export async function GET(request: Request) {
     let allAccounts: any[] = [];
 
     try {
-      // Phase 2: Use stored functions for optimal performance (single query)
-      console.log(`🚀 Using stored functions for ${itemIds.length} items`);
-      
-      const [transactionResult, accountResult] = await Promise.all([
-        supabase.rpc('get_user_transactions', { user_uuid: user.id }),
-        supabase.rpc('get_user_accounts', { user_uuid: user.id })
-      ]);
-
-      if (transactionResult.error) throw transactionResult.error;
-      if (accountResult.error) throw accountResult.error;
-
-      allTransactions = transactionResult.data || [];
-      allAccounts = accountResult.data || [];
-
-      // Check if accounts have plaid_item_id, if not, enrich them
-      const needsEnrichment = allAccounts.length > 0 && !allAccounts[0].plaid_item_id;
-      if (needsEnrichment) {
-        console.log('🔧 Enriching accounts with plaid_item_id...');
-        const itemIds = allAccounts.map(acc => acc.item_id).filter(Boolean);
-        if (itemIds.length > 0) {
-          const { data: items } = await supabase
-            .from('items')
-            .select('id, plaid_item_id, institution_name')
-            .in('id', itemIds);
-          
-          if (items) {
-            const itemMap = new Map(items.map(item => [item.id, { plaid_item_id: item.plaid_item_id, institution_name: item.institution_name }]));
-            allAccounts = allAccounts.map(account => {
-              const itemData = itemMap.get(account.item_id);
-              return {
-                ...account,
-                plaid_item_id: itemData?.plaid_item_id,
-                institution_name: itemData?.institution_name
-              };
-            });
-          }
-        }
-      }
-
-      console.log(`✅ Stored function approach successful: ${allTransactions.length} transactions, ${allAccounts.length} accounts`);
+      // TEMPORARY FIX: Force chunking fallback to resolve missing recent transactions
+      // The stored function has complex joins that can miss transactions
+      console.log(`🔧 TEMPORARY: Forcing chunking fallback to fix missing transactions`);
+      throw new Error("Forcing chunking approach for reliability");
 
     } catch (storedFuncError) {
       console.log(`⚠️ Stored function failed, falling back to chunking approach:`, storedFuncError);
