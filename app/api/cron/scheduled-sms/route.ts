@@ -4,8 +4,9 @@ import { generateSMSMessage } from '@/utils/sms/templates';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { DateTime } from 'luxon';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { checkAndLogSMS, SMSTemplateType } from '@/utils/sms/deduplication';
 
-type NewSMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway';
+type NewSMSTemplateType = SMSTemplateType;
 
 function hasMessage(obj: unknown): obj is { message: string } {
   return typeof obj === 'object' && obj !== null && 'message' in obj && typeof (obj as { message: unknown }).message === 'string';
@@ -250,11 +251,9 @@ export async function GET(request: NextRequest) {
 
         console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - User Templates: ${userTemplatesToSend.join(', ')}`);
 
-        // ✅ GUARDRAIL: Track sent templates to prevent duplicates within this run
-        const todayKey = nowEST.toFormat('yyyy-MM-dd');
-        
         // Send each template type for this user
         for (const templateType of userTemplatesToSend) {
+          let dedupeResult: Awaited<ReturnType<typeof checkAndLogSMS>> | null = null; // Declare outside try block for catch access
           try {
             // Check if user has enabled this specific SMS type
             let preferenceType: string;
@@ -299,30 +298,28 @@ export async function GET(request: NextRequest) {
               continue;
             }
 
-            // ✅ GUARDRAIL: Check if this user already received this template type today
-            // Check recent cron logs to see if this user+template was already sent today
-            const { data: todayLogs } = await supabase
-              .from('cron_log')
-              .select('log_details')
-              .eq('job_name', 'scheduled-sms')
-              .gte('started_at', `${todayKey}T00:00:00-05:00`)
-              .lte('started_at', `${todayKey}T23:59:59-05:00`);
-            
-            // Check if this user+template combination was already sent today
-            const alreadySent = todayLogs?.some(log => {
-              if (!log.log_details || !Array.isArray(log.log_details)) return false;
-              return log.log_details.some((detail: { userId?: string; templateType?: string; sent?: boolean }) => 
-                detail.userId === userId && 
-                detail.templateType === templateType && 
-                detail.sent === true
-              );
+            // ✅ GUARDRAIL: Check deduplication using new unified system
+            dedupeResult = await checkAndLogSMS({
+              phoneNumber: userPhoneNumber,
+              templateType,
+              userId,
+              sourceEndpoint: 'scheduled',
+              success: true // We'll update this after actual send
             });
             
-            if (alreadySent) {
-              logDetails.push({ userId, templateType, skipped: true, reason: 'Already sent today (deduplication)' });
-              console.log(`🚫 Skipping ${templateType} for user ${userId} - already sent today`);
+            if (!dedupeResult.canSend) {
+              logDetails.push({ 
+                userId, 
+                templateType, 
+                skipped: true, 
+                reason: `Deduplication prevented send: ${dedupeResult.reason}`,
+                logId: dedupeResult.logId 
+              });
+              console.log(`🚫 Skipping ${templateType} for user ${userId} - ${dedupeResult.reason}`);
               continue;
             }
+            
+            console.log(`✅ Deduplication check passed for ${templateType} (log ID: ${dedupeResult.logId})`);
 
             console.log(`📝 Generating ${templateType} SMS for user ${userId}`);
             
@@ -350,11 +347,24 @@ export async function GET(request: NextRequest) {
 
             if (smsResult.success) {
               smsSent++;
-              logDetails.push({ userId, templateType, sent: true, preview: smsMessage.substring(0, 100) });
-              console.log(`✅ ${templateType} SMS sent successfully to user ${userId}`);
+              logDetails.push({ 
+                userId, 
+                templateType, 
+                sent: true, 
+                preview: smsMessage.substring(0, 100),
+                logId: dedupeResult.logId,
+                messageId: smsResult.messageId
+              });
+              console.log(`✅ ${templateType} SMS sent successfully to user ${userId} (log ID: ${dedupeResult.logId})`);
             } else {
               smsFailed++;
-              logDetails.push({ userId, templateType, sent: false, error: smsResult.error });
+              logDetails.push({ 
+                userId, 
+                templateType, 
+                sent: false, 
+                error: smsResult.error,
+                logId: dedupeResult.logId
+              });
               console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
             }
 
@@ -371,7 +381,7 @@ export async function GET(request: NextRequest) {
             } else {
               errorMsg = String(smsError);
             }
-            logDetails.push({ userId, templateType, error: errorMsg });
+            logDetails.push({ userId, templateType, error: errorMsg, logId: dedupeResult?.logId });
             console.error(`❌ Error processing ${templateType} SMS for user ${userId}:`, smsError);
           }
         }

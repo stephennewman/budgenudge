@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { generateSMSMessage } from '@/utils/sms/templates';
+import { checkAndLogSMS, SMSTemplateType } from '@/utils/sms/deduplication';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -33,21 +34,43 @@ export async function GET() {
 
     console.log(`📊 TEST SMS: Found ${userItems.length} bank connections`);
 
-    // Test all 3 new templates
-    const templateTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'] as const;
+    // Test all 4 templates with deduplication
+    const templateTypes: SMSTemplateType[] = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
     const results = [];
+    const testNumber = '+16173472721'; // Your phone number
 
     for (const templateType of templateTypes) {
       try {
         console.log(`📝 Testing ${templateType} template...`);
+        
+        // ✅ DEDUPLICATION CHECK: Prevent duplicate sends
+        const dedupeResult = await checkAndLogSMS({
+          phoneNumber: testNumber,
+          templateType,
+          userId,
+          sourceEndpoint: 'test',
+          success: true // We'll update this after actual send
+        });
+        
+        if (!dedupeResult.canSend) {
+          console.log(`🚫 Skipping ${templateType} - ${dedupeResult.reason}`);
+          results.push({
+            templateType,
+            success: false,
+            skipped: true,
+            reason: dedupeResult.reason,
+            error: 'Deduplication prevented send'
+          });
+          continue;
+        }
+        
+        console.log(`✅ Deduplication check passed for ${templateType} (log ID: ${dedupeResult.logId})`);
         
         // Generate message using new template system
         const smsMessage = await generateSMSMessage(userId, templateType);
         
         console.log(`📱 ${templateType} template generated (${smsMessage.length} chars): ${smsMessage.substring(0, 100)}...`);
 
-        // Send SMS using SlickText
-        const testNumber = '+16173472721'; // Your phone number
         const fullMessage = `🧪 NEW ${templateType.toUpperCase()} TEMPLATE (${startTime.toLocaleTimeString('en-US', { timeZone: 'America/New_York' })} EST)\n\n${smsMessage}`;
         
         console.log(`📤 Sending ${templateType} SMS to ${testNumber} (${fullMessage.length} total chars)`);
@@ -64,7 +87,8 @@ export async function GET() {
           messageLength: fullMessage.length,
           preview: smsMessage.substring(0, 100),
           error: smsResult.error || null,
-          messageId: smsResult.messageId || null
+          messageId: smsResult.messageId || null,
+          logId: dedupeResult.logId
         });
 
         console.log(`${smsResult.success ? '✅' : '❌'} ${templateType} template ${smsResult.success ? 'sent successfully' : 'failed'}`);
