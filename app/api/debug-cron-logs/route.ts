@@ -10,14 +10,14 @@ export async function GET() {
   try {
     console.log('📊 Fetching cron logs for SMS duplication investigation...');
     
-    // Get recent cron logs, especially from today
+    // Get recent cron logs, especially from today - broader range and more logs
     const { data: logs, error } = await supabase
       .from('cron_log')
       .select('*')
       .eq('job_name', 'scheduled-sms')
-      .gte('started_at', '2025-08-04T00:00:00-04:00') // Today in EDT
+      .gte('started_at', '2025-08-03T00:00:00-04:00') // Yesterday and today
       .order('started_at', { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (error) {
       console.error('❌ Error fetching cron logs:', error);
