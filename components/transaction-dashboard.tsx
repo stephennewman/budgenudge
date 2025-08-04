@@ -188,13 +188,11 @@ export default function TransactionDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>🏦 Connected Accounts</CardTitle>
-          {accounts.length > 0 && (
-            <PlaidLinkButton 
-              onSuccess={handleConnectionSuccess}
-              buttonText="+ Connect Another Account"
-              buttonVariant="outline"
-            />
-          )}
+          <PlaidLinkButton 
+            onSuccess={handleConnectionSuccess}
+            buttonText="+ Account"
+            buttonVariant="default"
+          />
         </CardHeader>
         <CardContent>
           {accounts.length > 0 ? (

@@ -113,7 +113,7 @@ export default function PlaidLinkButton({
       onClick={() => open()} 
       disabled={!ready || isLoading}
       variant={buttonVariant}
-      className={buttonVariant === 'default' ? "bg-blue-600 hover:bg-blue-700" : ""}
+      className={buttonVariant === 'default' ? "bg-green-600 hover:bg-green-700" : ""}
     >
       {isLoading ? 'Connecting...' : buttonText}
     </Button>
