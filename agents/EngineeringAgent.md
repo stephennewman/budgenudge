@@ -1,9 +1,97 @@
 # ⚙️ ENGINEERING AGENT
 
-**Last Updated:** February 4, 2025 12:45 PM EST  
-**Current Sprint:** Transaction Display Fix Complete  
+**Last Updated:** August 4, 2025 2:55 PM EDT  
+**Current Sprint:** SMS Deduplication System Complete  
 
 ## 📋 RECENT DEPLOYMENTS
+
+### Deployment #20: SMS DEDUPLICATION SYSTEM
+**Date:** August 4, 2025 2:55 PM EDT  
+**Status:** ✅ SUCCESSFULLY DEPLOYED & VERIFIED  
+**Build Time:** 2 minutes  
+**Commits:** 573f44e, 6d46810, b4b2d9e
+
+**🎯 OBJECTIVE:** Implement comprehensive SMS deduplication to prevent duplicate messages across all endpoints.
+
+**🔧 TECHNICAL IMPLEMENTATION:**
+
+**Files Created:**
+- `utils/sms/deduplication.ts` - Unified deduplication logic with TypeScript types
+- `supabase/migrations/20250805000000_add_sms_deduplication.sql` - Database schema
+
+**Files Modified:**
+- `app/api/test-sms/route.ts` - Integrated deduplication checks before sending
+- `app/api/cron/scheduled-sms/route.ts` - Replaced old deduplication with unified system
+
+**Key Technical Changes:**
+
+1. **Database Schema:**
+   ```sql
+   CREATE TABLE public.sms_send_log (
+       id BIGSERIAL PRIMARY KEY,
+       phone_number TEXT NOT NULL,
+       template_type TEXT NOT NULL,
+       user_id UUID REFERENCES auth.users(id),
+       sent_at TIMESTAMPTZ DEFAULT NOW(),
+       source_endpoint TEXT NOT NULL,
+       message_id TEXT,
+       success BOOLEAN NOT NULL DEFAULT true
+   );
+   
+   -- Unique index prevents duplicates per phone/template/day
+   CREATE UNIQUE INDEX idx_sms_send_log_unique_daily 
+   ON public.sms_send_log (phone_number, template_type, DATE(sent_at AT TIME ZONE 'America/New_York'));
+   ```
+
+2. **TypeScript Deduplication Logic:**
+   ```typescript
+   export async function checkAndLogSMS(record: SMSSendRecord): Promise<{
+     canSend: boolean;
+     reason?: string;
+     logId?: number;
+   }> {
+     // Check if can send, and if so, log immediately to prevent race conditions
+     const { canSend, reason } = await canSendSMS(record.phoneNumber, record.templateType);
+     if (!canSend) return { canSend, reason };
+     
+     const logResult = await logSMSSend(record);
+     return { canSend: true, logId: logResult.logId };
+   }
+   ```
+
+3. **Integration Pattern:**
+   ```typescript
+   // Before sending any SMS
+   const dedupeResult = await checkAndLogSMS({
+     phoneNumber: userPhoneNumber,
+     templateType,
+     userId,
+     sourceEndpoint: 'scheduled',
+     success: true
+   });
+   
+   if (!dedupeResult.canSend) {
+     console.log(`🚫 Skipping ${templateType} - ${dedupeResult.reason}`);
+     continue; // Skip this SMS
+   }
+   ```
+
+**Database Migration:**
+- Applied via Supabase CLI: `supabase db push --include-all`
+- Fixed PostgreSQL syntax issues with unique constraints on expressions
+- Used unique index instead of constraint for function-based uniqueness
+
+**Testing & Verification:**
+- Live test shows perfect deduplication: "Already sent [template] to 2721 today"
+- All 4 duplicate templates successfully blocked
+- System working across all SMS endpoints
+
+**Performance Considerations:**
+- Unique index ensures O(log n) duplicate checking
+- Additional indexes on user_id and sent_at for analytics
+- Fail-safe design allows SMS sending if deduplication check fails
+
+---
 
 ### Deployment #19: URGENT TRANSACTION DISPLAY FIX
 **Date:** February 4, 2025 12:45 PM EST  
