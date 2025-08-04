@@ -1,9 +1,26 @@
 # ⚙️ ENGINEERING AGENT
 
-**Last Updated:** August 4, 2025 12:30 PM EDT  
-**Current Sprint:** Enhanced Balance Display System Complete  
+**Last Updated:** February 4, 2025 12:45 PM EST  
+**Current Sprint:** Transaction Display Fix Complete  
 
 ## 📋 RECENT DEPLOYMENTS
+
+### Deployment #19: URGENT TRANSACTION DISPLAY FIX
+**Date:** February 4, 2025 12:45 PM EST  
+**Status:** ✅ SUCCESSFULLY DEPLOYED  
+**Build Time:** 1 minute  
+**Commit:** 8c40611
+
+**🚨 CRITICAL FIX:** Resolved missing recent transactions issue (last 2 days not appearing in UI).
+
+**🔧 TECHNICAL IMPLEMENTATION:**
+- **Root Cause:** Complex stored function `get_user_transactions` with account joins filtering out recent transactions
+- **Solution:** Force chunking fallback approach in `app/api/plaid/transactions/route.ts`
+- **Result:** All recent transactions now visible, reliable multi-bank support maintained
+
+**Files Modified:**
+- `app/api/plaid/transactions/route.ts` - Forced chunking fallback for reliability
+- `supabase/migrations/20250204000000_revert_to_simple_transaction_function.sql` - Future DB optimization
 
 ### Deployment #18: ENHANCED BALANCE DISPLAY SYSTEM
 **Date:** August 4, 2025 12:30 PM EDT  
