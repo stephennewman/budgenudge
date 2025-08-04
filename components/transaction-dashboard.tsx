@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PlaidLinkButton from './plaid-link-button';
-import AccountDisconnectModal from './account-disconnect-modal';
+
 import AccountRemoveModal from './account-remove-modal';
 
 interface Account {
@@ -28,11 +28,6 @@ interface Account {
 export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [disconnectModal, setDisconnectModal] = useState<{
-    isOpen: boolean;
-    item: { plaid_item_id: string; institution_name: string; accounts: Account[] } | null;
-  }>({ isOpen: false, item: null });
-  
   const [disconnectAccountModal, setDisconnectAccountModal] = useState<{
     isOpen: boolean;
     account: Account | null;
@@ -107,67 +102,7 @@ export default function TransactionDashboard() {
     fetchAccounts();
   };
 
-  const handleBankDisconnect = async (itemId: string) => {
-    try {
-      console.log('🔌 handleDisconnect called with:', { itemId });
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.error('No session found');
-        return;
-      }
 
-      const requestBody = {
-        item_id: itemId
-      };
-      
-      console.log('📤 Sending request body:', requestBody);
-
-      const apiUrl = '/api/plaid/disconnect-item';
-      console.log('🌐 Calling API URL:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      console.log('📡 Response status:', response.status);
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Account disconnected successfully:', result);
-        
-        // Refresh accounts list
-        await fetchAccounts();
-        
-        // Check if any accounts are still connected
-        await checkConnection();
-      } else {
-        console.error('❌ Response not ok. Status:', response.status, 'StatusText:', response.statusText);
-        
-        let errorData;
-        const responseText = await response.text();
-        console.error('❌ Raw response text:', responseText);
-        
-        try {
-          errorData = JSON.parse(responseText);
-          console.error('❌ Parsed error data:', errorData);
-        } catch (parseError) {
-          console.error('❌ Failed to parse response as JSON:', parseError);
-          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
-        }
-        
-        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error('💥 Error disconnecting account:', error);
-      throw error;
-    }
-  };
 
   const handleAccountDisconnect = async (accountId: number) => {
     try {
@@ -228,13 +163,7 @@ export default function TransactionDashboard() {
     }
   };
 
-  const openDisconnectModal = (item: { plaid_item_id: string; institution_name: string; accounts: Account[] }) => {
-    setDisconnectModal({ isOpen: true, item });
-  };
 
-  const closeDisconnectModal = () => {
-    setDisconnectModal({ isOpen: false, item: null });
-  };
 
   const openDisconnectAccountModal = (account: Account) => {
     setDisconnectAccountModal({ isOpen: true, account });
@@ -282,7 +211,7 @@ export default function TransactionDashboard() {
                   if (!acc[itemId]) {
                     acc[itemId] = {
                       plaid_item_id: itemId,
-                      institution_name: account.institution_name || 'Unknown Bank',
+                      institution_name: account.institution_name || '',
                       accounts: []
                     };
                   }
@@ -297,20 +226,11 @@ export default function TransactionDashboard() {
                       <div className="flex items-center gap-3">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         <div>
-                          <div className="font-semibold text-lg">{item.institution_name}</div>
                           <div className="text-sm text-muted-foreground">
                             {item.accounts.length} account{item.accounts.length !== 1 ? 's' : ''} connected
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDisconnectModal(item)}
-                        className="text-red-600 hover:text-red-700 hover:border-red-300"
-                      >
-                        Disconnect Bank
-                      </Button>
                     </div>
                     
                     {/* Account List */}
@@ -378,13 +298,7 @@ export default function TransactionDashboard() {
         </CardContent>
       </Card>
 
-      {/* Bank Disconnect Modal */}
-      <AccountDisconnectModal
-        item={disconnectModal.item}
-        isOpen={disconnectModal.isOpen}
-        onClose={closeDisconnectModal}
-        onConfirm={handleBankDisconnect}
-      />
+
       
       {/* Account Disconnect Modal */}
       <AccountRemoveModal
