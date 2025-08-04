@@ -32,11 +32,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's items first
+    // Get user's items first (exclude disconnected items)
     const { data: items } = await supabase
       .from('items')
       .select('id, plaid_item_id')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
 
     if (!items || items.length === 0) {
       return NextResponse.json({ transactions: [], accounts: [] });
@@ -65,6 +66,31 @@ export async function GET(request: Request) {
 
       allTransactions = transactionResult.data || [];
       allAccounts = accountResult.data || [];
+
+      // Check if accounts have plaid_item_id, if not, enrich them
+      const needsEnrichment = allAccounts.length > 0 && !allAccounts[0].plaid_item_id;
+      if (needsEnrichment) {
+        console.log('🔧 Enriching accounts with plaid_item_id...');
+        const itemIds = allAccounts.map(acc => acc.item_id).filter(Boolean);
+        if (itemIds.length > 0) {
+          const { data: items } = await supabase
+            .from('items')
+            .select('id, plaid_item_id, institution_name')
+            .in('id', itemIds);
+          
+          if (items) {
+            const itemMap = new Map(items.map(item => [item.id, { plaid_item_id: item.plaid_item_id, institution_name: item.institution_name }]));
+            allAccounts = allAccounts.map(account => {
+              const itemData = itemMap.get(account.item_id);
+              return {
+                ...account,
+                plaid_item_id: itemData?.plaid_item_id,
+                institution_name: itemData?.institution_name
+              };
+            });
+          }
+        }
+      }
 
       console.log(`✅ Stored function approach successful: ${allTransactions.length} transactions, ${allAccounts.length} accounts`);
 
@@ -120,7 +146,10 @@ export async function GET(request: Request) {
         const accountPromises = itemDbIdChunks.map(chunk => 
           supabase
             .from('accounts')
-            .select('*')
+            .select(`
+              *,
+              items!inner(plaid_item_id)
+            `)
             .in('item_id', chunk)
         );
 
@@ -132,18 +161,31 @@ export async function GET(request: Request) {
             throw result.error;
           }
           if (result.data) {
-            allAccounts.push(...result.data);
+            // Flatten the plaid_item_id into each account object
+            const accountsWithPlaidItemId = result.data.map(account => ({
+              ...account,
+              plaid_item_id: account.items?.plaid_item_id
+            }));
+            allAccounts.push(...accountsWithPlaidItemId);
           }
         }
       } else {
-        // Single query for small number of items
+        // Single query for small number of items - include plaid_item_id for disconnect functionality
         const { data: accounts, error: accError } = await supabase
           .from('accounts')
-          .select('*')
+          .select(`
+            *,
+            items!inner(plaid_item_id)
+          `)
           .in('item_id', itemDbIds);
 
         if (accError) throw accError;
-        allAccounts = accounts || [];
+        
+        // Flatten the plaid_item_id into each account object
+        allAccounts = (accounts || []).map(account => ({
+          ...account,
+          plaid_item_id: account.items?.plaid_item_id
+        }));
       }
 
       console.log(`✅ Chunking fallback successful: ${allTransactions.length} transactions, ${allAccounts.length} accounts`);

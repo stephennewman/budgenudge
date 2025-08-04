@@ -9,9 +9,16 @@ import { useRouter } from 'next/navigation';
 interface PlaidLinkButtonProps {
   onSuccess?: () => void;
   redirectToAnalysis?: boolean; // New prop to control redirect behavior
+  buttonText?: string; // Custom button text
+  buttonVariant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive'; // Button variant
 }
 
-export default function PlaidLinkButton({ onSuccess, redirectToAnalysis = false }: PlaidLinkButtonProps) {
+export default function PlaidLinkButton({ 
+  onSuccess, 
+  redirectToAnalysis = false, 
+  buttonText = 'Connect my account',
+  buttonVariant = 'default'
+}: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createSupabaseClient();
@@ -85,9 +92,11 @@ export default function PlaidLinkButton({ onSuccess, redirectToAnalysis = false 
       }
     },
     onExit: (err) => {
-      if (err) {
+      // Only log actual errors, not normal exits (empty objects)
+      if (err && Object.keys(err).length > 0) {
         console.error('Plaid Link exit error:', err);
       }
+      // Normal exit (user closed modal) - no need to log
     },
   });
 
@@ -103,9 +112,10 @@ export default function PlaidLinkButton({ onSuccess, redirectToAnalysis = false 
     <Button 
       onClick={() => open()} 
       disabled={!ready || isLoading}
-      className="bg-blue-600 hover:bg-blue-700"
+      variant={buttonVariant}
+      className={buttonVariant === 'default' ? "bg-blue-600 hover:bg-blue-700" : ""}
     >
-      {isLoading ? 'Connecting...' : 'Connect my account'}
+      {isLoading ? 'Connecting...' : buttonText}
     </Button>
   );
 } 

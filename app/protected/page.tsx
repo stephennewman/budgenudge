@@ -6,6 +6,7 @@ import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
+
 import type { User } from "@supabase/supabase-js";
 
 export default function AccountPage() {
@@ -115,6 +116,8 @@ export default function AccountPage() {
 
       {/* Connected Bank Accounts */}
       <TransactionDashboard />
+
+
 
       {/* Account Settings Grid */}
       <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">

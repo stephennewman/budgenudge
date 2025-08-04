@@ -184,6 +184,54 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
         .eq('plaid_item_id', item_id);
       break;
 
+    case 'ITEM_REMOVED':
+      console.log(`🔌 Item ${item_id} was removed from Plaid`);
+      
+      // Check if this was an intentional disconnection or external removal
+      const { data: itemData } = await supabase
+        .from('items')
+        .select('id, deleted_at, retention_choice, institution_name, user_id')
+        .eq('plaid_item_id', item_id)
+        .single();
+
+      if (itemData) {
+        if (itemData.deleted_at) {
+          // This was an intentional disconnect - item is already marked for deletion
+          console.log(`✅ Confirmed disconnection for item ${item_id} (${itemData.institution_name})`);
+        } else {
+          // External removal - user likely disconnected from bank's side
+          console.log(`⚠️ External removal detected for item ${item_id} - marking as disconnected`);
+          
+          // Mark as externally disconnected but don't delete data immediately
+          await supabase
+            .from('items')
+            .update({ 
+              status: 'disconnected_external',
+              deleted_at: new Date().toISOString(),
+              retention_choice: 'soft_30_days', // Default to 30-day retention for external disconnects
+              permanent_delete_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            })
+            .eq('plaid_item_id', item_id);
+
+          // Log the external disconnection for audit
+          await supabase
+            .from('audit_log')
+            .insert({
+              user_id: itemData.user_id,
+              action: 'item_disconnected_external',
+              details: {
+                item_id: item_id,
+                institution_name: itemData.institution_name,
+                reason: 'External removal detected via webhook'
+              }
+            });
+          console.log('📝 External disconnect audit log created');
+        }
+      } else {
+        console.warn(`❓ ITEM_REMOVED webhook for unknown item: ${item_id}`);
+      }
+      break;
+
     default:
       console.log(`Unhandled item webhook code: ${webhook_code}`);
   }

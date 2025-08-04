@@ -66,6 +66,7 @@ const getMerchantColor = (merchantName: string) => {
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<TransactionWithAnalytics[]>([]);
+  const [accounts, setAccounts] = useState<Array<{ id: string; plaid_account_id: string; name: string; official_name?: string; type: string; subtype?: string; mask?: string; current_balance?: number; available_balance?: number; verification_status?: string; iso_currency_code?: string; balance_last_updated?: string }>>([]);
   // Removed merchantAnalytics state and overallAnalytics state - data is now used directly in fetchData
   const [isLoading, setIsLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -74,11 +75,7 @@ export default function TransactionsPage() {
   const [, setTaggedMerchants] = useState<Set<string>>(new Set());
   const [starringMerchant, setStarringMerchant] = useState<string | null>(null);
   const [transactionStarredStatus, setTransactionStarredStatus] = useState<Map<string, boolean>>(new Map());
-  
-  // Balance state
-  const [availableBalance, setAvailableBalance] = useState<number | null>(null);
-  const [balanceLastUpdated, setBalanceLastUpdated] = useState<string | null>(null);
-  const [balanceLoading, setBalanceLoading] = useState(false);
+
   
   // AI Tag Editor state
   const [tagEditorOpen, setTagEditorOpen] = useState(false);
@@ -92,6 +89,58 @@ export default function TransactionsPage() {
   const [highlightedTransactions, setHighlightedTransactions] = useState<Set<string | number>>(new Set());
   
   const supabase = createSupabaseClient();
+
+  // Helper function to get account info for a transaction
+  const getAccountInfo = (accountId: string) => {
+    // Try multiple possible mappings between transaction account_id and account records
+    let account = accounts.find(acc => acc.plaid_account_id === accountId);
+    
+    if (!account) {
+      // Try matching by id field
+      account = accounts.find(acc => acc.id === accountId);
+    }
+    
+    if (!account) {
+      // Try matching by id field (database ID)
+      account = accounts.find(acc => acc.id?.toString() === accountId);
+    }
+    
+    if (!account) {
+      return { 
+        name: 'Unknown Account', 
+        displayName: `Unknown (${accountId?.slice(0, 8)}...)`,
+        type: '?',
+        subtype: '?',
+        fullAccount: null
+      };
+    }
+    
+    // Create better display name using available data
+    // Try to extract institution from account name if available
+    const accountName = account.official_name || account.name;
+    const accountType = account.subtype ? 
+      account.subtype.charAt(0).toUpperCase() + account.subtype.slice(1) :
+      (account.type || 'Account');
+    const maskPart = account.mask ? ` • ••••${account.mask}` : '';
+    
+    // For now, use the account name until we can safely get institution names
+    const displayName = `${accountName} • ${accountType}${maskPart}`;
+    
+    return {
+      name: account.name,
+      official_name: account.official_name,
+      displayName,
+      type: account.type || 'unknown',
+      subtype: account.subtype || 'unknown',
+      mask: account.mask,
+      current_balance: account.current_balance,
+      available_balance: account.available_balance,
+      verification_status: account.verification_status,
+      iso_currency_code: account.iso_currency_code,
+      balance_last_updated: account.balance_last_updated,
+      fullAccount: account
+    };
+  };
 
   // Handle opening the tag editor
   const handleEditTags = (transaction: Transaction) => {
@@ -307,65 +356,7 @@ export default function TransactionsPage() {
 
   // Analytics are now fetched from cached merchant_analytics table for performance
 
-  // Fetch balance data
-  async function fetchBalanceData() {
-    try {
-      setBalanceLoading(true);
-      console.log('Starting balance fetch...');
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        console.log('No session found, skipping balance fetch');
-        return;
-      }
 
-      console.log('Making balance API request...');
-      const balanceResponse = await fetch('/api/plaid/balances', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` }
-      });
-      
-      console.log('Balance response status:', balanceResponse.status);
-      
-      if (balanceResponse.ok) {
-        const balanceData = await balanceResponse.json();
-        console.log('Balance API response:', balanceData);
-        
-        if (balanceData.success && balanceData.accounts) {
-          console.log('Accounts data:', balanceData.accounts);
-          console.log('Number of accounts:', balanceData.accounts.length);
-          
-          // Calculate total available balance across all accounts
-          const totalAvailableBalance = balanceData.accounts.reduce((sum: number, account: { available_balance?: number; name?: string }) => {
-            console.log('Account:', account.name || 'Unknown', 'Available balance:', account.available_balance, 'Type:', typeof account.available_balance);
-            return sum + (account.available_balance || 0);
-          }, 0);
-          
-          console.log('Total available balance:', totalAvailableBalance);
-          
-          // Get the most recent balance update time
-          const mostRecentUpdate = balanceData.accounts.reduce((latest: string | null, account: { balance_last_updated?: string }) => {
-            if (!account.balance_last_updated) return latest;
-            if (!latest) return account.balance_last_updated;
-            return new Date(account.balance_last_updated) > new Date(latest) 
-              ? account.balance_last_updated 
-              : latest;
-          }, null as string | null);
-          
-          setAvailableBalance(totalAvailableBalance);
-          setBalanceLastUpdated(mostRecentUpdate);
-        } else {
-          console.log('No accounts found or API error:', balanceData);
-        }
-      } else {
-        const errorText = await balanceResponse.text();
-        console.error('Failed to fetch balance data. Status:', balanceResponse.status, 'Response:', errorText);
-      }
-    } catch (error) {
-      console.error('Error fetching balance data:', error);
-    } finally {
-      setBalanceLoading(false);
-    }
-  }
 
   // OPTIMIZED: Simplified data fetching for faster loading
   async function fetchData() {
@@ -383,6 +374,12 @@ export default function TransactionsPage() {
       
       if (transactionsResponse.ok && transactionsData.transactions) {
         console.log('Transactions fetched:', transactionsData.transactions.length);
+        console.log('Accounts fetched:', transactionsData.accounts?.length || 0);
+        
+        // Store accounts data for account column mapping
+        if (transactionsData.accounts) {
+          setAccounts(transactionsData.accounts);
+        }
         
         // SIMPLIFIED: Minimal processing for fast display
         const enhancedTransactions = transactionsData.transactions.map((transaction: Transaction) => ({
@@ -411,7 +408,6 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     fetchData();
-    fetchBalanceData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Column definitions
@@ -454,6 +450,65 @@ export default function TransactionsPage() {
         return date.toLocaleDateString();
       },
       sortDescFirst: true,
+    },
+    {
+      accessorKey: 'account_id',
+      header: '🏦 Account',
+      cell: ({ getValue }: { getValue: () => string }) => {
+        const accountId = getValue();
+        
+        if (!accountId) {
+          return (
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-400">No account ID</div>
+            </div>
+          );
+        }
+        
+        const accountInfo = getAccountInfo(accountId);
+        
+        const balanceInfo = accountInfo.current_balance !== null && accountInfo.current_balance !== undefined
+          ? `Balance: $${accountInfo.current_balance.toLocaleString()}`
+          : '';
+        
+        const verificationInfo = accountInfo.verification_status 
+          ? `Verification: ${accountInfo.verification_status}`
+          : '';
+        
+        const tooltipContent = [
+          `Account Name: ${accountInfo.name}`,
+          accountInfo.official_name && accountInfo.official_name !== accountInfo.name ? `Official Name: ${accountInfo.official_name}` : '',
+          `Type: ${accountInfo.type} • ${accountInfo.subtype}`,
+          accountInfo.mask ? `Account Number: ••••${accountInfo.mask}` : '',
+          balanceInfo,
+          verificationInfo,
+          accountInfo.balance_last_updated ? `Last Updated: ${new Date(accountInfo.balance_last_updated).toLocaleDateString()}` : ''
+        ].filter(Boolean).join('\n');
+        
+        return (
+          <div className="flex items-center gap-2" title={tooltipContent}>
+            <div className="flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-xs font-medium text-blue-700">
+                  {accountInfo.type?.charAt(0).toUpperCase() || '?'}
+                </span>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">
+                {accountInfo.displayName}
+              </div>
+              {accountInfo.current_balance !== null && accountInfo.current_balance !== undefined && (
+                <div className="text-xs text-green-600 font-medium">
+                  ${accountInfo.current_balance.toLocaleString()}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+      size: 180,
+      enableSorting: true,
     },
     {
       accessorKey: 'ai_merchant_name',
@@ -630,71 +685,24 @@ export default function TransactionsPage() {
           <div className="flex flex-col">
             <h1 className="text-2xl font-medium">💳 Transactions</h1>
             <div className="flex items-center gap-6 mt-2">
-              {balanceLoading ? (
-                <div className="flex items-center gap-2">
-                  <p className="text-green-600 font-bold">
-                    Available: Loading...
-                  </p>
-                </div>
-              ) : availableBalance !== null ? (
-                <div className="flex items-center gap-2">
-                  <p className="text-green-600 font-bold">
-                    Available: ${availableBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                  {balanceLastUpdated && (
-                    <span className="text-xs text-muted-foreground">
-                      (updated {new Date(balanceLastUpdated).toLocaleDateString()})
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <p className="text-muted-foreground">
-                    No balance data available
-                  </p>
-                </div>
-              )}
               <p className="text-muted-foreground">
                 {transactions.length} total transactions
               </p>
+              <a 
+                href="/protected" 
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+              >
+                View account balances →
+              </a>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <ManualRefreshButton 
               onRefresh={() => {
                 fetchData();
-                fetchBalanceData();
               }}
             />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                try {
-                  const { data: { session } } = await supabase.auth.getSession();
-                  if (!session) return;
-                  
-                  // Refresh balances from Plaid
-                  const refreshResponse = await fetch('/api/plaid/balances', {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${session.access_token}` }
-                  });
-                  
-                  if (refreshResponse.ok) {
-                    console.log('Balance refresh successful');
-                    // Fetch updated balance data
-                    fetchBalanceData();
-                  } else {
-                    console.error('Failed to refresh balances');
-                  }
-                } catch (error) {
-                  console.error('Error refreshing balances:', error);
-                }
-              }}
-            >
-              Refresh Balance
-            </Button>
-            
+
             <Button
               variant="outline"
               size="sm"
