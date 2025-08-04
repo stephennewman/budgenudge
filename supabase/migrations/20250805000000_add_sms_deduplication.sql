@@ -13,15 +13,11 @@ CREATE TABLE public.sms_send_log (
     success BOOLEAN NOT NULL DEFAULT true
 );
 
--- Add unique constraint for deduplication (separate from table creation)
-ALTER TABLE public.sms_send_log 
-ADD CONSTRAINT sms_send_log_unique_daily 
-UNIQUE(phone_number, template_type, DATE(sent_at AT TIME ZONE 'America/New_York'));
-
--- Add indexes for performance
-CREATE INDEX idx_sms_send_log_phone_template_date 
+-- Add unique index for deduplication (PostgreSQL supports expressions in indexes)
+CREATE UNIQUE INDEX idx_sms_send_log_unique_daily 
 ON public.sms_send_log (phone_number, template_type, DATE(sent_at AT TIME ZONE 'America/New_York'));
 
+-- Add indexes for performance (unique index above covers phone_number, template_type, date)
 CREATE INDEX idx_sms_send_log_user_date 
 ON public.sms_send_log (user_id, DATE(sent_at AT TIME ZONE 'America/New_York'));
 
