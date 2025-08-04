@@ -10,11 +10,13 @@ CREATE TABLE public.sms_send_log (
     sent_at TIMESTAMPTZ DEFAULT NOW(),
     source_endpoint TEXT NOT NULL, -- 'scheduled', 'test', 'manual', etc.
     message_id TEXT, -- SlickText message ID if available
-    success BOOLEAN NOT NULL DEFAULT true,
-    
-    -- Composite index for fast deduplication checks
-    UNIQUE(phone_number, template_type, DATE(sent_at AT TIME ZONE 'America/New_York'))
+    success BOOLEAN NOT NULL DEFAULT true
 );
+
+-- Add unique constraint for deduplication (separate from table creation)
+ALTER TABLE public.sms_send_log 
+ADD CONSTRAINT sms_send_log_unique_daily 
+UNIQUE(phone_number, template_type, DATE(sent_at AT TIME ZONE 'America/New_York'));
 
 -- Add indexes for performance
 CREATE INDEX idx_sms_send_log_phone_template_date 
