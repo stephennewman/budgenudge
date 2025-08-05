@@ -196,7 +196,7 @@ function getKeywordResponse(message: string): string {
 /**
  * Handle contact creation events (form submissions)
  */
-async function handleContactCreated(webhookData: any): Promise<NextResponse> {
+async function handleContactCreated(webhookData: Record<string, any>): Promise<NextResponse> {
   try {
     console.log('📝 Processing SlickText contact creation...');
     
