@@ -9,6 +9,11 @@ export async function POST(request: NextRequest) {
     console.log('📨 SlickText webhook received...');
     
     const webhookData = await request.json();
+    
+    // Check if this is a contact creation event (form submission)
+    if (webhookData.event === 'contact.created' || webhookData.event === 'contact_created') {
+      return await handleContactCreated(webhookData);
+    }
     console.log('�� Webhook payload:', JSON.stringify(webhookData, null, 2));
     
     // Extract from SlickText's actual payload format
@@ -184,6 +189,83 @@ function getKeywordResponse(message: string): string {
                 return "🔔 Krezzo sends texts about your money and spending. Manage alerts at https://get.krezzo.com or text STOP to unsubscribe.";
   }
   
-  // Default helpful response
-              return "Hi! I'm Krezzo AI. I help with financial monitoring questions. Visit https://get.krezzo.com or text HELP for commands!";
+    // Default helpful response
+  return "Hi! I'm Krezzo AI. I help with financial monitoring questions. Visit https://get.krezzo.com or text HELP for commands!";
+}
+
+/**
+ * Handle contact creation events (form submissions)
+ */
+async function handleContactCreated(webhookData: any): Promise<NextResponse> {
+  try {
+    console.log('📝 Processing SlickText contact creation...');
+    
+    const contactData = webhookData.data || webhookData.contact || webhookData;
+    
+    // Extract contact information
+    const phoneNumber = contactData.phone_number || contactData.phone || '';
+    const firstName = contactData.first_name || contactData.firstName || '';
+    const lastName = contactData.last_name || contactData.lastName || '';
+    const email = contactData.email || '';
+    
+    console.log('📊 Contact data extracted:', { phoneNumber, firstName, lastName, email });
+    
+    if (!phoneNumber) {
+      console.log('⚠️ No phone number found in contact data');
+      return NextResponse.json({ success: true, message: 'No phone number to process' });
+    }
+    
+    // Store in our database
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    
+    // Clean phone number
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    
+    // Generate tracking token
+    const trackingToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    const { data, error } = await supabase
+      .from('sample_sms_leads')
+      .insert({
+        phone_number: cleanPhone,
+        email: email,
+        first_name: firstName,
+        last_name: lastName,
+        source: 'slicktext_webhook',
+        tracking_token: trackingToken,
+        opted_in_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Database error:', error);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Database error',
+        details: error.message 
+      }, { status: 500 });
+    }
+    
+    console.log('✅ Contact stored successfully:', data);
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Contact created and stored',
+      leadId: data.id,
+      trackingToken: trackingToken
+    });
+    
+  } catch (error) {
+    console.error('❌ Contact creation handler error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Contact creation failed'
+    }, { status: 500 });
+  }
 } 
