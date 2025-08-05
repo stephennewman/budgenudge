@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
         last_name: lastName,
         source: 'slicktext_java_form',
         tracking_token: trackingToken,
+        opted_in_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       })
       .select()
