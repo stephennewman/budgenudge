@@ -15,11 +15,21 @@ export async function POST(request: NextRequest) {
     // Clean phone number
     const cleanPhone = phoneNumber?.replace(/\D/g, '');
     
+    // Log the full contact data for now (until we add proper columns)
+    console.log('📊 Contact Data Details:', {
+      phone: cleanPhone,
+      email: email || 'not-provided',
+      firstName: firstName || 'not-provided', 
+      lastName: lastName || 'not-provided',
+      timestamp: new Date().toISOString()
+    });
+    
     // Generate tracking token
     const trackingToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
     // Store additional contact data in a way that works with current schema
-    const enhancedSource = `slicktext_java_form:${firstName || 'Unknown'}:${lastName || 'Unknown'}:${email || 'no-email'}`;
+    // Keep source field short due to VARCHAR(50) limit
+    const enhancedSource = `slicktext_form`;
     
     // Store in database (only fields that exist in current schema)
     const { data, error } = await supabase
