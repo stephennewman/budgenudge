@@ -240,6 +240,37 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       }
     }
 
+    // 5. Add user to SlickText as subscriber (optional)
+    // This creates a feedback loop: SlickText leads → auth users → SlickText subscribers
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+      if (authUser.user?.email) {
+        console.log('📱 Adding new user to SlickText as subscriber...');
+        
+        const slickTextResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/add-user-to-slicktext`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: user.id,
+            email: authUser.user.email,
+            phone: authUser.user.phone,
+            first_name: authUser.user.user_metadata?.full_name?.split(' ')[0] || authUser.user.user_metadata?.first_name,
+            last_name: authUser.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || authUser.user.user_metadata?.last_name
+          })
+        });
+
+        if (slickTextResponse.ok) {
+          const slickTextResult = await slickTextResponse.json();
+          console.log('✅ User added to SlickText:', slickTextResult.slicktext_contact_id || 'success');
+        } else {
+          console.log('⚠️ SlickText subscription failed (non-blocking):', slickTextResponse.status);
+        }
+      }
+    } catch (slickTextError) {
+      console.log('⚠️ SlickText subscription error (non-blocking):', slickTextError);
+      // Non-blocking: User setup continues even if SlickText subscription fails
+    }
+
     console.log('🎉 New user setup completed successfully');
 
   } catch (error) {
