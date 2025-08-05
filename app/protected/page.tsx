@@ -6,6 +6,7 @@ import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
+import { Button } from "@/components/ui/button";
 
 import type { User } from "@supabase/supabase-js";
 
@@ -14,6 +15,8 @@ export default function AccountPage() {
   const [hasConnectedAccount, setHasConnectedAccount] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
 
   const supabase = createSupabaseClient();
 
@@ -39,6 +42,22 @@ export default function AccountPage() {
           .eq('user_id', user.id);
 
         setHasConnectedAccount(!!(items && items.length > 0));
+
+        // Get phone number from auth.users or user_sms_settings
+        let phone = user.phone; // Try auth.users first
+        
+        if (!phone) {
+          // Fallback to SMS settings table
+          const { data: smsSettings } = await supabase
+            .from('user_sms_settings')
+            .select('phone_number')
+            .eq('user_id', user.id)
+            .single();
+          
+          phone = smsSettings?.phone_number ? `+1${smsSettings.phone_number}` : null;
+        }
+        
+        setPhoneNumber(phone);
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError("There was an error loading your account. Please try again.");
@@ -49,6 +68,51 @@ export default function AccountPage() {
 
     fetchUserAndAccounts();
   }, [supabase]);
+
+  const handleAddPhone = async () => {
+    if (!user) return;
+    
+    setIsUpdatingPhone(true);
+    
+    try {
+      // Get phone from SlickText leads if available
+      const { data: leads } = await supabase
+        .from('sample_sms_leads')
+        .select('phone_number')
+        .eq('user_id', user.id)
+        .limit(1);
+      
+      if (leads && leads.length > 0 && leads[0].phone_number) {
+        const phoneToAdd = `+1${leads[0].phone_number}`;
+        
+        // Update auth.users phone field
+        const { error: authError } = await supabase.auth.updateUser({
+          phone: phoneToAdd
+        });
+        
+        if (!authError) {
+          // Also ensure SMS settings has the phone number
+          const { error: smsError } = await supabase
+            .from('user_sms_settings')
+            .upsert({ 
+              user_id: user.id, 
+              phone_number: leads[0].phone_number 
+            });
+          
+          if (!smsError) {
+            setPhoneNumber(phoneToAdd);
+          }
+        }
+      } else {
+        // Navigate to SMS preferences to add phone manually
+        window.location.href = '/protected/sms-preferences';
+      }
+    } catch (error) {
+      console.error('Error adding phone:', error);
+    } finally {
+      setIsUpdatingPhone(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -131,6 +195,27 @@ export default function AccountPage() {
             <div className="grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">Email</div>
               <div className="font-medium break-all">{user?.email}</div>
+            </div>
+            <div className="grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-2">
+              <div className="text-muted-foreground">Phone</div>
+              <div className="flex items-center gap-2">
+                {phoneNumber ? (
+                  <span className="font-medium">{phoneNumber}</span>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 text-xs">Not set</span>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={handleAddPhone}
+                      disabled={isUpdatingPhone}
+                      className="text-xs h-6 px-2"
+                    >
+                      {isUpdatingPhone ? "Adding..." : "Add Phone"}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-[80px_1fr] sm:grid-cols-[100px_1fr] gap-2">
               <div className="text-muted-foreground">User ID</div>
