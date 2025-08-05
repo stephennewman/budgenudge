@@ -414,7 +414,7 @@ export default function TransactionsPage() {
   const columns = useMemo(() => [
     {
       id: 'star',
-      header: '⭐ Recurring',
+      header: 'Track Bill',
       cell: ({ row }: { row: { original: TransactionWithAnalytics } }) => {
         const transaction = row.original;
         const merchantName = transaction.merchant_name || transaction.name;
@@ -450,65 +450,6 @@ export default function TransactionsPage() {
         return date.toLocaleDateString();
       },
       sortDescFirst: true,
-    },
-    {
-      accessorKey: 'account_id',
-      header: '🏦 Account',
-      cell: ({ getValue }: { getValue: () => string }) => {
-        const accountId = getValue();
-        
-        if (!accountId) {
-          return (
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-400">No account ID</div>
-            </div>
-          );
-        }
-        
-        const accountInfo = getAccountInfo(accountId);
-        
-        const balanceInfo = accountInfo.current_balance !== null && accountInfo.current_balance !== undefined
-          ? `Balance: $${accountInfo.current_balance.toLocaleString()}`
-          : '';
-        
-        const verificationInfo = accountInfo.verification_status 
-          ? `Verification: ${accountInfo.verification_status}`
-          : '';
-        
-        const tooltipContent = [
-          `Account Name: ${accountInfo.name}`,
-          accountInfo.official_name && accountInfo.official_name !== accountInfo.name ? `Official Name: ${accountInfo.official_name}` : '',
-          `Type: ${accountInfo.type} • ${accountInfo.subtype}`,
-          accountInfo.mask ? `Account Number: ••••${accountInfo.mask}` : '',
-          balanceInfo,
-          verificationInfo,
-          accountInfo.balance_last_updated ? `Last Updated: ${new Date(accountInfo.balance_last_updated).toLocaleDateString()}` : ''
-        ].filter(Boolean).join('\n');
-        
-        return (
-          <div className="flex items-center gap-2" title={tooltipContent}>
-            <div className="flex-shrink-0">
-              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                <span className="text-xs font-medium text-blue-700">
-                  {accountInfo.type?.charAt(0).toUpperCase() || '?'}
-                </span>
-              </div>
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">
-                {accountInfo.displayName}
-              </div>
-              {accountInfo.current_balance !== null && accountInfo.current_balance !== undefined && (
-                <div className="text-xs text-green-600 font-medium">
-                  ${accountInfo.current_balance.toLocaleString()}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      },
-      size: 180,
-      enableSorting: true,
     },
     {
       accessorKey: 'ai_merchant_name',
@@ -646,6 +587,45 @@ export default function TransactionsPage() {
         </span>
       ),
     },
+    {
+      accessorKey: 'account_id',
+      header: 'Account',
+      cell: ({ getValue }: { getValue: () => string }) => {
+        const accountId = getValue();
+        
+        if (!accountId) {
+          return (
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-400">No account ID</div>
+            </div>
+          );
+        }
+        
+        const accountInfo = getAccountInfo(accountId);
+        
+        return (
+          <div className="flex items-center gap-2">
+            <div className="flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-xs font-medium text-blue-700">
+                  {accountInfo.type?.charAt(0).toUpperCase() || '?'}
+                </span>
+              </div>
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">
+                {accountInfo.name}
+              </div>
+              <div className="text-xs text-gray-500">
+                {accountInfo.subtype ? accountInfo.subtype.charAt(0).toUpperCase() + accountInfo.subtype.slice(1) : accountInfo.type}
+              </div>
+            </div>
+          </div>
+        );
+      },
+      size: 150,
+      enableSorting: true,
+    },
   ], [transactionStarredStatus, starringMerchant, handleStarMerchant, handleUnstarMerchant]);
 
   const table = useReactTable({
@@ -696,25 +676,7 @@ export default function TransactionsPage() {
               </a>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <ManualRefreshButton 
-              onRefresh={() => {
-                fetchData();
-              }}
-            />
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                console.log('🌟 Manual refresh stars triggered');
-                const transactionIds = transactions.map(tx => tx.plaid_transaction_id).filter((id): id is string => Boolean(id));
-                await fetchTransactionStarredStatus(transactionIds);
-              }}
-            >
-              🌟 Refresh Stars
-            </Button>
-          </div>
+          {/* Removed refresh buttons as requested */}
         </div>
 
 
