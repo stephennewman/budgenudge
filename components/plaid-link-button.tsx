@@ -86,9 +86,21 @@ export default function PlaidLinkButton({
             // Use callback for existing dashboard flow
             onSuccess();
           }
+        } else {
+          console.error('Plaid token exchange failed:', response.status);
+          // Even on error, redirect to plaid-success if redirectToAnalysis is true
+          // The success page can handle the error state
+          if (redirectToAnalysis) {
+            router.push('/plaid-success');
+          }
         }
       } catch (error) {
         console.error('Error exchanging token:', error);
+        // Even on exception, redirect to plaid-success if redirectToAnalysis is true
+        // The success page can handle the error state
+        if (redirectToAnalysis) {
+          router.push('/plaid-success');
+        }
       } finally {
         setIsLoading(false);
       }
