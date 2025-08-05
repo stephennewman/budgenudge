@@ -160,11 +160,14 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
     }
 
     // 4. Check for SlickText lead conversion (email match)
-    if (user.email) {
+    // Get user's email from Supabase auth
+    const { data: authUser, error: authUserError } = await supabase.auth.admin.getUserById(user.id);
+    
+    if (!authUserError && authUser.user?.email) {
       const { data: emailLeads, error: emailLeadError } = await supabase
         .from('sample_sms_leads')
         .select('*')
-        .eq('email', user.email)
+        .eq('email', authUser.user.email)
         .is('user_id', null) // Only unlinked leads
         .order('created_at', { ascending: false }); // Most recent first
 
@@ -226,7 +229,7 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
         }
 
         console.log('✅ SlickText leads linked via email:', {
-          email: user.email,
+          email: authUser.user.email,
           userId: user.id,
           leadCount: emailLeads.length,
           leadIds: leadIds,
