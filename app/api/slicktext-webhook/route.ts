@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 interface ContactData {
   phone_number?: string;
   phone?: string;
+  mobile_number?: string; // SlickText uses mobile_number
   first_name?: string;
   firstName?: string;
   last_name?: string;
@@ -220,7 +221,7 @@ async function handleContactCreated(webhookData: WebhookData): Promise<NextRespo
     const contactData = webhookData.data || webhookData.contact || (webhookData as ContactData);
     
     // Extract contact information
-    const phoneNumber = contactData?.phone_number || contactData?.phone || '';
+    const phoneNumber = contactData?.mobile_number || contactData?.phone_number || contactData?.phone || '';
     const firstName = contactData?.first_name || contactData?.firstName || '';
     const lastName = contactData?.last_name || contactData?.lastName || '';
     const email = contactData?.email || '';
