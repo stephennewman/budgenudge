@@ -135,6 +135,33 @@ export async function POST(request: NextRequest) {
         console.log('⚠️ Historical AI tagging error (non-blocking):', tagError);
         // Non-blocking: Account setup continues even if AI tagging fails
       }
+
+      // 🆕 PHASE 2: Trigger auto-selection for pacing tracking
+      // This sets up merchant and category tracking for new users automatically
+      try {
+        console.log('🎯 Triggering pacing auto-selection for new account...');
+        const autoSelectResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auto-select-pacing`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Pass through user's auth token
+          }
+        });
+
+        if (autoSelectResponse.ok) {
+          const autoSelectResult = await autoSelectResponse.json();
+          console.log('✅ Pacing auto-selection completed:', {
+            merchants: autoSelectResult.merchants_selected || 0,
+            categories: autoSelectResult.categories_selected || 0,
+            total: autoSelectResult.total_selected || 0
+          });
+        } else {
+          console.log('⚠️ Pacing auto-selection failed (non-blocking):', autoSelectResponse.status);
+        }
+      } catch (autoSelectError) {
+        console.log('⚠️ Pacing auto-selection error (non-blocking):', autoSelectError);
+        // Non-blocking: Account setup continues even if auto-selection fails
+      }
     }
 
     return NextResponse.json({ 
