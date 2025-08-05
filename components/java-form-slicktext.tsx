@@ -66,11 +66,12 @@ export default function JavaFormSlickText() {
           const inputs = targetForm.querySelectorAll('input, select, textarea');
           let phoneValue = '', emailValue = '', firstNameValue = '', lastNameValue = '';
           
-          inputs.forEach((input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => {
-            const value = input.value || '';
-            const type = (input as HTMLInputElement).type || '';
-            const name = input.name || '';
-            const placeholder = (input as HTMLInputElement).placeholder || '';
+          inputs.forEach((input) => {
+            const element = input as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+            const value = element.value || '';
+            const type = (element as HTMLInputElement).type || '';
+            const name = element.name || '';
+            const placeholder = (element as HTMLInputElement).placeholder || '';
             
             console.log(`🔍 Backup checking input: type="${type}" name="${name}" placeholder="${placeholder}" value="${value}"`);
             
