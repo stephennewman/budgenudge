@@ -83,12 +83,12 @@ export default function AccountPage() {
 
   // Helper function to detect Google OAuth users missing critical data
   const isGoogleOAuthUserMissingData = (user: User, phone: string | null): boolean => {
-    // Check if user has a provider_id indicating OAuth (not email/password signup)
-    const isOAuthUser = user.app_metadata?.providers?.includes('google') || 
-                       user.app_metadata?.provider === 'google' ||
-                       !user.user_metadata?.signupPhone; // Regular signup users have signupPhone
+    // Check if user signed up via Google OAuth (not email/password signup)
+    const isGoogleOAuthUser = user.app_metadata?.providers?.includes('google') || 
+                             user.app_metadata?.provider === 'google';
     
-    if (!isOAuthUser) return false;
+    // Only check Google OAuth users
+    if (!isGoogleOAuthUser) return false;
     
     // Check if missing critical data
     const missingPhone = !phone;
