@@ -1,6 +1,7 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
+import { notifySlackNewUserSignup } from "@/utils/slack/notifications";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -310,6 +311,25 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
     }
 
     console.log('🎉 New user setup completed successfully');
+
+    // 7. Send Slack notification for new signup (non-blocking)
+    try {
+      const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+      if (authUser.user) {
+        await notifySlackNewUserSignup({
+          id: user.id,
+          email: authUser.user.email || undefined,
+          phone: authUser.user.phone || updatedPhone || undefined,
+          firstName: authUser.user.user_metadata?.firstName || authUser.user.user_metadata?.first_name,
+          lastName: authUser.user.user_metadata?.lastName || authUser.user.user_metadata?.last_name,
+          signupSource: authUser.user.user_metadata?.sampleSmsToken ? 'SMS Lead Conversion' : 'Direct Signup',
+          conversionSource: authUser.user.user_metadata?.sampleSmsToken ? `Tracking Token: ${authUser.user.user_metadata.sampleSmsToken}` : undefined
+        });
+      }
+    } catch (slackError) {
+      console.log('⚠️ Slack notification error (non-blocking):', slackError);
+      // Non-blocking: User setup continues even if Slack notification fails
+    }
 
   } catch (error) {
     console.error('User setup error (non-blocking):', error);
