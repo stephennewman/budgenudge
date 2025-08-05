@@ -57,7 +57,7 @@ export default function JavaFormSlickText() {
           
           console.log('📊 Backup: All form fields:');
           const allData: Record<string, string> = {};
-          for (let [key, value] of formData.entries()) {
+          for (const [key, value] of formData.entries()) {
             allData[key] = value.toString();
             console.log(`  ${key}: ${value}`);
           }
@@ -66,11 +66,11 @@ export default function JavaFormSlickText() {
           const inputs = targetForm.querySelectorAll('input, select, textarea');
           let phoneValue = '', emailValue = '', firstNameValue = '', lastNameValue = '';
           
-          inputs.forEach((input: any) => {
+          inputs.forEach((input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) => {
             const value = input.value || '';
-            const type = input.type || '';
+            const type = (input as HTMLInputElement).type || '';
             const name = input.name || '';
-            const placeholder = input.placeholder || '';
+            const placeholder = (input as HTMLInputElement).placeholder || '';
             
             console.log(`🔍 Backup checking input: type="${type}" name="${name}" placeholder="${placeholder}" value="${value}"`);
             
