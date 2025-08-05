@@ -121,13 +121,12 @@ export class SlickTextClient {
       const data = await this.makeRequest('/contacts', {
         method: 'POST',
         body: JSON.stringify({
-          phone_number: contact.phone_number.replace(/\D/g, ''), // Remove non-digits
+          mobile_number: `+1${contact.phone_number.replace(/\D/g, '')}`, // Format as +1XXXXXXXXXX
           first_name: contact.first_name || 'Krezzo',
           last_name: contact.last_name || 'User',
           email: contact.email,
-          opt_in_source: contact.opt_in_source || 'Krezzo Transaction Alerts',
-          list_ids: contact.list_ids || [],
-          custom_fields: contact.custom_fields || {}
+          opt_in_status: 'subscribed',
+          source: contact.opt_in_source || 'Krezzo Transaction Alerts'
         })
       });
 

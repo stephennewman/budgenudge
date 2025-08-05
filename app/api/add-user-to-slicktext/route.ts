@@ -47,15 +47,22 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Clean phone number
-    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    // Clean phone number and handle various formats
+    let cleanPhone = phoneNumber.replace(/\D/g, '');
+    
+    // Handle different phone number formats
+    if (cleanPhone.length === 11 && cleanPhone.startsWith('1')) {
+      // Remove leading 1 from US numbers (e.g., 16173472721 -> 6173472721)
+      cleanPhone = cleanPhone.substring(1);
+    }
     
     if (cleanPhone.length !== 10) {
-      console.log('⚠️ Invalid phone number format:', cleanPhone);
+      console.log('⚠️ Invalid phone number format:', cleanPhone, 'from original:', phoneNumber);
       return NextResponse.json({
         success: false,
         error: 'Invalid phone number format',
-        phone: cleanPhone
+        phone: cleanPhone,
+        original: phoneNumber
       }, { status: 400 });
     }
 
