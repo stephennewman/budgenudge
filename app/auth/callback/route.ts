@@ -240,13 +240,13 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       }
     }
 
-    // 5. Handle signup phone number if provided
+    // 5. Handle signup phone number (now required)
     try {
       const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
       const signupPhone = authUser.user?.user_metadata?.signupPhone;
       
-      if (signupPhone && signupPhone.length === 10) {
-        console.log('📞 Processing phone from signup form:', signupPhone);
+      if (signupPhone && signupPhone.length >= 10) {
+        console.log('📞 Processing required phone from signup form:', signupPhone);
         
         // Update auth.users with phone number
         const formattedPhone = `+1${signupPhone}`;
@@ -260,7 +260,9 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
             phone_number: signupPhone 
           });
         
-        console.log('✅ Signup phone number stored:', formattedPhone);
+        console.log('✅ Required signup phone number stored:', formattedPhone);
+      } else {
+        console.log('⚠️ No phone number provided during signup (this should not happen with required field)');
       }
     } catch (phoneError) {
       console.log('⚠️ Signup phone processing error (non-blocking):', phoneError);
