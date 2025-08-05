@@ -170,19 +170,30 @@ export async function POST(request: NextRequest) {
       accounts: accountsResponse.data.accounts.length,
       transactions: transactionsResponse.data.transactions.length
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error exchanging public token:', error);
     
     // Try to extract more details about the error
-    if (error.response?.data) {
-      console.error('Plaid API Error Details:', error.response.data);
+    if (error && typeof error === 'object' && 'response' in error) {
+      const typedError = error as any;
+      if (typedError.response?.data) {
+        console.error('Plaid API Error Details:', typedError.response.data);
+      }
     }
     
     handlePlaidError(error);
     
-    // More descriptive error response
-    const errorMessage = error.response?.data?.error_message || error.message || 'Failed to exchange token';
-    const errorCode = error.response?.data?.error_code || 'UNKNOWN_ERROR';
+    // More descriptive error response with proper type checking
+    let errorMessage = 'Failed to exchange token';
+    let errorCode = 'UNKNOWN_ERROR';
+    
+    if (error && typeof error === 'object' && 'response' in error) {
+      const typedError = error as any;
+      errorMessage = typedError.response?.data?.error_message || errorMessage;
+      errorCode = typedError.response?.data?.error_code || errorCode;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
     
     return NextResponse.json(
       { 
