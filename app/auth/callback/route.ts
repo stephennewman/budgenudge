@@ -240,7 +240,8 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       }
     }
 
-    // 5. Handle signup phone number (now required)
+    // 5. Handle signup phone number (now required) - MUST BE DONE BEFORE SLICKTEXT
+    let updatedPhone = null;
     try {
       const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
       const signupPhone = authUser.user?.user_metadata?.signupPhone;
@@ -251,6 +252,7 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
         // Update auth.users with phone number
         const formattedPhone = `+1${signupPhone}`;
         await supabase.auth.admin.updateUserById(user.id, { phone: formattedPhone });
+        updatedPhone = formattedPhone;
         
         // Also store in SMS settings
         await supabase
@@ -275,23 +277,31 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       if (authUser.user?.email) {
         console.log('📱 Adding new user to SlickText as subscriber...');
         
+        // Use the updated phone number or fallback to what's in the database
+        const phoneForSlickText = updatedPhone || authUser.user.phone;
+        
+        console.log('📞 Phone number for SlickText:', phoneForSlickText);
+        console.log('📋 User metadata:', authUser.user.user_metadata);
+        
         const slickTextResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/add-user-to-slicktext`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             user_id: user.id,
             email: authUser.user.email,
-            phone: authUser.user.phone,
+            phone: phoneForSlickText,
             first_name: authUser.user.user_metadata?.firstName || authUser.user.user_metadata?.full_name?.split(' ')[0] || authUser.user.user_metadata?.first_name || 'User',
             last_name: authUser.user.user_metadata?.lastName || authUser.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || authUser.user.user_metadata?.last_name || 'Account'
           })
         });
 
+        const slickTextResult = await slickTextResponse.json();
+        console.log('📱 SlickText API response:', slickTextResult);
+
         if (slickTextResponse.ok) {
-          const slickTextResult = await slickTextResponse.json();
           console.log('✅ User added to SlickText:', slickTextResult.slicktext_contact_id || 'success');
         } else {
-          console.log('⚠️ SlickText subscription failed (non-blocking):', slickTextResponse.status);
+          console.log('⚠️ SlickText subscription failed (non-blocking):', slickTextResponse.status, slickTextResult);
         }
       }
     } catch (slickTextError) {
