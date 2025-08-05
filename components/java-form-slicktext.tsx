@@ -6,6 +6,66 @@ import { LoaderIcon } from 'lucide-react';
 export default function JavaFormSlickText() {
   const [formLoading, setFormLoading] = useState(true);
   
+  // Function to set up form capture after SlickText form loads
+  const setupFormCapture = () => {
+    console.log('🔍 Setting up Java Form capture...');
+    
+    const findAndCaptureForm = () => {
+      const form = document.querySelector('#java-form-container form');
+      if (!form) {
+        console.log('⏳ Java Form not ready, retrying...');
+        setTimeout(findAndCaptureForm, 500);
+        return;
+      }
+      
+      console.log('📋 Java Form found, setting up capture');
+      
+      form.addEventListener('submit', function(e) {
+        console.log('📤 Java Form submitted! Capturing data...');
+        
+        try {
+          // Get form data
+          const formData = new FormData(form as HTMLFormElement);
+          const firstName = formData.get('first_name') || formData.get('firstname') || '';
+          const lastName = formData.get('last_name') || formData.get('lastname') || '';
+          const email = formData.get('email') || '';
+          const phoneNumber = formData.get('phone') || formData.get('phone_number') || '';
+          
+          const captureData = {
+            firstName: firstName.toString(),
+            lastName: lastName.toString(), 
+            email: email.toString(),
+            phoneNumber: phoneNumber.toString()
+          };
+          
+          console.log('📊 Captured data:', captureData);
+          
+          // Send to our API
+          fetch('/api/capture-slicktext-lead', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(captureData)
+          })
+          .then(response => response.json())
+          .then(data => {
+            console.log('✅ Successfully sent to Krezzo:', data);
+          })
+          .catch(error => {
+            console.error('❌ Error sending to Krezzo:', error);
+          });
+          
+        } catch (error) {
+          console.error('❌ Error capturing form data:', error);
+        }
+      });
+    };
+    
+    // Start looking for the form
+    setTimeout(findAndCaptureForm, 1000);
+  };
+  
   // Load SlickText Java Form script when component mounts
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
@@ -40,6 +100,9 @@ export default function JavaFormSlickText() {
         script.onload = () => {
           console.log('Java Form script loaded successfully');
           timeoutId = setTimeout(() => setFormLoading(false), 2000);
+          
+          // Set up form capture after script loads
+          setupFormCapture();
         };
         
         script.onerror = (error) => {
