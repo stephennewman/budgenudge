@@ -1,8 +1,6 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import HomepageSlickTextForm from "@/components/homepage-slicktext-form";
-import SampleSMSSection from "@/components/sample-sms-section";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -106,7 +104,7 @@ export default function Home() {
         </div>
       </section>
 
-      <SampleSMSSection />
+
 
       {/* SECTION 3: WHY MOST MONEY TRACKING TOOLS DON'T WORK */}
       <section className="bg-gray-900 text-white py-20 px-4 sm:px-6">
@@ -361,124 +359,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SECTION 8: PRICING */}
-      <section className="bg-white py-20 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-6">Choose your money awareness level</h2>
-            <p className="text-xl text-gray-600">Start free, upgrade when you&apos;re ready</p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {/* FREE TIER */}
-            <div className="bg-gray-50 border-2 border-gray-200 rounded-2xl p-8 text-center">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">Create an account</h3>
-              <div className="text-4xl font-bold text-green-600 mb-6">FREE</div>
-              <ul className="text-gray-600 space-y-3 mb-8">
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-green-500">✓</span>
-                  We&apos;ll send you a sample text
-                </li>
-              </ul>
-              <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                <Link href="/sign-up">Get Started</Link>
-              </Button>
-            </div>
 
-            {/* PINCHING PENNIES */}
-            <div className="bg-blue-50 border-2 border-blue-300 rounded-2xl p-8 text-center relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">Most Popular</span>
-              </div>
-              <h3 className="text-2xl font-bold text-blue-800 mb-4">Pinching Pennies Package</h3>
-              <div className="text-4xl font-bold text-blue-600 mb-2">$5</div>
-              <div className="text-gray-500 mb-6">a month</div>
-              <ul className="text-gray-600 space-y-3 mb-8">
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-blue-500">✓</span>
-                  Daily snapshot of your finances
-                </li>
-              </ul>
-              <Button asChild className="w-full bg-blue-600 hover:bg-blue-700">
-                <Link href="/sign-up">Start Now</Link>
-              </Button>
-            </div>
 
-            {/* BOUGIE ON A BUDGET */}
-            <div className="bg-purple-50 border-2 border-purple-300 rounded-2xl p-8 text-center">
-              <h3 className="text-2xl font-bold text-purple-800 mb-4">Bougie on a Budget Package</h3>
-              <div className="text-4xl font-bold text-purple-600 mb-2">$8</div>
-              <div className="text-gray-500 mb-6">a month</div>
-              <ul className="text-gray-600 space-y-3 mb-8">
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-purple-500">✓</span>
-                  Multiple categories of text updates
-                </li>
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-purple-500">✓</span>
-                  On your schedule
-                </li>
-              </ul>
-              <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
-                <Link href="/sign-up">Get Started</Link>
-              </Button>
-            </div>
 
-            {/* ALL-IN */}
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 border-2 border-orange-300 rounded-2xl p-8 text-center">
-              <h3 className="text-2xl font-bold text-orange-800 mb-4">All-In Package</h3>
-              <div className="text-4xl font-bold text-orange-600 mb-2">$15</div>
-              <div className="text-gray-500 mb-6">a month</div>
-              <ul className="text-gray-600 space-y-3 mb-8">
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-orange-500">✓</span>
-                  All the bells and whistles
-                </li>
-                <li className="flex items-center justify-center gap-2">
-                  <span className="text-orange-500">✓</span>
-                  And more
-                </li>
-              </ul>
-              <Button asChild className="w-full bg-orange-600 hover:bg-orange-700">
-                <Link href="/sign-up">Go All-In</Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <p className="text-gray-600 text-lg">
-              Cancel anytime • No hidden fees • Bank-level security
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 9: SOCIAL PROOF */}
-      <section className="bg-gray-50 py-20 px-4 sm:px-6">
-        <div className="mx-auto max-w-5xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-6">Real results</h2>
-            <p className="text-xl text-gray-600">Numbers don&apos;t lie.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
-            <div className="text-center bg-white rounded-2xl p-10 border-2 border-gray-200">
-              <div className="text-5xl font-bold text-blue-600 mb-4">12%</div>
-              <p className="text-gray-600 text-lg">Average reduction in spending when you know where your money goes</p>
-            </div>
-            
-            <div className="text-center bg-white rounded-2xl p-10 border-2 border-gray-200">
-              <div className="text-5xl font-bold text-green-600 mb-4">2 min</div>
-              <p className="text-gray-600 text-lg">Time it takes to read your daily text and stay informed, if you read slow</p>
-            </div>
-            
-            <div className="text-center bg-white rounded-2xl p-10 border-2 border-gray-200">
-              <div className="text-5xl font-bold text-purple-600 mb-4">0</div>
-              <p className="text-gray-600 text-lg">Apps you need to remember to check or maintain</p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* SECTION 10: PLATFORM FEATURES */}
       <section className="bg-white py-20 px-4 sm:px-6">
@@ -674,17 +557,13 @@ export default function Home() {
             No apps, no spreadsheets, no nonsense.
           </p>
           
-          <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100 text-2xl px-16 py-8 h-auto font-bold mb-8">
-            <Link href="/sign-up">Sign up now</Link>
-          </Button>
+          <div className="mt-8">
+            <script async src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvMDMwNzhlYzVkMGE5ZGJjMjUwMmFkNGY0N2M5YWZiMjQifQ"></script>
+          </div>
           
-          <p className="text-blue-200 text-lg">
+          <p className="text-blue-200 text-lg mt-8">
             Bank-level security • No access to your money • Cancel anytime
           </p>
-          
-          <div className="mt-16">
-            <HomepageSlickTextForm />
-          </div>
         </div>
       </section>
 
