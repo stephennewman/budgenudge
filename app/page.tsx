@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
+import JavaFormSlickText from "@/components/java-form-slicktext";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -558,7 +559,7 @@ export default function Home() {
           </p>
           
           <div className="mt-8">
-            <script async src="https://static.slicktext.com/forms/scripts/embed/eyJ1cmwiOiJodHRwczpcL1wvc3Rmb3Jtcy5jb1wvMDMwNzhlYzVkMGE5ZGJjMjUwMmFkNGY0N2M5YWZiMjQifQ"></script>
+            <JavaFormSlickText />
           </div>
           
           <p className="text-blue-200 text-lg mt-8">
