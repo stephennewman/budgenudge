@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
     
     // Try to extract more details about the error
     if (error && typeof error === 'object' && 'response' in error) {
-      const typedError = error as any;
+      const typedError = error as { response?: { data?: { error_message?: string; error_code?: string } } };
       if (typedError.response?.data) {
         console.error('Plaid API Error Details:', typedError.response.data);
       }
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     let errorCode = 'UNKNOWN_ERROR';
     
     if (error && typeof error === 'object' && 'response' in error) {
-      const typedError = error as any;
+      const typedError = error as { response?: { data?: { error_message?: string; error_code?: string } } };
       errorMessage = typedError.response?.data?.error_message || errorMessage;
       errorCode = typedError.response?.data?.error_code || errorCode;
     } else if (error instanceof Error) {
