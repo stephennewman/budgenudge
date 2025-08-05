@@ -461,13 +461,13 @@ export default function AICategoryAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Track Pacing</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Track Pacing</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Category</th>
                       <th 
-                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('spending')}
                       >
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center">
                           Monthly Avg
                           {sortBy === 'spending' && (
                             <span className="ml-1">
@@ -476,12 +476,12 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Spent This Month</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Spent This Month</th>
                       <th 
-                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('remaining')}
                       >
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center">
                           Remaining Monthly Spend
                           {sortBy === 'remaining' && (
                             <span className="ml-1">
@@ -491,10 +491,10 @@ export default function AICategoryAnalysisPage() {
                         </div>
                       </th>
                       <th 
-                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('transactions')}
                       >
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center">
                           Transactions This Month
                           {sortBy === 'transactions' && (
                             <span className="ml-1">
@@ -504,10 +504,10 @@ export default function AICategoryAnalysisPage() {
                         </div>
                       </th>
                       <th 
-                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('merchants')}
                       >
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center">
                           Total Merchants in Category
                           {sortBy === 'merchants' && (
                             <span className="ml-1">
@@ -516,14 +516,14 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">High Activity Merchants</th>
                     </tr>
                   </thead>
                   <tbody>
                     {categoryData.map((category) => (
                       <tr key={category.ai_category} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-left">
                           <button
                             onClick={() => toggleCategoryTracking(category.ai_category)}
                             disabled={trackingLoading.has(category.ai_category)}
@@ -543,19 +543,19 @@ export default function AICategoryAnalysisPage() {
                             )}
                           </button>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-left">
                           <div className="flex items-center space-x-2">
                             <span className="text-lg">{getCategoryIcon(category.ai_category)}</span>
                             <span className="font-medium text-gray-900">{category.ai_category}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-2 text-right font-bold text-blue-600">
+                        <td className="py-3 px-2 text-left font-bold text-blue-600">
                           {formatCurrency(category.avg_monthly_spending)}
                         </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-left">
                           {formatCurrency(category.current_month_spending)}
                         </td>
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-left">
                           {(() => {
                             const remaining = category.avg_monthly_spending - category.current_month_spending;
                             const percentSpent = category.avg_monthly_spending > 0 ? (category.current_month_spending / category.avg_monthly_spending) : 0;
@@ -568,14 +568,14 @@ export default function AICategoryAnalysisPage() {
                             }
                             
                             return (
-                              <div className="text-center">
+                              <div className="flex items-center space-x-2">
                                 <div className="text-lg">{emoji}</div>
-                                <div className="text-xs text-gray-600">{formatCurrency(Math.abs(remaining))}</div>
+                                <div className="text-sm text-gray-600">{formatCurrency(Math.abs(remaining))}</div>
                               </div>
                             );
                           })()}
                         </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-left">
                           <button
                             onClick={() => openTransactionModal(category)}
                             className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
@@ -584,13 +584,13 @@ export default function AICategoryAnalysisPage() {
                             {category.current_month_transaction_count} transactions
                           </button>
                         </td>
-                        <td className="py-3 px-2 text-right text-gray-600">
+                        <td className="py-3 px-2 text-left text-gray-600">
                           {category.unique_merchants}
                         </td>
-                        <td className="py-3 px-2 text-right text-gray-600">
+                        <td className="py-3 px-2 text-left text-gray-600">
                           {formatCurrency(category.avg_transaction_amount)}
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-left">
                           <div className="flex flex-wrap gap-1">
                             {category.top_merchants.slice(0, 3).map((merchant, i) => (
                               <span key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
