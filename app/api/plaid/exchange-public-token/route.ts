@@ -172,9 +172,24 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error exchanging public token:', error);
+    
+    // Try to extract more details about the error
+    if (error.response?.data) {
+      console.error('Plaid API Error Details:', error.response.data);
+    }
+    
     handlePlaidError(error);
+    
+    // More descriptive error response
+    const errorMessage = error.response?.data?.error_message || error.message || 'Failed to exchange token';
+    const errorCode = error.response?.data?.error_code || 'UNKNOWN_ERROR';
+    
     return NextResponse.json(
-      { error: 'Failed to exchange token' },
+      { 
+        error: errorMessage,
+        error_code: errorCode,
+        details: 'Please try reconnecting your account. If the issue persists, contact support.'
+      },
       { status: 500 }
     );
   }
