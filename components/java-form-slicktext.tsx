@@ -20,7 +20,7 @@ export default function JavaFormSlickText() {
       
       console.log('📋 Java Form found, setting up capture');
       
-      form.addEventListener('submit', function(e) {
+      form.addEventListener('submit', function(_e) {
         console.log('📤 Java Form submitted! Capturing data...');
         
         try {
