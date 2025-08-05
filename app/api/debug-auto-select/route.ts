@@ -1,10 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
 
 // DEBUG endpoint to manually trigger auto-selection for users who missed it due to Plaid errors
 export async function POST(request: Request) {
