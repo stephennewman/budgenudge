@@ -5,7 +5,6 @@ import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
-import ManualRefreshButton from '@/components/manual-refresh-button';
 import TransactionVerificationModal from '@/components/transaction-verification-modal';
 
 interface AICategoryData {
@@ -399,22 +398,6 @@ export default function AICategoryAnalysisPage() {
     return icons[category] || '💼';
   };
 
-  const getPacingColor = (status: string) => {
-    switch (status) {
-      case 'under': return 'text-green-600 bg-green-50';
-      case 'over': return 'text-red-600 bg-red-50';
-      default: return 'text-yellow-600 bg-yellow-50';
-    }
-  };
-
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'increasing': return '📈';
-      case 'decreasing': return '📉';
-      default: return '➡️';
-    }
-  };
-
   const handleSort = (newSortBy: 'spending' | 'transactions' | 'merchants' | 'remaining') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
@@ -461,7 +444,6 @@ export default function AICategoryAnalysisPage() {
             )}
           </p>
         </div>
-        <ManualRefreshButton onRefresh={fetchAICategoryData} />
       </div>
 
       {categoryData.length === 0 ? (
@@ -494,14 +476,13 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
+                      <th className="text-right py-3 px-2 font-medium text-gray-900">Spent This Month</th>
                       <th 
                         className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('remaining')}
                       >
                         <div className="flex items-center justify-center">
-                          Remaining
+                          Remaining Monthly Spend
                           {sortBy === 'remaining' && (
                             <span className="ml-1">
                               {sortOrder === 'desc' ? '↓' : '↑'}
@@ -509,13 +490,12 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
                       <th 
                         className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('transactions')}
                       >
                         <div className="flex items-center justify-end">
-                          Transactions
+                          Transactions This Month
                           {sortBy === 'transactions' && (
                             <span className="ml-1">
                               {sortOrder === 'desc' ? '↓' : '↑'}
@@ -528,7 +508,7 @@ export default function AICategoryAnalysisPage() {
                         onClick={() => handleSort('merchants')}
                       >
                         <div className="flex items-center justify-end">
-                          Merchants
+                          Total Merchants in Category
                           {sortBy === 'merchants' && (
                             <span className="ml-1">
                               {sortOrder === 'desc' ? '↓' : '↑'}
@@ -536,12 +516,12 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Avg/Transaction</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Top Merchants</th>
+                      <th className="text-right py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">High Activity Merchants</th>
                     </tr>
                   </thead>
                   <tbody>
-                                         {categoryData.map((category) => (
+                    {categoryData.map((category) => (
                       <tr key={category.ai_category} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="py-3 px-2 text-center">
                           <button
@@ -555,6 +535,7 @@ export default function AICategoryAnalysisPage() {
                             {trackingLoading.has(category.ai_category) ? (
                               '⏳'
                             ) : trackedCategories.has(category.ai_category) ? (
+                              // Horizontal stoplight instead of dots
                               category.pacing_status === 'over' ? '🔴' :
                               category.pacing_status === 'under' ? '🟢' : '🟡'
                             ) : (
@@ -575,14 +556,6 @@ export default function AICategoryAnalysisPage() {
                           {formatCurrency(category.current_month_spending)}
                         </td>
                         <td className="py-3 px-2 text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPacingColor(category.pacing_status)}`}>
-                            {category.pacing_status === 'under' && '🟢'}
-                            {category.pacing_status === 'on-track' && '🟡'}
-                            {category.pacing_status === 'over' && '🔴'}
-                            {Math.round(category.pacing_percentage * 100)}%
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-center">
                           {(() => {
                             const remaining = category.avg_monthly_spending - category.current_month_spending;
                             const percentSpent = category.avg_monthly_spending > 0 ? (category.current_month_spending / category.avg_monthly_spending) : 0;
@@ -601,9 +574,6 @@ export default function AICategoryAnalysisPage() {
                               </div>
                             );
                           })()}
-                        </td>
-                        <td className="py-3 px-2 text-center">
-                          <span className="text-lg">{getTrendIcon(category.spending_trend)}</span>
                         </td>
                         <td className="py-3 px-2 text-right">
                           <button
@@ -649,10 +619,10 @@ export default function AICategoryAnalysisPage() {
                   <p><strong>🔴 Over:</strong> Spending more than 110% of expected</p>
                 </div>
                 <div>
-                  <p><strong>Trends:</strong> Based on last 3 months of data</p>
-                  <p><strong>📈 Increasing:</strong> Spending has grown by 10%+</p>
-                  <p><strong>📉 Decreasing:</strong> Spending has dropped by 10%+</p>
-                  <p><strong>➡️ Stable:</strong> Spending change is less than 10%</p>
+                  <p><strong>Remaining Monthly Spend:</strong> How much you have left to spend this month</p>
+                  <p><strong>🟩 Under Budget:</strong> You have money left to spend</p>
+                  <p><strong>🟨 Approaching Budget:</strong> You&apos;re close to your monthly average</p>
+                  <p><strong>🟥 Over Budget:</strong> You&apos;ve exceeded your monthly average</p>
                 </div>
               </div>
             </CardContent>
