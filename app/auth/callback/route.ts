@@ -181,13 +181,58 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
           })
           .in('id', leadIds);
 
+        // Update user's phone number if not already set and we have phone data
+        const phoneNumbers = emailLeads.map(l => l.phone_number).filter(Boolean);
+        if (phoneNumbers.length > 0) {
+          const mostRecentPhone = emailLeads[0].phone_number; // Most recent lead's phone
+          
+          if (mostRecentPhone) {
+            const formattedPhone = `+1${mostRecentPhone}`;
+            
+            try {
+              // Update auth.users phone field - requires admin client
+              const { error: phoneUpdateError } = await supabase.auth.admin.updateUserById(
+                user.id,
+                { 
+                  phone: formattedPhone // Format as E.164
+                }
+              );
+
+              if (phoneUpdateError) {
+                console.warn('Phone update error (non-blocking):', phoneUpdateError);
+              } else {
+                console.log('📞 User phone number updated in auth.users:', formattedPhone);
+              }
+            } catch (phoneError) {
+              console.warn('Phone update failed (non-blocking):', phoneError);
+            }
+
+            // Also update SMS settings table with phone number for SMS delivery
+            try {
+              const { error: smsPhoneError } = await supabase
+                .from('user_sms_settings')
+                .update({ phone_number: mostRecentPhone }) // Store raw number for SMS
+                .eq('user_id', user.id);
+
+              if (smsPhoneError) {
+                console.warn('SMS settings phone update error (non-blocking):', smsPhoneError);
+              } else {
+                console.log('📱 User phone number updated in SMS settings:', mostRecentPhone);
+              }
+            } catch (smsPhoneError) {
+              console.warn('SMS settings phone update failed (non-blocking):', smsPhoneError);
+            }
+          }
+        }
+
         console.log('✅ SlickText leads linked via email:', {
           email: user.email,
           userId: user.id,
           leadCount: emailLeads.length,
           leadIds: leadIds,
           sources: emailLeads.map(l => l.source),
-          phones: emailLeads.map(l => l.phone_number)
+          phones: emailLeads.map(l => l.phone_number),
+          phoneUpdated: phoneNumbers.length > 0
         });
       }
     }
