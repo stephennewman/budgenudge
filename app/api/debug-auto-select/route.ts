@@ -49,10 +49,13 @@ export async function POST(request: Request) {
       message: 'Auto-selection manually triggered'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in debug auto-select:', error);
     return NextResponse.json(
-      { error: 'Failed to trigger auto-selection', details: error.message },
+      { 
+        error: 'Failed to trigger auto-selection', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      },
       { status: 500 }
     );
   }
