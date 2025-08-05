@@ -5,7 +5,6 @@ import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
-import ManualRefreshButton from '@/components/manual-refresh-button';
 import TransactionVerificationModal from '@/components/transaction-verification-modal';
 
 interface AIMerchantData {
@@ -435,47 +434,6 @@ export default function AIMerchantAnalysisPage() {
     return icons[merchant] || '🏢';
   };
 
-  const getPacingColor = (status: string) => {
-    switch (status) {
-      case 'under': return 'text-green-600 bg-green-50';
-      case 'over': return 'text-red-600 bg-red-50';
-      default: return 'text-yellow-600 bg-yellow-50';
-    }
-  };
-
-  const getTrendIcon = (trend: string) => {
-    switch (trend) {
-      case 'increasing': return '📈';
-      case 'decreasing': return '📉';
-      default: return '➡️';
-    }
-  };
-
-  const getMerchantTypeColor = (type: string) => {
-    switch (type) {
-      case 'frequent': return 'text-blue-700 bg-blue-100';
-      case 'occasional': return 'text-orange-700 bg-orange-100';
-      case 'rare': return 'text-gray-700 bg-gray-100';
-      default: return 'text-gray-700 bg-gray-100';
-    }
-  };
-
-  const getMerchantTypeLabel = (type: string) => {
-    switch (type) {
-      case 'frequent': return 'Frequent';
-      case 'occasional': return 'Occasional';
-      case 'rare': return 'Rare';
-      default: return 'Unknown';
-    }
-  };
-
-  const formatFrequency = (days: number) => {
-    if (days < 1) return 'Daily+';
-    if (days < 7) return `${Math.round(days)}d`;
-    if (days < 30) return `${Math.round(days / 7)}w`;
-    return `${Math.round(days / 30)}m`;
-  };
-
   const handleSort = (newSortBy: 'spending' | 'transactions' | 'frequency' | 'remaining') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
@@ -522,15 +480,14 @@ export default function AIMerchantAnalysisPage() {
             )}
           </p>
         </div>
-        <ManualRefreshButton onRefresh={fetchAIMerchantData} />
       </div>
 
       {merchantData.length === 0 ? (
-                 <Card>
-           <CardContent className="text-center py-8">
-             <p className="text-gray-600">No merchant transactions found. This could mean no transactions are available or they&apos;re still being processed.</p>
-           </CardContent>
-         </Card>
+        <Card>
+          <CardContent className="text-center py-8">
+            <p className="text-gray-600">No merchant transactions found. This could mean no transactions are available or they&apos;re still being processed.</p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-6">
           {/* Table View */}
@@ -540,13 +497,13 @@ export default function AIMerchantAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Track Pacing</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Track Pacing</th>
                       <th className="text-left py-3 px-2 font-medium text-gray-900">Merchant</th>
                       <th 
-                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('spending')}
                       >
-                        <div className="flex items-center justify-end">
+                        <div className="flex items-center">
                           Monthly Avg
                           {sortBy === 'spending' && (
                             <span className="ml-1">
@@ -555,13 +512,12 @@ export default function AIMerchantAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">This Month</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Pacing</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Spent This Month</th>
                       <th 
-                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('remaining')}
                       >
-                        <div className="flex items-center justify-center">
+                        <div className="flex items-center">
                           Remaining
                           {sortBy === 'remaining' && (
                             <span className="ml-1">
@@ -570,27 +526,12 @@ export default function AIMerchantAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Trend</th>
-                      <th className="text-center py-3 px-2 font-medium text-gray-900">Type</th>
                       <th 
-                        className="text-center py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
-                        onClick={() => handleSort('frequency')}
-                      >
-                        <div className="flex items-center justify-center">
-                          Frequency
-                          {sortBy === 'frequency' && (
-                            <span className="ml-1">
-                              {sortOrder === 'desc' ? '↓' : '↑'}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                      <th 
-                        className="text-right py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('transactions')}
                       >
-                        <div className="flex items-center justify-end">
-                          Transactions
+                        <div className="flex items-center">
+                          Transactions This Month
                           {sortBy === 'transactions' && (
                             <span className="ml-1">
                               {sortOrder === 'desc' ? '↓' : '↑'}
@@ -598,14 +539,14 @@ export default function AIMerchantAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-right py-3 px-2 font-medium text-gray-900">Avg/Transaction</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Categories</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Associated Category</th>
                     </tr>
                   </thead>
                   <tbody>
                     {merchantData.map((merchant) => (
                       <tr key={merchant.ai_merchant} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-left">
                           <button
                             onClick={() => toggleMerchantTracking(merchant.ai_merchant)}
                             disabled={trackingLoading.has(merchant.ai_merchant)}
@@ -617,34 +558,26 @@ export default function AIMerchantAnalysisPage() {
                             {trackingLoading.has(merchant.ai_merchant) ? (
                               '⏳'
                             ) : trackedMerchants.has(merchant.ai_merchant) ? (
-                              merchant.pacing_status === 'under' ? '🟢' :
-                              merchant.pacing_status === 'over' ? '🔴' : '🟡'
+                              // Traffic light emoji instead of individual dots
+                              '🚥'
                             ) : (
                               '⚪'
                             )}
                           </button>
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-left">
                           <div className="flex items-center space-x-2">
                             <span className="text-lg">{getMerchantIcon(merchant.ai_merchant)}</span>
                             <span className="font-medium text-gray-900">{merchant.ai_merchant}</span>
                           </div>
                         </td>
-                        <td className="py-3 px-2 text-right font-bold text-blue-600">
+                        <td className="py-3 px-2 text-left font-bold text-blue-600">
                           {formatCurrency(merchant.avg_monthly_spending)}
                         </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-left">
                           {formatCurrency(merchant.current_month_spending)}
                         </td>
-                        <td className="py-3 px-2 text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPacingColor(merchant.pacing_status)}`}>
-                            {merchant.pacing_status === 'under' && '🟢'}
-                            {merchant.pacing_status === 'on-track' && '🟡'}
-                            {merchant.pacing_status === 'over' && '🔴'}
-                            {Math.round(merchant.pacing_percentage * 100)}%
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-center">
+                        <td className="py-3 px-2 text-left">
                           {(() => {
                             const remaining = merchant.avg_monthly_spending - merchant.current_month_spending;
                             const percentSpent = merchant.avg_monthly_spending > 0 ? (merchant.current_month_spending / merchant.avg_monthly_spending) : 0;
@@ -657,25 +590,14 @@ export default function AIMerchantAnalysisPage() {
                             }
                             
                             return (
-                              <div className="text-center">
+                              <div className="flex items-center space-x-2">
                                 <div className="text-lg">{emoji}</div>
-                                <div className="text-xs text-gray-600">{formatCurrency(Math.abs(remaining))}</div>
+                                <div className="text-sm text-gray-600">{formatCurrency(Math.abs(remaining))}</div>
                               </div>
                             );
                           })()}
                         </td>
-                        <td className="py-3 px-2 text-center">
-                          <span className="text-lg">{getTrendIcon(merchant.spending_trend)}</span>
-                        </td>
-                        <td className="py-3 px-2 text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getMerchantTypeColor(merchant.merchant_type)}`}>
-                            {getMerchantTypeLabel(merchant.merchant_type)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-center text-sm text-gray-600">
-                          {formatFrequency(merchant.frequency_days)}
-                        </td>
-                        <td className="py-3 px-2 text-right">
+                        <td className="py-3 px-2 text-left">
                           <button
                             onClick={() => openTransactionModal(merchant)}
                             className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
@@ -684,14 +606,14 @@ export default function AIMerchantAnalysisPage() {
                             {merchant.current_month_transaction_count} transactions
                           </button>
                         </td>
-                        <td className="py-3 px-2 text-right text-gray-600">
+                        <td className="py-3 px-2 text-left text-gray-600">
                           {formatCurrency(merchant.avg_transaction_amount)}
                         </td>
-                        <td className="py-3 px-2">
+                        <td className="py-3 px-2 text-left">
                           <div className="flex flex-wrap gap-1">
                             {merchant.categories.slice(0, 2).map((cat, i) => (
                               <span key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                                {cat.category} ({cat.count})
+                                {cat.category}
                               </span>
                             ))}
                           </div>
@@ -700,26 +622,6 @@ export default function AIMerchantAnalysisPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Legend */}
-          <Card>
-            <CardContent className="p-4">
-              <h4 className="font-medium text-gray-900 mb-2">🔍 Understanding Your Data</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                <div>
-                  <p><strong>Merchant Types:</strong> Based on transaction frequency</p>
-                  <p><strong>🔵 Frequent:</strong> Weekly or more (≤7 days)</p>
-                  <p><strong>🟠 Occasional:</strong> Monthly (8-30 days)</p>
-                  <p><strong>⚪ Rare:</strong> Less than monthly (&gt;30 days)</p>
-                </div>
-                <div>
-                  <p><strong>Frequency:</strong> Average days between transactions</p>
-                  <p><strong>d:</strong> days, <strong>w:</strong> weeks, <strong>m:</strong> months</p>
-                  <p><strong>Categories:</strong> Top categories by spending with transaction count</p>
-                </div>
               </div>
             </CardContent>
           </Card>
