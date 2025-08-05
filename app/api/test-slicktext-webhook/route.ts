@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     console.log('📤 Simulating webhook payload:', webhookPayload);
     
     // Call the actual webhook endpoint locally
-    const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://budgenudge.vercel.app';
+    const baseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://get.krezzo.com';
     
     const webhookResponse = await fetch(`${baseUrl}/api/slicktext-webhook`, {
       method: 'POST',

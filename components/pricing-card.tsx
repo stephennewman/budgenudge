@@ -40,7 +40,7 @@ export default function PricingCard({
   async function handleSelectPlan(priceId: string) {
     setIsLoading(true);
     const client = createUpdateClient();
-    const redirectUrl = `https://budgenudge.vercel.app/protected`;
+    const redirectUrl = `https://get.krezzo.com/protected`;
     const { data, error } = await client.billing.createCheckoutSession(
       priceId,
       {
