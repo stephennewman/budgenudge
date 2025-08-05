@@ -1,10 +1,10 @@
 # 🔔 Slack Notifications Setup Guide
 
-This guide will help you set up Slack notifications for new user signups in BudgeNudge.
+This guide will help you set up Slack notifications for new user signups in Krezzo.
 
 ## 📋 Overview
 
-When a new user completes email verification and account setup, BudgeNudge will automatically send a rich notification to your Slack channel with:
+When a new user completes email verification and account setup, Krezzo will automatically send a rich notification to your Slack channel with:
 
 - ✅ User details (name, email, phone)
 - ✅ Signup timestamp
@@ -18,7 +18,7 @@ When a new user completes email verification and account setup, BudgeNudge will 
 
 1. Go to [https://api.slack.com/apps](https://api.slack.com/apps)
 2. Click **"Create New App"** → **"From scratch"**
-3. Name your app (e.g., "BudgeNudge Notifications")
+3. Name your app (e.g., "Krezzo Notifications")
 4. Select your Slack workspace
 5. Click **"Create App"**
 
@@ -88,7 +88,7 @@ Create a new test account to see the full notification in action.
 The notification includes:
 
 ```
-🎉 New BudgeNudge User Signup!
+🎉 New Krezzo User Signup!
 
 Name: John Doe
 Email: john@example.com  
@@ -136,4 +136,4 @@ Source: Direct signup
 
 ---
 
-✅ **Setup Complete**: New user signups will now trigger Slack notifications automatically!
+✅ **Setup Complete**: New Krezzo user signups will now trigger Slack notifications automatically!

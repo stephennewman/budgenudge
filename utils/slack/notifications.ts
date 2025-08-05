@@ -64,13 +64,13 @@ export async function notifySlackNewUserSignup(user: SlackUser): Promise<boolean
 
     // Create rich notification with Block Kit
     const payload: SlackNotificationPayload = {
-      text: `🎉 New BudgeNudge Signup: ${userDisplayName}`,
+      text: `🎉 New Krezzo Signup: ${userDisplayName}`,
       blocks: [
         {
           type: "header",
           text: {
             type: "plain_text",
-            text: "🎉 New BudgeNudge User Signup!"
+            text: "🎉 New Krezzo User Signup!"
           }
         },
         {

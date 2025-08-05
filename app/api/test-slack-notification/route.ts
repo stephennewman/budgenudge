@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     console.log(`🧪 Testing Slack notification: ${testType}`);
     
     if (testType === 'simple') {
-      const result = await notifySlackSimple('🧪 Test notification from BudgeNudge - Slack integration is working!');
+      const result = await notifySlackSimple('🧪 Test notification from Krezzo - Slack integration is working!');
       
       return NextResponse.json({
         success: result,
