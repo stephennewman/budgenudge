@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
+import GoogleOAuthDataCollectionModal from "@/components/google-oauth-data-collection-modal";
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
 import { Button } from "@/components/ui/button";
 
@@ -17,6 +18,8 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [showDataCollectionModal, setShowDataCollectionModal] = useState(false);
+  const [needsDataCollection, setNeedsDataCollection] = useState(false);
 
   const supabase = createSupabaseClient();
 
@@ -58,6 +61,15 @@ export default function AccountPage() {
         }
         
         setPhoneNumber(phone);
+
+        // Check if user needs data collection (Google OAuth users missing info)
+        const needsData = isGoogleOAuthUserMissingData(user, phone);
+        setNeedsDataCollection(needsData);
+        
+        // Show modal automatically for Google OAuth users missing critical data
+        if (needsData && !user.user_metadata?.googleOAuthDataCompleted) {
+          setShowDataCollectionModal(true);
+        }
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError("There was an error loading your account. Please try again.");
@@ -68,6 +80,29 @@ export default function AccountPage() {
 
     fetchUserAndAccounts();
   }, [supabase]);
+
+  // Helper function to detect Google OAuth users missing critical data
+  const isGoogleOAuthUserMissingData = (user: User, phone: string | null): boolean => {
+    // Check if user has a provider_id indicating OAuth (not email/password signup)
+    const isOAuthUser = user.app_metadata?.providers?.includes('google') || 
+                       user.app_metadata?.provider === 'google' ||
+                       !user.user_metadata?.signupPhone; // Regular signup users have signupPhone
+    
+    if (!isOAuthUser) return false;
+    
+    // Check if missing critical data
+    const missingPhone = !phone;
+    const missingNames = !user.user_metadata?.firstName || !user.user_metadata?.lastName;
+    
+    return missingPhone || missingNames;
+  };
+
+  const handleDataCollectionComplete = () => {
+    setShowDataCollectionModal(false);
+    setNeedsDataCollection(false);
+    // Refresh user data
+    window.location.reload();
+  };
 
   const handleAddPhone = async () => {
     if (!user) return;
@@ -137,6 +172,33 @@ export default function AccountPage() {
     return (
       <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
         <VerificationSuccessBanner />
+        
+        {/* Data Collection Notice for Google OAuth Users */}
+        {needsDataCollection && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-100">
+                  <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-blue-800">Complete Your Profile</h3>
+                <p className="mt-1 text-sm text-blue-700">
+                  We need your phone number and name details to enable SMS notifications and personalize your experience.
+                </p>
+                <Button
+                  onClick={() => setShowDataCollectionModal(true)}
+                  className="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2"
+                >
+                  Complete Profile
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">🏠 Account Setup</h1>
@@ -305,6 +367,17 @@ export default function AccountPage() {
         </div>
         */}
       </div>
+
+      {/* Google OAuth Data Collection Modal */}
+      {user && (
+        <GoogleOAuthDataCollectionModal
+          isOpen={showDataCollectionModal}
+          onClose={() => setShowDataCollectionModal(false)}
+          userEmail={user.email || ''}
+          fullName={user.user_metadata?.full_name || ''}
+          onDataCollected={handleDataCollectionComplete}
+        />
+      )}
     </div>
   );
 }
