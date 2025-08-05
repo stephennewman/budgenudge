@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import SampleSMSModal from '@/components/sample-sms-modal';
-import SlickTextForm from '@/components/slicktext-form';
+import HomepageSignUpForm from '@/components/homepage-signup-form';
 
 export default function SampleSMSSection() {
   const [showSampleModal, setShowSampleModal] = useState(false);
@@ -62,10 +62,10 @@ export default function SampleSMSSection() {
         </div>
       </section>
       
-      {/* SECTION 3: SLICKTEXT SUBSCRIPTION FORM */}
+      {/* SECTION 3: SIGNUP FORM */}
       <section className="bg-white py-20 px-4 sm:px-6">
-        <div className="mx-auto max-w-2xl">
-          <SlickTextForm />
+        <div className="mx-auto max-w-md">
+          <HomepageSignUpForm />
         </div>
       </section>
       

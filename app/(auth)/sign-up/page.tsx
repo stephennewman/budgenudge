@@ -40,6 +40,22 @@ function SignUpForm() {
         {/* Hidden tracking token field */}
         <input type="hidden" name="trackingToken" value={trackingToken} />
         
+        <Label htmlFor="firstName" className="text-base sm:text-sm">First Name</Label>
+        <Input 
+          name="firstName" 
+          placeholder="John" 
+          required 
+          className="h-12 sm:h-10 text-base"
+        />
+        
+        <Label htmlFor="lastName" className="text-base sm:text-sm">Last Name</Label>
+        <Input 
+          name="lastName" 
+          placeholder="Smith" 
+          required 
+          className="h-12 sm:h-10 text-base"
+        />
+        
         <Label htmlFor="email" className="text-base sm:text-sm">Email</Label>
         <Input 
           name="email" 

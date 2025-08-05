@@ -282,8 +282,8 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
             user_id: user.id,
             email: authUser.user.email,
             phone: authUser.user.phone,
-            first_name: authUser.user.user_metadata?.full_name?.split(' ')[0] || authUser.user.user_metadata?.first_name,
-            last_name: authUser.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || authUser.user.user_metadata?.last_name
+            first_name: authUser.user.user_metadata?.firstName || authUser.user.user_metadata?.full_name?.split(' ')[0] || authUser.user.user_metadata?.first_name || 'User',
+            last_name: authUser.user.user_metadata?.lastName || authUser.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || authUser.user.user_metadata?.last_name || 'Account'
           })
         });
 

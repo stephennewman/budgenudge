@@ -22,6 +22,8 @@ export const signInAction = async (formData: FormData) => {
 };
 
 export const signUpAction = async (formData: FormData) => {
+  const firstName = formData.get("firstName") as string;
+  const lastName = formData.get("lastName") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
   const phone = formData.get("phone") as string;
@@ -43,7 +45,9 @@ export const signUpAction = async (formData: FormData) => {
       emailRedirectTo: url,
       data: {
         sampleSmsToken: trackingToken || null,
-        signupPhone: cleanPhone // Store phone from signup form
+        signupPhone: cleanPhone, // Store phone from signup form
+        firstName: firstName, // Store first name from signup form
+        lastName: lastName // Store last name from signup form
       }
     },
   });

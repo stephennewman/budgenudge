@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import JavaFormSlickText from "@/components/java-form-slicktext";
+import HomepageSignUpForm from "@/components/homepage-signup-form";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -558,8 +558,8 @@ export default function Home() {
             No apps, no spreadsheets, no nonsense.
           </p>
           
-          <div className="mt-8">
-            <JavaFormSlickText />
+          <div className="mt-8 max-w-md mx-auto">
+            <HomepageSignUpForm />
           </div>
           
           <p className="text-blue-200 text-lg mt-8">

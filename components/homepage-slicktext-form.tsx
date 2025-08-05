@@ -1,6 +1,8 @@
 "use client";
 
+import HomepageSignUpForm from '@/components/homepage-signup-form';
+
 export default function HomepageSlickTextForm() {
-  // Temporarily disabled - SlickText script was auto-embedding on all pages
-  return null;
+  // Now redirects to the new signup form component
+  return <HomepageSignUpForm />;
 } 
