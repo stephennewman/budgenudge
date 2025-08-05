@@ -24,6 +24,7 @@ export const signInAction = async (formData: FormData) => {
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const phone = formData.get("phone") as string;
   const trackingToken = formData.get("trackingToken") as string;
   const client = await createSupabaseClient();
 
@@ -32,13 +33,17 @@ export const signUpAction = async (formData: FormData) => {
     ? "https://get.krezzo.com/auth/callback"
     : "http://localhost:3000/auth/callback";
 
+  // Clean phone number if provided
+  const cleanPhone = phone ? phone.replace(/\D/g, '') : null;
+  
   const { error } = await client.auth.signUp({
     email,
     password,
     options: {
       emailRedirectTo: url,
       data: {
-        sampleSmsToken: trackingToken || null
+        sampleSmsToken: trackingToken || null,
+        signupPhone: cleanPhone // Store phone from signup form
       }
     },
   });

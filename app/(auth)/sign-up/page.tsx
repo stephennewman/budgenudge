@@ -48,6 +48,17 @@ function SignUpForm() {
           className="h-12 sm:h-10 text-base"
         />
         
+        <Label htmlFor="phone" className="text-base sm:text-sm">
+          Phone Number 
+          <span className="text-muted-foreground font-normal">(optional)</span>
+        </Label>
+        <Input 
+          name="phone" 
+          type="tel"
+          placeholder="(555) 123-4567" 
+          className="h-12 sm:h-10 text-base"
+        />
+        
         <div className="flex justify-between items-center">
           <Label htmlFor="password" className="text-base sm:text-sm">Password</Label>
         </div>
