@@ -1,5 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Type definitions for webhook data
+interface ContactData {
+  phone_number?: string;
+  phone?: string;
+  first_name?: string;
+  firstName?: string;
+  last_name?: string;
+  lastName?: string;
+  email?: string;
+}
+
+interface WebhookData {
+  data?: ContactData;
+  contact?: ContactData;
+  [key: string]: unknown;
+}
+
 /**
  * SlickText Webhook Handler for Two-Way SMS Messaging
  * Processes incoming SMS replies and sends intelligent responses
@@ -196,17 +213,17 @@ function getKeywordResponse(message: string): string {
 /**
  * Handle contact creation events (form submissions)
  */
-async function handleContactCreated(webhookData: Record<string, any>): Promise<NextResponse> {
+async function handleContactCreated(webhookData: WebhookData): Promise<NextResponse> {
   try {
     console.log('📝 Processing SlickText contact creation...');
     
-    const contactData = webhookData.data || webhookData.contact || webhookData;
+    const contactData = webhookData.data || webhookData.contact || (webhookData as ContactData);
     
     // Extract contact information
-    const phoneNumber = contactData.phone_number || contactData.phone || '';
-    const firstName = contactData.first_name || contactData.firstName || '';
-    const lastName = contactData.last_name || contactData.lastName || '';
-    const email = contactData.email || '';
+    const phoneNumber = contactData?.phone_number || contactData?.phone || '';
+    const firstName = contactData?.first_name || contactData?.firstName || '';
+    const lastName = contactData?.last_name || contactData?.lastName || '';
+    const email = contactData?.email || '';
     
     console.log('📊 Contact data extracted:', { phoneNumber, firstName, lastName, email });
     

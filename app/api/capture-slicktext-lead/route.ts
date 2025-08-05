@@ -18,18 +18,20 @@ export async function POST(request: NextRequest) {
     // Generate tracking token
     const trackingToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
-    // Store in database
+    // Store additional contact data in a way that works with current schema
+    const enhancedSource = `slicktext_java_form:${firstName || 'Unknown'}:${lastName || 'Unknown'}:${email || 'no-email'}`;
+    
+    // Store in database (only fields that exist in current schema)
     const { data, error } = await supabase
       .from('sample_sms_leads')
       .insert({
         phone_number: cleanPhone,
-        email: email,
-        first_name: firstName,
-        last_name: lastName,
-        source: 'slicktext_java_form',
+        source: enhancedSource, // Store contact data in source field for now
         tracking_token: trackingToken,
         opted_in_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
+        // Note: email, first_name, last_name will be added via migration
+        // For now, storing as enhanced source field with format:
+        // slicktext_java_form:FirstName:LastName:email@example.com
       })
       .select()
       .single();
