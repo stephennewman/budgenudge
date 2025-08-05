@@ -6,8 +6,125 @@ import { LoaderIcon } from 'lucide-react';
 export default function JavaFormSlickText() {
   const [formLoading, setFormLoading] = useState(true);
   
-  // Note: Form capture is now handled by SlickText's built-in JavaScript injection
-  // The capture code is added directly in the SlickText form builder
+  // Backup form capture (in addition to SlickText JavaScript injection)
+  // This provides double coverage in case SlickText timing fails
+  const setupBackupCapture = () => {
+    console.log('🔧 Setting up backup form capture...');
+    
+    let attempts = 0;
+    const maxAttempts = 15;
+    
+    const findAndCaptureForm = () => {
+      attempts++;
+      console.log(`🔍 Backup capture attempt ${attempts}/${maxAttempts}`);
+      
+      // Look for forms in multiple ways
+      const containerForms = document.querySelectorAll('#java-form-container form');
+      const allForms = document.querySelectorAll('form');
+      const anyInputs = document.querySelectorAll('input[type="email"], input[type="tel"]');
+      
+      console.log(`📊 Backup found: ${containerForms.length} container forms, ${allForms.length} total forms, ${anyInputs.length} email/phone inputs`);
+      
+      const targetForm = containerForms[0] || allForms[0];
+      
+      if (!targetForm && attempts < maxAttempts) {
+        console.log('⏳ Backup: No form found, retrying...');
+        setTimeout(findAndCaptureForm, 1000);
+        return;
+      }
+      
+      if (!targetForm) {
+        console.log('❌ Backup: No forms found after all attempts');
+        return;
+      }
+      
+      console.log('📋 Backup: Form found!', targetForm);
+      
+      // Check if listener already attached
+      if (targetForm.dataset.krezzoBackupAttached) {
+        console.log('⚠️ Backup: Already attached to this form');
+        return;
+      }
+      
+      targetForm.dataset.krezzoBackupAttached = 'true';
+      
+      targetForm.addEventListener('submit', function() {
+        console.log('📤 BACKUP CAPTURE: Form submitted!');
+        
+        try {
+          // Get form data with multiple strategies
+          const formData = new FormData(targetForm as HTMLFormElement);
+          
+          console.log('📊 Backup: All form fields:');
+          const allData: Record<string, string> = {};
+          for (let [key, value] of formData.entries()) {
+            allData[key] = value.toString();
+            console.log(`  ${key}: ${value}`);
+          }
+          
+          // Find fields by multiple methods
+          const inputs = targetForm.querySelectorAll('input, select, textarea');
+          let phoneValue = '', emailValue = '', firstNameValue = '', lastNameValue = '';
+          
+          inputs.forEach((input: any) => {
+            const value = input.value || '';
+            const type = input.type || '';
+            const name = input.name || '';
+            const placeholder = input.placeholder || '';
+            
+            console.log(`🔍 Backup checking input: type="${type}" name="${name}" placeholder="${placeholder}" value="${value}"`);
+            
+            if (type === 'tel' || name.toLowerCase().includes('phone') || placeholder.toLowerCase().includes('phone')) {
+              phoneValue = value;
+            } else if (type === 'email' || name.toLowerCase().includes('email') || placeholder.toLowerCase().includes('email')) {
+              emailValue = value;
+            } else if (name.toLowerCase().includes('first') || placeholder.toLowerCase().includes('first')) {
+              firstNameValue = value;
+            } else if (name.toLowerCase().includes('last') || placeholder.toLowerCase().includes('last')) {
+              lastNameValue = value;
+            }
+          });
+          
+          const captureData = {
+            firstName: firstNameValue,
+            lastName: lastNameValue,
+            email: emailValue,
+            phoneNumber: phoneValue
+          };
+          
+          console.log('📊 Backup captured data:', captureData);
+          
+          // Send to our API
+          fetch('/api/capture-slicktext-lead', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(captureData)
+          })
+          .then(response => response.json())
+          .then(data => {
+            console.log('✅ Backup: Successfully sent to Krezzo:', data);
+          })
+          .catch(error => {
+            console.error('❌ Backup: Error sending to Krezzo:', error);
+          });
+          
+        } catch (error) {
+          console.error('❌ Backup: Error capturing form data:', error);
+        }
+      });
+      
+      console.log('✅ Backup: Submit listener attached successfully');
+    };
+    
+    // Start looking immediately and keep trying
+    setTimeout(findAndCaptureForm, 500);
+    setTimeout(findAndCaptureForm, 2000);
+    setTimeout(findAndCaptureForm, 4000);
+    setTimeout(findAndCaptureForm, 6000);
+    setTimeout(findAndCaptureForm, 8000);
+  };
   
   // Load SlickText Java Form script when component mounts
   useEffect(() => {
@@ -43,6 +160,9 @@ export default function JavaFormSlickText() {
         script.onload = () => {
           console.log('Java Form script loaded successfully');
           timeoutId = setTimeout(() => setFormLoading(false), 2000);
+          
+          // Set up backup capture after SlickText script loads
+          setupBackupCapture();
         };
         
         script.onerror = (error) => {
