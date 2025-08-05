@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const webhookData = await request.json();
     
     // Check if this is a contact creation event (form submission)
-    if (webhookData.event === 'contact.created' || webhookData.event === 'contact_created') {
+    if (webhookData.name === 'contact_created' || webhookData.event === 'contact_created') {
       return await handleContactCreated(webhookData);
     }
     console.log('�� Webhook payload:', JSON.stringify(webhookData, null, 2));
