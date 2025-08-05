@@ -14,7 +14,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`🧪 Testing paycheck-period SMS templates for user: ${user_id}`);
     
-    const templatesToTest = template_types || ['paycheck-efficiency', 'cash-flow-runway'];
+    const templatesToTest = template_types || [];
+// TEMPORARILY DISABLED - Paycheck templates
+// ['paycheck-efficiency', 'cash-flow-runway']
     const results = [];
     
     for (const templateType of templatesToTest) {
@@ -58,7 +60,9 @@ export async function GET() {
     message: 'Use POST with user_id to test paycheck-period SMS templates',
     example: {
       user_id: 'your-user-id-here',
-      template_types: ['paycheck-efficiency', 'cash-flow-runway']
+      template_types: []
+// TEMPORARILY DISABLED - Paycheck templates
+// ['paycheck-efficiency', 'cash-flow-runway']
     }
   });
 } 

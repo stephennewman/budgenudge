@@ -141,7 +141,8 @@ export async function GET(request: NextRequest) {
     
     if (isPaycheckAnalysisTime) {
       console.log('💰 Tuesday/Friday 9am: Adding paycheck analysis to template list');
-      templatesToSend.push('paycheck-efficiency', 'cash-flow-runway');
+      // TEMPORARILY DISABLED - Paycheck templates
+// templatesToSend.push('paycheck-efficiency', 'cash-flow-runway');
     }
 
     console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
@@ -188,7 +189,9 @@ export async function GET(request: NextRequest) {
         }
 
         // ✅ FIX: Handle both special templates (monthly/weekly) and daily templates
-        const specialTemplates = ['monthly-summary', 'weekly-summary', 'paycheck-efficiency', 'cash-flow-runway'];
+        const specialTemplates = ['monthly-summary', 'weekly-summary'];
+// TEMPORARILY DISABLED - Paycheck templates
+// , 'paycheck-efficiency', 'cash-flow-runway'
         const dailyTemplates = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
         
         const hasSpecialTemplates = templatesToSend.some(t => specialTemplates.includes(t));
@@ -276,12 +279,13 @@ export async function GET(request: NextRequest) {
               case 'monthly-summary':
                 preferenceType = 'monthly-summary';
                 break;
-              case 'paycheck-efficiency':
-                preferenceType = 'paycheck-efficiency';
-                break;
-              case 'cash-flow-runway':
-                preferenceType = 'cash-flow-runway';
-                break;
+              // TEMPORARILY DISABLED - Paycheck templates
+// case 'paycheck-efficiency':
+//   preferenceType = 'paycheck-efficiency';
+//   break;
+// case 'cash-flow-runway':
+//   preferenceType = 'cash-flow-runway';
+//   break;
               default:
                 preferenceType = templateType;
             }

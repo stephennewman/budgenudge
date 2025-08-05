@@ -45,12 +45,21 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     // Get user's account balances
     const { data: accounts } = await supabase
       .from('accounts')
-      .select('name, type, current_balance, available_balance')
+      .select('name, type, subtype, current_balance, available_balance')
       .in('item_id', itemDbIds);
 
-    // Calculate total available balance from depository accounts
-    const depositoryAccounts = accounts?.filter(acc => acc.type === 'depository') || [];
-    const totalAvailableBalance = depositoryAccounts.reduce(
+    // Calculate total available balance from checking/savings accounts only
+    const checkingSavingsAccounts = accounts?.filter(acc => 
+      acc.type === 'depository' && 
+      (acc.subtype === 'checking' || acc.subtype === 'savings')
+    ) || [];
+    
+    // Debug logging to see what accounts are being included
+    console.log('🔍 Recurring bills - Available balance calculation:');
+    console.log('All accounts:', accounts?.map(acc => ({ name: acc.name, type: acc.type, subtype: acc.subtype, balance: acc.available_balance })));
+    console.log('Filtered accounts:', checkingSavingsAccounts?.map(acc => ({ name: acc.name, type: acc.type, subtype: acc.subtype, balance: acc.available_balance })));
+    
+    const totalAvailableBalance = checkingSavingsAccounts.reduce(
       (sum, acc) => sum + (acc.available_balance || 0), 
       0
     );
@@ -79,7 +88,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
       return `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n💳 RECURRING BILLS\n\nNo upcoming recurring bills found.`;
     }
 
-    let message = `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n⭐ Recurring Bills\n${upcoming.length} upcoming\n\n`;
+    let message = `⭐ Recurring Bills\n${upcoming.length} upcoming\n\n`;
     upcoming.slice(0, 20).forEach(tm => {
       const date = new Date(tm.next_predicted_date + 'T12:00:00');
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -102,16 +111,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     message += `\nNEXT 7 DAYS: $${total7.toFixed(2)}`;
     message += `\nNEXT 14 DAYS: $${total14.toFixed(2)}`;
     message += `\nNEXT 30 DAYS: $${total30.toFixed(2)}`;
-    
-    // Add balance coverage insight
-    if (total30 > 0) {
-      const coverageMonths = totalAvailableBalance / total30;
-      if (coverageMonths >= 1) {
-        message += `\n\n💡 Balance covers ${coverageMonths.toFixed(1)} months of bills`;
-      } else {
-        message += `\n\n⚠️ Balance covers ${(coverageMonths * 30).toFixed(0)} days of bills`;
-      }
-    }
+    message += `\n\n💰 Available Balance: $${totalAvailableBalance.toFixed(2)}`;
     
     return message.trim();
   } catch (error) {
@@ -927,7 +927,7 @@ export async function generateMonthlySpendingSummaryMessage(userId: string): Pro
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -941,10 +941,11 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateWeeklySpendingSummaryMessage(userId);
     case 'monthly-summary':
       return await generateMonthlySpendingSummaryMessage(userId);
-    case 'paycheck-efficiency':
-      return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
-    case 'cash-flow-runway':
-      return await generateSMSMessageForUser(userId, 'cash-flow-runway');
+    // TEMPORARILY DISABLED - Paycheck templates
+    // case 'paycheck-efficiency':
+    //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
+    // case 'cash-flow-runway':
+    //   return await generateSMSMessageForUser(userId, 'cash-flow-runway');
     default:
       return "📱 Krezzo\n\nInvalid template type.";
   }

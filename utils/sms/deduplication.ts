@@ -6,7 +6,9 @@ const supabase = createClient(
 );
 
 export type SMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 
-                             'weekly-summary' | 'monthly-summary' | 'paycheck-efficiency' | 'cash-flow-runway';
+                             'weekly-summary' | 'monthly-summary';
+                             // TEMPORARILY DISABLED - Paycheck templates
+                             // | 'paycheck-efficiency' | 'cash-flow-runway';
 
 export type SMSSourceEndpoint = 'scheduled' | 'test' | 'manual' | 'webhook' | 'debug';
 
