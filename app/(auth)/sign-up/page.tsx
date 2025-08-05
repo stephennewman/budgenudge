@@ -40,40 +40,52 @@ function SignUpForm() {
         {/* Hidden tracking token field */}
         <input type="hidden" name="trackingToken" value={trackingToken} />
         
-        <Label htmlFor="firstName" className="text-base sm:text-sm">First Name</Label>
-        <Input 
-          name="firstName" 
-          placeholder="John" 
-          required 
-          className="h-12 sm:h-10 text-base"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="firstName" className="text-base sm:text-sm">First Name</Label>
+            <Input 
+              name="firstName" 
+              placeholder="John" 
+              required 
+              className="h-12 sm:h-10 text-base"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="lastName" className="text-base sm:text-sm">Last Name</Label>
+            <Input 
+              name="lastName" 
+              placeholder="Smith" 
+              required 
+              className="h-12 sm:h-10 text-base"
+            />
+          </div>
+        </div>
         
-        <Label htmlFor="lastName" className="text-base sm:text-sm">Last Name</Label>
-        <Input 
-          name="lastName" 
-          placeholder="Smith" 
-          required 
-          className="h-12 sm:h-10 text-base"
-        />
-        
-        <Label htmlFor="email" className="text-base sm:text-sm">Email</Label>
-        <Input 
-          name="email" 
-          placeholder="you@example.com" 
-          required 
-          className="h-12 sm:h-10 text-base"
-        />
-        
-        <Label htmlFor="phone" className="text-base sm:text-sm">Phone Number</Label>
-        <Input 
-          name="phone" 
-          type="tel"
-          placeholder="(555) 123-4567" 
-          required
-          pattern="[0-9\s\(\)\-\+\.]+"
-          title="Please enter a valid phone number"
-          className="h-12 sm:h-10 text-base"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="email" className="text-base sm:text-sm">Email</Label>
+            <Input 
+              name="email" 
+              placeholder="you@example.com" 
+              required 
+              className="h-12 sm:h-10 text-base"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="phone" className="text-base sm:text-sm">Phone Number</Label>
+            <Input 
+              name="phone" 
+              type="tel"
+              placeholder="(555) 123-4567" 
+              required
+              pattern="[0-9\s\(\)\-\+\.]+"
+              title="Please enter a valid phone number"
+              className="h-12 sm:h-10 text-base"
+            />
+          </div>
+        </div>
         
         <div className="flex justify-between items-center">
           <Label htmlFor="password" className="text-base sm:text-sm">Password</Label>

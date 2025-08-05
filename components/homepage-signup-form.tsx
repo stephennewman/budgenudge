@@ -64,28 +64,30 @@ function SignUpFormContent() {
           </div>
         </div>
         
-        <div>
-          <Label htmlFor="email" className="text-sm">Email</Label>
-          <Input 
-            name="email" 
-            type="email"
-            placeholder="you@example.com" 
-            required 
-            className="h-10 text-base"
-          />
-        </div>
-        
-        <div>
-          <Label htmlFor="phone" className="text-sm">Phone Number</Label>
-          <Input 
-            name="phone" 
-            type="tel"
-            placeholder="(555) 123-4567" 
-            required
-            pattern="[0-9\s\(\)\-\+\.]+"
-            title="Please enter a valid phone number"
-            className="h-10 text-base"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="email" className="text-sm">Email</Label>
+            <Input 
+              name="email" 
+              type="email"
+              placeholder="you@example.com" 
+              required 
+              className="h-10 text-base"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="phone" className="text-sm">Phone Number</Label>
+            <Input 
+              name="phone" 
+              type="tel"
+              placeholder="(555) 123-4567" 
+              required
+              pattern="[0-9\s\(\)\-\+\.]+"
+              title="Please enter a valid phone number"
+              className="h-10 text-base"
+            />
+          </div>
         </div>
         
         <div>
