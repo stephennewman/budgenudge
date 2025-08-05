@@ -44,7 +44,7 @@ export default function AccountPage() {
         setHasConnectedAccount(!!(items && items.length > 0));
 
         // Get phone number from auth.users or user_sms_settings
-        let phone = user.phone; // Try auth.users first
+        let phone: string | null = user.phone; // Try auth.users first
         
         if (!phone) {
           // Fallback to SMS settings table
