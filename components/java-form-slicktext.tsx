@@ -6,95 +6,8 @@ import { LoaderIcon } from 'lucide-react';
 export default function JavaFormSlickText() {
   const [formLoading, setFormLoading] = useState(true);
   
-  // Function to set up form capture after SlickText form loads
-  const setupFormCapture = () => {
-    console.log('🔍 Setting up Java Form capture...');
-    
-    const findAndCaptureForm = () => {
-      // Look for forms in multiple ways
-      const containerForms = document.querySelectorAll('#java-form-container form');
-      const allForms = document.querySelectorAll('form');
-      
-      console.log(`🔍 Found ${containerForms.length} forms in container, ${allForms.length} total forms`);
-      
-      // Debug: log all forms found
-      allForms.forEach((form, index) => {
-        console.log(`Form ${index}:`, form);
-        const inputs = form.querySelectorAll('input');
-        console.log(`  - Has ${inputs.length} inputs`);
-        inputs.forEach(input => {
-          console.log(`    - Input: name="${input.name}" type="${input.type}" placeholder="${input.placeholder}"`);
-        });
-      });
-      
-      const targetForm = containerForms[0] || allForms[0];
-      
-      if (!targetForm) {
-        console.log('⏳ No forms found, retrying in 500ms...');
-        setTimeout(findAndCaptureForm, 500);
-        return;
-      }
-      
-      console.log('📋 Form found! Setting up capture on:', targetForm);
-      
-      targetForm.addEventListener('submit', function() {
-        console.log('📤 Form submitted! Capturing data...');
-        
-        try {
-          // Get form data - try multiple field name variations
-          const formData = new FormData(targetForm as HTMLFormElement);
-          
-          // Debug: log all form data
-          console.log('📊 All form data:');
-          for (let [key, value] of formData.entries()) {
-            console.log(`  ${key}: ${value}`);
-          }
-          
-          // Try various field name patterns
-          const firstName = formData.get('first_name') || formData.get('firstname') || formData.get('First Name') || formData.get('fname') || '';
-          const lastName = formData.get('last_name') || formData.get('lastname') || formData.get('Last Name') || formData.get('lname') || '';
-          const email = formData.get('email') || formData.get('Email') || formData.get('email_address') || '';
-          const phoneNumber = formData.get('phone') || formData.get('phone_number') || formData.get('Phone') || formData.get('mobile') || '';
-          
-          const captureData = {
-            firstName: firstName.toString(),
-            lastName: lastName.toString(), 
-            email: email.toString(),
-            phoneNumber: phoneNumber.toString()
-          };
-          
-          console.log('📊 Captured data:', captureData);
-          
-          // Send to our API
-          fetch('/api/capture-slicktext-lead', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(captureData)
-          })
-          .then(response => response.json())
-          .then(data => {
-            console.log('✅ Successfully sent to Krezzo:', data);
-          })
-          .catch(error => {
-            console.error('❌ Error sending to Krezzo:', error);
-          });
-          
-        } catch (error) {
-          console.error('❌ Error capturing form data:', error);
-        }
-      });
-      
-      console.log('✅ Form capture listener attached successfully');
-    };
-    
-    // Start looking for the form with multiple attempts
-    console.log('🚀 Starting form detection...');
-    setTimeout(findAndCaptureForm, 1000);
-    setTimeout(findAndCaptureForm, 2000);
-    setTimeout(findAndCaptureForm, 3000);
-  };
+  // Note: Form capture is now handled by SlickText's built-in JavaScript injection
+  // The capture code is added directly in the SlickText form builder
   
   // Load SlickText Java Form script when component mounts
   useEffect(() => {
@@ -130,9 +43,6 @@ export default function JavaFormSlickText() {
         script.onload = () => {
           console.log('Java Form script loaded successfully');
           timeoutId = setTimeout(() => setFormLoading(false), 2000);
-          
-          // Set up form capture after script loads
-          setupFormCapture();
         };
         
         script.onerror = (error) => {
