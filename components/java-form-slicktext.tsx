@@ -11,25 +11,50 @@ export default function JavaFormSlickText() {
     console.log('🔍 Setting up Java Form capture...');
     
     const findAndCaptureForm = () => {
-      const form = document.querySelector('#java-form-container form');
-      if (!form) {
-        console.log('⏳ Java Form not ready, retrying...');
+      // Look for forms in multiple ways
+      const containerForms = document.querySelectorAll('#java-form-container form');
+      const allForms = document.querySelectorAll('form');
+      
+      console.log(`🔍 Found ${containerForms.length} forms in container, ${allForms.length} total forms`);
+      
+      // Debug: log all forms found
+      allForms.forEach((form, index) => {
+        console.log(`Form ${index}:`, form);
+        const inputs = form.querySelectorAll('input');
+        console.log(`  - Has ${inputs.length} inputs`);
+        inputs.forEach(input => {
+          console.log(`    - Input: name="${input.name}" type="${input.type}" placeholder="${input.placeholder}"`);
+        });
+      });
+      
+      const targetForm = containerForms[0] || allForms[0];
+      
+      if (!targetForm) {
+        console.log('⏳ No forms found, retrying in 500ms...');
         setTimeout(findAndCaptureForm, 500);
         return;
       }
       
-      console.log('📋 Java Form found, setting up capture');
+      console.log('📋 Form found! Setting up capture on:', targetForm);
       
-      form.addEventListener('submit', function() {
-        console.log('📤 Java Form submitted! Capturing data...');
+      targetForm.addEventListener('submit', function() {
+        console.log('📤 Form submitted! Capturing data...');
         
         try {
-          // Get form data
-          const formData = new FormData(form as HTMLFormElement);
-          const firstName = formData.get('first_name') || formData.get('firstname') || '';
-          const lastName = formData.get('last_name') || formData.get('lastname') || '';
-          const email = formData.get('email') || '';
-          const phoneNumber = formData.get('phone') || formData.get('phone_number') || '';
+          // Get form data - try multiple field name variations
+          const formData = new FormData(targetForm as HTMLFormElement);
+          
+          // Debug: log all form data
+          console.log('📊 All form data:');
+          for (let [key, value] of formData.entries()) {
+            console.log(`  ${key}: ${value}`);
+          }
+          
+          // Try various field name patterns
+          const firstName = formData.get('first_name') || formData.get('firstname') || formData.get('First Name') || formData.get('fname') || '';
+          const lastName = formData.get('last_name') || formData.get('lastname') || formData.get('Last Name') || formData.get('lname') || '';
+          const email = formData.get('email') || formData.get('Email') || formData.get('email_address') || '';
+          const phoneNumber = formData.get('phone') || formData.get('phone_number') || formData.get('Phone') || formData.get('mobile') || '';
           
           const captureData = {
             firstName: firstName.toString(),
@@ -60,10 +85,15 @@ export default function JavaFormSlickText() {
           console.error('❌ Error capturing form data:', error);
         }
       });
+      
+      console.log('✅ Form capture listener attached successfully');
     };
     
-    // Start looking for the form
+    // Start looking for the form with multiple attempts
+    console.log('🚀 Starting form detection...');
     setTimeout(findAndCaptureForm, 1000);
+    setTimeout(findAndCaptureForm, 2000);
+    setTimeout(findAndCaptureForm, 3000);
   };
   
   // Load SlickText Java Form script when component mounts
