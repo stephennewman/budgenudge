@@ -535,9 +535,8 @@ export default function AICategoryAnalysisPage() {
                             {trackingLoading.has(category.ai_category) ? (
                               '⏳'
                             ) : trackedCategories.has(category.ai_category) ? (
-                              // Horizontal stoplight instead of dots
-                              category.pacing_status === 'over' ? '🔴' :
-                              category.pacing_status === 'under' ? '🟢' : '🟡'
+                              // Traffic light emoji instead of individual dots
+                              '🚥'
                             ) : (
                               '⚪'
                             )}
