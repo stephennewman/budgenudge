@@ -11,13 +11,15 @@ interface PlaidLinkButtonProps {
   redirectToAnalysis?: boolean; // New prop to control redirect behavior
   buttonText?: string; // Custom button text
   buttonVariant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive'; // Button variant
+  showSkeleton?: boolean; // Show skeleton instead of "Loading Plaid Link..."
 }
 
 export default function PlaidLinkButton({ 
   onSuccess, 
   redirectToAnalysis = false, 
   buttonText = 'Connect my account',
-  buttonVariant = 'default'
+  buttonVariant = 'default',
+  showSkeleton = false
 }: PlaidLinkButtonProps) {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -99,6 +101,13 @@ export default function PlaidLinkButton({
       // Normal exit (user closed modal) - no need to log
     },
   });
+
+  // Show skeleton if showSkeleton prop is true, regardless of linkToken state
+  if (showSkeleton) {
+    return (
+      <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+    );
+  }
 
   if (!linkToken) {
     return (

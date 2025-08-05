@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import PlaidLinkButton from './plaid-link-button';
+import { AccountSkeletonLoader } from '@/components/ui/account-skeleton-loader';
 
 import AccountRemoveModal from './account-remove-modal';
 
@@ -28,6 +29,7 @@ interface Account {
 export default function TransactionDashboard() {
   const [isConnected, setIsConnected] = useState(false);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [disconnectAccountModal, setDisconnectAccountModal] = useState<{
     isOpen: boolean;
     account: Account | null;
@@ -48,17 +50,24 @@ export default function TransactionDashboard() {
       setIsConnected(!!(items && items.length > 0));
       
       if (items && items.length > 0) {
+        setIsLoadingAccounts(true);
         await fetchAccounts();
+      } else {
+        setIsLoadingAccounts(false);
       }
     } catch (error) {
       console.error('Error checking connection:', error);
+      setIsLoadingAccounts(false);
     }
   }
 
   async function fetchAccounts() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        setIsLoadingAccounts(false);
+        return;
+      }
 
       const response = await fetch('/api/plaid/transactions', {
         method: 'GET',
@@ -90,6 +99,8 @@ export default function TransactionDashboard() {
       }
     } catch (error) {
       console.error('Error fetching accounts:', error);
+    } finally {
+      setIsLoadingAccounts(false);
     }
   }
 
@@ -99,6 +110,7 @@ export default function TransactionDashboard() {
 
   const handleConnectionSuccess = () => {
     setIsConnected(true);
+    setIsLoadingAccounts(true);
     fetchAccounts();
   };
 
@@ -174,6 +186,31 @@ export default function TransactionDashboard() {
   };
 
 
+
+  // Show skeleton while loading accounts, regardless of connection state
+  if (isLoadingAccounts) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle>🏦 Connected Accounts</CardTitle>
+            <PlaidLinkButton 
+              onSuccess={handleConnectionSuccess}
+              buttonText="+ Account"
+              buttonVariant="default"
+              showSkeleton={true}
+            />
+          </CardHeader>
+          <CardContent>
+            <AccountSkeletonLoader 
+              accountGroups={2} 
+              accountsPerGroup={2} 
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isConnected) {
     return (
