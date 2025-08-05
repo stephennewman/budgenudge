@@ -15,8 +15,6 @@ import {
 
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import ManualRefreshButton from '@/components/manual-refresh-button';
 import AITagEditor from '@/components/ai-tag-editor';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
