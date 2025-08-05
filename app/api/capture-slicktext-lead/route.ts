@@ -35,8 +35,18 @@ export async function POST(request: NextRequest) {
       .single();
     
     if (error) {
-      console.error('❌ Database error:', error);
-      return NextResponse.json({ error: 'Database error' }, { status: 500 });
+      console.error('❌ Database error details:', {
+        error,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      return NextResponse.json({ 
+        error: 'Database error', 
+        details: error.message,
+        code: error.code 
+      }, { status: 500 });
     }
     
     console.log('✅ Successfully captured lead:', data);
