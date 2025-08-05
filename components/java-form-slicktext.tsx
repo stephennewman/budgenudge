@@ -41,12 +41,12 @@ export default function JavaFormSlickText() {
       console.log('📋 Backup: Form found!', targetForm);
       
       // Check if listener already attached
-      if (targetForm.dataset.krezzoBackupAttached) {
+      if ((targetForm as HTMLFormElement).dataset.krezzoBackupAttached) {
         console.log('⚠️ Backup: Already attached to this form');
         return;
       }
       
-      targetForm.dataset.krezzoBackupAttached = 'true';
+      (targetForm as HTMLFormElement).dataset.krezzoBackupAttached = 'true';
       
       targetForm.addEventListener('submit', function() {
         console.log('📤 BACKUP CAPTURE: Form submitted!');
