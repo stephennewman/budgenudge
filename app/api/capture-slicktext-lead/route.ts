@@ -31,17 +31,17 @@ export async function POST(request: NextRequest) {
     // Keep source field short due to VARCHAR(50) limit
     const enhancedSource = `slicktext_form`;
     
-    // Store in database (only fields that exist in current schema)
+    // Store in database with all contact fields
     const { data, error } = await supabase
       .from('sample_sms_leads')
       .insert({
         phone_number: cleanPhone,
-        source: enhancedSource, // Store contact data in source field for now
+        first_name: firstName,
+        last_name: lastName,
+        email: email,
+        source: enhancedSource,
         tracking_token: trackingToken,
         opted_in_at: new Date().toISOString(),
-        // Note: email, first_name, last_name will be added via migration
-        // For now, storing as enhanced source field with format:
-        // slicktext_java_form:FirstName:LastName:email@example.com
       })
       .select()
       .single();
