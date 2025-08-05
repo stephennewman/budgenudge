@@ -613,12 +613,6 @@ export default function AICategoryAnalysisPage() {
               <h4 className="font-medium text-gray-900 mb-2">🔍 Understanding Your Data</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                 <div>
-                  <p><strong>Pacing:</strong> How your current month spending compares to your historical average</p>
-                  <p><strong>🟢 Under:</strong> Spending less than 90% of expected</p>
-                  <p><strong>🟡 On Track:</strong> Spending 90-110% of expected</p>
-                  <p><strong>🔴 Over:</strong> Spending more than 110% of expected</p>
-                </div>
-                <div>
                   <p><strong>Remaining Monthly Spend:</strong> How much you have left to spend this month</p>
                   <p><strong>🟩 Under Budget:</strong> You have money left to spend</p>
                   <p><strong>🟨 Approaching Budget:</strong> You&apos;re close to your monthly average</p>
