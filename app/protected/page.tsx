@@ -1,7 +1,7 @@
 "use client";
 
 import { createSupabaseClient } from "@/utils/supabase/client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
@@ -21,6 +21,8 @@ export default function AccountPage() {
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
   // Removed: showProgressModal state - using fullscreen approach instead
   // REMOVED: Modal state variables (no longer needed)
+  
+  const plaidButtonRef = useRef<HTMLDivElement>(null);
 
   const supabase = createSupabaseClient();
 
@@ -184,9 +186,22 @@ export default function AccountPage() {
                   <span className="text-xl">✅</span>
                   <span className="text-gray-900 font-medium">Email Verified</span>
                 </div>
-                <div className="flex items-center space-x-3 bg-blue-50 p-2 rounded">
+                <div 
+                  className="flex items-center space-x-3 bg-blue-50 p-2 rounded cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => {
+                    // Scroll to and click the Plaid button
+                    if (plaidButtonRef.current) {
+                      plaidButtonRef.current.scrollIntoView({ behavior: 'smooth' });
+                      // Find the button within the ref and click it
+                      const button = plaidButtonRef.current.querySelector('button');
+                      if (button) {
+                        setTimeout(() => button.click(), 300); // Small delay for smooth scroll
+                      }
+                    }
+                  }}
+                >
                   <span className="text-xl">🔄</span>
-                  <span className="text-blue-600 font-semibold">Connect Your Bank</span>
+                  <span className="text-blue-600 font-semibold underline">Connect Your Bank</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <span className="text-xl">⏳</span>
@@ -201,10 +216,12 @@ export default function AccountPage() {
 
             {/* CTA Section */}
             <div className="space-y-4">
-              <p className="text-gray-600">
+              <div ref={plaidButtonRef}>
+                <PlaidLinkButton redirectToAnalysis={true} />
+              </div>
+              <p className="text-gray-600 text-sm">
                 Securely connect your bank account to start receiving intelligent financial insights via SMS
               </p>
-              <PlaidLinkButton redirectToAnalysis={true} />
             </div>
           </div>
         </div>
