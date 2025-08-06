@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
-import VerificationProgressModal from "@/components/verification-progress-modal";
+// Removed: VerificationProgressModal - replaced with fullscreen approach
 // import GoogleOAuthDataCollectionModal from "@/components/google-oauth-data-collection-modal"; // REMOVED
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
-  const [showProgressModal, setShowProgressModal] = useState(false);
+  // Removed: showProgressModal state - using fullscreen approach instead
   // REMOVED: Modal state variables (no longer needed)
 
   const supabase = createSupabaseClient();
@@ -67,26 +67,7 @@ export default function AccountPage() {
         // const needsData = isGoogleOAuthUserMissingData(user, phone);
         // setNeedsDataCollection(needsData);
         
-        // Check if we should show verification progress modal
-        const searchParams = new URLSearchParams(window.location.search);
-        const isVerified = searchParams.get('verified') === 'true';
-        const hasNoAccounts = !items || items.length === 0;
-        const forceShow = searchParams.get('debug') === 'force';
-        
-        // Debug logging
-        console.log('🔍 Modal Debug:', {
-          url: window.location.href,
-          isVerified,
-          hasNoAccounts,
-          itemsCount: items?.length || 0,
-          forceShow,
-          willShowModal: (isVerified && hasNoAccounts) || forceShow
-        });
-        
-        if ((isVerified && hasNoAccounts) || forceShow) {
-          console.log('🎯 Showing verification progress modal');
-          setShowProgressModal(true);
-        }
+        // Removed: Modal detection logic - now using fullscreen approach in render
         
         // Modal disabled - users can manually add data via SMS preferences if needed
       } catch (err) {
@@ -165,8 +146,79 @@ export default function AccountPage() {
     );
   }
 
+  // Check if this is a verified user for focused onboarding
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const isVerified = searchParams?.get('verified') === 'true';
+  const forceShow = searchParams?.get('debug') === 'force';
+
   // If no connected account, show onboarding flow
   if (!hasConnectedAccount) {
+    // Special focused onboarding for newly verified users
+    if (isVerified || forceShow) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+          <div className="max-w-md w-full space-y-8 text-center">
+            {/* Success Header */}
+            <div className="space-y-4">
+              <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100">
+                <svg className="h-10 w-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">🎉 Welcome to Krezzo!</h1>
+                <p className="text-gray-600 mt-2">Your email {user?.email} has been successfully verified</p>
+              </div>
+            </div>
+
+            {/* Progress Steps */}
+            <div className="bg-white rounded-lg shadow-lg p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Progress:</h2>
+              
+              <div className="space-y-3 text-left">
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">✅</span>
+                  <span className="text-gray-900 font-medium">Account Created</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">✅</span>
+                  <span className="text-gray-900 font-medium">Email Verified</span>
+                </div>
+                <div className="flex items-center space-x-3 bg-blue-50 p-2 rounded">
+                  <span className="text-xl">🔄</span>
+                  <span className="text-blue-600 font-semibold">Connect Your Bank</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">⏳</span>
+                  <span className="text-gray-400">Instant Analysis</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">⏳</span>
+                  <span className="text-gray-400">Smart SMS Alerts</span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA Section */}
+            <div className="space-y-4">
+              <p className="text-gray-600">
+                Securely connect your bank account to start receiving intelligent financial insights via SMS
+              </p>
+              <PlaidLinkButton redirectToAnalysis={true} />
+              
+              <button 
+                onClick={() => window.history.replaceState({}, '', '/protected')}
+                className="text-sm text-gray-500 hover:text-gray-700 underline"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Regular onboarding for non-verified users
     return (
       <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
         <VerificationSuccessBanner />
@@ -341,45 +393,7 @@ export default function AccountPage() {
         */}
       </div>
 
-      {/* REMOVED: Google OAuth Data Collection Modal - disabled to prevent false positives */}
-      
-      {/* Verification Progress Modal */}
-      {user && (
-        <>
-          {console.log('🎯 About to render modal component:', { showProgressModal, userEmail: user.email })}
-          {showProgressModal && (
-            <div style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 255, 0, 0.8)',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <div style={{
-                backgroundColor: 'white',
-                padding: '40px',
-                borderRadius: '8px',
-                fontSize: '24px',
-                fontWeight: 'bold'
-              }}>
-                🟢 INLINE MODAL TEST<br/>
-                showProgressModal: {String(showProgressModal)}<br/>
-                userEmail: {user.email}
-              </div>
-            </div>
-          )}
-          <VerificationProgressModal
-            isOpen={showProgressModal}
-            onClose={() => setShowProgressModal(false)}
-            userEmail={user.email || ''}
-          />
-        </>
-      )}
+      {/* REMOVED: Modal approach - replaced with fullscreen verification landing page */}
     </div>
   );
 }
