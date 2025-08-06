@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
-import GoogleOAuthDataCollectionModal from "@/components/google-oauth-data-collection-modal";
+// import GoogleOAuthDataCollectionModal from "@/components/google-oauth-data-collection-modal"; // REMOVED
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
 import { Button } from "@/components/ui/button";
 
@@ -18,8 +18,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
-  const [showDataCollectionModal, setShowDataCollectionModal] = useState(false);
-  const [needsDataCollection, setNeedsDataCollection] = useState(false);
+  // REMOVED: Modal state variables (no longer needed)
 
   const supabase = createSupabaseClient();
 
@@ -62,14 +61,11 @@ export default function AccountPage() {
         
         setPhoneNumber(phone);
 
-        // Check if user needs data collection (Google OAuth users missing info)
-        const needsData = isGoogleOAuthUserMissingData(user, phone);
-        setNeedsDataCollection(needsData);
+        // DISABLED: Google OAuth data collection modal (causing false positives)
+        // const needsData = isGoogleOAuthUserMissingData(user, phone);
+        // setNeedsDataCollection(needsData);
         
-        // Show modal automatically for Google OAuth users missing critical data
-        if (needsData && !user.user_metadata?.googleOAuthDataCompleted) {
-          setShowDataCollectionModal(true);
-        }
+        // Modal disabled - users can manually add data via SMS preferences if needed
       } catch (err) {
         console.error('Error fetching user data:', err);
         setError("There was an error loading your account. Please try again.");
@@ -81,51 +77,7 @@ export default function AccountPage() {
     fetchUserAndAccounts();
   }, [supabase]);
 
-  // Helper function to detect Google OAuth users missing critical data
-  const isGoogleOAuthUserMissingData = (user: User, phone: string | null): boolean => {
-    // Check if user signed up via Google OAuth (not email/password signup)
-    const isGoogleOAuthUser = user.app_metadata?.providers?.includes('google') || 
-                             user.app_metadata?.provider === 'google';
-    
-    // Only check Google OAuth users
-    if (!isGoogleOAuthUser) return false;
-    
-    // If user already completed the OAuth data collection, don't show modal again
-    if (user.user_metadata?.googleOAuthDataCompleted) {
-      return false;
-    }
-    
-    // Enhanced logic: If user has complete data, consider them "completed" even without the flag
-    const hasPhone = !!phone;
-    const hasFirstName = !!(user.user_metadata?.firstName || user.user_metadata?.first_name);
-    const hasLastName = !!(user.user_metadata?.lastName || user.user_metadata?.last_name);
-    
-    // If user has all required data, automatically mark as completed and don't show modal
-    if (hasPhone && hasFirstName && hasLastName) {
-      // Automatically set the completion flag to prevent future prompts
-      supabase.auth.updateUser({
-        data: {
-          ...user.user_metadata,
-          googleOAuthDataCompleted: true
-        }
-      }).catch(err => console.error('Failed to update completion flag:', err));
-      
-      return false; // Don't show modal - user has complete data
-    }
-    
-    // Only show modal if actually missing critical data
-    const missingPhone = !hasPhone;
-    const missingNames = !hasFirstName || !hasLastName;
-    
-    return missingPhone || missingNames;
-  };
-
-  const handleDataCollectionComplete = () => {
-    setShowDataCollectionModal(false);
-    setNeedsDataCollection(false);
-    // Refresh user data
-    window.location.reload();
-  };
+  // REMOVED: All modal-related functions (no longer needed)
 
   const handleAddPhone = async () => {
     if (!user) return;
@@ -196,32 +148,7 @@ export default function AccountPage() {
       <div className="space-y-6 sm:space-y-8 px-4 sm:px-0">
         <VerificationSuccessBanner />
         
-        {/* Data Collection Notice for Google OAuth Users */}
-        {needsDataCollection && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-100">
-                  <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-medium text-blue-800">Complete Your Profile</h3>
-                <p className="mt-1 text-sm text-blue-700">
-                  We need your phone number and name details to enable SMS notifications and personalize your experience.
-                </p>
-                <Button
-                  onClick={() => setShowDataCollectionModal(true)}
-                  className="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2"
-                >
-                  Complete Profile
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* REMOVED: Data Collection Notice - this was causing false positive prompts */}
         
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">🏠 Account Setup</h1>
@@ -391,16 +318,7 @@ export default function AccountPage() {
         */}
       </div>
 
-      {/* Google OAuth Data Collection Modal */}
-      {user && (
-        <GoogleOAuthDataCollectionModal
-          isOpen={showDataCollectionModal}
-          onClose={() => setShowDataCollectionModal(false)}
-          userEmail={user.email || ''}
-          fullName={user.user_metadata?.full_name || ''}
-          onDataCollected={handleDataCollectionComplete}
-        />
-      )}
+      {/* REMOVED: Google OAuth Data Collection Modal - disabled to prevent false positives */}
     </div>
   );
 }
