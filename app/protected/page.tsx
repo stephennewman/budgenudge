@@ -72,7 +72,17 @@ export default function AccountPage() {
         const isVerified = searchParams.get('verified') === 'true';
         const hasNoAccounts = !items || items.length === 0;
         
+        // Debug logging
+        console.log('🔍 Modal Debug:', {
+          url: window.location.href,
+          isVerified,
+          hasNoAccounts,
+          itemsCount: items?.length || 0,
+          willShowModal: isVerified && hasNoAccounts
+        });
+        
         if (isVerified && hasNoAccounts) {
+          console.log('🎯 Showing verification progress modal');
           setShowProgressModal(true);
         }
         
