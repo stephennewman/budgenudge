@@ -156,7 +156,7 @@ export default function AccountPage() {
     // Special focused onboarding for newly verified users
     if (isVerified || forceShow) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
           <div className="max-w-md w-full space-y-8 text-center">
             {/* Success Header */}
             <div className="space-y-4">
