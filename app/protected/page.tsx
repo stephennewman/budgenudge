@@ -90,9 +90,32 @@ export default function AccountPage() {
     // Only check Google OAuth users
     if (!isGoogleOAuthUser) return false;
     
-    // Check if missing critical data
-    const missingPhone = !phone;
-    const missingNames = !user.user_metadata?.firstName || !user.user_metadata?.lastName;
+    // If user already completed the OAuth data collection, don't show modal again
+    if (user.user_metadata?.googleOAuthDataCompleted) {
+      return false;
+    }
+    
+    // Enhanced logic: If user has complete data, consider them "completed" even without the flag
+    const hasPhone = !!phone;
+    const hasFirstName = !!(user.user_metadata?.firstName || user.user_metadata?.first_name);
+    const hasLastName = !!(user.user_metadata?.lastName || user.user_metadata?.last_name);
+    
+    // If user has all required data, automatically mark as completed and don't show modal
+    if (hasPhone && hasFirstName && hasLastName) {
+      // Automatically set the completion flag to prevent future prompts
+      supabase.auth.updateUser({
+        data: {
+          ...user.user_metadata,
+          googleOAuthDataCompleted: true
+        }
+      }).catch(err => console.error('Failed to update completion flag:', err));
+      
+      return false; // Don't show modal - user has complete data
+    }
+    
+    // Only show modal if actually missing critical data
+    const missingPhone = !hasPhone;
+    const missingNames = !hasFirstName || !hasLastName;
     
     return missingPhone || missingNames;
   };
