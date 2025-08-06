@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import TransactionDashboard from "@/components/transaction-dashboard";
 import PlaidLinkButton from "@/components/plaid-link-button";
 import VerificationSuccessBanner from "@/components/verification-success-banner";
+import VerificationProgressModal from "@/components/verification-progress-modal";
 // import GoogleOAuthDataCollectionModal from "@/components/google-oauth-data-collection-modal"; // REMOVED
 import { ContentAreaLoader } from "@/components/ui/content-area-loader";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null);
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [showProgressModal, setShowProgressModal] = useState(false);
   // REMOVED: Modal state variables (no longer needed)
 
   const supabase = createSupabaseClient();
@@ -64,6 +66,15 @@ export default function AccountPage() {
         // DISABLED: Google OAuth data collection modal (causing false positives)
         // const needsData = isGoogleOAuthUserMissingData(user, phone);
         // setNeedsDataCollection(needsData);
+        
+        // Check if we should show verification progress modal
+        const searchParams = new URLSearchParams(window.location.search);
+        const isVerified = searchParams.get('verified') === 'true';
+        const hasNoAccounts = !items || items.length === 0;
+        
+        if (isVerified && hasNoAccounts) {
+          setShowProgressModal(true);
+        }
         
         // Modal disabled - users can manually add data via SMS preferences if needed
       } catch (err) {
@@ -319,6 +330,15 @@ export default function AccountPage() {
       </div>
 
       {/* REMOVED: Google OAuth Data Collection Modal - disabled to prevent false positives */}
+      
+      {/* Verification Progress Modal */}
+      {user && (
+        <VerificationProgressModal
+          isOpen={showProgressModal}
+          onClose={() => setShowProgressModal(false)}
+          userEmail={user.email || ''}
+        />
+      )}
     </div>
   );
 }
