@@ -15,11 +15,18 @@ export default function VerificationProgressModal({
   userEmail 
 }: VerificationProgressModalProps) {
   const [isVisible, setIsVisible] = useState(false);
+  
+  // Debug logging
+  console.log('🎭 Modal Component Rendering:', { isOpen, userEmail });
 
   useEffect(() => {
     if (isOpen) {
+      console.log('🎭 Modal useEffect: Setting up modal');
       // Slight delay for smooth animation
-      setTimeout(() => setIsVisible(true), 50);
+      setTimeout(() => {
+        console.log('🎭 Modal: Setting visible to true');
+        setIsVisible(true);
+      }, 50);
       // Prevent body scroll
       document.body.style.overflow = 'hidden';
     } else {
@@ -34,7 +41,12 @@ export default function VerificationProgressModal({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  console.log('🎭 Modal Render Check:', { isOpen, isVisible });
+
+  if (!isOpen) {
+    console.log('🎭 Modal: Not rendering (isOpen=false)');
+    return null;
+  }
 
   const steps = [
     { id: 1, title: "Account Created", status: "completed", icon: "✅" },
@@ -44,8 +56,14 @@ export default function VerificationProgressModal({
     { id: 5, title: "Smart SMS Alerts", status: "pending", icon: "⏳" }
   ];
 
+  console.log('🎭 Modal: About to render modal JSX');
+  
   return (
-    <div className="fixed inset-0 z-50">
+    <div className="fixed inset-0 z-50" style={{backgroundColor: 'rgba(255,0,0,0.5)'}}>
+      <div style={{color: 'white', padding: '20px', fontSize: '24px'}}>
+        🎭 MODAL IS RENDERING! Email: {userEmail}
+      </div>
+      
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/20 backdrop-blur-sm"
