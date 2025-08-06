@@ -205,13 +205,6 @@ export default function AccountPage() {
                 Securely connect your bank account to start receiving intelligent financial insights via SMS
               </p>
               <PlaidLinkButton redirectToAnalysis={true} />
-              
-              <button 
-                onClick={() => window.history.replaceState({}, '', '/protected')}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
-              >
-                Skip for now
-              </button>
             </div>
           </div>
         </div>
