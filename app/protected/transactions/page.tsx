@@ -496,17 +496,17 @@ export default function TransactionsPage() {
             {/* Merchant name */}
             <div>
               {aiMerchant ? (
-                <button
-                  onClick={() => handleEditTags(transaction)}
-                  className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer"
-                  title="Click to edit AI tags"
-                >
-                  {aiMerchant}
-                </button>
+                                  <button
+                    onClick={() => handleEditTags(transaction)}
+                    className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer text-left justify-start"
+                    title="Click to edit AI tags"
+                  >
+                    {aiMerchant}
+                  </button>
               ) : (
                 <button
                   onClick={() => handleEditTags(transaction)}
-                  className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
+                  className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer text-left justify-start"
                   title="Click to add AI tags"
                 >
                   Not tagged
@@ -523,7 +523,7 @@ export default function TransactionsPage() {
       cell: ({ getValue }: { getValue: () => number }) => {
         const amount = getValue();
         return (
-          <span className={`font-medium ${amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+          <span className={`font-medium text-left ${amount > 0 ? 'text-red-600' : 'text-green-600'}`}>
             ${Math.abs(amount).toFixed(2)}
           </span>
         );
@@ -533,7 +533,7 @@ export default function TransactionsPage() {
       accessorKey: 'name',
       header: 'Description',
       cell: ({ getValue }: { getValue: () => string }) => (
-        <div className="font-medium max-w-[200px] truncate">
+        <div className="font-medium max-w-[200px] truncate text-left">
           {getValue()}
         </div>
       ),
@@ -547,7 +547,7 @@ export default function TransactionsPage() {
         return aiCategory ? (
           <button
             onClick={() => handleEditTags(transaction)}
-            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium hover:bg-green-200 transition-colors cursor-pointer"
+            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium hover:bg-green-200 transition-colors cursor-pointer text-left justify-start"
             title="Click to edit AI tags"
           >
             {aiCategory}
@@ -555,7 +555,7 @@ export default function TransactionsPage() {
         ) : (
           <button
             onClick={() => handleEditTags(transaction)}
-            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer"
+            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer text-left justify-start"
             title="Click to add AI tags"
           >
             Not tagged
@@ -569,11 +569,11 @@ export default function TransactionsPage() {
       cell: ({ getValue }: { getValue: () => string | undefined }) => {
         const subcategory = getValue();
         return subcategory ? (
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded text-left">
             {subcategory}
           </span>
         ) : (
-          <span className="text-gray-400">-</span>
+          <span className="text-gray-400 text-left">-</span>
         );
       },
     },
@@ -581,7 +581,7 @@ export default function TransactionsPage() {
       accessorKey: 'pending',
       header: 'Status',
       cell: ({ getValue }: { getValue: () => boolean }) => (
-        <span className={`px-2 py-1 rounded text-xs ${getValue() ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
+        <span className={`px-2 py-1 rounded text-xs text-left ${getValue() ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}>
           {getValue() ? 'Pending' : 'Posted'}
         </span>
       ),
@@ -595,7 +595,7 @@ export default function TransactionsPage() {
         if (!accountId) {
           return (
             <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-400">No account ID</div>
+              <div className="text-sm text-gray-400 text-left">No account ID</div>
             </div>
           );
         }
@@ -606,16 +606,16 @@ export default function TransactionsPage() {
           <div className="flex items-center gap-2">
             <div className="flex-shrink-0">
               <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                <span className="text-xs font-medium text-blue-700">
+                <span className="text-xs font-medium text-blue-700 text-left">
                   {accountInfo.type?.charAt(0).toUpperCase() || '?'}
                 </span>
               </div>
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-medium truncate">
+              <div className="text-sm font-medium truncate text-left">
                 {accountInfo.name}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-gray-500 text-left">
                 {accountInfo.subtype ? accountInfo.subtype.charAt(0).toUpperCase() + accountInfo.subtype.slice(1) : accountInfo.type}
               </div>
             </div>
@@ -662,14 +662,14 @@ export default function TransactionsPage() {
       <div className="flex flex-col space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <h1 className="text-2xl font-medium">💳 Transactions</h1>
+            <h1 className="text-2xl font-medium text-left">💳 Transactions</h1>
             <div className="flex items-center gap-6 mt-2">
-              <p className="text-muted-foreground">
+              <p className="text-muted-foreground text-left">
                 {transactions.length} total transactions
               </p>
               <a 
                 href="/protected" 
-                className="text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                className="text-sm text-blue-600 hover:text-blue-700 hover:underline text-left"
               >
                 View account balances →
               </a>
@@ -751,7 +751,7 @@ export default function TransactionsPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                      <td colSpan={columns.length} className="h-24 text-left text-muted-foreground">
                         {transactions.length === 0 ? 
                           "No transactions found. Connect your bank account to see data!" : 
                           "No transactions match your search criteria."
@@ -766,7 +766,7 @@ export default function TransactionsPage() {
 
           {/* Pagination */}
           <div className="flex items-center justify-between space-x-2 py-4">
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground text-left">
               Showing {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1} to{' '}
               {Math.min(
                 (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
@@ -778,7 +778,7 @@ export default function TransactionsPage() {
               )}
             </div>
             <div className="flex items-center space-x-2">
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground text-left">
                 Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
               </div>
               <Button

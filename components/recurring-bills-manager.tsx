@@ -41,6 +41,7 @@ export default function RecurringBillsManager() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
+    merchant_name: '',
     expected_amount: '',
     prediction_frequency: '',
     next_predicted_date: '',
@@ -123,6 +124,7 @@ export default function RecurringBillsManager() {
   const handleEdit = (merchant: TaggedMerchant) => {
     setEditingId(merchant.id);
     setEditForm({
+      merchant_name: merchant.merchant_name,
       expected_amount: merchant.expected_amount.toString(),
       prediction_frequency: merchant.prediction_frequency,
       next_predicted_date: merchant.next_predicted_date,
@@ -244,17 +246,35 @@ export default function RecurringBillsManager() {
   const getDisplayName = (merchant: TaggedMerchant): string => {
     const baseName = merchant.ai_merchant_name || merchant.merchant_name;
     
+    // Hide technical strings that look like internal identifiers
+    const cleanBaseName = isLikelyTechnicalString(baseName) ? "Unnamed Bill" : baseName;
+    
     if (!merchant.account_identifier) {
-      return baseName; // "Prudential" (original, unsplit)
+      return cleanBaseName; // "Prudential" (original, unsplit)
+    }
+    
+    // If account_identifier is a technical string (like plaid_item_id), don't show it
+    if (isLikelyTechnicalString(merchant.account_identifier)) {
+      return cleanBaseName; // Just show the clean base name
     }
     
     // Check if numeric identifier
     if (/^\d+$/.test(merchant.account_identifier)) {
-      return `${baseName} ${merchant.account_identifier}`; // "OpenAI 1"
+      return `${cleanBaseName} ${merchant.account_identifier}`; // "OpenAI 1"
     } else {
       // For custom names, use clean format without parentheses
-      return `${baseName} ${merchant.account_identifier}`; // "OpenAI API", "Chase Credit Card"
+      return `${cleanBaseName} ${merchant.account_identifier}`; // "OpenAI API", "Chase Credit Card"
     }
+  };
+
+  const isLikelyTechnicalString = (str: string): boolean => {
+    // Check for patterns like "10XB...", plaid IDs, or other technical identifiers
+    return /^[A-Z0-9]{10,}$/i.test(str) || // Long alphanumeric strings (10+ chars)
+           /^[a-z0-9_-]{15,}$/i.test(str) || // Very long lowercase with underscores/dashes
+           str.includes('plaid') ||
+           str.includes('item_') ||
+           str.length > 30 || // Very long strings are likely technical
+           /^[A-Z0-9]{3,}\d{5,}/.test(str); // Pattern like "10xbBNDxYJURRZdqE1DQC3YDmpaZ1nTmq533d"
   };
 
   const handleSplitAccounts = (merchant: TaggedMerchant) => {
@@ -337,13 +357,17 @@ export default function RecurringBillsManager() {
               value={newMerchant.merchant_name}
               onChange={(e) => setNewMerchant({...newMerchant, merchant_name: e.target.value})}
             />
-            <Input
-              type="number"
-              step="0.01"
-              placeholder="Amount"
-              value={newMerchant.expected_amount}
-              onChange={(e) => setNewMerchant({...newMerchant, expected_amount: e.target.value})}
-            />
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={newMerchant.expected_amount}
+                onChange={(e) => setNewMerchant({...newMerchant, expected_amount: e.target.value})}
+                className="pl-6"
+              />
+            </div>
             <select 
               className="px-3 py-2 border rounded-md"
               value={newMerchant.prediction_frequency}
@@ -374,43 +398,70 @@ export default function RecurringBillsManager() {
               <div key={merchant.id} className="bg-gray-50 rounded-lg">
                 <div className="flex items-center justify-between p-3">
                   {editingId === merchant.id ? (
-                    // Edit mode
-                    <div className="flex items-center gap-3 flex-1">
-                      <span className="font-medium min-w-0 flex-1">{merchant.merchant_name}</span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={editForm.expected_amount}
-                        onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
-                        className="w-24"
-                      />
-                      <Input
-                        type="date"
-                        value={editForm.next_predicted_date}
-                        onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
-                        className="w-36"
-                      />
-                      <Input
-                        type="text"
-                        placeholder="API, Credit Card, etc."
-                        value={editForm.account_identifier}
-                        onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
-                        className="w-40"
-                        title="Custom name for this account (e.g., 'API', 'Credit Card', 'Personal')"
-                      />
-                      <select 
-                        value={editForm.prediction_frequency}
-                        onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
-                        className="px-2 py-1 border rounded text-sm"
-                      >
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                        <option value="bi-monthly">Bi-monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                      </select>
-                      <div className="flex gap-1">
-                        <Button size="sm" onClick={() => handleSaveEdit(merchant.id)}>Save</Button>
-                        <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                    // Edit mode - improved layout with Name first
+                    <div className="flex-1 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                          <Input
+                            type="text"
+                            value={editForm.merchant_name}
+                            onChange={(e) => setEditForm({...editForm, merchant_name: e.target.value})}
+                            placeholder="Bill name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editForm.expected_amount}
+                              onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
+                              className="pl-6"
+                              placeholder="0.00"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Next Date</label>
+                          <Input
+                            type="date"
+                            value={editForm.next_predicted_date}
+                            onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+                          <select 
+                            value={editForm.prediction_frequency}
+                            onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
+                            className="w-full px-3 py-2 border rounded-md text-sm"
+                          >
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="bi-monthly">Bi-monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                          </select>
+                        </div>
+                      </div>
+                      {/* Second row for subgroup name and actions */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Subgroup Name (optional)</label>
+                          <Input
+                            type="text"
+                            placeholder="API, Credit Card, etc."
+                            value={editForm.account_identifier}
+                            onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
+                            title="Custom name for this account (e.g., 'API', 'Credit Card', 'Personal')"
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-5">
+                          <Button size="sm" onClick={() => handleSaveEdit(merchant.id)}>Save</Button>
+                          <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -420,26 +471,28 @@ export default function RecurringBillsManager() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-medium truncate">{getDisplayName(merchant)}</span>
+                            {merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) && (
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Subgroup</span>
+                            )}
                             {merchant.ai_category_tag && (
                               <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{merchant.ai_category_tag}</span>
                             )}
                           </div>
                           <div className="text-sm text-gray-600">
                             <span className="text-red-600">Next: {formatNextDate(merchant.next_predicted_date)}</span> • 
-                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency} • 
-                            <span className="text-gray-600">{merchant.confidence_score}% confidence</span>
+                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-4">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit</Button>
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit Item</Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleSplitAccounts(merchant)}
-                          className={merchant.account_identifier ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
+                          className={merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
                         >
-                          {merchant.account_identifier ? "✏️ Edit Split" : "🔀 Split"}
+                          {merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) ? "✏️ Edit Subgroup" : "🔀 Split"}
                         </Button>
                         <Button 
                           variant="outline" 
