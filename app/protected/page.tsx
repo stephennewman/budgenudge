@@ -71,6 +71,7 @@ export default function AccountPage() {
         const searchParams = new URLSearchParams(window.location.search);
         const isVerified = searchParams.get('verified') === 'true';
         const hasNoAccounts = !items || items.length === 0;
+        const forceShow = searchParams.get('debug') === 'force';
         
         // Debug logging
         console.log('🔍 Modal Debug:', {
@@ -78,10 +79,11 @@ export default function AccountPage() {
           isVerified,
           hasNoAccounts,
           itemsCount: items?.length || 0,
-          willShowModal: isVerified && hasNoAccounts
+          forceShow,
+          willShowModal: (isVerified && hasNoAccounts) || forceShow
         });
         
-        if (isVerified && hasNoAccounts) {
+        if ((isVerified && hasNoAccounts) || forceShow) {
           console.log('🎯 Showing verification progress modal');
           setShowProgressModal(true);
         }
