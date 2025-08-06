@@ -345,11 +345,40 @@ export default function AccountPage() {
       
       {/* Verification Progress Modal */}
       {user && (
-        <VerificationProgressModal
-          isOpen={showProgressModal}
-          onClose={() => setShowProgressModal(false)}
-          userEmail={user.email || ''}
-        />
+        <>
+          {console.log('🎯 About to render modal component:', { showProgressModal, userEmail: user.email })}
+          {showProgressModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 255, 0, 0.8)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <div style={{
+                backgroundColor: 'white',
+                padding: '40px',
+                borderRadius: '8px',
+                fontSize: '24px',
+                fontWeight: 'bold'
+              }}>
+                🟢 INLINE MODAL TEST<br/>
+                showProgressModal: {String(showProgressModal)}<br/>
+                userEmail: {user.email}
+              </div>
+            </div>
+          )}
+          <VerificationProgressModal
+            isOpen={showProgressModal}
+            onClose={() => setShowProgressModal(false)}
+            userEmail={user.email || ''}
+          />
+        </>
       )}
     </div>
   );
