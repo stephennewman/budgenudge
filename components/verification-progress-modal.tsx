@@ -1,8 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import PlaidLinkButton from '@/components/plaid-link-button';
-
 interface VerificationProgressModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,118 +11,43 @@ export default function VerificationProgressModal({
   onClose, 
   userEmail 
 }: VerificationProgressModalProps) {
-  const [isVisible, setIsVisible] = useState(false);
+  console.log('🎭 MODAL COMPONENT CALLED:', { isOpen, userEmail });
   
-  // Debug logging
-  console.log('🎭 Modal Component Rendering:', { isOpen, userEmail });
-
-  useEffect(() => {
-    if (isOpen) {
-      console.log('🎭 Modal useEffect: Setting up modal');
-      // Slight delay for smooth animation
-      setTimeout(() => {
-        console.log('🎭 Modal: Setting visible to true');
-        setIsVisible(true);
-      }, 50);
-      // Prevent body scroll
-      document.body.style.overflow = 'hidden';
-    } else {
-      setIsVisible(false);
-      // Restore body scroll
-      document.body.style.overflow = 'unset';
-    }
-
-    // Cleanup on unmount
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
-
-  console.log('🎭 Modal Render Check:', { isOpen, isVisible });
-
   if (!isOpen) {
-    console.log('🎭 Modal: Not rendering (isOpen=false)');
+    console.log('🎭 Modal not showing - isOpen is false');
     return null;
   }
 
-  const steps = [
-    { id: 1, title: "Account Created", status: "completed", icon: "✅" },
-    { id: 2, title: "Email Verified", status: "completed", icon: "✅" },
-    { id: 3, title: "Connect Your Bank", status: "current", icon: "🔄" },
-    { id: 4, title: "Instant Analysis", status: "pending", icon: "⏳" },
-    { id: 5, title: "Smart SMS Alerts", status: "pending", icon: "⏳" }
-  ];
-
-  console.log('🎭 Modal: About to render modal JSX');
+  console.log('🎭 MODAL ABOUT TO RENDER');
   
   return (
-    <div className="fixed inset-0 z-50" style={{backgroundColor: 'rgba(255,0,0,0.5)'}}>
-      <div style={{color: 'white', padding: '20px', fontSize: '24px'}}>
-        🎭 MODAL IS RENDERING! Email: {userEmail}
-      </div>
-      
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal */}
-      <div 
-        className={`absolute inset-x-4 bottom-4 bg-white rounded-lg shadow-xl max-w-md mx-auto transform transition-transform duration-300 ease-out ${
-          isVisible ? 'translate-y-0' : 'translate-y-full'
-        }`}
-      >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 0, 0, 0.8)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+      onClick={onClose}
+    >
+      <div style={{
+        backgroundColor: 'white',
+        padding: '40px',
+        borderRadius: '8px',
+        fontSize: '24px',
+        fontWeight: 'bold'
+      }}>
+        🎭 MODAL IS WORKING!<br/>
+        Email: {userEmail}<br/>
+        <button onClick={onClose} style={{marginTop: '20px', padding: '10px'}}>
+          Close Modal
         </button>
-
-        <div className="p-6">
-          {/* Header */}
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              🎉 Welcome to Krezzo!
-            </h2>
-            <p className="text-sm text-gray-600">
-              Your email {userEmail} has been successfully verified
-            </p>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="space-y-3 mb-6">
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Your Progress:</h3>
-            {steps.map((step) => (
-              <div key={step.id} className="flex items-center space-x-3">
-                <span className="text-lg">{step.icon}</span>
-                <span 
-                  className={`text-sm ${
-                    step.status === 'completed' 
-                      ? 'text-gray-900' 
-                      : step.status === 'current'
-                      ? 'text-blue-600 font-medium'
-                      : 'text-gray-400'
-                  }`}
-                >
-                  {step.title}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <div className="text-center">
-            <p className="text-sm text-gray-600 mb-4">
-              Securely connect your bank account to start receiving intelligent financial insights
-            </p>
-            <PlaidLinkButton redirectToAnalysis={true} />
-          </div>
-        </div>
       </div>
     </div>
   );
