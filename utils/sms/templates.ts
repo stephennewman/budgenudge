@@ -381,22 +381,47 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
         
         const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
 
-        // Calculate pacing
-        const expectedSpendToDate = avgMonthlySpend * (dayOfMonth / 30);
-        const pacingPercentage = expectedSpendToDate > 0 ? (currentMonthSpend / expectedSpendToDate) * 100 : 0;
+        // ✅ FIX: Special handling for monthly bills (rent, insurance, utilities)
+        const monthlyBillKeywords = ['sentinel', 'rent', 'insurance', 'prog select', 'usaa', 'duke energy', 'electric', 'geico', 'allstate', 'state farm', 'mortgage', 'car payment', 'loan'];
+        const isMonthlyBill = monthlyBillKeywords.some(keyword => 
+          merchantName.toLowerCase().includes(keyword)
+        );
 
-        // Determine status and icon
-        let status = '';
-        let icon = '';
-        if (pacingPercentage < 90) {
-          status = 'Under pace';
-          icon = '🟢';
-        } else if (pacingPercentage <= 110) {
-          status = 'On track';
-          icon = '🟡';
+        let expectedSpendToDate, pacingPercentage, status, icon;
+
+        if (isMonthlyBill) {
+          // For monthly bills: compare current month spend to average monthly spend
+          expectedSpendToDate = avgMonthlySpend;
+          pacingPercentage = avgMonthlySpend > 0 ? (currentMonthSpend / avgMonthlySpend) * 100 : 0;
+          
+          if (currentMonthSpend === 0) {
+            status = 'Not paid yet';
+            icon = '🟡';
+          } else if (pacingPercentage >= 90 && pacingPercentage <= 110) {
+            status = 'Paid (on track)';
+            icon = '🟢';
+          } else if (pacingPercentage > 110) {
+            status = 'Paid (over avg)';
+            icon = '🔴';
+          } else {
+            status = 'Paid (under avg)';
+            icon = '🟢';
+          }
         } else {
-          status = 'Over pace';
-          icon = '🔴';
+          // For regular spending: use daily pacing logic
+          expectedSpendToDate = avgMonthlySpend * (dayOfMonth / 30);
+          pacingPercentage = expectedSpendToDate > 0 ? (currentMonthSpend / expectedSpendToDate) * 100 : 0;
+          
+          if (pacingPercentage < 90) {
+            status = 'Under pace';
+            icon = '🟢';
+          } else if (pacingPercentage <= 110) {
+            status = 'On track';
+            icon = '🟡';
+          } else {
+            status = 'Over pace';
+            icon = '🔴';
+          }
         }
 
         message += `${icon} ${merchantName}:\n`;
