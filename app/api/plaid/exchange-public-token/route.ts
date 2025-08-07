@@ -192,6 +192,72 @@ export async function POST(request: NextRequest) {
         console.log('⚠️ Automatic recurring bill detection error (non-blocking):', billDetectionError);
         // Non-blocking: Account setup continues even if bill detection fails
       }
+
+      // 🆕 PHASE 4: Complete SMS workflow setup for new users
+      // This ensures all future users get full SMS functionality automatically
+      try {
+        console.log('📱 Setting up complete SMS workflow for new user...');
+        
+        // 4A: Create SMS preferences for all 4 message types
+        const smsPreferencesResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/sms-preferences`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            preferences: [
+              { sms_type: 'activity', enabled: true, frequency: 'daily', phone_number: null },
+              { sms_type: 'bills', enabled: true, frequency: 'daily', phone_number: null },
+              { sms_type: 'merchant-pacing', enabled: true, frequency: 'daily', phone_number: null },
+              { sms_type: 'category-pacing', enabled: true, frequency: 'daily', phone_number: null }
+            ]
+          })
+        });
+
+        if (smsPreferencesResponse.ok) {
+          console.log('✅ SMS preferences created for all 4 message types');
+        } else {
+          console.log('⚠️ SMS preferences setup failed (non-blocking):', smsPreferencesResponse.status);
+        }
+
+        // 4B: Create user_sms_settings with default 8AM send time
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('phone_number')
+          .eq('id', user.id)
+          .single();
+
+        const phoneNumber = profileData?.phone_number || null;
+
+        const { error: smsSettingsError } = await supabase
+          .from('user_sms_settings')
+          .upsert({
+            user_id: user.id,
+            phone_number: phoneNumber,
+            send_time: '08:00:00',
+            timezone: 'America/New_York',
+            is_active: true,
+            recurring_enabled: true,
+            recent_enabled: true,
+            merchant_pacing_enabled: true,
+            category_pacing_enabled: true,
+            slicktext_contact_id: null // Will be set when phone number is added
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (!smsSettingsError) {
+          console.log('✅ SMS settings created with 8AM default send time');
+        } else {
+          console.log('⚠️ SMS settings creation failed (non-blocking):', smsSettingsError.message);
+        }
+
+      } catch (smsSetupError) {
+        console.log('⚠️ SMS workflow setup error (non-blocking):', smsSetupError);
+        // Non-blocking: Account setup continues even if SMS setup fails
+      }
     }
 
     return NextResponse.json({ 
