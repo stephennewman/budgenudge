@@ -61,7 +61,7 @@ export async function POST() {
         const userResult = {
           user_id: user.user_id,
           email: profile?.email,
-          actions: []
+          actions: [] as string[]
         };
 
         // Create missing SMS preferences
