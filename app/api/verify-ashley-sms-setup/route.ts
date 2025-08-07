@@ -45,7 +45,7 @@ export async function POST() {
       issues.push('❌ No SMS settings found for Ashley');
       
       // Create SMS settings
-      const { data: newSettings, error: createError } = await supabase
+      const { error: createError } = await supabase
         .from('user_sms_settings')
         .insert({
           user_id: ashleyUserId,
