@@ -414,6 +414,8 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
       return `📊 MERCHANT PACING\n${yesterday.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}\n\nNo spending data found for tracked merchants.`;
     }
 
+    message += `\n\n⚠️ Predictions based on historical spending patterns`;
+    
     return message.trim();
 
   } catch (error) {
@@ -580,9 +582,12 @@ export async function generateCategoryPacingMessage(userId: string): Promise<str
       }
     });
 
-    // Ensure message fits within 918 character limit
+    // Add prediction disclaimer
+    smsContent += `\n\n⚠️ Predictions based on historical spending patterns`;
+
+    // Ensure message fits within character limit (adjusted for disclaimer)
     if (smsContent.length > 918) {
-      smsContent = smsContent.substring(0, 915) + "...";
+      smsContent = smsContent.substring(0, 875) + "...\n\n⚠️ Predictions based on historical spending patterns";
     }
 
     return smsContent;
