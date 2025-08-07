@@ -141,7 +141,8 @@ export async function POST() {
           testResults[type] = '❌ Failed to generate';
         }
       } catch (error) {
-        testResults[type] = `❌ Error: ${error.message}`;
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        testResults[type] = `❌ Error: ${errorMessage}`;
       }
     }
 
