@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
       return await fallbackRecurringAnalysis(user_id, itemIds, confidence_threshold);
     }
 
-    const billsToInsert = transactions?.filter(t => 
+        const billsToInsert = transactions?.filter((t: any) =>
       t.recurring_likelihood >= confidence_threshold
     ) || [];
 
@@ -133,7 +133,7 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
 
     // Group by merchant and analyze patterns
     const merchantGroups = new Map<string, typeof patterns>();
-    patterns.forEach(t => {
+    patterns.forEach((t: any) => {
       const key = t.merchant_name || t.name;
       if (!merchantGroups.has(key)) {
         merchantGroups.set(key, []);
@@ -146,13 +146,13 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
 
     for (const [merchant, transactions] of merchantGroups) {
       if (transactions.length >= 2) {
-        const amounts = transactions.map(t => t.amount);
+        const amounts = transactions.map((t: any) => t.amount);
         const avgAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
         const stdDev = Math.sqrt(amounts.reduce((sq, n) => sq + Math.pow(n - avgAmount, 2), 0) / amounts.length);
         const consistency = stdDev === 0 ? 100 : Math.max(60, 100 - (stdDev / avgAmount) * 100);
 
         // Check for regular timing
-        const dates = transactions.map(t => new Date(t.date)).sort((a, b) => a.getTime() - b.getTime());
+        const dates = transactions.map((t: any) => new Date(t.date)).sort((a, b) => a.getTime() - b.getTime());
         const daysBetween = dates.length > 1 ? 
           (dates[dates.length - 1].getTime() - dates[0].getTime()) / (1000 * 60 * 60 * 24) / (dates.length - 1) : 0;
 
