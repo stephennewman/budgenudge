@@ -33,14 +33,7 @@ export async function POST() {
         .insert({
           user_id: ashleyUserId,
           phone_number: ashleyPhone,
-          send_time: sendTime,
-          timezone: 'America/New_York',
-          is_active: true,
-          recurring_enabled: true,
-          recent_enabled: true,
-          merchant_pacing_enabled: true,
-          category_pacing_enabled: true,
-          slicktext_contact_id: slicktextContactId
+          send_time: sendTime
         })
         .select();
 
@@ -55,13 +48,7 @@ export async function POST() {
         .from('user_sms_settings')
         .update({
           phone_number: ashleyPhone,
-          send_time: sendTime,
-          is_active: true,
-          recurring_enabled: true,
-          recent_enabled: true,
-          merchant_pacing_enabled: true,
-          category_pacing_enabled: true,
-          slicktext_contact_id: slicktextContactId
+          send_time: sendTime
         })
         .eq('user_id', ashleyUserId);
 

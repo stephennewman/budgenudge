@@ -236,14 +236,7 @@ export async function POST(request: NextRequest) {
           .upsert({
             user_id: user.id,
             phone_number: phoneNumber,
-            send_time: '08:00:00',
-            timezone: 'America/New_York',
-            is_active: true,
-            recurring_enabled: true,
-            recent_enabled: true,
-            merchant_pacing_enabled: true,
-            category_pacing_enabled: true,
-            slicktext_contact_id: null // Will be set when phone number is added
+            send_time: '08:00:00'
           }, {
             onConflict: 'user_id'
           });

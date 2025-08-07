@@ -50,14 +50,7 @@ export async function POST() {
         .insert({
           user_id: ashleyUserId,
           phone_number: ashleyPhone,
-          send_time: sendTime,
-          timezone: 'America/New_York',
-          is_active: true,
-          recurring_enabled: true,
-          recent_enabled: true,
-          merchant_pacing_enabled: true,
-          category_pacing_enabled: true,
-          slicktext_contact_id: slicktextContactId
+          send_time: sendTime
         })
         .select();
 
@@ -76,47 +69,25 @@ export async function POST() {
       if (settings.send_time !== sendTime) {
         settingsIssues.push(`Send time mismatch: ${settings.send_time} vs ${sendTime}`);
       }
-      if (!settings.is_active) {
-        settingsIssues.push('SMS not active');
-      }
-      if (!settings.recurring_enabled) {
-        settingsIssues.push('Recurring messages disabled');
-      }
-      if (!settings.recent_enabled) {
-        settingsIssues.push('Recent activity messages disabled');
-      }
-      if (!settings.merchant_pacing_enabled) {
-        settingsIssues.push('Merchant pacing messages disabled');
-      }
-      if (!settings.category_pacing_enabled) {
-        settingsIssues.push('Category pacing messages disabled');
-      }
-      if (settings.slicktext_contact_id !== slicktextContactId) {
-        settingsIssues.push(`SlickText contact ID mismatch: ${settings.slicktext_contact_id} vs ${slicktextContactId}`);
-      }
+      // Only check columns that actually exist in user_sms_settings table
+      // Message type enablement is handled by user_sms_preferences table
 
       if (settingsIssues.length > 0) {
         issues.push(`❌ SMS settings issues: ${settingsIssues.join(', ')}`);
         
-        // Fix SMS settings
+        // Fix SMS settings (only update existing columns)
         const { error: updateError } = await supabase
           .from('user_sms_settings')
           .update({
             phone_number: ashleyPhone,
-            send_time: sendTime,
-            is_active: true,
-            recurring_enabled: true,
-            recent_enabled: true,
-            merchant_pacing_enabled: true,
-            category_pacing_enabled: true,
-            slicktext_contact_id: slicktextContactId
+            send_time: sendTime
           })
           .eq('user_id', ashleyUserId);
 
         if (updateError) {
           issues.push(`❌ Failed to update SMS settings: ${updateError.message}`);
         } else {
-          fixes.push('✅ Updated SMS settings to enable all message types');
+          fixes.push('✅ Updated SMS settings (phone number and send time)');
         }
       } else {
         console.log('✅ SMS settings are correct');

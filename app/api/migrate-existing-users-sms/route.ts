@@ -94,14 +94,7 @@ export async function POST() {
             .insert({
               user_id: user.user_id,
               phone_number: profile?.phone_number || null,
-              send_time: '08:00:00',
-              timezone: 'America/New_York',
-              is_active: true,
-              recurring_enabled: true,
-              recent_enabled: true,
-              merchant_pacing_enabled: true,
-              category_pacing_enabled: true,
-              slicktext_contact_id: null
+              send_time: '08:00:00'
             });
 
           if (!settingsError) {
@@ -110,20 +103,16 @@ export async function POST() {
             userResult.actions.push(`❌ Failed to create SMS settings: ${settingsError.message}`);
           }
         } else {
-          // Update existing settings to ensure all message types are enabled
+          // Update existing settings to ensure send time is correct
           const { error: updateError } = await supabase
             .from('user_sms_settings')
             .update({
-              recurring_enabled: true,
-              recent_enabled: true,
-              merchant_pacing_enabled: true,
-              category_pacing_enabled: true,
               send_time: '08:00:00'
             })
             .eq('user_id', user.user_id);
 
           if (!updateError) {
-            userResult.actions.push('✅ Updated SMS settings to enable all message types');
+            userResult.actions.push('✅ Updated SMS settings send time to 8AM');
           } else {
             userResult.actions.push(`❌ Failed to update SMS settings: ${updateError.message}`);
           }
