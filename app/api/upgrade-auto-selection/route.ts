@@ -4,7 +4,7 @@ import { createSupabaseClient } from '@/utils/supabase/server';
 // POST - Upgrade existing user's auto-selection to use new high-activity criteria
 export async function POST(request: Request) {
   try {
-    const { user_id, force_upgrade = false } = await request.json();
+    const { user_id } = await request.json();
     
     const supabase = await createSupabaseClient();
 
