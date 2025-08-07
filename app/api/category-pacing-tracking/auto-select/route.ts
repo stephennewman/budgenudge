@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
 
-// POST - Auto-select top 3 high-activity categories for a user
+// POST - Auto-select top 5 high-activity categories for a user
 export async function POST() {
   try {
     const supabase = await createSupabaseClient();
@@ -130,13 +130,13 @@ export async function POST() {
         };
       })
       .filter(item => 
-        item.avgMonthlySpending >= 50 && // Minimum $50/month average spending
-        item.avgMonthlyTransactions >= 2 && // Minimum 2 transactions per month
+        item.avgMonthlySpending >= 25 && // Lower threshold: $25/month average spending
+        item.avgMonthlyTransactions >= 1.5 && // Lower threshold: 1.5+ transactions per month
         // Allow high-activity categories even without current month activity
-        (item.analysis.currentMonthSpending > 0 || item.avgMonthlySpending >= 100)
+        (item.analysis.currentMonthSpending > 0 || item.avgMonthlySpending >= 75)
       )
       .sort((a, b) => b.totalScore - a.totalScore)
-      .slice(0, 3); // Top 3
+      .slice(0, 5); // Top 5
 
     if (categoryScores.length === 0) {
       return NextResponse.json({ 

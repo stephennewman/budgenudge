@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
 
-// POST - Auto-select top 3 high-activity merchants for a user
+// POST - Auto-select top 5 high-activity merchants for a user
 export async function POST() {
   try {
     const supabase = await createSupabaseClient();
@@ -108,11 +108,11 @@ export async function POST() {
       };
     })
     .filter(m => 
-      m.avgMonthlySpending >= 50 &&  // Meaningful spending ($50+ avg monthly)
-      m.frequencyDays <= 30 &&       // At least monthly frequency
-      m.transactionCount >= 3 &&     // Minimum transaction count
-      // Allow high-activity merchants with lower frequency if they spend enough
-      (m.frequencyDays <= 30 || (m.avgMonthlySpending >= 150 && m.frequencyDays <= 45))
+      m.avgMonthlySpending >= 25 &&  // Lower threshold for meaningful spending ($25+ avg monthly)
+      m.frequencyDays <= 45 &&       // Allow up to 6-week frequency 
+      m.transactionCount >= 2 &&     // Lower minimum transaction count (2+)
+      // Allow high-activity merchants with even lower frequency if they spend enough
+      (m.frequencyDays <= 45 || (m.avgMonthlySpending >= 100 && m.frequencyDays <= 60))
     )
     .sort((a, b) => {
       // Enhanced scoring: spending (60%) + frequency (30%) + high activity bonus (10%)
@@ -125,12 +125,12 @@ export async function POST() {
       const scoreB = (b.avgMonthlySpending * 0.6) + (frequencyScoreB * 0.3) + (highActivityBonusB * 0.1);
       return scoreB - scoreA;
     })
-    .slice(0, 3); // Top 3
+    .slice(0, 5); // Top 5
 
     if (merchantAnalysis.length === 0) {
       return NextResponse.json({ 
         success: false,
-        message: 'No qualifying merchants found for auto-selection (need $50+ monthly avg, monthly frequency, 3+ transactions)',
+        message: 'No qualifying merchants found for auto-selection (need $25+ monthly avg, 6-week frequency, 2+ transactions)',
         auto_selected: []
       });
     }
@@ -155,7 +155,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: `Auto-selected ${merchantAnalysis.length} merchants for pacing tracking`,
+      message: `Auto-selected ${merchantAnalysis.length} merchants for pacing tracking (top 5 by activity)`,
       auto_selected: insertedMerchants,
       merchant_analysis: merchantAnalysis.map(m => ({
         merchant: m.merchant,
