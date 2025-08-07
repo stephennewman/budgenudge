@@ -162,6 +162,36 @@ export async function POST(request: NextRequest) {
         console.log('⚠️ Pacing auto-selection error (non-blocking):', autoSelectError);
         // Non-blocking: Account setup continues even if auto-selection fails
       }
+
+      // 🆕 PHASE 3: Trigger automatic recurring bill detection
+      // This analyzes transaction patterns to auto-detect recurring bills
+      try {
+        console.log('💳 Triggering automatic recurring bill detection for new account...');
+        const billDetectionResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auto-detect-recurring-bills`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // Pass through user's auth token
+          },
+          body: JSON.stringify({ 
+            user_id: user.id,
+            confidence_threshold: 85 // Minimum confidence for auto-inclusion
+          })
+        });
+
+        if (billDetectionResponse.ok) {
+          const billResult = await billDetectionResponse.json();
+          console.log('✅ Automatic recurring bill detection completed:', {
+            bills_detected: billResult.bills_detected || 0,
+            total_monthly_amount: billResult.total_monthly_amount || 0
+          });
+        } else {
+          console.log('⚠️ Automatic recurring bill detection failed (non-blocking):', billDetectionResponse.status);
+        }
+      } catch (billDetectionError) {
+        console.log('⚠️ Automatic recurring bill detection error (non-blocking):', billDetectionError);
+        // Non-blocking: Account setup continues even if bill detection fails
+      }
     }
 
     return NextResponse.json({ 

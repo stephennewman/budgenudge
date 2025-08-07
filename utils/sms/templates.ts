@@ -112,6 +112,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     message += `\nNEXT 14 DAYS: $${total14.toFixed(2)}`;
     message += `\nNEXT 30 DAYS: $${total30.toFixed(2)}`;
     message += `\n\n💰 Available Balance: $${totalAvailableBalance.toFixed(2)}`;
+    message += `\n\n⚠️ Predictions based on transaction history`;
     
     return message.trim();
   } catch (error) {
