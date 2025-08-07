@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
           totalMonthlyAmount += parseFloat(bill.avg_amount);
           console.log(`✅ Auto-detected recurring bill: ${bill.merchant_name} - $${bill.avg_amount}`);
         }
-      } catch (err) {
+      } catch {
         console.log(`⚠️ Skipped duplicate or invalid bill: ${bill.merchant_name}`);
       }
     }
@@ -132,7 +132,7 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
     }
 
     // Group by merchant and analyze patterns
-    const merchantGroups = new Map<string, any[]>();
+    const merchantGroups = new Map<string, typeof patterns>();
     patterns.forEach(t => {
       const key = t.merchant_name || t.name;
       if (!merchantGroups.has(key)) {
@@ -141,7 +141,6 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
       merchantGroups.get(key)!.push(t);
     });
 
-    const recurringBills = [];
     let billsDetected = 0;
     let totalMonthlyAmount = 0;
 
@@ -187,7 +186,7 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
               totalMonthlyAmount += avgAmount;
               console.log(`✅ Fallback auto-detected: ${merchant} - $${avgAmount.toFixed(2)} (${confidence.toFixed(0)}% confidence)`);
             }
-          } catch (err) {
+          } catch {
             console.log(`⚠️ Skipped duplicate bill: ${merchant}`);
           }
         }
