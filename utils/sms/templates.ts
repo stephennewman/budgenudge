@@ -37,7 +37,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
       .eq('user_id', userId);
 
     if (!userItems || userItems.length === 0) {
-      return '💳 RECURRING BILLS\n\nNo bank accounts connected.';
+      return '💳 ANTICIPATED UPCOMING BILLS\n\nNo bank accounts connected.';
     }
 
     const itemDbIds = userItems.map(item => item.id);
@@ -74,7 +74,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
 
     if (error) {
       console.error('Error fetching tagged merchants for SMS:', error);
-      return '💳 RECURRING BILLS\n\nError loading recurring bills.';
+      return '💳 ANTICIPATED UPCOMING BILLS\n\nError loading anticipated bills.';
     }
 
     const now = new Date();
@@ -85,10 +85,10 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     });
 
     if (upcoming.length === 0) {
-      return `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n💳 RECURRING BILLS\n\nNo upcoming recurring bills found.`;
+      return `💰 Available Balance: $${totalAvailableBalance.toFixed(2)}\n\n💳 ANTICIPATED UPCOMING BILLS\n\nNo upcoming bills predicted.`;
     }
 
-    let message = `⭐ Recurring Bills\n${upcoming.length} upcoming\n\n`;
+    let message = `⭐ Anticipated Upcoming Bills\n${upcoming.length} upcoming\n\n`;
     upcoming.slice(0, 20).forEach(tm => {
       const date = new Date(tm.next_predicted_date + 'T12:00:00');
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -117,7 +117,7 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
     return message.trim();
   } catch (error) {
     console.error('Error generating recurring transactions message:', error);
-    return '💳 RECURRING BILLS\n\nError loading recurring bills.';
+    return '💳 ANTICIPATED UPCOMING BILLS\n\nError loading anticipated bills.';
   }
 }
 
