@@ -342,14 +342,14 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
 
     let message = `📊 MERCHANT PACING\n${yesterday.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}\nMonth Progress: ${monthProgress.toFixed(0)}% (Day ${dayOfMonth})\n\n`;
 
+    // ✅ FIX: Collect ALL merchant data first, then sort by activity and show only top 3-4
+    const merchantData = [];
     const merchantNames = trackedMerchants.map(t => t.ai_merchant_name);
-    let processedCount = 0;
 
+    // Collect data for all merchants
     for (const merchantName of merchantNames) {
-      // Check message length limit (918 chars) - allow ~120 chars per merchant
-      if (message.length > 780) break; // Leave room for current merchant
 
-      // Get all historical transactions for this merchant
+            // Get all historical transactions for this merchant
       const { data: allTxns } = await supabase
         .from('transactions')
         .select('amount, date')
@@ -411,7 +411,7 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
           // For regular spending: use daily pacing logic
           expectedSpendToDate = avgMonthlySpend * (dayOfMonth / 30);
           pacingPercentage = expectedSpendToDate > 0 ? (currentMonthSpend / expectedSpendToDate) * 100 : 0;
-          
+
           if (pacingPercentage < 90) {
             status = 'Under pace';
             icon = '🟢';
@@ -424,19 +424,37 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
           }
         }
 
-        message += `${icon} ${merchantName}:\n`;
-        message += `   Month to date: $${currentMonthSpend.toFixed(2)}\n`;
-        message += `   Expected by now: $${expectedSpendToDate.toFixed(2)}\n`;
-        message += `   Avg monthly: $${avgMonthlySpend.toFixed(2)}\n`;
-        message += `   Pacing: ${pacingPercentage.toFixed(0)}%\n`;
-        message += `   Status: ${status}\n\n`;
-
-        processedCount++;
+        // Store merchant data for sorting
+        merchantData.push({
+          merchantName,
+          avgMonthlySpend,
+          currentMonthSpend,
+          expectedSpendToDate,
+          pacingPercentage,
+          status,
+          icon,
+          transactionCount: allTxns.length
+        });
       }
     }
 
-    if (processedCount === 0) {
+    // ✅ FIX: Sort by highest activity (avg monthly spend) and limit to top 3-4
+    const topMerchants = merchantData
+      .sort((a, b) => b.avgMonthlySpend - a.avgMonthlySpend) // Highest spending first
+      .slice(0, 4); // Limit to top 4 merchants
+
+    if (topMerchants.length === 0) {
       return `📊 MERCHANT PACING\n${yesterday.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}\n\nNo spending data found for tracked merchants.`;
+    }
+
+    // Build message with only top merchants
+    for (const merchant of topMerchants) {
+      message += `${merchant.icon} ${merchant.merchantName}:\n`;
+      message += `   Month to date: $${merchant.currentMonthSpend.toFixed(2)}\n`;
+      message += `   Expected by now: $${merchant.expectedSpendToDate.toFixed(2)}\n`;
+      message += `   Avg monthly: $${merchant.avgMonthlySpend.toFixed(2)}\n`;
+      message += `   Pacing: ${merchant.pacingPercentage.toFixed(0)}%\n`;
+      message += `   Status: ${merchant.status}\n\n`;
     }
 
     message += `\n\n⚠️ Predictions based on historical spending patterns`;
