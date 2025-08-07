@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
         if (!insertError) {
           billsDetected++;
-          totalMonthlyAmount += parseFloat(bill.avg_amount);
+          totalMonthlyAmount += bill.avg_amount;
           console.log(`✅ Auto-detected recurring bill: ${bill.merchant_name} - $${bill.avg_amount}`);
         }
       } catch {
