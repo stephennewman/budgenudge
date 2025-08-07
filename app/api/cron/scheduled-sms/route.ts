@@ -68,7 +68,8 @@ export async function GET(request: NextRequest) {
     
     const { data: itemsWithUsers, error: itemsError } = await supabase
       .from('items')
-      .select('id, user_id, plaid_item_id');
+      .select('id, user_id, plaid_item_id')
+      .is('deleted_at', null);
 
     // DEBUG LOGGING START
     console.log('DEBUG: itemsWithUsers:', itemsWithUsers);
@@ -118,11 +119,8 @@ export async function GET(request: NextRequest) {
                                nowEST.hour === 7 && 
                                nowEST.minute <= 10; // Within first 10 minutes of 7am
     
-    // Paycheck Analysis: Send on Tuesdays and Fridays at 9am EST (±10 minutes)
-    // This catches most bi-weekly patterns (15th/30th, every Friday, etc.)
-    const isPaycheckAnalysisTime = (nowEST.weekday === 2 || nowEST.weekday === 5) && // Tuesday or Friday
-                                   nowEST.hour === 9 && 
-                                   nowEST.minute <= 10; // Within first 10 minutes of 9am
+    // Cash Flow Runway: Daily at 5pm EST (±10 minutes)
+    const isCashFlowRunwayTime = nowEST.hour === 17 && nowEST.minute <= 10;
     
     // ✅ FIX: Make templates additive instead of exclusive
     // Always include daily templates - they'll be filtered by user send_time later
@@ -138,11 +136,10 @@ export async function GET(request: NextRequest) {
       console.log('📊 Sunday 7am: Adding weekly summary to template list');
       templatesToSend.push('weekly-summary');
     }
-    
-    if (isPaycheckAnalysisTime) {
-      console.log('💰 Tuesday/Friday 9am: Adding paycheck analysis to template list');
-      // TEMPORARILY DISABLED - Paycheck templates
-// templatesToSend.push('paycheck-efficiency', 'cash-flow-runway');
+
+    if (isCashFlowRunwayTime) {
+      console.log('🛤️ 5pm: Adding cash-flow-runway to template list');
+      templatesToSend.push('cash-flow-runway');
     }
 
     console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
@@ -189,9 +186,7 @@ export async function GET(request: NextRequest) {
         }
 
         // ✅ FIX: Handle both special templates (monthly/weekly) and daily templates
-        const specialTemplates = ['monthly-summary', 'weekly-summary'];
-// TEMPORARILY DISABLED - Paycheck templates
-// , 'paycheck-efficiency', 'cash-flow-runway'
+        const specialTemplates = ['monthly-summary', 'weekly-summary', 'cash-flow-runway'];
         const dailyTemplates = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
         
         const hasSpecialTemplates = templatesToSend.some(t => specialTemplates.includes(t));
@@ -279,13 +274,9 @@ export async function GET(request: NextRequest) {
               case 'monthly-summary':
                 preferenceType = 'monthly-summary';
                 break;
-              // TEMPORARILY DISABLED - Paycheck templates
-// case 'paycheck-efficiency':
-//   preferenceType = 'paycheck-efficiency';
-//   break;
-// case 'cash-flow-runway':
-//   preferenceType = 'cash-flow-runway';
-//   break;
+              case 'cash-flow-runway':
+                preferenceType = 'cash-flow-runway';
+                break;
               default:
                 preferenceType = templateType;
             }
@@ -297,7 +288,9 @@ export async function GET(request: NextRequest) {
               .eq('sms_type', preferenceType)
               .single();
             
-            if (!templatePref || !templatePref.enabled) {
+            const isEnabledByDefault = preferenceType === 'cash-flow-runway';
+            const enabled = templatePref ? !!templatePref.enabled : isEnabledByDefault;
+            if (!enabled) {
               console.log(`📭 Skipping ${templateType} for user ${userId} (disabled in preferences)`);
               continue;
             }

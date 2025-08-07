@@ -8,7 +8,7 @@ import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway';
   // TEMPORARILY DISABLED - Paycheck templates
   // | 'paycheck-efficiency' | 'cash-flow-runway';
   enabled: boolean;
@@ -24,7 +24,7 @@ interface SMSPreference {
 // ];
 
 // Define active SMS template types
-const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary'];
+const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway'];
 
 const smsTypeInfo = {
   bills: {
@@ -63,6 +63,12 @@ const smsTypeInfo = {
     description: 'Comprehensive monthly spending recap sent on the 1st of each month at 7:00 AM EST',
     icon: '🗓️',
     example: `📊 MONTHLY SPENDING SUMMARY\nJune 2025\n\n💰 Current Balance: $3,083.26\n\n💳 Total Spent: $12,547.89\n📈 Transactions: 234\n📉 15% less than prev month\n\n🏷️ Top Categories:\n1. Groceries: $2,847 (23%)\n2. Restaurant: $1,965 (16%)\n3. Utilities: $1,234 (10%)\n4. Transportation: $987 (8%)\n\n🏪 Top Merchants:\n1. Publix: $1,456\n2. Amazon: $1,234\n3. Duke Energy: $798\n4. Shell: $634\n\n📅 Weekly Breakdown:\nWeek 1: $3,124  Week 2: $2,987  Week 3: $3,456  Week 4: $2,981\n\n📊 Daily Average: $405`
+  },
+  'cash-flow-runway': {
+    title: 'Cash Flow Runway',
+    description: 'Daily at 5:00 PM EST. Forecast until next paycheck and whether you’re on track.',
+    icon: '🛤️',
+    example: `🛤️ CASH FLOW RUNWAY\n9 days until next paycheck (Jul 29)\nBills before then: $842\nProjected spend: $567\nStatus: At risk\nTip: Reduce discretionary by ~$63/day to stay on track.\n\n⚠️ Predictions based on historical data`
   },
   // TEMPORARILY DISABLED - Paycheck templates
   // 'paycheck-efficiency': {

@@ -27,15 +27,14 @@ export async function POST(request: NextRequest) {
     let transactionsText = '';
     
     // If a valid templateType is provided, use the corresponding SMS template
-    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary'].includes(templateType)) {
-// TEMPORARILY DISABLED - Paycheck templates
-// ,'paycheck-efficiency','cash-flow-runway'
+    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary','cash-flow-runway'].includes(templateType)) {
       smsMessage = await generateSMSMessage(userId, templateType);
-    } else if (userId) {
+    } else if (userId && !message) {
       const { data: userItems, error: itemsError } = await supabase
         .from('items')
         .select('plaid_item_id')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .is('deleted_at', null);
       console.log('DEBUG: Supabase items for user:', { userItems, itemsError });
       if (userItems && userItems.length > 0) {
         const itemIds = userItems.map(item => item.plaid_item_id);
