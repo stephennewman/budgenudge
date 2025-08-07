@@ -121,7 +121,7 @@ export async function POST() {
     // 5. Test all 4 message types
     console.log('5. Testing message generation...');
     const messageTypes = ['recent', 'recurring', 'merchant-pacing', 'category-pacing'];
-    const testResults = {};
+    const testResults: Record<string, string> = {};
 
     for (const type of messageTypes) {
       try {
