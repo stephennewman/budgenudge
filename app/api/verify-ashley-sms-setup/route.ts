@@ -180,7 +180,7 @@ export async function POST() {
 
     // 5. Test SMS generation
     console.log('5. Testing SMS message generation...');
-    const testResults = {};
+    const testResults: Record<string, string> = {};
     const messageTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
     
     for (const type of messageTypes) {
@@ -202,8 +202,9 @@ export async function POST() {
           issues.push(`❌ ${type} message generation failed`);
         }
       } catch (error) {
-        testResults[type] = `❌ Error: ${error.message}`;
-        issues.push(`❌ ${type} message test error: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        testResults[type] = `❌ Error: ${errorMessage}`;
+        issues.push(`❌ ${type} message test error: ${errorMessage}`);
       }
     }
 
