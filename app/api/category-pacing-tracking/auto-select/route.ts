@@ -130,13 +130,19 @@ export async function POST() {
         };
       })
       .filter(item => {
-        // Exclude large monthly bill categories from pacing tracking
+        // Exclude large monthly bill categories and one-time payment types from pacing tracking
         const largeMonthlyBillCategories = ['housing', 'rent', 'mortgage', 'insurance', 'loan'];
+        const oneTimePaymentCategories = ['transfer', 'financial', 'payment', 'credit card payment', 'loan payment'];
+        
         const isLargeMonthlyBillCategory = largeMonthlyBillCategories.some(keyword => 
           item.category.toLowerCase().includes(keyword)
         ) && item.avgMonthlySpending >= 400; // Large amount threshold for categories
         
-        if (isLargeMonthlyBillCategory) {
+        const isOneTimePaymentCategory = oneTimePaymentCategories.some(keyword => 
+          item.category.toLowerCase().includes(keyword)
+        ); // These categories are typically one-time transactions that don't benefit from daily pacing
+        
+        if (isLargeMonthlyBillCategory || isOneTimePaymentCategory) {
           return false; // Exclude from pacing tracking
         }
         

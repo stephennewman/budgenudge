@@ -15,6 +15,8 @@ export async function POST() {
     // Define keywords and thresholds for large monthly bills
     const largeMonthlyBillKeywords = ['sentinel', 'rent', 'mortgage', 'insurance', 'prog select', 'usaa', 'geico', 'allstate', 'state farm', 'car payment', 'loan', 'housing'];
     const largeMonthlyBillCategories = ['housing', 'rent', 'mortgage', 'insurance', 'loan'];
+    const oneTimePaymentCategories = ['transfer', 'financial', 'payment', 'credit card payment', 'loan payment'];
+    const categoriesToRemove = [...largeMonthlyBillCategories, ...oneTimePaymentCategories];
     
     // Get all merchant pacing tracking records
     const { data: merchants, error: merchantError } = await supabase
@@ -80,12 +82,12 @@ export async function POST() {
     // Identify large monthly bill categories to remove
     if (categories) {
       for (const category of categories) {
-        const isLargeMonthlyBillCategory = largeMonthlyBillCategories.some(keyword => 
+        const isLargeMonthlyBillCategory = categoriesToRemove.some(keyword => 
           category.ai_category.toLowerCase().includes(keyword)
         );
         
         if (isLargeMonthlyBillCategory) {
-          console.log(`🗑️ Removing large monthly bill category: ${category.ai_category}`);
+          console.log(`🗑️ Removing inappropriate pacing category: ${category.ai_category}`);
           
           const { error: deleteError } = await supabase
             .from('category_pacing_tracking')
@@ -111,7 +113,7 @@ export async function POST() {
         removed_merchants: removedMerchants,
         removed_categories: removedCategories
       },
-      explanation: 'Large monthly bills (rent, mortgage, insurance) excluded from pacing analysis as they are binary (paid vs not paid) rather than gradual spending patterns'
+      explanation: 'Large monthly bills (rent, mortgage, insurance) and one-time payments (transfers, financial) excluded from pacing analysis as they are binary (paid vs not paid) rather than gradual spending patterns'
     });
 
   } catch (error) {
