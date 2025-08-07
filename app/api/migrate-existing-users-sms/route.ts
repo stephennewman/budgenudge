@@ -155,10 +155,11 @@ export async function POST() {
 
       } catch (userError) {
         console.error(`Error migrating user ${user.user_id}:`, userError);
+        const errorMessage = userError instanceof Error ? userError.message : 'Unknown error';
         migrationResults.push({
           user_id: user.user_id,
           email: 'unknown',
-          actions: [`❌ Migration failed: ${userError.message}`]
+          actions: [`❌ Migration failed: ${errorMessage}`]
         });
       }
     }
@@ -173,10 +174,11 @@ export async function POST() {
 
   } catch (error) {
     console.error('Error migrating existing users:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',
-      details: error.message 
+      details: errorMessage 
     }, { status: 500 });
   }
 }

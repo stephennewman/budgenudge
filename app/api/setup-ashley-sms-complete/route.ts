@@ -169,10 +169,11 @@ export async function POST() {
 
   } catch (error) {
     console.error('Error setting up Ashley SMS:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',
-      details: error.message 
+      details: errorMessage 
     }, { status: 500 });
   }
 }
