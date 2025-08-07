@@ -28,7 +28,7 @@ export async function POST() {
       .eq('user_id', ashleyUserId);
 
     if (!existingSettings || existingSettings.length === 0) {
-      const { data: newSettings, error: settingsError } = await supabase
+              const { error: settingsError } = await supabase
         .from('user_sms_settings')
         .insert({
           user_id: ashleyUserId,

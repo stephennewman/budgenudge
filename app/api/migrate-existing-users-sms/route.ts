@@ -54,7 +54,7 @@ export async function POST() {
         const existingTypes = new Set(existingPreferences?.map(p => p.sms_type) || []);
         const missingTypes = requiredTypes.filter(type => !existingTypes.has(type));
 
-        let userResult = {
+        const userResult = {
           user_id: user.user_id,
           email: user.profiles?.email,
           actions: []
