@@ -56,11 +56,11 @@
 ---
 
 ### **Test 4: User Data Isolation (Security Fix)** ✅
-**Problem Fixed**: Calendar showed transactions from ALL users (major security issue)
+**Problem Fixed**: Recurring bills showed transactions from ALL users (major security issue)
 
 **Test Steps**:
 1. Login to your account
-2. Navigate to `/protected/calendar` 
+2. Navigate to `/protected/recurring-bills` 
 3. Check the "Upcoming Bills" section
 
 **✅ Expected Result**: Only YOUR transactions displayed (or empty if no bank connected)
@@ -134,7 +134,7 @@
 1. **Sign-up** → Check-email page ✅
 2. **Email confirmation** → Auto-login ✅  
 3. **New users** → Bank connection required ✅
-4. **Calendar** → User-specific data only ✅
+4. **Recurring Bills** → User-specific data only ✅
 5. **SMS** → Dynamic carrier/phone ✅
 6. **Webhook** → Real-time transactions ✅
 

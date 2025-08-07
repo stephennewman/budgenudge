@@ -92,7 +92,7 @@ Key features:
 - Spending categorization and analysis  
 - Weekly spending summaries
 - Recurring bill tracking
-- Calendar view of transactions
+- Transaction analysis and insights
 
 Respond helpfully but keep responses under 300 characters for SMS. Direct users to https://get.krezzo.com for detailed account access. Be friendly and professional.`
           },

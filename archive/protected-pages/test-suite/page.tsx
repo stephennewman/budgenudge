@@ -40,7 +40,7 @@ export default function TestSuitePage() {
           <div>
             <h4 className="font-medium text-blue-800 mb-1">4. User Data Isolation Test</h4>
             <p className="text-blue-700">
-              • Check calendar page → Should only show YOUR transactions, not other users&apos;
+              • Check recurring bills page → Should only show YOUR transactions, not other users&apos;
             </p>
           </div>
           
@@ -75,7 +75,7 @@ export default function TestSuitePage() {
           <div>
             <h4 className="font-medium text-green-800 mb-2">UI Tests</h4>
             <ul className="space-y-1 text-green-700">
-              <li>• <a href="/protected/calendar" className="underline">Calendar page</a></li>
+              <li>• <a href="/protected/recurring-bills" className="underline">Recurring bills page</a></li>
               <li>• <a href="/protected/transactions" className="underline">Transactions page</a></li>
               <li>• <a href="/sign-out" className="underline">Sign out flow</a></li>
             </ul>

@@ -134,7 +134,7 @@ export default function SMSPreferencesPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">📱 Texts</h1>
           <p className="text-muted-foreground mt-2">
-            Daily SMS will be sent at <span className="font-semibold">7:00 AM EST</span>.
+            Daily SMS will be sent at <span className="font-semibold">8:00 AM EST</span>.
             <br />
             Weekly summaries are sent every <span className="font-semibold">Sunday at 7:00 AM EST</span>.
             <br />
