@@ -129,12 +129,22 @@ export async function POST() {
           totalScore
         };
       })
-      .filter(item => 
-        item.avgMonthlySpending >= 25 && // Lower threshold: $25/month average spending
-        item.avgMonthlyTransactions >= 1.5 && // Lower threshold: 1.5+ transactions per month
-        // Allow high-activity categories even without current month activity
-        (item.analysis.currentMonthSpending > 0 || item.avgMonthlySpending >= 75)
-      )
+      .filter(item => {
+        // Exclude large monthly bill categories from pacing tracking
+        const largeMonthlyBillCategories = ['housing', 'rent', 'mortgage', 'insurance', 'loan'];
+        const isLargeMonthlyBillCategory = largeMonthlyBillCategories.some(keyword => 
+          item.category.toLowerCase().includes(keyword)
+        ) && item.avgMonthlySpending >= 400; // Large amount threshold for categories
+        
+        if (isLargeMonthlyBillCategory) {
+          return false; // Exclude from pacing tracking
+        }
+        
+        return item.avgMonthlySpending >= 25 && // Lower threshold: $25/month average spending
+          item.avgMonthlyTransactions >= 1.5 && // Lower threshold: 1.5+ transactions per month
+          // Allow high-activity categories even without current month activity
+          (item.analysis.currentMonthSpending > 0 || item.avgMonthlySpending >= 75);
+      })
       .sort((a, b) => b.totalScore - a.totalScore)
       .slice(0, 5); // Top 5
 

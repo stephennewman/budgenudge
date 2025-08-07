@@ -107,13 +107,23 @@ export async function POST() {
         frequencyDays
       };
     })
-    .filter(m => 
-      m.avgMonthlySpending >= 25 &&  // Lower threshold for meaningful spending ($25+ avg monthly)
-      m.frequencyDays <= 45 &&       // Allow up to 6-week frequency 
-      m.transactionCount >= 2 &&     // Lower minimum transaction count (2+)
-      // Allow high-activity merchants with even lower frequency if they spend enough
-      (m.frequencyDays <= 45 || (m.avgMonthlySpending >= 100 && m.frequencyDays <= 60))
-    )
+    .filter(m => {
+      // Exclude large monthly bills from pacing tracking (they're binary: paid vs not paid)
+      const largeMonthlyBillKeywords = ['sentinel', 'rent', 'mortgage', 'insurance', 'prog select', 'usaa', 'geico', 'allstate', 'state farm', 'car payment', 'loan', 'housing'];
+      const isLargeMonthlyBill = largeMonthlyBillKeywords.some(keyword => 
+        m.merchant.toLowerCase().includes(keyword)
+      ) && m.avgMonthlySpending >= 300; // Large amount threshold
+      
+      if (isLargeMonthlyBill) {
+        return false; // Exclude from pacing tracking
+      }
+      
+      return m.avgMonthlySpending >= 25 &&  // Lower threshold for meaningful spending ($25+ avg monthly)
+        m.frequencyDays <= 45 &&       // Allow up to 6-week frequency 
+        m.transactionCount >= 2 &&     // Lower minimum transaction count (2+)
+        // Allow high-activity merchants with even lower frequency if they spend enough
+        (m.frequencyDays <= 45 || (m.avgMonthlySpending >= 100 && m.frequencyDays <= 60));
+    })
     .sort((a, b) => {
       // Enhanced scoring: spending (60%) + frequency (30%) + high activity bonus (10%)
       const frequencyScoreA = Math.max(0, 30 - a.frequencyDays);
