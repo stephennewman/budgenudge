@@ -110,12 +110,19 @@ export async function POST() {
     .filter(m => 
       m.avgMonthlySpending >= 50 &&  // Meaningful spending ($50+ avg monthly)
       m.frequencyDays <= 30 &&       // At least monthly frequency
-      m.transactionCount >= 3         // Minimum transaction count
+      m.transactionCount >= 3 &&     // Minimum transaction count
+      // Allow high-activity merchants with lower frequency if they spend enough
+      (m.frequencyDays <= 30 || (m.avgMonthlySpending >= 150 && m.frequencyDays <= 45))
     )
     .sort((a, b) => {
-      // Weight: 60% avg monthly spending + 40% frequency (lower days = higher frequency)
-      const scoreA = (a.avgMonthlySpending * 0.6) + ((30 - a.frequencyDays) * 0.4);
-      const scoreB = (b.avgMonthlySpending * 0.6) + ((30 - b.frequencyDays) * 0.4);
+      // Enhanced scoring: spending (60%) + frequency (30%) + high activity bonus (10%)
+      const frequencyScoreA = Math.max(0, 30 - a.frequencyDays);
+      const frequencyScoreB = Math.max(0, 30 - b.frequencyDays);
+      const highActivityBonusA = a.avgMonthlySpending >= 200 ? 100 : 0;
+      const highActivityBonusB = b.avgMonthlySpending >= 200 ? 100 : 0;
+      
+      const scoreA = (a.avgMonthlySpending * 0.6) + (frequencyScoreA * 0.3) + (highActivityBonusA * 0.1);
+      const scoreB = (b.avgMonthlySpending * 0.6) + (frequencyScoreB * 0.3) + (highActivityBonusB * 0.1);
       return scoreB - scoreA;
     })
     .slice(0, 3); // Top 3

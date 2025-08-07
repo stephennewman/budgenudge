@@ -113,12 +113,13 @@ export async function POST() {
         const avgMonthlySpending = analysis.totalSpending / 3; // 3 months of data
         const avgMonthlyTransactions = analysis.transactionCount / 3;
         
-        // Score based on: high spending + frequent usage (more than 2-3 transactions per month)
+        // Score based on: high spending + frequent usage + high activity patterns
         const spendingScore = avgMonthlySpending;
         const frequencyScore = avgMonthlyTransactions >= 2.5 ? avgMonthlyTransactions * 20 : 0; // Boost for frequent usage
         const currentActivityScore = analysis.currentMonthSpending > 0 ? 50 : 0; // Boost for current activity
+        const highActivityScore = avgMonthlySpending >= 200 ? 100 : 0; // Extra boost for high-spend categories
         
-        const totalScore = spendingScore + frequencyScore + currentActivityScore;
+        const totalScore = spendingScore + frequencyScore + currentActivityScore + highActivityScore;
 
         return {
           category,
@@ -131,7 +132,8 @@ export async function POST() {
       .filter(item => 
         item.avgMonthlySpending >= 50 && // Minimum $50/month average spending
         item.avgMonthlyTransactions >= 2 && // Minimum 2 transactions per month
-        item.analysis.currentMonthSpending > 0 // Must have current month activity
+        // Allow high-activity categories even without current month activity
+        (item.analysis.currentMonthSpending > 0 || item.avgMonthlySpending >= 100)
       )
       .sort((a, b) => b.totalScore - a.totalScore)
       .slice(0, 3); // Top 3

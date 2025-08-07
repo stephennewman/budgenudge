@@ -32,7 +32,7 @@ export async function POST() {
     // Run merchant pacing auto-selection
     let merchantResult = null;
     try {
-      const merchantResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('/graphql/v1', '')}/api/merchant-pacing-tracking/auto-select`, {
+      const merchantResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/merchant-pacing-tracking/auto-select`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await supabase.auth.getSession().then(s => s.data.session?.access_token)}`,
@@ -50,7 +50,7 @@ export async function POST() {
     // Run category pacing auto-selection
     let categoryResult = null;
     try {
-      const categoryResponse = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('/graphql/v1', '')}/api/category-pacing-tracking/auto-select`, {
+      const categoryResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/category-pacing-tracking/auto-select`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${await supabase.auth.getSession().then(s => s.data.session?.access_token)}`,
