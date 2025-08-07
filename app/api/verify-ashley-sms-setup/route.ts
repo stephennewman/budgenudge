@@ -220,7 +220,7 @@ export async function POST() {
         plaid_items: items?.length || 0,
         merchant_tracking: merchantCount,
         category_tracking: categoryCount,
-        sms_settings_configured: smsSettings?.length > 0
+        sms_settings_configured: (smsSettings?.length ?? 0) > 0
       },
       message_test_results: testResults,
       issues: issues,
@@ -232,10 +232,11 @@ export async function POST() {
 
   } catch (error) {
     console.error('Error verifying Ashley SMS setup:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',
-      details: error.message 
+      details: errorMessage 
     }, { status: 500 });
   }
 }
