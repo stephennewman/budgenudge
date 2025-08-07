@@ -438,9 +438,9 @@ export async function generateMerchantPacingMessage(userId: string): Promise<str
       }
     }
 
-    // ✅ FIX: Sort by highest activity (avg monthly spend) and limit to top 3-4
+    // ✅ FIX: Sort by highest activity (transaction frequency) and limit to top 3-4
     const topMerchants = merchantData
-      .sort((a, b) => b.avgMonthlySpend - a.avgMonthlySpend) // Highest spending first
+      .sort((a, b) => b.transactionCount - a.transactionCount) // Most transactions first (real activity)
       .slice(0, 4); // Limit to top 4 merchants
 
     if (topMerchants.length === 0) {

@@ -118,21 +118,20 @@ export async function POST() {
         return false; // Exclude from pacing tracking
       }
       
-      return m.avgMonthlySpending >= 25 &&  // Lower threshold for meaningful spending ($25+ avg monthly)
-        m.frequencyDays <= 45 &&       // Allow up to 6-week frequency 
-        m.transactionCount >= 2 &&     // Lower minimum transaction count (2+)
-        // Allow high-activity merchants with even lower frequency if they spend enough
-        (m.frequencyDays <= 45 || (m.avgMonthlySpending >= 100 && m.frequencyDays <= 60));
+      return m.avgMonthlySpending >= 25 &&  // Minimum meaningful spending ($25+ avg monthly)
+        m.transactionCount >= 5 &&     // ✅ FIX: Higher minimum for real activity (5+ transactions)
+        m.frequencyDays <= 30 &&       // More frequent transactions (every 30 days or less)
+        // Focus on genuinely active merchants with regular transaction patterns
+        (m.transactionCount >= 8 || (m.transactionCount >= 5 && m.frequencyDays <= 15));
     })
     .sort((a, b) => {
-      // Enhanced scoring: spending (60%) + frequency (30%) + high activity bonus (10%)
-      const frequencyScoreA = Math.max(0, 30 - a.frequencyDays);
-      const frequencyScoreB = Math.max(0, 30 - b.frequencyDays);
-      const highActivityBonusA = a.avgMonthlySpending >= 200 ? 100 : 0;
-      const highActivityBonusB = b.avgMonthlySpending >= 200 ? 100 : 0;
+      // ✅ FIX: Priority scoring based on TRANSACTION FREQUENCY (real activity)
+      // Transaction count (70%) + frequency bonus (20%) + spending (10%)
+      const frequencyBonusA = Math.max(0, 30 - a.frequencyDays); // Bonus for more frequent transactions
+      const frequencyBonusB = Math.max(0, 30 - b.frequencyDays);
       
-      const scoreA = (a.avgMonthlySpending * 0.6) + (frequencyScoreA * 0.3) + (highActivityBonusA * 0.1);
-      const scoreB = (b.avgMonthlySpending * 0.6) + (frequencyScoreB * 0.3) + (highActivityBonusB * 0.1);
+      const scoreA = (a.transactionCount * 70) + (frequencyBonusA * 20) + (a.avgMonthlySpending * 0.1);
+      const scoreB = (b.transactionCount * 70) + (frequencyBonusB * 20) + (b.avgMonthlySpending * 0.1);
       return scoreB - scoreA;
     })
     .slice(0, 5); // Top 5
