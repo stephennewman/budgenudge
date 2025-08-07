@@ -15,10 +15,7 @@ export async function POST() {
     // Get all users who have Plaid connections but incomplete SMS setup
     const { data: users, error: usersError } = await supabase
       .from('items')
-      .select(`
-        user_id,
-        profiles!inner(email, phone_number)
-      `)
+      .select('user_id')
       .not('user_id', 'is', null);
 
     if (usersError) {
@@ -39,6 +36,13 @@ export async function POST() {
       try {
         console.log(`🔄 Migrating user: ${user.user_id}`);
         
+        // Get user profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email, phone_number')
+          .eq('id', user.user_id)
+          .single();
+        
         // Check if user already has complete SMS setup
         const { data: existingPreferences } = await supabase
           .from('user_sms_preferences')
@@ -56,7 +60,7 @@ export async function POST() {
 
         const userResult = {
           user_id: user.user_id,
-          email: user.profiles?.email,
+          email: profile?.email,
           actions: []
         };
 
@@ -70,7 +74,7 @@ export async function POST() {
                 sms_type: smsType,
                 enabled: true,
                 frequency: 'daily',
-                phone_number: user.profiles?.phone_number || null
+                phone_number: profile?.phone_number || null
               }, {
                 onConflict: 'user_id,sms_type'
               });
@@ -89,7 +93,7 @@ export async function POST() {
             .from('user_sms_settings')
             .insert({
               user_id: user.user_id,
-              phone_number: user.profiles?.phone_number || null,
+              phone_number: profile?.phone_number || null,
               send_time: '08:00:00',
               timezone: 'America/New_York',
               is_active: true,
@@ -153,7 +157,7 @@ export async function POST() {
         console.error(`Error migrating user ${user.user_id}:`, userError);
         migrationResults.push({
           user_id: user.user_id,
-          email: user.profiles?.email,
+          email: 'unknown',
           actions: [`❌ Migration failed: ${userError.message}`]
         });
       }
