@@ -36,8 +36,8 @@ export async function POST() {
       return NextResponse.json({ success: false, error: 'Failed to fetch category records' });
     }
 
-    let removedMerchants = [];
-    let removedCategories = [];
+    const removedMerchants = [];
+    const removedCategories = [];
 
     // Identify large monthly bill merchants to remove
     if (merchants) {
