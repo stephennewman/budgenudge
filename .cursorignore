@@ -1,0 +1,42 @@
+# Build & Dependencies (1GB+ ignored)
+node_modules/
+.next/
+.git/
+.vercel/
+*.tsbuildinfo
+*.log
+
+# Archived Code
+archive/
+
+# Temporary Files
+.DS_Store
+*.cache
+*.tmp
+.pnpm-debug.log*
+
+# Development Scripts (context-specific)
+scripts/
+*.sql
+*-user-*.js
+test-*.js
+verify-*.js
+update-*.js
+fix-*.js
+
+# Documentation (keep for strategy, ignore for code)
+README.md
+SECURITY_GUIDE.md
+SLACK_SETUP.md
+
+# Environment & Secrets
+.env*
+!.env.example
+
+# Additional build artifacts
+pnpm-lock.yaml
+.deployment-trigger
+.vercel-deployment-trigger.txt
+next-env.d.ts
+postcss.config.mjs
+dev.log

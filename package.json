@@ -1,6 +1,7 @@
 {
-  "name": "vercel-template",
-  "version": "0.1.1",
+  "name": "budgenudge",
+  "version": "1.0.0",
+  "description": "AI-Powered Financial Wellness Platform",
   "private": true,
   "scripts": {
     "dev": "next dev",

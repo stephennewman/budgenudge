@@ -1112,8 +1112,33 @@ export async function generateCashFlowRunwayMessage(userId: string): Promise<str
       return streams.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime() || b.expectedAmount - a.expectedAmount);
     }
 
-    const streams = detectStreams((incomeCandidates || []) as IncomeTxn[]);
-    const primaryNext = streams.length > 0 ? streams[0].nextDate : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    const streamsAll = detectStreams((incomeCandidates || []) as IncomeTxn[]);
+
+    function isTransferOrInvestmentSource(label: string): boolean {
+      const l = (label || '').toLowerCase();
+      const badKeywords = [
+        'brokerage',
+        'transfer',
+        'venmo',
+        'paypal',
+        'zelle',
+        'cash app',
+        'apple cash',
+        'external account',
+        'internal transfer',
+        'from savings',
+        'to checking',
+        'funds from',
+        'sweep'
+      ];
+      return badKeywords.some(k => l.includes(k));
+    }
+
+    // Filter out likely non-paycheck sources for display and for primary next date
+    const streams = (streamsAll || []).filter(s => !isTransferOrInvestmentSource(s.source));
+    const primaryNext = streams.length > 0
+      ? streams[0].nextDate
+      : (streamsAll.length > 0 ? streamsAll[0].nextDate : new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000));
     const nextPaycheckDate = primaryNext;
     const daysUntilPay = Math.max(1, Math.ceil((nextPaycheckDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
 

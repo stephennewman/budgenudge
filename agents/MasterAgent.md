@@ -23,6 +23,37 @@
 
 ## 📈 DEPLOYMENT LOG
 
+### Deployment #34: CASH FLOW RUNWAY — DAILY 5PM SMS (Paycheck-Aware Runway)
+**Date:** August 7, 2025 5:05 PM EDT  
+**Status:** ✅ DEPLOYED (build in progress → ready)  
+**Scope:** New daily runway SMS at 5:00 PM EST using paycheck-aware forecast and patterned discretionary baseline
+
+**What shipped**
+- New template `cash-flow-runway` sent daily at 5pm EST via cron
+- Format: Available balance → next income countdown → bills before income (+list) → predicted money remaining → max spend per day → next income(s) → encouragement line → disclaimer
+- Pattern-based discretionary baseline: 180d history to detect recurring discretionary patterns; 90d baseline window (or since first tx). Excludes tagged bills, bill-like categories, Venmo/transfers, and disconnected items
+- Uses earliest upcoming income stream from deposits; lists top 1–2 income streams with amounts and dates
+- Wording: “income” (not “payday”); removed amount from the countdown line; minimal emojis; final line: “*Predictions based on historical data.”
+
+**Files changed**
+- `utils/sms/templates.ts` (new generator, exclusions, pattern logic, formatting, encouragement)
+- `app/api/cron/scheduled-sms/route.ts` (add 5pm schedule, filter deleted items)
+- `app/api/manual-sms/route.ts` (support templateType=cash-flow-runway and avoid appending recent tx)
+- `app/protected/sms-preferences/page.tsx` (add template type visibility)
+- `utils/sms/deduplication.ts` (add template type)
+
+**Production impact**
+- New daily guidance tailored to each user’s next income and bills; clearer per-day cap for discretionary spend
+- Reduced noise and inflated spend by excluding bills/transfers/Venmo and disconnected/sandbox items
+
+**Coordination**
+- Engineering: Logged below; build green locally, Vercel deploy building/ready
+- Product: Add to feature set; track adoption and feedback
+- Marketing: Update messaging with “Paycheck-aware Cash Flow Runway” differentiator and sample copy
+- Documentation: Add section to SMS system docs, template format, and exclusions
+
+---
+
 ### Deployment #33: COMPREHENSIVE SMS SYSTEM VALIDATION & RECURRING BILL ENHANCEMENT
 **Date:** August 7, 2025 12:30 PM EST  
 **Status:** ✅ SUCCESSFULLY DEPLOYED & FULLY OPERATIONAL  
