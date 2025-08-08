@@ -3,7 +3,7 @@
 **Project Name**: Krezzo - Real-Time Financial Transaction Monitoring
 **Current Time**: Tuesday, August 5, 2025, 7:42 PM EDT  
 **Project Status**: ✅ **PRODUCTION OPERATIONAL + GOOGLE OAUTH MODAL FIX DEPLOYED**
-**Live URL**: https://budgenudge.vercel.app
+**Live URL**: https://get.krezzo.com
 
 ---
 
@@ -605,7 +605,7 @@ Complete PostgreSQL schema with 15+ core tables:
 - **Dependencies Verified**: All packages up to date via pnpm (502ms), Next.js 15.2.4 build successful with only minor ESLint warnings
 - **GitHub Status**: Clean working tree, ready for development
 - **Codebase Understanding**: Comprehensive understanding of webhook system, SMS integration, recurring bills, and database architecture
-- **Production Status**: Live at https://budgenudge.vercel.app with Charles Schwab integration monitoring 100+ transactions
+- **Production Status**: Live at https://get.krezzo.com with Charles Schwab integration monitoring 100+ transactions
 - **Recent Major Changes**: July 18, 2025 - Fixed admin permission errors, updated cron schedule to 1:45 PM EST, 3-template SMS system operational
 - **Ready State**: ✅ FULLY BRIEFED with deep understanding of financial monitoring and SMS notification architecture, prepared for immediate development tasks
 
