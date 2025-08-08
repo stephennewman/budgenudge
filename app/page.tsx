@@ -38,7 +38,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12">
-            <Button asChild size="lg" className="text-xl px-12 py-6 h-auto font-bold bg-white text-gray-900 hover:bg-gray-100">
+            <Button asChild size="lg" className="text-xl px-12 py-6 h-auto font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white">
               <Link href="/sign-up">Sign up</Link>
             </Button>
           </div>
@@ -255,6 +255,18 @@ export default function Home() {
           <div className="text-center mb-16">
             <h2 className="text-4xl sm:text-5xl font-bold text-blue-800 mb-6">How Does Krezzo Work?</h2>
             <p className="text-xl text-blue-700">Simple, automated, and powerful</p>
+          </div>
+          
+          {/* Money Assistant Image */}
+          <div className="mb-12 text-center">
+            <Image
+              src="/assets/pictures/krezzo_money_assistant.png"
+              alt="Krezzo money assistant showing how the AI analyzes your financial data"
+              width={800}
+              height={600}
+              className="rounded-xl mx-auto"
+              priority
+            />
           </div>
           
           <div className="bg-white border-2 border-blue-300 rounded-2xl p-8 sm:p-12">
@@ -479,8 +491,8 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* Feature 7 */}
-              <div className="group bg-white border-2 border-gray-100 rounded-2xl p-6 hover:border-teal-300 hover:shadow-lg transition-all duration-300 hover:scale-105">
+              {/* Feature 7 - Hidden SSO/Authentication feature */}
+              {/* <div className="group bg-white border-2 border-gray-100 rounded-2xl p-6 hover:border-teal-300 hover:shadow-lg transition-all duration-300 hover:scale-105">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center group-hover:bg-teal-200 transition-colors">
                     <span className="text-2xl">🔐</span>
@@ -490,7 +502,7 @@ export default function Home() {
                     <p className="text-gray-600">Bank-level security with encrypted data and secure access controls</p>
                   </div>
                 </div>
-              </div>
+              </div> */}
               
               {/* Feature 8 */}
               <div className="group bg-white border-2 border-gray-100 rounded-2xl p-6 hover:border-pink-300 hover:shadow-lg transition-all duration-300 hover:scale-105">
@@ -538,43 +550,83 @@ export default function Home() {
 
       {/* SECTION 9: HOW TO GET STARTED */}
       <section className="bg-white py-20 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl sm:text-5xl font-bold mb-6">How to get started</h2>
-            <p className="text-xl text-gray-600">Just a few steps and you&apos;re in.</p>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-12 mb-16">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">1</div>
-              <h3 className="text-2xl font-bold mb-4">Sign up for free to create your account</h3>
-              <p className="text-gray-600 text-lg">Takes 2 seconds. We&apos;re not going to ask you a million questions.</p>
+        <div className="mx-auto max-w-7xl">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            
+            {/* Left Column - Content */}
+            <div className="space-y-8">
+              <div>
+                <h2 className="text-4xl sm:text-5xl font-bold mb-6">How to get started</h2>
+                <p className="text-xl text-gray-600 mb-8">Just a few steps and you&apos;re in.</p>
+              </div>
+              
+              {/* Steps - Stacked Vertically */}
+              <div className="space-y-8">
+                <div className="flex items-start gap-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0">1</div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-3">
+                      <Link href="/sign-up" className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 underline">
+                        Sign up for free to create your account
+                      </Link>
+                    </h3>
+                    <p className="text-gray-600 text-lg">Takes 2 seconds. We&apos;re not going to ask you a million questions.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0">2</div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-3">Connect your bank</h3>
+                    <p className="text-gray-600 text-lg">Via secure Plaid integration. Same thing your bank uses.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold flex-shrink-0">3</div>
+                  <div>
+                    <h3 className="text-2xl font-bold mb-3">Start receiving texts!</h3>
+                    <p className="text-gray-600 text-lg">Adjust as you wish... what you spent, what&apos;s coming, and more. Done.</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* CTA Button */}
+              <div className="pt-4">
+                <Link 
+                  href="/sign-up"
+                  className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-semibold text-lg rounded-xl transition-all duration-200"
+                >
+                  Get Started Now
+                </Link>
+              </div>
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">2</div>
-              <h3 className="text-2xl font-bold mb-4">Connect your bank</h3>
-              <p className="text-gray-600 text-lg">Via secure Plaid integration. Same thing your bank uses.</p>
+            {/* Right Column - Image */}
+            <div className="lg:pl-8">
+              <Image
+                src="/assets/pictures/krezzo_alerts-min.png"
+                alt="Krezzo alerts and notifications showing financial insights on mobile device"
+                width={600}
+                height={700}
+                className="rounded-2xl shadow-lg w-full h-auto"
+                priority
+              />
             </div>
             
-            <div className="text-center">
-              <div className="w-20 h-20 bg-blue-600 text-white rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold">3</div>
-              <h3 className="text-2xl font-bold mb-4">Start receiving texts!</h3>
-              <p className="text-gray-600 text-lg">Adjust as you wish... what you spent, what&apos;s coming, and more. Done.</p>
-            </div>
           </div>
         </div>
       </section>
 
       {/* SECTION 10: FINAL CTA WITH SIGNUP FORM */}
-      <section className="bg-blue-600 py-20 px-4 sm:px-6">
+      <section className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 py-20 px-4 sm:px-6">
         <div className="mx-auto max-w-5xl text-center">
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-8">Stop flying blind with your money</h2>
-          <p className="text-2xl text-blue-100 mb-12 max-w-4xl mx-auto">
+          <p className="text-2xl text-white/90 mb-12 max-w-4xl mx-auto">
             Start getting daily financial awareness that actually works. No apps, no spreadsheets, no BS.
           </p>
           
-          <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-12 py-4 text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button asChild size="lg" className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-12 py-4 text-xl rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
             <Link href="/sign-up">Get Started Free</Link>
           </Button>
         </div>
@@ -747,19 +799,19 @@ export default function Home() {
       </section>
 
       {/* FINAL CTA SECTION */}
-      <section className="bg-gradient-to-r from-blue-600 to-indigo-600 py-20 px-4 sm:px-6">
+      <section className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 py-20 px-4 sm:px-6">
         <div className="mx-auto max-w-4xl text-center">
           <h2 className="text-4xl sm:text-5xl font-bold text-white mb-6">
             Start taking control of your money
           </h2>
-          <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-xl text-white/90 mb-8 max-w-2xl mx-auto">
             Join thousands who are already getting daily financial insights that actually work. 
             No apps, no spreadsheets, no BS.
           </p>
-          <Button asChild size="lg" className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-8 py-4 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
+          <Button asChild size="lg" className="bg-white text-purple-600 hover:bg-gray-100 font-semibold px-8 py-4 text-lg rounded-xl shadow-lg hover:shadow-xl transition-all duration-300">
             <Link href="/sign-up">Sign Up Today</Link>
             </Button>
-          <p className="text-blue-200 text-sm mt-4">
+          <p className="text-white/80 text-sm mt-4">
             Free to start • No credit card required • Cancel anytime
           </p>
         </div>

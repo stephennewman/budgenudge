@@ -2,7 +2,6 @@
 
 import { signUpAction } from "@/app/actions";
 import AuthSubmitButton from "@/components/auth-submit-button";
-import GoogleSignInButton from "@/components/google-sign-in-button";
 import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -131,16 +130,16 @@ function SignUpForm() {
             </p>
             
             {/* Divider */}
-            <div className="flex items-center gap-4 my-4 sm:my-6">
+            {/* <div className="flex items-center gap-4 my-4 sm:my-6">
               <div className="flex-1 h-px bg-gray-300"></div>
               <span className="text-sm text-gray-500">Or</span>
               <div className="flex-1 h-px bg-gray-300"></div>
             </div>
             
-            {/* Google Sign-Up */}
+            Google Sign-Up
             <div>
               <GoogleSignInButton text="Sign up with Google" className="h-11 sm:h-12" />
-            </div>
+            </div> */}
           </form>
         </div>
         </div>
