@@ -46,7 +46,7 @@ export default function Header() {
               <Button variant="outline" asChild>
                 <Link href="/sign-in">Sign In</Link>
               </Button>
-              <Button asChild>
+              <Button asChild className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white">
                 <Link href="/sign-up">Sign Up</Link>
               </Button>
             </>

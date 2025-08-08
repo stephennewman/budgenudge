@@ -271,7 +271,45 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       console.log('⚠️ Signup phone processing error (non-blocking):', phoneError);
     }
 
-    // 6. Add user to SlickText as subscriber (optional)
+    // 6. Send welcome text message to new user
+    if (updatedPhone && updatedPhone.length > 5) {
+      try {
+        const { sendUnifiedSMS } = await import('../../../utils/sms/unified-sms');
+        const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+        const firstName = authUser.user?.user_metadata?.firstName || 'there';
+        
+        const welcomeMessage = `🎉 Welcome to Krezzo, ${firstName}! 
+
+Your financial awareness journey starts now. Once you connect your bank account, you'll get daily insights that actually matter.
+
+Ready to explore? Text these commands:
+💰 "balance" - Check spending summary
+📊 "bills" - See upcoming bills  
+🏪 "merchants" - Top spending spots
+📈 "trends" - Spending patterns
+💡 "help" - All available commands
+
+Connect your bank account in the app to unlock these insights!`;
+
+        const smsResult = await sendUnifiedSMS({
+          phoneNumber: updatedPhone.replace('+1', ''),
+          message: welcomeMessage,
+          userId: user.id,
+          userEmail: authUser.user?.email,
+          context: 'welcome_new_user'
+        });
+
+        if (smsResult.success) {
+          console.log('✅ Welcome text sent successfully:', smsResult.messageId);
+        } else {
+          console.warn('⚠️ Welcome text failed (non-blocking):', smsResult.error);
+        }
+      } catch (welcomeError) {
+        console.warn('⚠️ Welcome text error (non-blocking):', welcomeError);
+      }
+    }
+
+    // 7. Add user to SlickText as subscriber (optional)
     // This creates a feedback loop: SlickText leads → auth users → SlickText subscribers
     try {
       const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
