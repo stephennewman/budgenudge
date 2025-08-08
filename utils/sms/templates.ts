@@ -1330,9 +1330,461 @@ export async function generateCashFlowRunwayMessage(userId: string): Promise<str
 }
 
 // ===================================
+// ONBOARDING SMS TEMPLATES
+// ===================================
+
+/**
+ * Immediate onboarding message sent right after bank connection
+ */
+export async function generateOnboardingImmediateMessage(userId: string): Promise<string> {
+  const firstName = await getUserFirstName(userId);
+  
+  return `🎉 Bank connected successfully${firstName ? `, ${firstName}` : ''}!
+
+We're analyzing your last 30 days of transactions with AI. This takes about 60 seconds.
+
+While that runs, here's what you can expect:
+📱 Daily money insights at 8 AM
+💳 Bill reminders before they're due  
+📊 Spending pattern alerts
+🤖 Smart merchant categorization
+
+Reply "status" to check analysis progress.`;
+}
+
+/**
+ * Analysis complete message with personalized insights
+ */
+export async function generateOnboardingAnalysisCompleteMessage(userId: string): Promise<string> {
+  try {
+    // Get user's item IDs for transactions
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+
+    if (!userItems || userItems.length === 0) {
+      return generateOnboardingAnalysisCompleteMessageFallback(userId);
+    }
+
+    // Get ALL transactions (no date filter for comprehensive analysis)
+    const { data: transactions } = await supabase
+      .from('transactions')
+      .select('amount, date, ai_category_tag, ai_merchant_name, name, merchant_name, category')
+      .in('plaid_item_id', userItems.map(item => item.plaid_item_id))
+      .order('date', { ascending: false });
+
+    // Get recurring bills detected
+    const { data: bills } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name, expected_amount')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('expected_amount', { ascending: false })
+      .limit(3);
+
+    if (!transactions || transactions.length === 0) {
+      return generateOnboardingAnalysisCompleteMessageFallback(userId);
+    }
+
+    // Run enhanced bill detection on the full transaction set
+    const enhancedBills = runEnhancedBillDetectionInTemplate(transactions);
+
+    // Analyze the COMPLETE transaction history
+    const expenses = transactions.filter(t => (t.amount || 0) > 0); // Positive amounts are expenses in Plaid
+    
+    // Calculate date range for comprehensive analysis
+    const dates = transactions.map(t => new Date(t.date)).sort((a, b) => a.getTime() - b.getTime());
+    const earliestDate = dates[0];
+    const latestDate = dates[dates.length - 1];
+    const daysCovered = Math.ceil((latestDate.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Total spending analysis
+    const transactionCount = expenses.length;
+    const totalSpending = expenses.reduce((sum, t) => sum + (t.amount || 0), 0);
+    
+    // Monthly average for context
+    const monthsOfData = Math.max(1, daysCovered / 30.44);
+    const averageMonthlySpending = totalSpending / monthsOfData;
+    
+    // Find top category
+    const categorySpending: Record<string, number> = {};
+    expenses.forEach(t => {
+      const category = t.ai_category_tag || t.category || 'Other';
+      categorySpending[category] = (categorySpending[category] || 0) + (t.amount || 0);
+    });
+    
+    const topCategory = Object.entries(categorySpending)
+      .sort(([,a], [,b]) => b - a)[0];
+
+    // Find most frequent merchants with counts and totals
+    const merchantData: Record<string, { count: number; total: number }> = {};
+    expenses.forEach(t => {
+      const merchant = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+      if (!merchantData[merchant]) {
+        merchantData[merchant] = { count: 0, total: 0 };
+      }
+      merchantData[merchant].count++;
+      merchantData[merchant].total += (t.amount || 0);
+    });
+    
+    const topMerchants = Object.entries(merchantData)
+      .sort(([,a], [,b]) => b.count - a.count)
+      .slice(0, 2);
+
+    // Build comprehensive bills list from both sources
+    const allDetectedBills: any[] = [];
+    
+    // Add existing tagged bills
+    if (bills && bills.length > 0) {
+      bills.forEach(bill => {
+        allDetectedBills.push({
+          name: bill.merchant_name,
+          amount: Math.abs(bill.expected_amount),
+          source: 'existing'
+        });
+      });
+    }
+    
+    // Add enhanced detection bills (avoiding duplicates)
+    enhancedBills.slice(0, 15).forEach(bill => { // Limit to top 15 for SMS length
+      const normalizedName = bill.merchant.toLowerCase().trim();
+      const isDuplicate = allDetectedBills.some(existing => 
+        existing.name.toLowerCase().trim().includes(normalizedName) || 
+        normalizedName.includes(existing.name.toLowerCase().trim())
+      );
+      
+      if (!isDuplicate) {
+        allDetectedBills.push({
+          name: bill.merchant,
+          amount: bill.averageAmount,
+          source: 'enhanced'
+        });
+      }
+    });
+    
+    // Sort by amount (highest first) and create display list
+    const sortedBills = allDetectedBills
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 12); // Limit total display for SMS
+    
+    let billsText = '';
+    if (sortedBills.length > 0) {
+      billsText = sortedBills.map(bill => 
+        `• ${bill.name}: $${Math.round(bill.amount)}`
+      ).join('\n');
+      
+      if (allDetectedBills.length > sortedBills.length) {
+        billsText += `\n• +${allDetectedBills.length - sortedBills.length} more...`;
+      }
+    } else {
+      billsText = '• None detected yet (more data needed)';
+    }
+
+    // Create timeframe description
+    function getTimeframeDescription(days: number): string {
+      if (days <= 35) return `${days} days`;
+      if (days <= 70) return `${Math.round(days / 7)} weeks`;
+      if (days <= 120) return `${Math.round(days / 30.44)} months`;
+      return `${Math.round(days / 365.25 * 10) / 10} years`;
+    }
+    
+    const timeframeDesc = getTimeframeDescription(daysCovered);
+
+    return `🔍 COMPREHENSIVE Analysis Complete!
+
+Your ${timeframeDesc} history: ${transactionCount} transactions, $${totalSpending.toLocaleString()} total
+
+📊 Top Category: ${topCategory?.[0] || 'Various'} ($${Math.round(topCategory?.[1] || 0).toLocaleString()})
+🏪 Most Frequent: ${topMerchants[0]?.[0] || 'Various'} (${topMerchants[0]?.[1]?.count || 0}), ${topMerchants[1]?.[0] || 'Others'} (${topMerchants[1]?.[1]?.count || 0})
+
+📋 DETECTED BILLS (${enhancedBills.length + (bills?.length || 0)} total):
+${billsText}
+
+🔧 Manage bills: https://get.krezzo.com/protected/recurring-bills
+
+✅ Profile optimized with ${timeframeDesc} of data!`;
+
+  } catch (error) {
+    console.error('Error generating onboarding analysis message:', error);
+    return generateOnboardingAnalysisCompleteMessageFallback(userId);
+  }
+}
+
+/**
+ * Fallback message when data isn't available
+ */
+function generateOnboardingAnalysisCompleteMessageFallback(userId: string): string {
+  return `✅ Analysis complete!
+
+We've set up your account and are ready to start tracking your spending patterns.
+
+Starting tomorrow at 8 AM, you'll get:
+📊 Daily spending insights
+💳 Bill reminders
+🎯 Budget tracking
+🤖 Smart categorization
+
+Reply "help" for commands or visit your dashboard to explore!`;
+}
+
+/**
+ * Day-before preparation message
+ */
+export async function generateOnboardingDayBeforeMessage(userId: string): Promise<string> {
+  const firstName = await getUserFirstName(userId);
+  
+  return `🌅 Good evening${firstName ? `, ${firstName}` : ''}! Tomorrow at 8 AM you'll get your first daily money insight.
+
+It will include:
+• Yesterday's spending breakdown
+• Upcoming bills this week
+• Budget pacing for your top categories
+
+You can change the time in your SMS preferences. Ready to take control of your finances? 💪
+
+Reply STOP anytime to pause messages.`;
+}
+
+/**
+ * Helper function to get user's first name
+ */
+async function getUserFirstName(userId: string): Promise<string | null> {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name')
+      .eq('id', userId)
+      .single();
+
+    if (profile?.first_name) {
+      return profile.first_name;
+    }
+
+    // Fallback to user metadata
+    const { data: user } = await supabase.auth.admin.getUserById(userId);
+    if (user.user?.user_metadata?.firstName) {
+      return user.user.user_metadata.firstName;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting user first name:', error);
+    return null;
+  }
+}
+
+// ===================================
+// ENHANCED BILL DETECTION FOR TEMPLATES
+// ===================================
+
+function runEnhancedBillDetectionInTemplate(transactions: any[]) {
+  // Group transactions by merchant
+  const merchantGroups: Record<string, any[]> = {};
+  
+  transactions.forEach(tx => {
+    if ((tx.amount || 0) <= 0) return; // Only expenses
+    
+    const merchant = normalizeMerchantNameForTemplate(tx.ai_merchant_name || tx.merchant_name || tx.name || 'Unknown');
+    
+    if (!merchantGroups[merchant]) {
+      merchantGroups[merchant] = [];
+    }
+    merchantGroups[merchant].push(tx);
+  });
+  
+  const detectedBills = [];
+  
+  for (const [merchant, txs] of Object.entries(merchantGroups)) {
+    // Enhanced: Accept 2+ transactions (was 5+ in old system)
+    if (txs.length < 2) continue;
+    
+    // Filter out non-bill merchants
+    if (isNonBillMerchant(merchant)) continue;
+    
+    // Sort by date
+    const sortedTxs = txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    // Analyze patterns
+    const analysis = analyzeMerchantPatternForTemplate(sortedTxs);
+    
+    // Enhanced scoring with bill-specific criteria
+    const score = calculateEnhancedBillScoreForTemplate(analysis, txs.length, merchant);
+    
+    // Higher threshold for better quality (60+ instead of 50+)
+    if (score >= 60) {
+      detectedBills.push({
+        merchant: merchant,
+        transactionCount: txs.length,
+        averageAmount: analysis.averageAmount,
+        frequency: analysis.frequency,
+        confidenceScore: score
+      });
+    }
+  }
+  
+  return detectedBills.sort((a, b) => b.confidenceScore - a.confidenceScore);
+}
+
+function analyzeMerchantPatternForTemplate(transactions: any[]) {
+  const amounts = transactions.map(tx => tx.amount);
+  const dates = transactions.map(tx => new Date(tx.date));
+  
+  // Calculate intervals
+  const intervals = [];
+  for (let i = 1; i < dates.length; i++) {
+    const daysBetween = Math.round((dates[i].getTime() - dates[i-1].getTime()) / (1000 * 60 * 60 * 24));
+    intervals.push(daysBetween);
+  }
+  
+  const averageAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+  const amountVariance = calculateVarianceForTemplate(amounts);
+  const averageInterval = intervals.length > 0 ? intervals.reduce((a, b) => a + b, 0) / intervals.length : 0;
+  
+  // Determine frequency
+  let frequency = 'unknown';
+  if (averageInterval >= 25 && averageInterval <= 35) frequency = 'monthly';
+  else if (averageInterval >= 12 && averageInterval <= 16) frequency = 'biweekly';
+  else if (averageInterval >= 6 && averageInterval <= 8) frequency = 'weekly';
+  else if (averageInterval >= 85 && averageInterval <= 95) frequency = 'quarterly';
+  
+  return {
+    averageAmount,
+    amountVariance,
+    averageInterval,
+    frequency
+  };
+}
+
+function isNonBillMerchant(merchant: string): boolean {
+  const nonBillKeywords = [
+    // Travel & Vacation
+    'vrbo', 'airbnb', 'booking', 'expedia', 'hotel', 'motel', 'inn', 'resort', 'travelocity',
+    'kayak', 'priceline', 'orbitz', 'trip', 'vacation', 'cruise', 'airline', 'flights',
+    
+    // Retail & Shopping
+    'amazon', 'target', 'walmart', 'costco', 'sams club', 'best buy', 'home depot', 'lowes',
+    'macys', 'nordstrom', 'kohls', 'tj maxx', 'marshalls', 'ross', 'old navy', 'gap',
+    
+    // Groceries & Food
+    'publix', 'kroger', 'safeway', 'whole foods', 'trader joe', 'aldi', 'wegmans', 'harris teeter',
+    'food lion', 'giant', 'stop shop', 'wegmans', 'meijer', 'hy vee', 'winn dixie',
+    'mcdonald', 'burger king', 'wendy', 'taco bell', 'kfc', 'subway', 'chipotle', 'panera',
+    'starbucks', 'dunkin', 'coffee', 'restaurant', 'cafe', 'diner', 'pizza', 'domino',
+    
+    // Gas Stations
+    'shell', 'exxon', 'bp', 'chevron', 'mobil', 'citgo', 'sunoco', 'marathon', 'speedway',
+    'wawa', 'sheetz', 'race trac', 'circle k', '7-eleven', 'casey', 'quick trip',
+    
+    // Entertainment
+    'movie', 'theater', 'cinema', 'amc', 'regal', 'dave buster', 'top golf', 'bowling',
+    'theme park', 'six flags', 'disney', 'universal', 'zoo', 'museum', 'aquarium',
+    
+    // One-time Services
+    'uber', 'lyft', 'taxi', 'parking', 'toll', 'venmo', 'paypal', 'zelle', 'cash app',
+    'apple pay', 'google pay', 'atm withdrawal', 'check deposit', 'transfer',
+    
+    // Variable Shopping
+    'etsy', 'ebay', 'facebook', 'instagram', 'social', 'marketplace', 'craigslist'
+  ];
+  
+  const merchantLower = merchant.toLowerCase();
+  return nonBillKeywords.some(keyword => merchantLower.includes(keyword));
+}
+
+function calculateEnhancedBillScoreForTemplate(analysis: any, txCount: number, merchant: string): number {
+  let score = 0;
+  
+  // Bill-specific merchant bonus (0-20 points)
+  if (isBillMerchant(merchant)) score += 20;
+  
+  // Transaction frequency score (0-25 points) - More strict for bills
+  if (txCount >= 6) score += 25;
+  else if (txCount >= 4) score += 20;
+  else if (txCount >= 3) score += 15;
+  else if (txCount >= 2) score += 8; // Lower for just 2 transactions
+  
+  // Regularity score (0-35 points) - Higher weight for bills
+  if (analysis.frequency === 'monthly') score += 35;
+  else if (analysis.frequency === 'quarterly') score += 30;
+  else if (analysis.frequency === 'biweekly') score += 25;
+  else if (analysis.frequency === 'weekly') score += 15; // Lower for weekly (less common for bills)
+  else if (analysis.averageInterval > 25 && analysis.averageInterval < 40) score += 20; // Monthly-ish
+  
+  // Amount consistency score (0-25 points) - Strict for bills
+  const varianceRatio = analysis.averageAmount > 0 ? analysis.amountVariance / analysis.averageAmount : 1;
+  if (varianceRatio < 0.05) score += 25; // Very consistent
+  else if (varianceRatio < 0.15) score += 20; // Mostly consistent
+  else if (varianceRatio < 0.30) score += 15; // Somewhat variable (utilities)
+  else if (varianceRatio < 0.50) score += 8;  // Variable (subscriptions with changes)
+  
+  // Amount range bonus (0-10 points) - Bills tend to be in certain ranges
+  if (analysis.averageAmount >= 50) score += 10; // Substantial bills
+  else if (analysis.averageAmount >= 20) score += 5; // Medium bills
+  
+  return Math.round(score);
+}
+
+function isBillMerchant(merchant: string): boolean {
+  const billKeywords = [
+    // Utilities
+    'electric', 'energy', 'power', 'gas', 'water', 'sewer', 'utility', 'duke energy', 
+    'pge', 'con ed', 'national grid', 'xcel energy', 'dte energy', 'commonwealth edison',
+    
+    // Internet/Cable/Phone
+    'internet', 'cable', 'verizon', 'att', 'tmobile', 't-mobile', 'sprint', 'comcast', 
+    'spectrum', 'cox', 'charter', 'dish', 'directv', 'xfinity', 'fios', 'optimum',
+    
+    // Insurance
+    'insurance', 'geico', 'state farm', 'allstate', 'progressive', 'farmers', 'usaa',
+    'liberty mutual', 'nationwide', 'aetna', 'blue cross', 'humana', 'kaiser', 'cigna',
+    
+    // Financial Services
+    'loan', 'mortgage', 'credit', 'bank', 'chase', 'wells fargo', 'citi', 'capital one',
+    'discover', 'american express', 'servicing', 'lending', 'finance', 'payment',
+    
+    // Subscriptions
+    'netflix', 'hulu', 'disney', 'spotify', 'apple music', 'amazon prime', 'gym',
+    'fitness', 'membership', 'subscription', 'monthly', 'annual', 'recurring',
+    
+    // Healthcare
+    'medical', 'health', 'doctor', 'dental', 'vision', 'pharmacy', 'hospital', 'clinic',
+    'urgent care', 'therapy', 'prescription', 'medicare', 'medicaid',
+    
+    // Education
+    'tuition', 'school', 'university', 'college', 'student loan', 'education', 'learning',
+    
+    // Government/Taxes
+    'tax', 'irs', 'dmv', 'license', 'registration', 'permit', 'fine', 'court', 'government',
+    
+    // Charity/Donations
+    'donation', 'charity', 'church', 'temple', 'mosque', 'tithe', 'offering', 'compassion',
+    'red cross', 'salvation army', 'goodwill', 'united way'
+  ];
+  
+  const merchantLower = merchant.toLowerCase();
+  return billKeywords.some(keyword => merchantLower.includes(keyword));
+}
+
+function normalizeMerchantNameForTemplate(name: string): string {
+  return name.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function calculateVarianceForTemplate(numbers: number[]): number {
+  if (numbers.length <= 1) return 0;
+  const mean = numbers.reduce((a, b) => a + b, 0) / numbers.length;
+  const squaredDiffs = numbers.map(num => Math.pow(num - mean, 2));
+  return squaredDiffs.reduce((a, b) => a + b, 0) / numbers.length;
+}
+
+// ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -1348,6 +1800,12 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateMonthlySpendingSummaryMessage(userId);
     case 'cash-flow-runway':
       return await generateCashFlowRunwayMessage(userId);
+    case 'onboarding-immediate':
+      return await generateOnboardingImmediateMessage(userId);
+    case 'onboarding-analysis-complete':
+      return await generateOnboardingAnalysisCompleteMessage(userId);
+    case 'onboarding-day-before':
+      return await generateOnboardingDayBeforeMessage(userId);
     // TEMPORARILY DISABLED - Paycheck templates
     // case 'paycheck-efficiency':
     //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');

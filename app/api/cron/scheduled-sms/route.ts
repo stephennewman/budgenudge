@@ -48,6 +48,34 @@ export async function GET(request: NextRequest) {
       })
       .select('id')
       .single();
+
+    // ===================================
+    // ONBOARDING SMS PROCESSING (BEFORE REGULAR SMS)
+    // ===================================
+    try {
+      console.log('🎯 Processing scheduled onboarding messages...');
+      const onboardingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/onboarding-sms-sequence`, {
+        method: 'GET'
+      });
+
+      if (onboardingResponse.ok) {
+        const onboardingResult = await onboardingResponse.json();
+        console.log('✅ Onboarding messages processed:', onboardingResult.summary);
+        logDetails.push({
+          onboarding_processed: onboardingResult.processed || 0,
+          onboarding_sent: onboardingResult.summary?.sent || 0,
+          onboarding_failed: onboardingResult.summary?.failed || 0
+        });
+      } else {
+        console.log('⚠️ Failed to process onboarding messages:', onboardingResponse.status);
+        logDetails.push({ onboarding_error: `HTTP ${onboardingResponse.status}` });
+      }
+    } catch (onboardingError) {
+      console.error('❌ Error processing onboarding messages:', onboardingError);
+      logDetails.push({ 
+        onboarding_error: onboardingError instanceof Error ? onboardingError.message : 'Unknown error' 
+      });
+    }
     if (logInsert && logInsert.id) cronLogId = logInsert.id;
   } catch (e) {
     // If logging fails, continue anyway

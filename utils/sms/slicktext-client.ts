@@ -163,7 +163,13 @@ export class SlickTextClient {
 
       // Method 1: First try to find or create contact, then send message
       try {
-        const phoneNumber = phoneNumbers[0].replace(/\D/g, '');
+        let phoneNumber = phoneNumbers[0].replace(/\D/g, '');
+        // Add country code if not present
+        if (phoneNumber.length === 10) {
+          phoneNumber = '+1' + phoneNumber;
+        } else if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
+          phoneNumber = '+' + phoneNumber;
+        }
         console.log('📤 Step 1: Ensuring contact exists for', phoneNumber);
 
         // Check if contact exists
@@ -188,7 +194,7 @@ export class SlickTextClient {
             const createContactPayload = {
               first_name: message.contact?.first_name || 'Krezzo',
               last_name: message.contact?.last_name || 'User',
-              mobile_number: `+1${phoneNumber}`,
+              mobile_number: phoneNumber, // phoneNumber already includes +1
               email: message.contact?.email,
               opt_in_status: 'subscribed',
               source: 'Krezzo Financial Alerts'
@@ -421,9 +427,17 @@ export async function sendEnhancedSlickTextSMS({
   try {
     const client = createSlickTextClient();
     
+    // Format phone number for SlickText
+    let formattedPhone = phoneNumber.replace(/\D/g, '');
+    if (formattedPhone.length === 10) {
+      formattedPhone = '+1' + formattedPhone;
+    } else if (formattedPhone.length === 11 && formattedPhone.startsWith('1')) {
+      formattedPhone = '+' + formattedPhone;
+    }
+    
     // Create contact with user info for better deliverability
     const contact: SlickTextContact = {
-      phone_number: phoneNumber,
+      phone_number: formattedPhone,
       email: userEmail,
       opt_in_source: 'Krezzo Financial Alerts',
       custom_fields: {

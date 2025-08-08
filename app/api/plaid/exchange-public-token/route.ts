@@ -251,6 +251,61 @@ export async function POST(request: NextRequest) {
         console.log('⚠️ SMS workflow setup error (non-blocking):', smsSetupError);
         // Non-blocking: Account setup continues even if SMS setup fails
       }
+
+      // 🆕 PHASE 5: Trigger onboarding SMS sequence
+      // This starts the 3-message onboarding flow for new bank connections
+      try {
+        console.log('🎯 Starting onboarding SMS sequence...');
+        
+        // Get user's phone number for SMS
+        const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
+        let userPhone = authUser.user?.phone || authUser.user?.user_metadata?.signupPhone;
+        
+        // Also check user_sms_settings table
+        if (!userPhone) {
+          const { data: smsSettings } = await supabase
+            .from('user_sms_settings')
+            .select('phone_number')
+            .eq('user_id', user.id)
+            .single();
+          
+          userPhone = smsSettings?.phone_number;
+        }
+
+        if (userPhone && userPhone.length >= 10) {
+          console.log('📱 User has phone number, starting onboarding sequence...');
+          
+          const onboardingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/onboarding-sms-sequence`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              phoneNumber: userPhone,
+              firstName: authUser.user?.user_metadata?.firstName || authUser.user?.user_metadata?.first_name
+            })
+          });
+
+          if (onboardingResponse.ok) {
+            const onboardingResult = await onboardingResponse.json();
+            console.log('✅ Onboarding SMS sequence started:', {
+              sequenceId: onboardingResult.sequenceId,
+              immediate: onboardingResult.summary?.immediate,
+              total_scheduled: onboardingResult.summary ? 
+                (onboardingResult.summary.analysisComplete === 'scheduled' ? 1 : 0) +
+                (onboardingResult.summary.dayBefore === 'scheduled' ? 1 : 0) : 0
+            });
+          } else {
+            console.log('⚠️ Onboarding SMS sequence failed to start:', onboardingResponse.status);
+          }
+        } else {
+          console.log('ℹ️ No phone number available, skipping onboarding SMS sequence');
+        }
+      } catch (onboardingError) {
+        console.log('⚠️ Onboarding SMS sequence error (non-blocking):', onboardingError);
+        // Non-blocking: Account setup continues even if onboarding SMS fails
+      }
     }
 
     return NextResponse.json({ 
