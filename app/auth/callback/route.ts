@@ -283,11 +283,11 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
 Your financial awareness journey starts now. Once you connect your bank account, you'll get daily insights that actually matter.
 
 Ready to explore? Text these commands:
-💰 "balance" - Check spending summary
-📊 "bills" - See upcoming bills  
-🏪 "merchants" - Top spending spots
-📈 "trends" - Spending patterns
-💡 "help" - All available commands
+💡 "help" - See all available commands
+💰 "balance" - Check your account
+🛑 "stop" - Pause texts anytime
+
+Or just ask me questions about your money - I'm here to help!
 
 Connect your bank account in the app to unlock these insights!`;
 
