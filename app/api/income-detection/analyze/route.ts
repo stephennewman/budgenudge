@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
     
     for (const [sourcePattern, groupTransactions] of incomeGroups.entries()) {
       const pattern = analyzeIncomePattern(sourcePattern, groupTransactions);
-      if (pattern && pattern.confidence_score >= 60) { // Only high-confidence patterns
+      if (pattern && pattern.confidence_score >= 50) { // Lowered threshold to catch variable income
         detectedPatterns.push(pattern);
       }
     }
@@ -174,7 +174,9 @@ function groupTransactionsByIncomeSource(transactions: TransactionData[]): Map<s
 function normalizeIncomeSourceName(name: string): string {
   return name
     .replace(/\d{4}-\d{2}-\d{2}/g, '') // Remove dates
-    .replace(/\b(payroll|deposit|direct|payment|transfer)\b/gi, '') // Remove common payroll terms
+    .replace(/\d{6,}/g, '') // Remove long ID numbers (6+ digits)
+    .replace(/\b(deposit|direct|transfer|ach|tran)\b/gi, '') // Remove generic terms but keep important identifiers
+    .replace(/[~\-_]/g, ' ') // Replace separators with spaces
     .replace(/[^\w\s]/g, ' ') // Replace special chars with spaces
     .replace(/\s+/g, ' ') // Collapse multiple spaces
     .trim()

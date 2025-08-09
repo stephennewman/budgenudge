@@ -58,11 +58,10 @@ export default async function ProtectedSidebar() {
             label: "📱 Texts",
             href: "/sms-preferences",
           },
-          // ARCHIVED: Income Setup
-          // {
-          //   label: "💰 Income Setup",
-          //   href: "/income-setup",
-          // },
+          {
+            label: "💰 Income",
+            href: "/income",
+          },
         ]}
       />
     </div>

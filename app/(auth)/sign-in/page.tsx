@@ -1,6 +1,5 @@
 import { signInAction } from "@/app/actions";
 import AuthSubmitButton from "@/components/auth-submit-button";
-import GoogleSignInButton from "@/components/google-sign-in-button";
 import { FormMessage, Message } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,18 +54,6 @@ export default async function SignIn(props: {
           Sign up
         </Link>
       </p>
-      
-      {/* Divider */}
-      <div className="flex items-center gap-4 my-8 sm:my-6">
-        <div className="flex-1 h-px bg-border"></div>
-        <span className="text-sm text-muted-foreground">Or</span>
-        <div className="flex-1 h-px bg-border"></div>
-      </div>
-      
-      {/* Google Sign-In */}
-      <div>
-        <GoogleSignInButton text="Continue with Google" className="h-12 sm:h-10" />
-      </div>
     </form>
   );
 }
