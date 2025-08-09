@@ -118,10 +118,31 @@ export class SlickTextClient {
     try {
       console.log('👤 Creating SlickText contact:', contact.phone_number);
       
+      // First, check if contact already exists
+      const cleanPhone = contact.phone_number.replace(/\D/g, '');
+      try {
+        const contactsResponse = await this.makeRequest('/contacts');
+        const existingContact = contactsResponse.data?.find((existingC: any) => {
+          const existingPhone = existingC.mobile_number?.replace(/\D/g, '');
+          return existingPhone === cleanPhone;
+        });
+        
+        if (existingContact) {
+          console.log('✅ Contact already exists:', existingContact.contact_id);
+          return {
+            success: true,
+            data: existingContact,
+            messageId: existingContact.contact_id
+          };
+        }
+      } catch (lookupError) {
+        console.log('⚠️ Could not check for existing contact, proceeding with creation:', lookupError);
+      }
+      
       const data = await this.makeRequest('/contacts', {
         method: 'POST',
         body: JSON.stringify({
-          mobile_number: `+1${contact.phone_number.replace(/\D/g, '')}`, // Format as +1XXXXXXXXXX
+          mobile_number: `+1${cleanPhone}`, // Format as +1XXXXXXXXXX
           first_name: contact.first_name || 'Krezzo',
           last_name: contact.last_name || 'User',
           email: contact.email,
@@ -136,7 +157,36 @@ export class SlickTextClient {
         messageId: data.id
       };
     } catch (error) {
-      console.log('⚠️ Contact creation failed (continuing anyway):', error);
+      console.log('⚠️ Contact creation failed:', error);
+      
+      // Handle duplicate contact error specifically
+      if (error instanceof Error && error.message.includes('422') && 
+          error.message.includes('mobile number already exists')) {
+        console.log('🔄 Contact already exists, trying to find it...');
+        
+        try {
+          const cleanPhone = contact.phone_number.replace(/\D/g, '');
+          const contactsResponse = await this.makeRequest('/contacts');
+          const existingContact = contactsResponse.data?.find((existingC: any) => {
+            const existingPhone = existingC.mobile_number?.replace(/\D/g, '');
+            return existingPhone === cleanPhone || 
+                   existingPhone === cleanPhone.substring(1) || // Remove leading 1
+                   '1' + existingPhone === cleanPhone; // Add leading 1
+          });
+          
+          if (existingContact) {
+            console.log('✅ Found existing contact after duplicate error:', existingContact.contact_id);
+            return {
+              success: true,
+              data: existingContact,
+              messageId: existingContact.contact_id
+            };
+          }
+        } catch (findError) {
+          console.log('⚠️ Could not find existing contact after duplicate error:', findError);
+        }
+      }
+      
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Contact creation failed'
@@ -176,13 +226,17 @@ export class SlickTextClient {
         let contactId: number | null = null;
         try {
           const contactsResponse = await this.makeRequest('/contacts');
-          const existingContact = contactsResponse.data?.find((contact: any) => 
-            contact.mobile_number?.replace(/\D/g, '') === phoneNumber
-          );
+          const cleanPhoneNumber = phoneNumber.replace(/\D/g, ''); // Remove +1 for comparison
+          const existingContact = contactsResponse.data?.find((contact: any) => {
+            const contactPhone = contact.mobile_number?.replace(/\D/g, '');
+            return contactPhone === cleanPhoneNumber;
+          });
           
           if (existingContact) {
             contactId = existingContact.contact_id;
-            console.log('✅ Found existing contact:', contactId);
+            console.log('✅ Found existing contact:', contactId, 'for phone:', cleanPhoneNumber);
+          } else {
+            console.log('📭 No existing contact found for phone:', cleanPhoneNumber);
           }
         } catch (error) {
           console.log('⚠️ Could not check existing contacts:', error);
@@ -211,6 +265,31 @@ export class SlickTextClient {
             console.log('✅ Created new contact:', contactId);
           } catch (contactError) {
             console.log('⚠️ Contact creation failed, will try without contact_id:', contactError);
+            
+            // Check if this is a duplicate contact error (422)
+            if (contactError instanceof Error && contactError.message.includes('422') && 
+                contactError.message.includes('mobile number already exists')) {
+              console.log('🔄 Duplicate contact detected, trying to find existing contact...');
+              
+              // Try to find the existing contact again with different search methods
+              try {
+                const retryContactsResponse = await this.makeRequest('/contacts');
+                const cleanPhoneForRetry = phoneNumber.replace(/\D/g, '');
+                const retryContact = retryContactsResponse.data?.find((contact: any) => {
+                  const contactPhone = contact.mobile_number?.replace(/\D/g, '');
+                  return contactPhone === cleanPhoneForRetry || 
+                         contactPhone === cleanPhoneForRetry.substring(1) || // Remove leading 1
+                         '1' + contactPhone === cleanPhoneForRetry; // Add leading 1
+                });
+                
+                if (retryContact) {
+                  contactId = retryContact.contact_id;
+                  console.log('✅ Found existing contact on retry:', contactId);
+                }
+              } catch (retryError) {
+                console.log('⚠️ Retry contact search also failed:', retryError);
+              }
+            }
           }
         }
 

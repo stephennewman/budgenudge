@@ -17,50 +17,28 @@ export default async function ProtectedSidebar() {
             href: "/",
           },
           {
+            label: "💰 Income",
+            href: "/income",
+          },
+          {
+            label: "💸 Expenses",
+            href: "/recurring-bills",
+          },
+          {
             label: "💳 Transactions",
             href: "/transactions",
-          },
-          // {
-          //   label: "📊 Category Analysis",
-          //   href: "/category-analysis",
-          // },
-          {
-            label: "🗂️ Categories",
-            href: "/ai-category-analysis",
           },
           {
             label: "🏪 Merchants",
             href: "/ai-merchant-analysis",
           },
-          // ARCHIVED: Bubble Chart (merchant-spend-grid)
-          // {
-          //   label: "📊 Bubble Chart", 
-          //   href: "/merchant-spend-grid",
-          // },
-          // REMOVED FOR PERFORMANCE: Heavy analytics features
-          // {
-          //   label: "Analysis",
-          //   href: "/analysis",
-          // },
-          // {
-          //   label: "Weekly Spending",
-          //   href: "/weekly-spending",
-          // },
-          // {
-          //   label: "Predictive Calendar",
-          //   href: "/calendar",
-          // },
           {
-            label: "⭐ Bills",
-            href: "/recurring-bills",
+            label: "🗂️ Categories",
+            href: "/ai-category-analysis",
           },
           {
             label: "📱 Texts",
             href: "/sms-preferences",
-          },
-          {
-            label: "💰 Income",
-            href: "/income",
           },
         ]}
       />
