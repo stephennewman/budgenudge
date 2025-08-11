@@ -2099,7 +2099,48 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       const nextIncome = findNextIncome(incomeCandidates);
       if (nextIncome) {
         const daysUntil = Math.ceil((nextIncome.nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        message += `In ${daysUntil} days for $${nextIncome.expectedAmount.toFixed(0)}\n\n`;
+        
+        // Show primary income
+        message += `In ${daysUntil} days for $${nextIncome.expectedAmount.toFixed(0)}`;
+        
+        // If we have structured income data, show additional sources
+        if (incomeCandidates[0]?.source_name && incomeCandidates[0]?.frequency) {
+          // For structured data, show multiple upcoming incomes
+          const upcomingIncomes = [];
+          const now = new Date();
+          
+          for (const source of incomeCandidates) {
+            if (source.frequency === 'irregular') continue;
+            
+            let nextDate: Date;
+            if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
+              nextDate = new Date(source.next_predicted_date);
+            } else if (source.last_pay_date) {
+              nextDate = new Date(source.last_pay_date);
+              switch (source.frequency) {
+                case 'weekly': while (nextDate <= now) nextDate.setDate(nextDate.getDate() + 7); break;
+                case 'bi-weekly': while (nextDate <= now) nextDate.setDate(nextDate.getDate() + 14); break;
+                case 'bi-monthly': while (nextDate <= now) { nextDate.setMonth(nextDate.getMonth() + 1); nextDate.setDate(15); } break;
+                case 'monthly': while (nextDate <= now) nextDate.setMonth(nextDate.getMonth() + 1); break;
+              }
+            } else continue;
+            
+            upcomingIncomes.push({ source: source.source_name, amount: source.expected_amount, date: nextDate });
+          }
+          
+          // Sort by date and show additional sources
+          upcomingIncomes.sort((a, b) => a.date.getTime() - b.date.getTime());
+          
+          if (upcomingIncomes.length > 1) {
+            message += ` (${upcomingIncomes[0].source})`;
+            const totalExpected = upcomingIncomes.reduce((sum, inc) => sum + inc.amount, 0);
+            message += `\nTotal expected: $${totalExpected.toFixed(0)} from ${upcomingIncomes.length} sources\n\n`;
+          } else {
+            message += `\n\n`;
+          }
+        } else {
+          message += `\n\n`;
+        }
       } else {
         message += `No income patterns detected\n\n`;
       }
@@ -2152,7 +2193,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
   }
 }
 
-// Helper function to find next income
+// Simple and reliable income prediction function
 function findNextIncome(incomeCandidates: any[]): any {
   if (!incomeCandidates || incomeCandidates.length === 0) return null;
 
@@ -2227,61 +2268,94 @@ function findNextIncome(incomeCandidates: any[]): any {
     return result;
   }
 
-  // Fallback to transaction-based detection for legacy users
+  // NEW: Simple transaction-based income prediction for multiple sources
+  console.log('🔍 Using simple transaction-based income prediction');
   const now = new Date();
-  const groups = new Map<string, any[]>();
-  for (const t of incomeCandidates) {
-    const label = `${t.merchant_name || ''} ${t.name || ''}`.trim();
-    const key = normalizeIncomeSourceName(label);
-    if (!key) continue;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(t);
+  
+  // Group transactions by likely income source
+  const incomeGroups = new Map<string, any[]>();
+  
+  for (const transaction of incomeCandidates) {
+    // Create a simple key from merchant and transaction name
+    const key = `${transaction.merchant_name || ''} ${transaction.name || ''}`.trim();
+    if (!key || key.length < 3) continue; // Skip if no meaningful identifier
+    
+    if (!incomeGroups.has(key)) {
+      incomeGroups.set(key, []);
+    }
+    incomeGroups.get(key)!.push(transaction);
   }
 
-  const streams: Array<{
-    source: string;
-    expectedAmount: number;
-    expectedInterval: number;
-    lastDate: Date;
-    nextDate: Date;
-  }> = [];
+  console.log('🔍 Grouped income sources:', Array.from(incomeGroups.keys()));
 
-  for (const [key, arr] of groups.entries()) {
-    if (arr.length < 2) continue;
-    
-    const sorted = [...arr].sort((a, b) => (a.date < b.date ? -1 : 1));
-    const dates = sorted.map(t => new Date(t.date + 'T12:00:00'));
-    
-    const intervals: number[] = [];
-    for (let i = 1; i < dates.length; i++) {
-      intervals.push(Math.max(1, Math.round((dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24))));
+  const incomePredictions = [];
+
+  for (const [sourceKey, transactions] of incomeGroups.entries()) {
+    if (transactions.length === 0) continue;
+
+    // Sort by date (newest first)
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    const mostRecent = sortedTransactions[0];
+    const mostRecentDate = new Date(mostRecent.date);
+    const mostRecentAmount = Math.abs(mostRecent.amount);
+
+    // Calculate interval from last 2-3 transactions
+    let interval = 14; // Default to bi-weekly
+    if (sortedTransactions.length >= 2) {
+      const intervals = [];
+      for (let i = 0; i < Math.min(sortedTransactions.length - 1, 3); i++) {
+        const current = new Date(sortedTransactions[i].date);
+        const next = new Date(sortedTransactions[i + 1].date);
+        const daysDiff = Math.round((current.getTime() - next.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 0) intervals.push(daysDiff);
+      }
+      
+      if (intervals.length > 0) {
+        // Use median interval for more stability
+        intervals.sort((a, b) => a - b);
+        interval = intervals[Math.floor(intervals.length / 2)];
+      }
     }
-    
-    let avgInterval = 14;
-    if (intervals.length > 0) {
-      avgInterval = intervals.reduce((s, n) => s + n, 0) / intervals.length;
-    }
-    
-    let nextDate = new Date(dates[dates.length - 1].getTime());
+
+    // Predict next date
+    let nextDate = new Date(mostRecentDate);
     while (nextDate <= now) {
-      nextDate = new Date(nextDate.getTime() + avgInterval * 24 * 60 * 60 * 1000);
+      nextDate.setDate(nextDate.getDate() + interval);
     }
 
-    const amounts = sorted.map(t => Math.abs(t.amount));
-    const avgAmount = amounts.reduce((s, n) => s + n, 0) / amounts.length;
-    const mostRecentAmount = Math.abs(sorted[sorted.length - 1].amount);
-    const finalAmount = Math.abs(mostRecentAmount - avgAmount) > avgAmount * 0.3 ? mostRecentAmount : avgAmount;
+    // Calculate expected amount (use most recent, but consider average if stable)
+    let expectedAmount = mostRecentAmount;
+    if (sortedTransactions.length >= 3) {
+      const amounts = sortedTransactions.slice(0, 3).map(t => Math.abs(t.amount));
+      const avgAmount = amounts.reduce((sum, amt) => sum + amt, 0) / amounts.length;
+      const variance = amounts.reduce((sum, amt) => sum + Math.pow(amt - avgAmount, 2), 0) / amounts.length;
+      
+      // If amounts are stable (low variance), use average; otherwise use most recent
+      if (variance < Math.pow(avgAmount * 0.1, 2)) { // Less than 10% variance
+        expectedAmount = Math.round(avgAmount);
+      }
+    }
 
-    streams.push({
-      source: key,
-      expectedAmount: finalAmount,
-      expectedInterval: avgInterval,
-      lastDate: dates[dates.length - 1],
-      nextDate
+    incomePredictions.push({
+      source: sourceKey,
+      expectedAmount: expectedAmount,
+      nextDate: nextDate,
+      confidence: Math.min(transactions.length / 3, 1) // Higher confidence with more transactions
     });
   }
 
-  return streams.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+  // Sort by next date (soonest first)
+  incomePredictions.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
+
+  console.log('🔍 Income predictions:', JSON.stringify(incomePredictions, null, 2));
+
+  // Return the soonest income prediction
+  const result = incomePredictions[0] || null;
+  console.log('🔍 Selected income result:', JSON.stringify(result, null, 2));
+  return result;
 }
 
 // Helper function to normalize income source names
