@@ -19,20 +19,24 @@ export default function ProtectedLayout({
       href: "/",
     },
     {
-      label: "💳 Transactions",
-      href: "/transactions",
+      label: "💰 Income",
+      href: "/income",
     },
     {
-      label: "🗂️ Categories",
-      href: "/ai-category-analysis",
+      label: "💸 Expenses",
+      href: "/recurring-bills",
+    },
+    {
+      label: "💳 Transactions",
+      href: "/transactions",
     },
     {
       label: "🏪 Merchants",
       href: "/ai-merchant-analysis",
     },
     {
-      label: "⭐ Bills",
-      href: "/recurring-bills",
+      label: "🗂️ Categories",
+      href: "/ai-category-analysis",
     },
     {
       label: "📱 Texts",
