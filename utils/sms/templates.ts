@@ -1937,7 +1937,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     let message = `📊 KREZZO REPORT\n\n`;
 
     // 1. TRANSACTIONS SECTION
-    message += `💳 Transactions: https://get.krezzo.com/protected/transactions\n`;
+    message += `💳 Transactions\n`;
     if (yesterdayTransactions && yesterdayTransactions.length > 0) {
       const yesterdayTotal = yesterdayTransactions.reduce((sum, t) => sum + t.amount, 0);
       message += `Posted yesterday: ${yesterdayTransactions.length} transactions for $${yesterdayTotal.toFixed(2)} total\n`;
@@ -1947,7 +1947,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     message += `Balance as of yesterday: $${yesterdayBalance.toFixed(2)}\n\n`;
 
     // 2. CATEGORY PACING SECTION
-    message += `📊 Category Pacing: https://get.krezzo.com/protected/ai-category-analysis\n`;
+    message += `📊 Category Pacing\n`;
     if (trackedCategories && trackedCategories.length > 0) {
       // Get current month data for categories
       const currentMonth = now.getMonth() + 1;
@@ -2006,12 +2006,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         categoryPacingData.sort((a, b) => b.pacing - a.pacing);
         
         categoryPacingData.slice(0, 3).forEach(cat => {
-          const status = cat.pacing > 110 ? '🚨' : '⚠️';
+          const status = cat.pacing > 110 ? 'Over' : 'Under';
           const diff = Math.abs(cat.pacing - 100);
-          message += `${status} ${cat.category}\n`;
+          message += `${cat.category}\n`;
           message += `Month to date: $${cat.currentMonthSpend.toFixed(0)}\n`;
           message += `Typical by now: $${cat.expectedByNow.toFixed(0)}\n`;
-          message += `Pacing: ${cat.pacing > 110 ? 'Over' : 'Under'} by ${diff.toFixed(0)}%\n\n`;
+          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
         });
       } else {
         message += `✅ All categories on track\n\n`;
@@ -2021,7 +2021,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     }
 
     // 3. MERCHANT PACING SECTION
-    message += `🏪 Merchant Pacing: https://get.krezzo.com/protected/ai-merchant-analysis\n`;
+    message += `🏪 Merchant Pacing\n`;
     if (trackedMerchants && trackedMerchants.length > 0) {
       // Similar logic for merchants
       const currentMonth = now.getMonth() + 1;
@@ -2078,12 +2078,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         merchantPacingData.sort((a, b) => b.pacing - a.pacing);
         
         merchantPacingData.slice(0, 3).forEach(merch => {
-          const status = merch.pacing > 110 ? '🚨' : '⚠️';
+          const status = merch.pacing > 110 ? 'Over' : 'Under';
           const diff = Math.abs(merch.pacing - 100);
-          message += `${status} ${merch.merchant}\n`;
+          message += `${merch.merchant}\n`;
           message += `Month to date: $${merch.currentMonthSpend.toFixed(0)}\n`;
           message += `Typical by now: $${merch.expectedByNow.toFixed(0)}\n`;
-          message += `Pacing: ${merch.pacing > 110 ? 'Over' : 'Under'} by ${diff.toFixed(0)}%\n\n`;
+          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
         });
       } else {
         message += `✅ All merchants on track\n\n`;
@@ -2093,7 +2093,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     }
 
     // 4. INCOME SECTION
-    message += `💰 Income: https://get.krezzo.com/protected/income\n`;
+    message += `💰 Income\n`;
     if (incomeCandidates && incomeCandidates.length > 0) {
       // Find next income
       const nextIncome = findNextIncome(incomeCandidates);
@@ -2149,7 +2149,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     }
 
     // 5. EXPENSES SECTION
-    message += `💸 Expenses: https://get.krezzo.com/protected/recurring-bills\n`;
+    message += `💸 Expenses\n`;
     if (upcomingBills && upcomingBills.length > 0) {
       const nextIncome = incomeCandidates && incomeCandidates.length > 0 ? findNextIncome(incomeCandidates) : null;
       if (nextIncome) {
