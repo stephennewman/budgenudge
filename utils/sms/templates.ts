@@ -1817,9 +1817,9 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
 } 
 
 // ===================================
-// 9. 4:15 PM KREZZO REPORT TEMPLATE (NEW)
+// 9. 5:30 PM KREZZO REPORT TEMPLATE (NEW)
 // ===================================
-// 4:15 PM KREZZO REPORT - Clean format without URLs
+// 5:30 PM KREZZO REPORT - Clean format without URLs
 export async function generate415pmSpecialMessage(userId: string): Promise<string> {
   try {
     console.log('🔍 generate415pmSpecialMessage called for user:', userId);
@@ -2190,7 +2190,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     return message.trim();
 
   } catch (error) {
-    console.error('Error generating 4:15 PM Krezzo Report:', error);
+    console.error('Error generating 5:30 PM Krezzo Report:', error);
     return '📊 KREZZO REPORT\n\nError generating report.';
   }
 }

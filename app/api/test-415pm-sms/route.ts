@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🧪 Testing 4:15 PM SMS template for user: ${userId}`);
+    console.log(`🧪 Testing 5:30 PM SMS template for user: ${userId}`);
     
     // Generate the message
     const message = await generateSMSMessage(userId, '415pm-special');
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error testing 4:15 PM SMS template:', error);
+    console.error('❌ Error testing 5:30 PM SMS template:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🧪 Testing 4:15 PM SMS template for user: ${userId}`);
+    console.log(`🧪 Testing 5:30 PM SMS template for user: ${userId}`);
     
     // Generate the message
     const message = await generateSMSMessage(userId, '415pm-special');
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('❌ Error testing 4:15 PM SMS template:', error);
+    console.error('❌ Error testing 5:30 PM SMS template:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',

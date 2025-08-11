@@ -50,32 +50,32 @@ export async function GET(request: NextRequest) {
       .single();
 
     // ===================================
-    // ONBOARDING SMS PROCESSING (BEFORE REGULAR SMS)
+    // ONBOARDING SMS PROCESSING: DISABLED
     // ===================================
-    try {
-      console.log('🎯 Processing scheduled onboarding messages...');
-      const onboardingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/onboarding-sms-sequence`, {
-        method: 'GET'
-      });
+    // try {
+    //   console.log('🎯 Processing scheduled onboarding messages...');
+    //   const onboardingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/onboarding-sms-sequence`, {
+    //     method: 'GET'
+    //   });
 
-      if (onboardingResponse.ok) {
-        const onboardingResult = await onboardingResponse.json();
-        console.log('✅ Onboarding messages processed:', onboardingResult.summary);
-        logDetails.push({
-          onboarding_processed: onboardingResult.processed || 0,
-          onboarding_sent: onboardingResult.summary?.sent || 0,
-          onboarding_failed: onboardingResult.summary?.failed || 0
-        });
-      } else {
-        console.log('⚠️ Failed to process onboarding messages:', onboardingResponse.status);
-        logDetails.push({ onboarding_error: `HTTP ${onboardingResponse.status}` });
-      }
-    } catch (onboardingError) {
-      console.error('❌ Error processing onboarding messages:', onboardingError);
-      logDetails.push({ 
-        onboarding_error: onboardingError instanceof Error ? onboardingError.message : 'Unknown error' 
-      });
-    }
+    //   if (onboardingResponse.ok) {
+    //     const onboardingResult = await onboardingResponse.json();
+    //     console.log('✅ Onboarding messages processed:', onboardingResult.summary);
+    //     logDetails.push({
+    //       onboarding_processed: onboardingResult.processed || 0,
+    //       onboarding_sent: onboardingResult.summary?.sent || 0,
+    //       onboarding_failed: onboardingResult.summary?.failed || 0
+    //     });
+    //   } else {
+    //     console.log('⚠️ Failed to process onboarding messages:', onboardingResponse.status);
+    //     logDetails.push({ onboarding_error: `HTTP ${onboardingResponse.status}` });
+    //   }
+    // } catch (onboardingError) {
+    //   console.error('❌ Error processing onboarding messages:', onboardingError);
+    //   logDetails.push({ 
+    //     onboarding_error: onboardingError instanceof Error ? onboardingError.message : 'Unknown error' 
+    //   });
+    // }
     if (logInsert && logInsert.id) cronLogId = logInsert.id;
   } catch (e) {
     // If logging fails, continue anyway
@@ -137,38 +137,37 @@ export async function GET(request: NextRequest) {
     // Determine which templates to send based on day and time
     let templatesToSend: NewSMSTemplateType[] = [];
     
-    // Monthly Summary: Send on the 1st of the month at 7am EST (±10 minutes)
-    const isMonthlySummaryTime = nowEST.day === 1 && // 1st of the month
-                                nowEST.hour === 7 && 
-                                nowEST.minute <= 10; // Within first 10 minutes of 7am
+    // Monthly Summary: DISABLED - was 1st of month at 7am EST
+    // const isMonthlySummaryTime = nowEST.day === 1 && nowEST.hour === 7 && nowEST.minute <= 10;
     
-    // Weekly Summary: Send on Sunday at 7am EST (±10 minutes)
-    const isWeeklySummaryTime = nowEST.weekday === 7 && // Sunday (Luxon uses 7 for Sunday)
-                               nowEST.hour === 7 && 
-                               nowEST.minute <= 10; // Within first 10 minutes of 7am
+    // Weekly Summary: DISABLED - was Sunday at 7am EST  
+    // const isWeeklySummaryTime = nowEST.weekday === 7 && nowEST.hour === 7 && nowEST.minute <= 10;
     
-    // Cash Flow Runway: Daily at 5pm EST (±10 minutes)
-    const isCashFlowRunwayTime = nowEST.hour === 17 && nowEST.minute <= 10;
+    // Cash Flow Runway: DISABLED - was daily at 5pm EST (replaced by Krezzo Report)
+    // const isCashFlowRunwayTime = nowEST.hour === 17 && nowEST.minute <= 10;
     
-    // ✅ FIX: Make templates additive instead of exclusive
-    // Always include daily templates - they'll be filtered by user send_time later
-    templatesToSend = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
+    // ✅ DISABLED: Only Krezzo Report at 5:00 PM is active now
+    // All other templates are disabled to avoid SMS spam
+    // Daily templates: DISABLED (recurring, recent, merchant-pacing, category-pacing)
+    templatesToSend = [];
     
-    // Add special templates when appropriate
-    if (isMonthlySummaryTime) {
-      console.log('📊 1st of month 7am: Adding monthly summary to template list');
-      templatesToSend.push('monthly-summary');
-    }
+    // Monthly Summary: DISABLED
+    // if (isMonthlySummaryTime) {
+    //   console.log('📊 1st of month 7am: Adding monthly summary to template list');
+    //   templatesToSend.push('monthly-summary');
+    // }
     
-    if (isWeeklySummaryTime) {
-      console.log('📊 Sunday 7am: Adding weekly summary to template list');
-      templatesToSend.push('weekly-summary');
-    }
+    // Weekly Summary: DISABLED
+    // if (isWeeklySummaryTime) {
+    //   console.log('📊 Sunday 7am: Adding weekly summary to template list');
+    //   templatesToSend.push('weekly-summary');
+    // }
 
-    if (isCashFlowRunwayTime) {
-      console.log('🛤️ 5pm: Adding cash-flow-runway to template list');
-      templatesToSend.push('cash-flow-runway');
-    }
+    // Cash Flow Runway: DISABLED (replaced by Krezzo Report)
+    // if (isCashFlowRunwayTime) {
+    //   console.log('🛤️ 5pm: Adding cash-flow-runway to template list');
+    //   templatesToSend.push('cash-flow-runway');
+    // }
 
     console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
 

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  console.log('🌅 Starting 4:15 PM Special SMS processing...');
+  console.log('🌅 Starting 5:30 PM Special SMS processing...');
   
   let usersProcessed = 0;
   let smsSent = 0;
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       .is('deleted_at', null);
 
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
-      console.log('📭 No bank connections found for 4:15 PM SMS');
+      console.log('📭 No bank connections found for 5:30 PM SMS');
       return NextResponse.json({ 
         success: true, 
         processed: 0,
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`👥 Found ${itemsWithUsers.length} users for 4:15 PM SMS`);
+          console.log(`👥 Found ${itemsWithUsers.length} users for 5:30 PM SMS`);
 
     // Process each user
     for (const userItem of itemsWithUsers) {
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Check if user has enabled 4:15 PM SMS
+        // Check if user has enabled 5:30 PM SMS
         const { data: templatePref } = await supabase
           .from('user_sms_preferences')
           .select('enabled')
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         // Default to enabled for new users
         const enabled = templatePref ? !!templatePref.enabled : true;
         if (!enabled) {
-          console.log(`📭 Skipping 4:15 PM SMS for user ${userId} (disabled in preferences)`);
+          console.log(`📭 Skipping 5:30 PM SMS for user ${userId} (disabled in preferences)`);
           continue;
         }
 
@@ -89,23 +89,23 @@ export async function GET(request: NextRequest) {
         });
         
         if (!dedupeResult.canSend) {
-          console.log(`🚫 Skipping 4:15 PM SMS for user ${userId} - ${dedupeResult.reason}`);
+          console.log(`🚫 Skipping 5:30 PM SMS for user ${userId} - ${dedupeResult.reason}`);
           continue;
         }
 
-        console.log(`📝 Generating 4:15 PM special SMS for user ${userId}`);
+        console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
         
         // Generate message
         const smsMessage = await generateSMSMessage(userId, '415pm-special');
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
-          console.log(`📭 4:15 PM SMS too short or error for user ${userId} - skipping`);
+          console.log(`📭 5:30 PM SMS too short or error for user ${userId} - skipping`);
           smsFailed++;
           continue;
         }
 
-        console.log(`📱 Sending 4:15 PM special SMS to user ${userId}`);
+        console.log(`📱 Sending 5:30 PM special SMS to user ${userId}`);
         console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
         // Send SMS
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
             logId: dedupeResult.logId,
             messageId: smsResult.messageId
           });
-          console.log(`✅ 4:15 PM special SMS sent successfully to user ${userId}`);
+          console.log(`✅ 5:30 PM special SMS sent successfully to user ${userId}`);
         } else {
           smsFailed++;
           logDetails.push({ 
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
             error: smsResult.error,
             logId: dedupeResult.logId
           });
-          console.log(`❌ Failed to send 4:15 PM special SMS to user ${userId}:`, smsResult.error);
+          console.log(`❌ Failed to send 5:30 PM special SMS to user ${userId}:`, smsResult.error);
         }
 
         // Add small delay between SMS sends
@@ -154,14 +154,14 @@ export async function GET(request: NextRequest) {
       smsSent,
       smsFailed,
       usersProcessed,
-      message: `4:15 PM Special SMS: Processed ${smsSent + smsFailed} SMS for ${usersProcessed} users`
+      message: `5:30 PM Special SMS: Processed ${smsSent + smsFailed} SMS for ${usersProcessed} users`
     };
 
-    console.log('📊 4:15 PM Special SMS Processing Complete:', result);
+    console.log('📊 5:30 PM Special SMS Processing Complete:', result);
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('❌ 4:15 PM Special SMS error:', error);
+    console.error('❌ 5:30 PM Special SMS error:', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Internal server error',

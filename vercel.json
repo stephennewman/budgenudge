@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/send-415pm-sms",
-      "schedule": "0 17 * * *"
+      "schedule": "30 21 * * *"
     },
     {
       "path": "/api/auto-ai-tag-new",
