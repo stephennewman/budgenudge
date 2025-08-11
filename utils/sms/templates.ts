@@ -1886,10 +1886,14 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       .eq('user_id', userId)
       .single();
 
+    console.log('🔍 Income Profile Data:', JSON.stringify(incomeProfile, null, 2));
+
     let incomeCandidates: any[] = [];
     if (incomeProfile?.profile_data?.income_sources) {
       // Use the structured income data from the income page
       const incomeSources = incomeProfile.profile_data.income_sources;
+      console.log('🔍 Income Sources Found:', JSON.stringify(incomeSources, null, 2));
+      
       incomeCandidates = incomeSources
         .filter((source: any) => source.frequency !== 'irregular' && source.expected_amount > 0)
         .map((source: any) => ({
@@ -1900,7 +1904,10 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
           last_pay_date: source.last_pay_date,
           confidence_score: source.confidence_score
         }));
+      
+      console.log('🔍 Filtered Income Candidates:', JSON.stringify(incomeCandidates, null, 2));
     } else {
+      console.log('🔍 No income profile found, using fallback detection');
       // Fallback to transaction-based detection if no income profile exists
       const lookbackStart = new Date();
       lookbackStart.setDate(lookbackStart.getDate() - 120);
@@ -1915,6 +1922,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         .order('date', { ascending: true });
       
       incomeCandidates = fallbackIncome || [];
+      console.log('🔍 Fallback Income Data:', JSON.stringify(incomeCandidates, null, 2));
     }
 
     // Get upcoming bills
@@ -2148,21 +2156,27 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
 function findNextIncome(incomeCandidates: any[]): any {
   if (!incomeCandidates || incomeCandidates.length === 0) return null;
 
+  console.log('🔍 findNextIncome called with:', JSON.stringify(incomeCandidates, null, 2));
+
   // Check if we have structured income data from user_income_profiles
   if (incomeCandidates[0]?.source_name && incomeCandidates[0]?.frequency) {
+    console.log('🔍 Using structured income data');
     // Use structured income data
     const now = new Date();
     const upcomingIncomes = [];
 
     for (const source of incomeCandidates) {
+      console.log('🔍 Processing income source:', source.source_name);
       let nextDate: Date;
       
       if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
         // Use manual override if it's in the future
         nextDate = new Date(source.next_predicted_date);
+        console.log('🔍 Using manual override date:', source.next_predicted_date);
       } else if (source.last_pay_date) {
         // Calculate from last payment date
         nextDate = new Date(source.last_pay_date);
+        console.log('🔍 Calculating from last pay date:', source.last_pay_date);
         
         // Add frequency-based days
         switch (source.frequency) {
@@ -2188,11 +2202,15 @@ function findNextIncome(incomeCandidates: any[]): any {
             }
             break;
           default:
+            console.log('🔍 Skipping irregular frequency:', source.frequency);
             continue; // Skip irregular sources
         }
       } else {
+        console.log('🔍 No date information for source:', source.source_name);
         continue; // Skip if no date information
       }
+
+      console.log('🔍 Calculated next date for', source.source_name, ':', nextDate.toISOString());
 
       upcomingIncomes.push({
         source: source.source_name,
@@ -2201,8 +2219,12 @@ function findNextIncome(incomeCandidates: any[]): any {
       });
     }
 
+    console.log('🔍 All upcoming incomes:', JSON.stringify(upcomingIncomes, null, 2));
+
     // Return the soonest income
-    return upcomingIncomes.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+    const result = upcomingIncomes.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+    console.log('🔍 Selected income result:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   // Fallback to transaction-based detection for legacy users
