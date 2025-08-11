@@ -1878,19 +1878,44 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       .eq('user_id', userId)
       .eq('is_active', true);
 
-    // Get income streams
+    // Get income streams from user_income_profiles table
     const now = new Date();
-    const lookbackStart = new Date();
-    lookbackStart.setDate(lookbackStart.getDate() - 120);
-    const lb = lookbackStart.toISOString().split('T')[0];
+    const { data: incomeProfile } = await supabase
+      .from('user_income_profiles')
+      .select('profile_data')
+      .eq('user_id', userId)
+      .single();
 
-    const { data: incomeCandidates } = await supabase
-      .from('transactions')
-      .select('date, name, merchant_name, amount')
-      .in('plaid_item_id', itemIds)
-      .gte('date', lb)
-      .lt('amount', 0) // deposits as negative
-      .order('date', { ascending: true });
+    let incomeCandidates: any[] = [];
+    if (incomeProfile?.profile_data?.income_sources) {
+      // Use the structured income data from the income page
+      const incomeSources = incomeProfile.profile_data.income_sources;
+      incomeCandidates = incomeSources
+        .filter((source: any) => source.frequency !== 'irregular' && source.expected_amount > 0)
+        .map((source: any) => ({
+          source_name: source.source_name,
+          expected_amount: source.expected_amount,
+          frequency: source.frequency,
+          next_predicted_date: source.next_predicted_date,
+          last_pay_date: source.last_pay_date,
+          confidence_score: source.confidence_score
+        }));
+    } else {
+      // Fallback to transaction-based detection if no income profile exists
+      const lookbackStart = new Date();
+      lookbackStart.setDate(lookbackStart.getDate() - 120);
+      const lb = lookbackStart.toISOString().split('T')[0];
+
+      const { data: fallbackIncome } = await supabase
+        .from('transactions')
+        .select('date, name, merchant_name, amount')
+        .in('plaid_item_id', itemIds)
+        .gte('date', lb)
+        .lt('amount', 0) // deposits as negative
+        .order('date', { ascending: true });
+      
+      incomeCandidates = fallbackIncome || [];
+    }
 
     // Get upcoming bills
     const { data: upcomingBills } = await supabase
@@ -2123,7 +2148,65 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
 function findNextIncome(incomeCandidates: any[]): any {
   if (!incomeCandidates || incomeCandidates.length === 0) return null;
 
-  // Group by income source and find patterns
+  // Check if we have structured income data from user_income_profiles
+  if (incomeCandidates[0]?.source_name && incomeCandidates[0]?.frequency) {
+    // Use structured income data
+    const now = new Date();
+    const upcomingIncomes = [];
+
+    for (const source of incomeCandidates) {
+      let nextDate: Date;
+      
+      if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
+        // Use manual override if it's in the future
+        nextDate = new Date(source.next_predicted_date);
+      } else if (source.last_pay_date) {
+        // Calculate from last payment date
+        nextDate = new Date(source.last_pay_date);
+        
+        // Add frequency-based days
+        switch (source.frequency) {
+          case 'weekly':
+            while (nextDate <= now) {
+              nextDate.setDate(nextDate.getDate() + 7);
+            }
+            break;
+          case 'bi-weekly':
+            while (nextDate <= now) {
+              nextDate.setDate(nextDate.getDate() + 14);
+            }
+            break;
+          case 'bi-monthly':
+            while (nextDate <= now) {
+              nextDate.setMonth(nextDate.getMonth() + 1);
+              nextDate.setDate(15); // Assume 15th of month
+            }
+            break;
+          case 'monthly':
+            while (nextDate <= now) {
+              nextDate.setMonth(nextDate.getMonth() + 1);
+            }
+            break;
+          default:
+            continue; // Skip irregular sources
+        }
+      } else {
+        continue; // Skip if no date information
+      }
+
+      upcomingIncomes.push({
+        source: source.source_name,
+        expectedAmount: source.expected_amount,
+        nextDate: nextDate
+      });
+    }
+
+    // Return the soonest income
+    return upcomingIncomes.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+  }
+
+  // Fallback to transaction-based detection for legacy users
+  const now = new Date();
   const groups = new Map<string, any[]>();
   for (const t of incomeCandidates) {
     const label = `${t.merchant_name || ''} ${t.name || ''}`.trim();
@@ -2142,39 +2225,40 @@ function findNextIncome(incomeCandidates: any[]): any {
   }> = [];
 
   for (const [key, arr] of groups.entries()) {
-    if (arr.length < 3) continue;
+    if (arr.length < 2) continue;
     
     const sorted = [...arr].sort((a, b) => (a.date < b.date ? -1 : 1));
     const dates = sorted.map(t => new Date(t.date + 'T12:00:00'));
     
-    // Calculate average interval
     const intervals: number[] = [];
     for (let i = 1; i < dates.length; i++) {
       intervals.push(Math.max(1, Math.round((dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24))));
     }
-    const avgInterval = intervals.reduce((s, n) => s + n, 0) / intervals.length;
     
-    // Calculate next date
+    let avgInterval = 14;
+    if (intervals.length > 0) {
+      avgInterval = intervals.reduce((s, n) => s + n, 0) / intervals.length;
+    }
+    
     let nextDate = new Date(dates[dates.length - 1].getTime());
-    const now = new Date();
     while (nextDate <= now) {
       nextDate = new Date(nextDate.getTime() + avgInterval * 24 * 60 * 60 * 1000);
     }
 
-    // Calculate expected amount
     const amounts = sorted.map(t => Math.abs(t.amount));
     const avgAmount = amounts.reduce((s, n) => s + n, 0) / amounts.length;
+    const mostRecentAmount = Math.abs(sorted[sorted.length - 1].amount);
+    const finalAmount = Math.abs(mostRecentAmount - avgAmount) > avgAmount * 0.3 ? mostRecentAmount : avgAmount;
 
     streams.push({
       source: key,
-      expectedAmount: avgAmount,
+      expectedAmount: finalAmount,
       expectedInterval: avgInterval,
       lastDate: dates[dates.length - 1],
       nextDate
     });
   }
 
-  // Return the soonest income
   return streams.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
 }
 
