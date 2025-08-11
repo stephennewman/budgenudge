@@ -1308,7 +1308,7 @@ export async function generateCashFlowRunwayMessage(userId: string): Promise<str
     }
     // Add a light, encouraging closer (varies per user/day but deterministic-ish)
     const encouragements = [
-      "You’re doing great—your wallet just winked. 😎💸",
+      "You're doing great—your wallet just winked. 😎💸",
       "Small steps, big wins. Future-you says thanks. 🌟",
       "Budget boss mode: engaged. Keep rolling. 🛼",
       "Your money has main-character energy today. 🎬✨",
@@ -1784,7 +1784,7 @@ function calculateVarianceForTemplate(numbers: number[]): number {
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -1806,6 +1806,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateOnboardingAnalysisCompleteMessage(userId);
     case 'onboarding-day-before':
       return await generateOnboardingDayBeforeMessage(userId);
+    case '415pm-special':
+      return await generate415pmSpecialMessage(userId);
     // TEMPORARILY DISABLED - Paycheck templates
     // case 'paycheck-efficiency':
     //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
@@ -1813,3 +1815,406 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return "📱 Krezzo\n\nInvalid template type.";
   }
 } 
+
+// ===================================
+// 9. 4:15 PM KREZZO REPORT TEMPLATE (NEW)
+// ===================================
+export async function generate415pmSpecialMessage(userId: string): Promise<string> {
+  try {
+    // Get user's item IDs
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+
+    if (!userItems || userItems.length === 0) {
+      return '📊 KREZZO REPORT\n\nNo bank accounts connected.';
+    }
+
+    const itemDbIds = userItems.map(item => item.id);
+    const itemIds = userItems.map(item => item.plaid_item_id);
+
+    // Get user's account balances
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('name, type, current_balance, available_balance')
+      .in('item_id', itemDbIds);
+
+    // Calculate total available balance from depository accounts
+    const depositoryAccounts = accounts?.filter(acc => acc.type === 'depository') || [];
+    const totalAvailableBalance = depositoryAccounts.reduce(
+      (sum, acc) => sum + (acc.available_balance || 0), 
+      0
+    );
+
+    // Get yesterday's transactions
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    
+    const { data: yesterdayTransactions } = await supabase
+      .from('transactions')
+      .select('date, merchant_name, name, amount, ai_category_tag')
+      .in('plaid_item_id', itemIds)
+      .eq('date', yesterdayStr)
+      .gt('amount', 0) // Only spending transactions
+      .order('amount', { ascending: false });
+
+    // Get yesterday's balance (approximate)
+    const yesterdayBalance = totalAvailableBalance + (yesterdayTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0);
+
+    // Get category pacing data
+    const { data: trackedCategories } = await supabase
+      .from('category_pacing_tracking')
+      .select('ai_category')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    // Get merchant pacing data
+    const { data: trackedMerchants } = await supabase
+      .from('merchant_pacing_tracking')
+      .select('ai_merchant_name')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    // Get income streams
+    const now = new Date();
+    const lookbackStart = new Date();
+    lookbackStart.setDate(lookbackStart.getDate() - 120);
+    const lb = lookbackStart.toISOString().split('T')[0];
+
+    const { data: incomeCandidates } = await supabase
+      .from('transactions')
+      .select('date, name, merchant_name, amount')
+      .in('plaid_item_id', itemIds)
+      .gte('date', lb)
+      .lt('amount', 0) // deposits as negative
+      .order('date', { ascending: true });
+
+    // Get upcoming bills
+    const { data: upcomingBills } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name, expected_amount, next_predicted_date')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .gte('next_predicted_date', now.toISOString().split('T')[0])
+      .order('next_predicted_date', { ascending: true });
+
+    let message = `📊 KREZZO REPORT\n\n`;
+
+    // 1. TRANSACTIONS SECTION
+    message += `💳 Transactions: https://get.krezzo.com/protected/transactions\n`;
+    if (yesterdayTransactions && yesterdayTransactions.length > 0) {
+      const yesterdayTotal = yesterdayTransactions.reduce((sum, t) => sum + t.amount, 0);
+      message += `Posted yesterday: ${yesterdayTransactions.length} transactions for $${yesterdayTotal.toFixed(2)} total\n`;
+    } else {
+      message += `Posted yesterday: 0 transactions for $0.00 total\n`;
+    }
+    message += `Balance as of yesterday: $${yesterdayBalance.toFixed(2)}\n\n`;
+
+    // 2. CATEGORY PACING SECTION
+    message += `📊 Category Pacing: https://get.krezzo.com/protected/ai-category-analysis\n`;
+    if (trackedCategories && trackedCategories.length > 0) {
+      // Get current month data for categories
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const dayOfMonth = now.getDate();
+      const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const categoryPacingData = [];
+      
+      for (const category of trackedCategories) {
+        const { data: allTxns } = await supabase
+          .from('transactions')
+          .select('amount, date')
+          .in('plaid_item_id', itemIds)
+          .eq('ai_category_tag', category.ai_category)
+          .gte('amount', 0);
+
+        if (allTxns && allTxns.length > 0) {
+          // Calculate historical average
+          const totalSpend = allTxns.reduce((sum, t) => sum + t.amount, 0);
+          const dates = allTxns.map(t => new Date(t.date));
+          const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+          const totalDays = Math.max(1, Math.floor((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          const avgDailySpend = totalSpend / totalDays;
+          const avgMonthlySpend = avgDailySpend * 30;
+
+          // Get current month spending
+          const { data: currentMonthTxns } = await supabase
+            .from('transactions')
+            .select('amount')
+            .in('plaid_item_id', itemIds)
+            .eq('ai_category_tag', category.ai_category)
+            .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+            .lte('date', yesterdayStr)
+            .gte('amount', 0);
+
+          const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
+          const expectedByNow = avgMonthlySpend * (dayOfMonth / 30);
+          const pacing = expectedByNow > 0 ? (currentMonthSpend / expectedByNow) * 100 : 0;
+
+          if (pacing > 110 || pacing < 90) { // Only red and yellow
+            categoryPacingData.push({
+              category: category.ai_category,
+              currentMonthSpend,
+              expectedByNow,
+              pacing
+            });
+          }
+        }
+      }
+
+      if (categoryPacingData.length > 0) {
+        // Sort by highest pacing (worst first)
+        categoryPacingData.sort((a, b) => b.pacing - a.pacing);
+        
+        categoryPacingData.slice(0, 3).forEach(cat => {
+          const status = cat.pacing > 110 ? 'Over' : 'Under';
+          const diff = Math.abs(cat.pacing - 100);
+          message += `${cat.category}\n`;
+          message += `Month to date: $${cat.currentMonthSpend.toFixed(0)}\n`;
+          message += `Typical by now: $${cat.expectedByNow.toFixed(0)}\n`;
+          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
+        });
+      } else {
+        message += `✅ All categories on track\n\n`;
+      }
+    } else {
+      message += `✅ No categories tracked\n\n`;
+    }
+
+    // 3. MERCHANT PACING SECTION
+    message += `🏪 Merchant Pacing: https://get.krezzo.com/protected/ai-merchant-analysis\n`;
+    if (trackedMerchants && trackedMerchants.length > 0) {
+      // Similar logic for merchants
+      const currentMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+      const dayOfMonth = now.getDate();
+      const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      const merchantPacingData = [];
+      
+      for (const merchant of trackedMerchants) {
+        const { data: allTxns } = await supabase
+          .from('transactions')
+          .select('amount, date')
+          .in('plaid_item_id', itemIds)
+          .eq('ai_merchant_name', merchant.ai_merchant_name)
+          .gte('amount', 0);
+
+        if (allTxns && allTxns.length > 0) {
+          const totalSpend = allTxns.reduce((sum, t) => sum + t.amount, 0);
+          const dates = allTxns.map(t => new Date(t.date));
+          const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+          const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+          const totalDays = Math.max(1, Math.floor((maxDate.getTime() - minDate.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          const avgDailySpend = totalSpend / totalDays;
+          const avgMonthlySpend = avgDailySpend * 30;
+
+          const { data: currentMonthTxns } = await supabase
+            .from('transactions')
+            .select('amount')
+            .in('plaid_item_id', itemIds)
+            .eq('ai_merchant_name', merchant.ai_merchant_name)
+            .gte('date', firstDayOfMonth.toISOString().split('T')[0])
+            .lte('date', yesterdayStr)
+            .gte('amount', 0);
+
+          const currentMonthSpend = currentMonthTxns?.reduce((sum, t) => sum + t.amount, 0) || 0;
+          const expectedByNow = avgMonthlySpend * (dayOfMonth / 30);
+          const pacing = expectedByNow > 0 ? (currentMonthSpend / expectedByNow) * 100 : 0;
+
+          if (pacing > 110 || pacing < 90) { // Only red and yellow
+            merchantPacingData.push({
+              merchant: merchant.ai_merchant_name,
+              currentMonthSpend,
+              expectedByNow,
+              pacing
+            });
+          }
+        }
+      }
+
+      if (merchantPacingData.length > 0) {
+        // Sort by highest pacing (worst first)
+        merchantPacingData.sort((a, b) => b.pacing - a.pacing);
+        
+        merchantPacingData.slice(0, 3).forEach(merch => {
+          const status = merch.pacing > 110 ? 'Over' : 'Under';
+          const diff = Math.abs(merch.pacing - 100);
+          message += `${merch.merchant}\n`;
+          message += `Month to date: $${merch.currentMonthSpend.toFixed(0)}\n`;
+          message += `Typical by now: $${merch.expectedByNow.toFixed(0)}\n`;
+          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
+        });
+      } else {
+        message += `✅ All merchants on track\n\n`;
+      }
+    } else {
+      message += `✅ No merchants tracked\n\n`;
+    }
+
+    // 4. INCOME SECTION
+    message += `💰 Income: https://get.krezzo.com/protected/income\n`;
+    if (incomeCandidates && incomeCandidates.length > 0) {
+      // Find next income
+      const nextIncome = findNextIncome(incomeCandidates);
+      if (nextIncome) {
+        const daysUntil = Math.ceil((nextIncome.nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        message += `In ${daysUntil} days for $${nextIncome.expectedAmount.toFixed(0)}\n\n`;
+      } else {
+        message += `No income patterns detected\n\n`;
+      }
+    } else {
+      message += `No income data available\n\n`;
+    }
+
+    // 5. EXPENSES SECTION
+    message += `💸 Expenses: https://get.krezzo.com/protected/recurring-bills\n`;
+    if (upcomingBills && upcomingBills.length > 0) {
+      const nextIncome = findNextIncome(incomeCandidates);
+      if (nextIncome) {
+        const daysUntil = Math.ceil((nextIncome.nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Get bills before next income
+        const billsBeforeIncome = upcomingBills.filter(bill => {
+          const billDate = new Date(bill.next_predicted_date + 'T12:00:00');
+          return billDate <= nextIncome.nextDate;
+        });
+
+        if (billsBeforeIncome.length > 0) {
+          const totalBills = billsBeforeIncome.reduce((sum, b) => sum + Number(b.expected_amount), 0);
+          message += `Next ${daysUntil} days: ${billsBeforeIncome.length} for $${totalBills.toFixed(0)} total\n\n`;
+
+          // Calculate expected balance and max daily spend
+          const expectedBalance = totalAvailableBalance - totalBills;
+          const maxDailySpend = expectedBalance > 0 ? expectedBalance / daysUntil : 0;
+
+          message += `Expected balance before next income: $${expectedBalance.toFixed(0)}\n`;
+          message += `Max spend per day: $${maxDailySpend.toFixed(0)}\n\n`;
+        } else {
+          message += `No bills before next income\n\n`;
+        }
+      } else {
+        message += `No income data for expense planning\n\n`;
+      }
+    } else {
+      message += `No upcoming bills\n\n`;
+    }
+
+    // 6. AI-INSPIRED VIBE MESSAGE
+    const vibeMessage = generateAIVibeMessage(totalAvailableBalance, yesterdayTransactions, upcomingBills);
+    message += `🎯 ${vibeMessage}`;
+
+    return message.trim();
+
+  } catch (error) {
+    console.error('Error generating 4:15 PM Krezzo Report:', error);
+    return '📊 KREZZO REPORT\n\nError generating report.';
+  }
+}
+
+// Helper function to find next income
+function findNextIncome(incomeCandidates: any[]): any {
+  if (!incomeCandidates || incomeCandidates.length === 0) return null;
+
+  // Group by income source and find patterns
+  const groups = new Map<string, any[]>();
+  for (const t of incomeCandidates) {
+    const label = `${t.merchant_name || ''} ${t.name || ''}`.trim();
+    const key = normalizeIncomeSourceName(label);
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(t);
+  }
+
+  const streams: Array<{
+    source: string;
+    expectedAmount: number;
+    expectedInterval: number;
+    lastDate: Date;
+    nextDate: Date;
+  }> = [];
+
+  for (const [key, arr] of groups.entries()) {
+    if (arr.length < 3) continue;
+    
+    const sorted = [...arr].sort((a, b) => (a.date < b.date ? -1 : 1));
+    const dates = sorted.map(t => new Date(t.date + 'T12:00:00'));
+    
+    // Calculate average interval
+    const intervals: number[] = [];
+    for (let i = 1; i < dates.length; i++) {
+      intervals.push(Math.max(1, Math.round((dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24))));
+    }
+    const avgInterval = intervals.reduce((s, n) => s + n, 0) / intervals.length;
+    
+    // Calculate next date
+    let nextDate = new Date(dates[dates.length - 1].getTime());
+    const now = new Date();
+    while (nextDate <= now) {
+      nextDate = new Date(nextDate.getTime() + avgInterval * 24 * 60 * 60 * 1000);
+    }
+
+    // Calculate expected amount
+    const amounts = sorted.map(t => Math.abs(t.amount));
+    const avgAmount = amounts.reduce((s, n) => s + n, 0) / amounts.length;
+
+    streams.push({
+      source: key,
+      expectedAmount: avgAmount,
+      expectedInterval: avgInterval,
+      lastDate: dates[dates.length - 1],
+      nextDate
+    });
+  }
+
+  // Return the soonest income
+  return streams.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+}
+
+// Helper function to normalize income source names
+function normalizeIncomeSourceName(name: string): string {
+  return name
+    .replace(/\d{4}-\d{2}-\d{2}/g, '')
+    .replace(/\b(payroll|deposit|direct|payment|transfer|ach|tran)\b/gi, '')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+// Helper function to generate AI-inspired vibe message
+function generateAIVibeMessage(balance: number, transactions: any[], bills: any[]): string {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  
+  // Analyze spending patterns
+  const hasSpending = transactions && transactions.length > 0;
+  const totalSpending = hasSpending ? transactions.reduce((sum, t) => sum + t.amount, 0) : 0;
+  const hasUpcomingBills = bills && bills.length > 0;
+  const totalBills = hasUpcomingBills ? bills.reduce((sum, b) => sum + Number(b.expected_amount), 0) : 0;
+  
+  // Generate vibe based on financial situation
+  if (balance > 5000 && !hasSpending) {
+    return "You're crushing it! 💪 Strong balance, no spending today. Keep this momentum going!";
+  } else if (balance > 2000 && totalSpending < 100) {
+    return "Solid day! 🎯 Good balance, controlled spending. You're in the financial sweet spot.";
+  } else if (balance > 1000 && totalBills < balance * 0.3) {
+    return "You're on track! 📈 Bills are manageable, balance is healthy. Consider saving the rest.";
+  } else if (balance < 500) {
+    return "Stay focused! 🔍 Balance is low. Review your spending and prioritize essentials.";
+  } else if (isWeekend && hasSpending) {
+    return "Weekend vibes! 🌅 Enjoy your weekend spending, but keep it reasonable. Balance looks good.";
+  } else if (hasUpcomingBills && totalBills > balance * 0.5) {
+    return "Plan ahead! ⚠️ Big bills coming. Consider reducing discretionary spending this week.";
+  } else {
+    return "You're doing great! 🌟 Keep monitoring your spending and stay within your daily budget.";
+  }
+}

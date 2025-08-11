@@ -8,7 +8,7 @@ import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | '415pm-special';
   // TEMPORARILY DISABLED - Paycheck templates
   // | 'paycheck-efficiency' | 'cash-flow-runway';
   enabled: boolean;
@@ -24,7 +24,7 @@ interface SMSPreference {
 // ];
 
 // Define active SMS template types
-const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway'];
+const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special'];
 
 const smsTypeInfo = {
   bills: {
@@ -69,6 +69,12 @@ const smsTypeInfo = {
     description: 'Daily at 5:00 PM EST. Forecast until next paycheck and whether you’re on track.',
     icon: '🛤️',
     example: `🛤️ CASH FLOW RUNWAY\n9 days until next paycheck (Jul 29)\nBills before then: $842\nProjected spend: $567\nStatus: At risk\nTip: Reduce discretionary by ~$63/day to stay on track.\n\n⚠️ Predictions based on historical data`
+  },
+  '415pm-special': {
+    title: 'Krezzo Report (4:15 PM)',
+    description: 'Daily at 4:15 PM EST. Comprehensive financial report with transactions, pacing, income, and expenses.',
+    icon: '📊',
+    example: `📊 KREZZO REPORT\n\n💳 Transactions: https://get.krezzo.com/protected/transactions\nPosted yesterday: 3 transactions for $156.78 total\nBalance as of yesterday: $3,083.26\n\n📊 Category Pacing: https://get.krezzo.com/protected/ai-category-analysis\n✅ All categories on track\n\n🏪 Merchant Pacing: https://get.krezzo.com/protected/ai-merchant-analysis\n✅ All merchants on track\n\n💰 Income: https://get.krezzo.com/protected/income\nIn 9 days for $4,020\n\n💸 Expenses: https://get.krezzo.com/protected/recurring-bills\nNext 9 days: 5 for $842 total\n\nExpected balance before next income: $2,241\nMax spend per day: $249\n\n🎯 You're crushing it! 💪 Strong balance, no spending today. Keep this momentum going!`
   },
   // TEMPORARILY DISABLED - Paycheck templates
   // 'paycheck-efficiency': {
