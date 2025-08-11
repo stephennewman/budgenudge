@@ -1822,6 +1822,7 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
 // 4:15 PM KREZZO REPORT - Clean format without URLs
 export async function generate415pmSpecialMessage(userId: string): Promise<string> {
   try {
+    console.log('🔍 generate415pmSpecialMessage called for user:', userId);
     // Get user's item IDs
     const { data: userItems } = await supabase
       .from('items')
