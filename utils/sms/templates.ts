@@ -1819,6 +1819,7 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
 // ===================================
 // 9. 4:15 PM KREZZO REPORT TEMPLATE (NEW)
 // ===================================
+// 4:15 PM KREZZO REPORT - Clean format without URLs
 export async function generate415pmSpecialMessage(userId: string): Promise<string> {
   try {
     // Get user's item IDs
