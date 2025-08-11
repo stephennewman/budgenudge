@@ -2077,7 +2077,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     // 5. EXPENSES SECTION
     message += `💸 Expenses: https://get.krezzo.com/protected/recurring-bills\n`;
     if (upcomingBills && upcomingBills.length > 0) {
-      const nextIncome = findNextIncome(incomeCandidates);
+      const nextIncome = incomeCandidates && incomeCandidates.length > 0 ? findNextIncome(incomeCandidates) : null;
       if (nextIncome) {
         const daysUntil = Math.ceil((nextIncome.nextDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         
@@ -2190,7 +2190,7 @@ function normalizeIncomeSourceName(name: string): string {
 }
 
 // Helper function to generate AI-inspired vibe message
-function generateAIVibeMessage(balance: number, transactions: any[], bills: any[]): string {
+function generateAIVibeMessage(balance: number, transactions: any[] | null, bills: any[] | null): string {
   const today = new Date();
   const dayOfWeek = today.getDay();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;

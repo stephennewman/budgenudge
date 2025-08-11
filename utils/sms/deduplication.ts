@@ -11,7 +11,7 @@ export type SMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'cate
                              // TEMPORARILY DISABLED - Paycheck templates
                              // | 'paycheck-efficiency' | 'cash-flow-runway';
 
-export type SMSSourceEndpoint = 'scheduled' | 'test' | 'manual' | 'webhook' | 'debug';
+export type SMSSourceEndpoint = 'scheduled' | 'test' | 'manual' | 'webhook' | 'debug' | '415pm-special';
 
 export interface SMSSendRecord {
   phoneNumber: string;

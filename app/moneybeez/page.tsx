@@ -106,7 +106,6 @@ const testimonials = [
 
 export default function MoneyBeezLandingPage() {
   const [selectedHive, setSelectedHive] = useState<string>("middle");
-  const [activeSection, setActiveSection] = useState<string>("hero");
 
   const handleSelectHive = (hiveId: string) => {
     setSelectedHive(hiveId);
@@ -119,7 +118,6 @@ export default function MoneyBeezLandingPage() {
   };
 
   const scrollToSection = (sectionId: string) => {
-    setActiveSection(sectionId);
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
@@ -379,7 +377,7 @@ export default function MoneyBeezLandingPage() {
                 <div className="text-center">
                   <div className="text-6xl mb-4">📱</div>
                   <h3 className="text-2xl font-bold text-yellow-400 mb-2">Real SMS Messages from Your Bees</h3>
-                  <p className="text-gray-300">See exactly what you'll receive every day</p>
+                  <p className="text-gray-300">See exactly what you&apos;ll receive every day</p>
                 </div>
               </div>
             </div>
@@ -674,7 +672,7 @@ export default function MoneyBeezLandingPage() {
                   <h3 className="text-lg font-semibold text-yellow-400">{testimonial.name}</h3>
                   <p className="text-sm text-gray-400">{testimonial.role}</p>
                 </div>
-                <p className="text-gray-300 text-center italic">"{testimonial.text}"</p>
+                <p className="text-gray-300 text-center italic">&ldquo;{testimonial.text}&rdquo;</p>
               </Card>
             ))}
           </div>
