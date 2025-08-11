@@ -1,12 +1,13 @@
 {
   "crons": [
+    // Krezzo Report SMS - Daily at 5:00 PM EST
     {
       "path": "/api/cron/scheduled-sms",
       "schedule": "*/30 * * * *"
     },
     {
       "path": "/api/send-415pm-sms",
-      "schedule": "0 17 * * *"
+      "schedule": "00 17 * * *"
     },
     {
       "path": "/api/auto-ai-tag-new",
