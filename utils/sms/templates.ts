@@ -2006,12 +2006,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         categoryPacingData.sort((a, b) => b.pacing - a.pacing);
         
         categoryPacingData.slice(0, 3).forEach(cat => {
-          const status = cat.pacing > 110 ? 'Over' : 'Under';
+          const status = cat.pacing > 110 ? '🚨' : '⚠️';
           const diff = Math.abs(cat.pacing - 100);
-          message += `${cat.category}\n`;
+          message += `${status} ${cat.category}\n`;
           message += `Month to date: $${cat.currentMonthSpend.toFixed(0)}\n`;
           message += `Typical by now: $${cat.expectedByNow.toFixed(0)}\n`;
-          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
+          message += `Pacing: ${cat.pacing > 110 ? 'Over' : 'Under'} by ${diff.toFixed(0)}%\n\n`;
         });
       } else {
         message += `✅ All categories on track\n\n`;
@@ -2078,12 +2078,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         merchantPacingData.sort((a, b) => b.pacing - a.pacing);
         
         merchantPacingData.slice(0, 3).forEach(merch => {
-          const status = merch.pacing > 110 ? 'Over' : 'Under';
+          const status = merch.pacing > 110 ? '🚨' : '⚠️';
           const diff = Math.abs(merch.pacing - 100);
-          message += `${merch.merchant}\n`;
+          message += `${status} ${merch.merchant}\n`;
           message += `Month to date: $${merch.currentMonthSpend.toFixed(0)}\n`;
           message += `Typical by now: $${merch.expectedByNow.toFixed(0)}\n`;
-          message += `Pacing: ${status} by ${diff.toFixed(0)}%\n\n`;
+          message += `Pacing: ${merch.pacing > 110 ? 'Over' : 'Under'} by ${diff.toFixed(0)}%\n\n`;
         });
       } else {
         message += `✅ All merchants on track\n\n`;
