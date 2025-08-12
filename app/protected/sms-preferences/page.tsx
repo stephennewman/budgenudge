@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card } from '@/components/ui/card';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
+import { Button } from '@/components/ui/button';
 
 interface SMSPreference {
   id?: number;
@@ -15,13 +16,6 @@ interface SMSPreference {
   frequency: '30min' | 'hourly' | 'daily' | 'weekly';
   phone_number?: string;
 }
-
-// const frequencyOptions = [
-//   { value: '30min', label: 'Every 30 minutes' },
-//   { value: 'hourly', label: 'Every hour' },
-//   { value: 'daily', label: 'Daily' },
-//   { value: 'weekly', label: 'Weekly' }
-// ];
 
 // Define active SMS template types
 const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special'];
@@ -66,7 +60,7 @@ const smsTypeInfo = {
   },
   'cash-flow-runway': {
     title: 'Cash Flow Runway',
-    description: 'Daily at 5:00 PM EST. Forecast until next paycheck and whether you’re on track.',
+    description: 'Daily at 5:00 PM EST. Forecast until next paycheck and whether you\'re on track.',
     icon: '🛤️',
     example: `🛤️ CASH FLOW RUNWAY\n9 days until next paycheck (Jul 29)\nBills before then: $842\nProjected spend: $567\nStatus: At risk\nTip: Reduce discretionary by ~$63/day to stay on track.\n\n⚠️ Predictions based on historical data`
   },
@@ -95,6 +89,7 @@ export default function SMSPreferencesPage() {
   const [preferences, setPreferences] = useState<SMSPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [liveSmsContent, setLiveSmsContent] = useState<Record<string, { content: string; loading: boolean; error?: string }>>({});
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -132,6 +127,56 @@ export default function SMSPreferencesPage() {
     }
   };
 
+  const generateLiveSMS = async (smsType: string) => {
+    try {
+      setLiveSmsContent(prev => ({
+        ...prev,
+        [smsType]: { content: '', loading: true, error: undefined }
+      }));
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Generate live SMS content using the SMS templates API
+      const response = await fetch('/api/manual-sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          templateType: smsType,
+          phoneNumber: user.user_metadata?.signupPhone || user.phone
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.smsContent) {
+        setLiveSmsContent(prev => ({
+          ...prev,
+          [smsType]: { content: data.smsContent, loading: false, error: undefined }
+        }));
+      } else {
+        throw new Error(data.error || 'Failed to generate SMS content');
+      }
+
+    } catch (error) {
+      console.error(`Error generating ${smsType} SMS:`, error);
+      setLiveSmsContent(prev => ({
+        ...prev,
+        [smsType]: { 
+          content: '', 
+          loading: false, 
+          error: error instanceof Error ? error.message : 'Failed to generate SMS content' 
+        }
+      }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="relative min-h-[600px]">
@@ -155,23 +200,6 @@ export default function SMSPreferencesPage() {
         </div>
       </div>
 
-      {/* Daily SMS Send Time Picker (hidden) */}
-      {/*
-      <div className="flex flex-col items-center mb-4">
-        <label htmlFor="send-time" className="font-medium mb-1">Daily SMS Send Time (EST):</label>
-        <input
-          id="send-time"
-          type="time"
-          value={sendTime}
-          onChange={handleSendTimeChange}
-          className="border border-gray-300 rounded px-3 py-2 text-lg"
-          disabled={sendTimeSaving}
-          style={{ width: '120px' }}
-        />
-        <span className="text-xs text-gray-500 mt-1">All SMS will be sent at this time (Eastern Time)</span>
-      </div>
-      */}
-
       {message && (
         <div className={`p-4 rounded-lg mb-6 ${
           message.type === 'success' 
@@ -187,10 +215,12 @@ export default function SMSPreferencesPage() {
           .filter((pref) => activeSmsTypes.includes(pref.sms_type))
           .map((pref) => {
           const info = smsTypeInfo[pref.sms_type];
+          const liveContent = liveSmsContent[pref.sms_type];
+          
           return (
             <Card key={pref.sms_type} className="p-6">
               <div className="space-y-4">
-                <div className="flex items-start">
+                <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
                     <span className="text-2xl">{info.icon}</span>
                     <div>
@@ -198,46 +228,58 @@ export default function SMSPreferencesPage() {
                       <p className="text-gray-600">{info.description}</p>
                     </div>
                   </div>
-                  {/* Hidden enabled checkmarks */}
+                  <Button
+                    onClick={() => generateLiveSMS(pref.sms_type)}
+                    disabled={liveContent?.loading}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {liveContent?.loading ? 'Generating...' : 'Show Live SMS'}
+                  </Button>
                 </div>
 
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono" style={{ margin: 0 }}>
-                    <strong>Example:</strong>{"\n"}{info.example}
-                  </pre>
-                </div>
-
-                {/* Frequency dropdown (hidden) */}
-                {/*
-                {pref.enabled && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor={`${pref.sms_type}-frequency`} className="text-sm font-medium">
-                        Frequency
-                      </Label>
-                      <select
-                        id={`${pref.sms_type}-frequency`}
-                        value={pref.frequency}
-                        onChange={(e) => handlePreferenceChange(pref.sms_type, 'frequency', e.target.value)}
-                        className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        {frequencyOptions.map(option => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                        </select>
+                {/* Live SMS Content */}
+                {liveContent && (liveContent.content || liveContent.error) && (
+                  <div className={`p-3 rounded-lg ${
+                    liveContent.error ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">
+                        {liveContent.error ? 'Error' : 'Live SMS Content'}
+                      </span>
+                      {liveContent.content && (
+                        <span className="text-xs text-gray-500">
+                          {liveContent.content.length} characters
+                        </span>
+                      )}
                     </div>
+                    {liveContent.error ? (
+                      <p className="text-sm text-red-700">{liveContent.error}</p>
+                    ) : (
+                      <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono" style={{ margin: 0 }}>
+                        {liveContent.content}
+                      </pre>
+                    )}
                   </div>
                 )}
-                */}
+
+                {/* Example SMS Content */}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Example Template</span>
+                    <span className="text-xs text-gray-500">
+                      {info.example.length} characters
+                    </span>
+                  </div>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono" style={{ margin: 0 }}>
+                    {info.example}
+                  </pre>
+                </div>
               </div>
             </Card>
           );
         })}
       </div>
-
-      {/* Hidden save button and how it works section */}
     </div>
   );
 } 
