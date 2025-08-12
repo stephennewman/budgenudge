@@ -51,12 +51,12 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Check if user has enabled 5:30 PM SMS
+        // Check if user has enabled weekly summary SMS (used for 4:15 PM report)
         const { data: templatePref } = await supabase
           .from('user_sms_preferences')
           .select('enabled')
           .eq('user_id', userId)
-          .eq('sms_type', '415pm-special')
+          .eq('sms_type', 'weekly-summary')
           .single();
         
         // Default to enabled for new users
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         // Check deduplication
         const dedupeResult = await checkAndLogSMS({
           phoneNumber: userPhoneNumber,
-          templateType: '415pm-special',
+          templateType: 'weekly-summary',
           userId,
           sourceEndpoint: '415pm-special',
           success: true
@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
 
         console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
         
-        // Generate message
-        const smsMessage = await generateSMSMessage(userId, '415pm-special');
+        // Generate message using weekly summary template for 4:15 PM report
+        const smsMessage = await generateSMSMessage(userId, 'weekly-summary');
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
           smsSent++;
           logDetails.push({ 
             userId, 
-            templateType: '415pm-special', 
+            templateType: 'weekly-summary', 
             sent: true, 
             preview: smsMessage.substring(0, 100),
             logId: dedupeResult.logId,
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
           smsFailed++;
           logDetails.push({ 
             userId, 
-            templateType: '415pm-special', 
+            templateType: 'weekly-summary', 
             sent: false, 
             error: smsResult.error,
             logId: dedupeResult.logId
