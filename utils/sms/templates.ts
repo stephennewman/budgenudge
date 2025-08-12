@@ -2157,7 +2157,8 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       message += `No transactions posted\n`;
       message += `Total spent: $0.00\n`;
     }
-    message += `Balance: $${(yesterdayBalance || 0).toFixed(2)}\n\n`;
+    message += `Posted Balance: $${(yesterdayBalance || 0).toFixed(2)}\n`;
+    message += `Available Balance: $${(totalAvailableBalance || 0).toFixed(2)}\n\n`;
 
     // SPENDING PACE
     message += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
