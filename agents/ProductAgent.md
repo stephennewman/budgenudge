@@ -1,4 +1,4 @@
-# Product Agent - Krezzo
+# Product Agent - KREZZO
 
 **Last Updated:** January 28, 2025 9:50 PM EST
 

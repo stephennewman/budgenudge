@@ -2077,22 +2077,35 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     // SPENDING PACE
     message += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
     if (categoryPacingData.length > 0) {
-      // Show top 3 categories (worst first)
-      const topCategories = categoryPacingData.slice(0, 3);
-      topCategories.forEach(cat => {
+      // Separate categories by status
+      const overCategories = categoryPacingData.filter(cat => cat.pacing > 100);
+      const approachingCategories = categoryPacingData.filter(cat => cat.pacing >= 90 && cat.pacing <= 100);
+      const goodCategories = categoryPacingData.filter(cat => cat.pacing < 90);
+      
+      // Show all reds/over first
+      overCategories.forEach(cat => {
         message += `${cat.category.toUpperCase()}\n`;
         message += `Spent: $${cat.currentMonthSpend.toFixed(0)}\n`;
         message += `Expected: $${cat.expectedByNow.toFixed(0)}\n`;
-        
-        if (cat.pacing > 100) {
-          message += `🚨 OVER by ${Math.round(cat.pacing - 100)}%\n`;
-        } else if (cat.pacing >= 90) {
-          message += `⚠️ APPROACHING OVER by ${Math.round(100 - cat.pacing)}%\n`;
-        } else {
-          message += `✅ GOOD by ${Math.round(100 - cat.pacing)}%\n`;
-        }
-        message += `\n`;
+        message += `🚨 OVER by ${Math.round(cat.pacing - 100)}%\n\n`;
       });
+      
+      // Show all yellows/approaching
+      approachingCategories.forEach(cat => {
+        message += `${cat.category.toUpperCase()}\n`;
+        message += `Spent: $${cat.currentMonthSpend.toFixed(0)}\n`;
+        message += `Expected: $${cat.expectedByNow.toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - cat.pacing)}%\n\n`;
+      });
+      
+      // Show one good category
+      if (goodCategories.length > 0) {
+        const bestCategory = goodCategories[0];
+        message += `${bestCategory.category.toUpperCase()}\n`;
+        message += `Spent: $${bestCategory.currentMonthSpend.toFixed(0)}\n`;
+        message += `Expected: $${bestCategory.expectedByNow.toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - bestCategory.pacing)}%\n\n`;
+      }
     } else {
       message += `No categories tracked yet\n\n`;
     }
@@ -2100,22 +2113,35 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     // MERCHANT WATCH
     message += `🏪 MERCHANT WATCH\n━━━━━━━━━━━━━━━━━━\n`;
     if (merchantPacingData.length > 0) {
-      // Show top 3 merchants (worst first)
-      const topMerchants = merchantPacingData.slice(0, 3);
-      topMerchants.forEach(merch => {
+      // Separate merchants by status
+      const overMerchants = merchantPacingData.filter(merch => merch.pacing > 100);
+      const approachingMerchants = merchantPacingData.filter(merch => merch.pacing >= 90 && merch.pacing <= 100);
+      const goodMerchants = merchantPacingData.filter(merch => merch.pacing < 90);
+      
+      // Show all reds/over first
+      overMerchants.forEach(merch => {
         message += `${merch.merchant.toUpperCase()}\n`;
         message += `Spent: $${merch.currentMonthSpend.toFixed(0)}\n`;
         message += `Expected: $${merch.expectedByNow.toFixed(0)}\n`;
-        
-        if (merch.pacing > 100) {
-          message += `🚨 OVER by ${Math.round(merch.pacing - 100)}%\n`;
-        } else if (merch.pacing >= 90) {
-          message += `⚠️ APPROACHING OVER by ${Math.round(100 - merch.pacing)}%\n`;
-        } else {
-          message += `✅ GOOD by ${Math.round(100 - merch.pacing)}%\n`;
-        }
-        message += `\n`;
+        message += `🚨 OVER by ${Math.round(merch.pacing - 100)}%\n\n`;
       });
+      
+      // Show all yellows/approaching
+      approachingMerchants.forEach(merch => {
+        message += `${merch.merchant.toUpperCase()}\n`;
+        message += `Spent: $${merch.currentMonthSpend.toFixed(0)}\n`;
+        message += `Expected: $${merch.expectedByNow.toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - merch.pacing)}%\n\n`;
+      });
+      
+      // Show one good merchant
+      if (goodMerchants.length > 0) {
+        const bestMerchant = goodMerchants[0];
+        message += `${bestMerchant.merchant.toUpperCase()}\n`;
+        message += `Spent: $${bestMerchant.currentMonthSpend.toFixed(0)}\n`;
+        message += `Expected: $${bestMerchant.expectedByNow.toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - bestMerchant.pacing)}%\n\n`;
+      }
     } else {
       message += `No merchants tracked yet\n\n`;
     }
@@ -2134,7 +2160,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     if (billsBeforeIncome && billsBeforeIncome.length > 0) {
       message += `(${billsBeforeIncome.length}) expenses for $${totalBillsBeforeIncome.toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
       
-      // Show individual bills
+      // Show individual bills with dates
       billsBeforeIncome.forEach(bill => {
         const billDate = new Date(bill.next_predicted_date + 'T12:00:00');
         const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
@@ -2150,13 +2176,14 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
         }
       });
       message += `\n`;
+      
+      // Add micro-budget calculation
+      message += `Your micro-budget: $${maxDailySpend.toFixed(0)} per day × ${daysUntilIncome} days = $${(maxDailySpend * daysUntilIncome).toFixed(0)} total available\n\n`;
     } else {
       message += `No bills before next income\n\n`;
     }
 
-    // Max spending info
-    message += `Max You Can Spend: $${expectedBalanceBeforeIncome.toFixed(0)}\n`;
-    message += `Per Day: $${maxDailySpend.toFixed(0)}\n\n`;
+
 
     // Status
     if (maxDailySpend < 50) {

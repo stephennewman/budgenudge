@@ -4,7 +4,7 @@
 
 ## 📋 PROJECT OVERVIEW
 
-**Project:** BudgeNudge - AI-Powered Personal Finance & SMS Automation  
+**Project:** KREZZO - AI-Powered Personal Finance & SMS Automation  
 **Purpose:** Help users track spending patterns, receive intelligent SMS alerts, and make better financial decisions through AI-powered transaction categorization and merchant analysis.
 
 **Key Goals:**
