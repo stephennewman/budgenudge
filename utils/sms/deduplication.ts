@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export type SMSTemplateType = 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 
+export type SMSTemplateType = 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 
                              'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' |
                              'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special';
                              // TEMPORARILY DISABLED - Paycheck templates

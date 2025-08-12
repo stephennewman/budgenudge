@@ -51,12 +51,12 @@ export async function GET(request: NextRequest) {
         const userId = userItem.user_id;
         usersProcessed++;
 
-        // Check if user has enabled weekly summary SMS (used for 4:15 PM report)
+        // Check if user has enabled activity SMS (used for 4:15 PM daily report)
         const { data: templatePref } = await supabase
           .from('user_sms_preferences')
           .select('enabled')
           .eq('user_id', userId)
-          .eq('sms_type', 'weekly-summary')
+          .eq('sms_type', 'activity')
           .single();
         
         // Default to enabled for new users
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         // Check deduplication
         const dedupeResult = await checkAndLogSMS({
           phoneNumber: userPhoneNumber,
-          templateType: 'weekly-summary',
+          templateType: 'activity',
           userId,
           sourceEndpoint: '415pm-special',
           success: true
@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
 
         console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
         
-        // Generate message using weekly summary template for 4:15 PM report
-        const smsMessage = await generateSMSMessage(userId, 'weekly-summary');
+        // Generate message using activity template for 4:15 PM daily report
+        const smsMessage = await generateSMSMessage(userId, 'activity');
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
           smsSent++;
           logDetails.push({ 
             userId, 
-            templateType: 'weekly-summary', 
+            templateType: 'activity', 
             sent: true, 
             preview: smsMessage.substring(0, 100),
             logId: dedupeResult.logId,
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
           smsFailed++;
           logDetails.push({ 
             userId, 
-            templateType: 'weekly-summary', 
+            templateType: 'activity', 
             sent: false, 
             error: smsResult.error,
             logId: dedupeResult.logId

@@ -126,6 +126,14 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
 // ===================================
 export async function generateRecentTransactionsMessage(userId: string): Promise<string> {
   try {
+    // Check if this is being called from the 4:15 PM SMS system
+    // If so, generate the comprehensive KREZZO REPORT
+    const stackTrace = new Error().stack || '';
+    if (stackTrace.includes('send-415pm-sms') || stackTrace.includes('415pm-special')) {
+      // Generate comprehensive KREZZO REPORT for 4:15 PM
+      return await generate415pmSpecialMessage(userId);
+    }
+
     // Get user's item IDs
     const { data: userItems } = await supabase
       .from('items')
@@ -1784,11 +1792,13 @@ function calculateVarianceForTemplate(numbers: number[]): number {
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special'): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
     case 'recent':
+      return await generateRecentTransactionsMessage(userId);
+    case 'activity':
       return await generateRecentTransactionsMessage(userId);
     case 'merchant-pacing':
       return await generateMerchantPacingMessage(userId);

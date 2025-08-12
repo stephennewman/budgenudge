@@ -54,7 +54,7 @@ export async function POST() {
 
         // Update preferences: enable only the 3 we want to keep
         const updatePromises = userPreferences.map(async (pref) => {
-          const shouldEnable = ['weekly-summary', 'monthly-summary', '415pm-special'].includes(pref.sms_type);
+          const shouldEnable = ['weekly-summary', 'monthly-summary', 'activity'].includes(pref.sms_type);
           
           if (pref.enabled !== shouldEnable) {
             const { error: updateError } = await supabase
@@ -79,7 +79,7 @@ export async function POST() {
 
         // Check if user is missing any of the 3 required templates
         const existingTypes = new Set(userPreferences.map(p => p.sms_type));
-        const requiredTypes = ['weekly-summary', 'monthly-summary', '415pm-special'];
+        const requiredTypes = ['weekly-summary', 'monthly-summary', 'activity'];
         const missingTypes = requiredTypes.filter(type => !existingTypes.has(type));
 
         // Create missing templates
