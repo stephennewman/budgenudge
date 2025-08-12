@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch preferences' }, { status: 500 });
     }
 
-    // Ensure all SMS types exist for the user
-    const allSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary'];
+    // Ensure all SMS types exist for the user (only 3 enabled by default)
+    const allSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', '415pm-special'];
 // TEMPORARILY DISABLED - Paycheck templates
 // , 'paycheck-efficiency', 'cash-flow-runway'
     const existingTypes = new Set(preferences?.map(p => p.sms_type) || []);
@@ -40,12 +40,15 @@ export async function GET(request: NextRequest) {
     if (missingTypes.length > 0) {
       for (const smsType of missingTypes) {
         try {
+          // Only enable weekly-summary, monthly-summary, and 415pm-special by default
+          const shouldEnable = ['weekly-summary', 'monthly-summary', '415pm-special'].includes(smsType);
+          
           await supabase
             .from('user_sms_preferences')
             .insert({
               user_id: userId,
               sms_type: smsType,
-              enabled: true,
+              enabled: shouldEnable,
               frequency: 'daily'
             });
         } catch {

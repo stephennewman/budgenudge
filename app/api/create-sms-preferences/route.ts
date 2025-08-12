@@ -15,11 +15,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // Create default SMS preferences for the user
+    // Create default SMS preferences for the user (only 3 types enabled)
     const defaultPreferences = [
-      { user_id: userId, sms_type: 'bills', enabled: true, frequency: 'daily' },
-      { user_id: userId, sms_type: 'spending', enabled: true, frequency: 'daily' },
-      { user_id: userId, sms_type: 'activity', enabled: true, frequency: 'daily' }
+      { user_id: userId, sms_type: 'bills', enabled: false, frequency: 'daily' },
+      { user_id: userId, sms_type: 'activity', enabled: false, frequency: 'daily' },
+      { user_id: userId, sms_type: 'merchant-pacing', enabled: false, frequency: 'daily' },
+      { user_id: userId, sms_type: 'category-pacing', enabled: false, frequency: 'daily' },
+      { user_id: userId, sms_type: 'weekly-summary', enabled: true, frequency: 'daily' },
+      { user_id: userId, sms_type: 'monthly-summary', enabled: true, frequency: 'daily' },
+      { user_id: userId, sms_type: '415pm-special', enabled: true, frequency: 'daily' }
     ];
 
     const { data: createdPrefs, error: createError } = await supabase

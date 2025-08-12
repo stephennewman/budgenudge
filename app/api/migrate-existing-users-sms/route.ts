@@ -54,7 +54,7 @@ export async function POST() {
           .select('id')
           .eq('user_id', user.user_id);
 
-        const requiredTypes = ['activity', 'bills', 'merchant-pacing', 'category-pacing'];
+        const requiredTypes = ['activity', 'bills', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', '415pm-special'];
         const existingTypes = new Set(existingPreferences?.map(p => p.sms_type) || []);
         const missingTypes = requiredTypes.filter(type => !existingTypes.has(type));
 
@@ -67,12 +67,15 @@ export async function POST() {
         // Create missing SMS preferences
         if (missingTypes.length > 0) {
           for (const smsType of missingTypes) {
+            // Only enable weekly-summary, monthly-summary, and 415pm-special by default
+            const shouldEnable = ['weekly-summary', 'monthly-summary', '415pm-special'].includes(smsType);
+            
             const { error: prefError } = await supabase
               .from('user_sms_preferences')
               .upsert({
                 user_id: user.user_id,
                 sms_type: smsType,
-                enabled: true,
+                enabled: shouldEnable,
                 frequency: 'daily',
                 phone_number: profile?.phone_number || null
               }, {
