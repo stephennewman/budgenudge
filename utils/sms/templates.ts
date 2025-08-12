@@ -2264,17 +2264,17 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       const availableAfterExpenses = totalAvailableBalance - totalBillsBeforeIncome;
       message += `Available after expenses: $${availableAfterExpenses.toFixed(0)}\n`;
       
-      // Calculate realistic daily spending limit based on available balance
-      let realisticDailySpend = 0;
+      // Calculate daily spending limit to make it to payday
+      let dailySpendLimit = 0;
       if (availableAfterExpenses > 0) {
         // If we have money left after bills, divide by days until income
-        realisticDailySpend = availableAfterExpenses / Math.max(daysUntilIncome, 1);
+        dailySpendLimit = availableAfterExpenses / Math.max(daysUntilIncome, 1);
       } else {
         // If we're negative after bills, daily spending should be 0
-        realisticDailySpend = 0;
+        dailySpendLimit = 0;
       }
       
-      message += `Max spend per day: $${realisticDailySpend.toFixed(0)}\n\n`;
+      message += `Max spend per day: $${dailySpendLimit.toFixed(0)}\n\n`;
     } else {
       message += `No bills before next income\n\n`;
     }
