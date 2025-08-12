@@ -2264,6 +2264,9 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       const availableAfterExpenses = totalAvailableBalance - totalBillsBeforeIncome;
       message += `Available after expenses: $${availableAfterExpenses.toFixed(0)}\n`;
       
+      // Debug: Show the calculation components
+      message += `(Debug: Balance $${totalAvailableBalance.toFixed(0)} - Bills $${totalBillsBeforeIncome.toFixed(0)} = $${availableAfterExpenses.toFixed(0)})\n`;
+      
       // Calculate daily spending limit: Available after expenses ÷ Days until income
       let dailySpendLimit = 0;
       if (availableAfterExpenses > 0 && daysUntilIncome > 0) {
