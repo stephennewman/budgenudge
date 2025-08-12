@@ -1992,11 +1992,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     // Find next income
     const nextIncome = findNextIncome(incomeCandidates);
     
-    // Get upcoming bills
+    // Get upcoming bills from tagged_merchants table
     const { data: upcomingBills } = await supabase
-      .from('recurring_bills')
+      .from('tagged_merchants')
       .select('merchant_name, expected_amount, next_predicted_date')
       .eq('user_id', userId)
+      .eq('is_active', true)
       .gte('next_predicted_date', now.toISOString().split('T')[0])
       .order('next_predicted_date', { ascending: true });
 
@@ -2005,9 +2006,16 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     let totalBillsBeforeIncome = 0;
     
     if (nextIncome && upcomingBills) {
-      billsBeforeIncome = upcomingBills.filter(bill => 
-        new Date(bill.next_predicted_date) <= new Date(nextIncome.next_predicted_date)
-      );
+      // Filter bills that are due within the days until income
+      const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      billsBeforeIncome = upcomingBills.filter(bill => {
+        const billDate = new Date(bill.next_predicted_date);
+        const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        // Only include bills due within the next X days (where X = days until income)
+        return daysUntilBill <= daysUntilIncome && daysUntilBill >= 0;
+      });
+      
       totalBillsBeforeIncome = billsBeforeIncome.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0);
     }
 
