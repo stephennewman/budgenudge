@@ -1894,7 +1894,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       .eq('is_active', true);
 
     // Get merchant pacing data
-    const { data: merchantPacingMerchants } = await supabase
+    const { data: merchantPacingMerchants, error: merchantError } = await supabase
       .from('merchant_pacing_tracking')
       .select('ai_merchant_name')
       .eq('user_id', userId)
@@ -1902,6 +1902,8 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     
     console.log('🔍 Merchant Pacing Merchants Query Result:', merchantPacingMerchants);
     console.log('🔍 Merchant Pacing Merchants Count:', merchantPacingMerchants?.length || 0);
+    console.log('🔍 Merchant Pacing Merchants Error:', merchantError);
+    console.log('🔍 User ID being queried:', userId);
 
     // Get income streams from user_income_profiles table
     const now = new Date();
