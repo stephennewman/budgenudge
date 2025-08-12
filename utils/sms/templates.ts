@@ -2171,20 +2171,18 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     if (billsBeforeIncome && billsBeforeIncome.length > 0) {
       message += `(${billsBeforeIncome.length}) expenses for $${(totalBillsBeforeIncome || 0).toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
       
-      // Show individual bills with dates
+      // Show individual bills with actual dates
       billsBeforeIncome.forEach(bill => {
         const billDate = new Date(bill.next_predicted_date + 'T12:00:00');
-        const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         const billName = bill.merchant_name || 'Unknown Bill';
         const billAmount = Number(bill.expected_amount || 0).toFixed(0);
         
-        if (daysUntilBill === 0) {
-          message += `TODAY: ${billName} - $${billAmount}\n`;
-        } else if (daysUntilBill === 1) {
-          message += `TOMORROW: ${billName} - $${billAmount}\n`;
-        } else {
-          message += `Day ${daysUntilBill}: ${billName} - $${billAmount}\n`;
-        }
+        // Format the actual date (e.g., "Dec 15", "Jan 3")
+        const month = billDate.toLocaleDateString('en-US', { month: 'short' });
+        const day = billDate.getDate();
+        const formattedDate = `${month} ${day}`;
+        
+        message += `${formattedDate}: ${billName} - $${billAmount}\n`;
       });
       message += `\n`;
       
