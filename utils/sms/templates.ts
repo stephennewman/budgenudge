@@ -2096,24 +2096,45 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     let categoryPacingData: any[] = [];
     if (trackedCategories && trackedCategories.length > 0) {
       for (const category of trackedCategories) {
-        const { data: pacing } = await supabase
-          .from('category_pacing_tracking')
-          .select('current_month_spend, expected_by_now, is_active')
-          .eq('user_id', userId)
-          .eq('ai_category', category.ai_category)
-          .eq('is_active', true)
-          .single();
+        // Get current month spending for this category
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        
+        const { data: categoryTransactions } = await supabase
+          .from('transactions')
+          .select('amount')
+          .eq('plaid_item_id', userItems[0].plaid_item_id)
+          .eq('ai_category_tag', category.ai_category)
+          .gte('date', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`)
+          .lte('date', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-31`);
 
-        if (pacing && pacing.is_active) {
-          const currentSpend = pacing.current_month_spend || 0;
-          const expectedByNow = pacing.expected_by_now || 0;
-          const pacingPercentage = expectedByNow > 0 ? (currentSpend / expectedByNow) * 100 : 0;
+        if (categoryTransactions && categoryTransactions.length > 0) {
+          const currentMonthSpend = categoryTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+          
+          // Calculate expected spending based on historical average (simplified)
+          // For now, we'll use a basic monthly estimate - this could be enhanced with historical analysis
+          const expectedMonthlySpend = 300; // Default estimate - could be calculated from historical data
+          const daysIntoMonth = new Date().getDate();
+          const expectedByNow = (expectedMonthlySpend / 30) * daysIntoMonth;
+          
+          const pacingPercentage = expectedByNow > 0 ? (currentMonthSpend / expectedByNow) * 100 : 0;
           
           categoryPacingData.push({
             category: category.ai_category,
-            currentMonthSpend: currentSpend,
+            currentMonthSpend: currentMonthSpend,
             expectedByNow: expectedByNow,
             pacing: pacingPercentage
+          });
+        } else {
+          // Even if no transactions this month, show the category with $0 spending
+          const daysIntoMonth = new Date().getDate();
+          const expectedByNow = (300 / 30) * daysIntoMonth;
+          
+          categoryPacingData.push({
+            category: category.ai_category,
+            currentMonthSpend: 0,
+            expectedByNow: expectedByNow,
+            pacing: 0
           });
         }
       }
