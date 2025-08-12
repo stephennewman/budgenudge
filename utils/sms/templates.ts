@@ -1989,8 +1989,69 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       }
     }
 
-    // Find next income
-    const nextIncome = findNextIncome(incomeCandidates);
+    // Get all upcoming income sources within the next 30 days
+    let upcomingIncomes: any[] = [];
+    
+    if (incomeProfile?.profile_data?.income_sources) {
+      const incomeSources = incomeProfile.profile_data.income_sources;
+      
+      upcomingIncomes = incomeSources
+        .filter((source: any) => source.frequency !== 'irregular' && source.expected_amount > 0)
+        .map((source: any) => {
+          let nextDate: Date;
+          
+          if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
+            // Use manual override if it's in the future
+            nextDate = new Date(source.next_predicted_date);
+          } else if (source.last_pay_date) {
+            // Calculate from last payment date
+            nextDate = new Date(source.last_pay_date);
+            
+            // Add frequency-based days
+            switch (source.frequency) {
+              case 'weekly':
+                while (nextDate <= now) {
+                  nextDate.setDate(nextDate.getDate() + 7);
+                }
+                break;
+              case 'bi-weekly':
+                while (nextDate <= now) {
+                  nextDate.setDate(nextDate.getDate() + 14);
+                }
+                break;
+              case 'bi-monthly':
+                while (nextDate <= now) {
+                  nextDate.setMonth(nextDate.getMonth() + 1);
+                  nextDate.setDate(15); // Assume 15th of month
+                }
+                break;
+              case 'monthly':
+                while (nextDate <= now) {
+                  nextDate.setMonth(nextDate.getMonth() + 1);
+                }
+                break;
+              default:
+                nextDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // Default to 30 days
+            }
+          } else {
+            nextDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // Default to 30 days
+          }
+          
+          return {
+            source_name: source.source_name,
+            expected_amount: source.expected_amount,
+            frequency: source.frequency,
+            next_predicted_date: nextDate.toISOString().split('T')[0],
+            last_pay_date: source.last_pay_date,
+            confidence_score: source.confidence_score
+          };
+        })
+        .filter((source: any) => {
+          const daysUntilIncome = Math.ceil((new Date(source.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          return daysUntilIncome <= 30; // Only show income within next 30 days
+        })
+        .sort((a: any, b: any) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
+    }
     
     // Get upcoming bills from tagged_merchants table
     const { data: upcomingBills } = await supabase
@@ -2005,9 +2066,10 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     let billsBeforeIncome: any[] = [];
     let totalBillsBeforeIncome = 0;
     
-    if (nextIncome && upcomingBills) {
-      // Filter bills that are due within the days until income
-      const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (upcomingIncomes.length > 0 && upcomingBills) {
+      // Use the soonest income date for bill filtering
+      const soonestIncomeDate = new Date(upcomingIncomes[0].next_predicted_date);
+      const daysUntilIncome = Math.ceil((soonestIncomeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
       
       billsBeforeIncome = upcomingBills.filter(bill => {
         const billDate = new Date(bill.next_predicted_date);
@@ -2020,8 +2082,9 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     }
 
     // Calculate expected balance and daily spending limits
-    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + (nextIncome?.expected_amount || 0);
-    const daysUntilIncome = nextIncome ? Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+    const totalExpectedIncome = upcomingIncomes.reduce((sum, income) => sum + (income.expected_amount || 0), 0);
+    const daysUntilIncome = upcomingIncomes.length > 0 ? Math.ceil((new Date(upcomingIncomes[0].next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
+    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + totalExpectedIncome;
     const maxDailySpend = expectedBalanceBeforeIncome / Math.max(daysUntilIncome, 1);
 
     // Get category pacing data for display
@@ -2147,9 +2210,35 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
 
     // FORECAST (Combined Income + Expenses)
     message += `🔮 FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
-    if (nextIncome) {
-      const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      message += `$${(nextIncome.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days\n`;
+    if (upcomingIncomes.length > 0) {
+      // Group income sources by date
+      const incomeByDate = new Map<string, { sources: any[], total: number }>();
+      
+      upcomingIncomes.forEach(income => {
+        const date = income.next_predicted_date;
+        if (!incomeByDate.has(date)) {
+          incomeByDate.set(date, { sources: [], total: 0 });
+        }
+        incomeByDate.get(date)!.sources.push(income);
+        incomeByDate.get(date)!.total += income.expected_amount;
+      });
+      
+      // Show income sources grouped by date
+      incomeByDate.forEach((dateData, date) => {
+        const daysUntilIncome = Math.ceil((new Date(date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (dateData.sources.length === 1) {
+          // Single income source on this date
+          const income = dateData.sources[0];
+          message += `$${(income.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days (${income.source_name})\n`;
+        } else {
+          // Multiple income sources on the same date
+          message += `$${dateData.total.toFixed(0)} expected income in ${daysUntilIncome} days\n`;
+          dateData.sources.forEach(income => {
+            message += `  • ${income.source_name}: $${(income.expected_amount || 0).toFixed(0)}\n`;
+          });
+        }
+      });
     } else {
       message += `No income patterns detected\n`;
     }
