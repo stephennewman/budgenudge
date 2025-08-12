@@ -210,9 +210,39 @@ export default function SMSPreferencesPage() {
         </div>
       )}
 
+      {/* SMS Status Overview */}
+      <div className="mb-6">
+        <h2 className="text-lg font-medium mb-3">📱 SMS Template Status</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {activeSmsTypes.map((smsType) => {
+            const pref = preferences.find(p => p.sms_type === smsType);
+            const info = smsTypeInfo[smsType as keyof typeof smsTypeInfo];
+            const isEnabled = pref?.enabled || false;
+            
+            return (
+              <div key={smsType} className={`p-3 rounded-lg border ${
+                isEnabled 
+                  ? 'bg-green-50 border-green-200 text-green-800' 
+                  : 'bg-gray-50 border-gray-200 text-gray-600'
+              }`}>
+                <div className="flex items-center space-x-2">
+                  <span className="text-lg">{info.icon}</span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{info.title}</div>
+                    <div className="text-xs">
+                      {isEnabled ? '✅ Enabled' : '❌ Disabled'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid gap-6">
         {preferences
-          .filter((pref) => activeSmsTypes.includes(pref.sms_type))
+          .filter((pref) => activeSmsTypes.includes(pref.sms_type) && pref.enabled)
           .map((pref) => {
           const info = smsTypeInfo[pref.sms_type];
           const liveContent = liveSmsContent[pref.sms_type];
