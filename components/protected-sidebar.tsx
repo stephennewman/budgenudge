@@ -17,10 +17,6 @@ export default async function ProtectedSidebar() {
             href: "/",
           },
           {
-            label: "🤖 Agents",
-            href: "/agents",
-          },
-          {
             label: "💰 Income",
             href: "/income",
           },
