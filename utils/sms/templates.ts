@@ -124,10 +124,15 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
 // ===================================
 // 2. RECENT TRANSACTIONS TEMPLATE
 // ===================================
-export async function generateRecentTransactionsMessage(userId: string): Promise<string> {
+export async function generateRecentTransactionsMessage(userId: string, force415pmReport: boolean = false): Promise<string> {
   try {
     // Check if this is being called from the 4:15 PM SMS system
     // If so, generate the comprehensive KREZZO REPORT
+    if (force415pmReport) {
+      // Generate comprehensive KREZZO REPORT for 4:15 PM
+      return await generate415pmSpecialMessage(userId);
+    }
+    
     const stackTrace = new Error().stack || '';
     if (stackTrace.includes('send-415pm-sms') || stackTrace.includes('415pm-special')) {
       // Generate comprehensive KREZZO REPORT for 4:15 PM
@@ -1792,14 +1797,14 @@ function calculateVarianceForTemplate(numbers: number[]): number {
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special'): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special', force415pmReport: boolean = false): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
     case 'recent':
-      return await generateRecentTransactionsMessage(userId);
+      return await generateRecentTransactionsMessage(userId, force415pmReport);
     case 'activity':
-      return await generateRecentTransactionsMessage(userId);
+      return await generateRecentTransactionsMessage(userId, force415pmReport);
     case 'merchant-pacing':
       return await generateMerchantPacingMessage(userId);
     case 'category-pacing':
@@ -2077,12 +2082,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     if (yesterdayTransactions && yesterdayTransactions.length > 0) {
       message += `${yesterdayTransactions.length} transactions posted\n`;
       const totalSpent = yesterdayTransactions.reduce((sum, t) => sum + t.amount, 0);
-      message += `Total spent: $${totalSpent.toFixed(2)}\n`;
+      message += `Total spent: $${(totalSpent || 0).toFixed(2)}\n`;
     } else {
       message += `No transactions posted\n`;
       message += `Total spent: $0.00\n`;
     }
-    message += `Balance: $${yesterdayBalance.toFixed(2)}\n\n`;
+    message += `Balance: $${(yesterdayBalance || 0).toFixed(2)}\n\n`;
 
     // SPENDING PACE
     message += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
@@ -2095,27 +2100,26 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       // Show all reds/over first
       overCategories.forEach(cat => {
         message += `${cat.category.toUpperCase()}\n`;
-        message += `Spent: $${cat.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${cat.expectedByNow.toFixed(0)}\n`;
-        message += `🚨 OVER by ${Math.round(cat.pacing - 100)}%\n\n`;
+        message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
+        message += `🚨 OVER by ${Math.round((cat.pacing || 0) - 100)}%\n\n`;
       });
       
       // Show all yellows/approaching
       approachingCategories.forEach(cat => {
         message += `${cat.category.toUpperCase()}\n`;
-        message += `Spent: $${cat.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${cat.expectedByNow.toFixed(0)}\n`;
-        message += `⚠️ APPROACHING OVER by ${Math.round(100 - cat.pacing)}%\n\n`;
+        message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - (cat.pacing || 0))}%\n\n`;
       });
       
-      // Show one good category
-      if (goodCategories.length > 0) {
-        const bestCategory = goodCategories[0];
-        message += `${bestCategory.category.toUpperCase()}\n`;
-        message += `Spent: $${bestCategory.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${bestCategory.expectedByNow.toFixed(0)}\n`;
-        message += `✅ GOOD by ${Math.round(100 - bestCategory.pacing)}%\n\n`;
-      }
+      // Show all good categories (not just one)
+      goodCategories.forEach(cat => {
+        message += `${cat.category.toUpperCase()}\n`;
+        message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - (cat.pacing || 0))}%\n\n`;
+      });
     } else {
       message += `No categories tracked yet\n\n`;
     }
@@ -2131,51 +2135,48 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       // Show all reds/over first
       overMerchants.forEach(merch => {
         message += `${merch.merchant.toUpperCase()}\n`;
-        message += `Spent: $${merch.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${merch.expectedByNow.toFixed(0)}\n`;
-        message += `🚨 OVER by ${Math.round(merch.pacing - 100)}%\n\n`;
+        message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
+        message += `🚨 OVER by ${Math.round((merch.pacing || 0) - 100)}%\n\n`;
       });
       
       // Show all yellows/approaching
       approachingMerchants.forEach(merch => {
         message += `${merch.merchant.toUpperCase()}\n`;
-        message += `Spent: $${merch.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${merch.expectedByNow.toFixed(0)}\n`;
-        message += `⚠️ APPROACHING OVER by ${Math.round(100 - merch.pacing)}%\n\n`;
+        message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - (merch.pacing || 0))}%\n\n`;
       });
       
-      // Show one good merchant
-      if (goodMerchants.length > 0) {
-        const bestMerchant = goodMerchants[0];
-        message += `${bestMerchant.merchant.toUpperCase()}\n`;
-        message += `Spent: $${bestMerchant.currentMonthSpend.toFixed(0)}\n`;
-        message += `Expected: $${bestMerchant.expectedByNow.toFixed(0)}\n`;
-        message += `✅ GOOD by ${Math.round(100 - bestMerchant.pacing)}%\n\n`;
-      }
+      // Show all good merchants (not just one)
+      goodMerchants.forEach(merch => {
+        message += `${merch.merchant.toUpperCase()}\n`;
+        message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - (merch.pacing || 0))}%\n\n`;
+      });
     } else {
       message += `No merchants tracked yet\n\n`;
     }
 
-    // INCOME FORECAST
-    message += `💰 INCOME FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
+    // FORECAST (Combined Income + Expenses)
+    message += `🔮 FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
     if (nextIncome) {
       const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      message += `$${nextIncome.expected_amount.toFixed(0)} expected income in ${daysUntilIncome} days\n\n`;
+      message += `$${(nextIncome.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days\n`;
     } else {
-      message += `No income patterns detected\n\n`;
+      message += `No income patterns detected\n`;
     }
-
-    // UPCOMING EXPENSES
-    message += `💸 UPCOMING EXPENSES\n━━━━━━━━━━━━━━━━━━\n`;
+    
     if (billsBeforeIncome && billsBeforeIncome.length > 0) {
-      message += `(${billsBeforeIncome.length}) expenses for $${totalBillsBeforeIncome.toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
+      message += `(${billsBeforeIncome.length}) expenses for $${(totalBillsBeforeIncome || 0).toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
       
       // Show individual bills with dates
       billsBeforeIncome.forEach(bill => {
         const billDate = new Date(bill.next_predicted_date + 'T12:00:00');
         const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         const billName = bill.merchant_name || 'Unknown Bill';
-        const billAmount = Number(bill.expected_amount).toFixed(0);
+        const billAmount = Number(bill.expected_amount || 0).toFixed(0);
         
         if (daysUntilBill === 0) {
           message += `TODAY: ${billName} - $${billAmount}\n`;
@@ -2187,31 +2188,21 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       });
       message += `\n`;
       
-      // Add micro-budget calculation
-      message += `Your micro-budget: $${maxDailySpend.toFixed(0)} per day × ${daysUntilIncome} days = $${(maxDailySpend * daysUntilIncome).toFixed(0)} total available\n\n`;
+      // Add available after expenses and daily budget
+      const availableAfterExpenses = totalAvailableBalance - totalBillsBeforeIncome;
+      message += `Available after expenses: $${availableAfterExpenses.toFixed(0)}\n`;
+      message += `Max spend per day: $${(maxDailySpend || 0).toFixed(0)}\n\n`;
     } else {
       message += `No bills before next income\n\n`;
     }
 
-
-
-    // Status
-    if (maxDailySpend < 50) {
-      message += `🔴 STATUS: Tight daily budget - prioritize essentials\n`;
-    } else if (maxDailySpend < 100) {
-      message += `🟡 STATUS: Moderate daily spending flexibility\n`;
-    } else {
-      message += `🟢 STATUS: Good daily spending flexibility\n`;
-    }
-    message += `\n`;
-
-    // DAILY INSIGHT
-    message += `🎯 DAILY INSIGHT\n━━━━━━━━━━━━━━━━━━\n`;
+    // INSPIRATION (renamed from DAILY INSIGHT)
+    message += `🙌 INSPIRATION\n━━━━━━━━━━━━━━━━━━\n`;
     message += generateEnhancedAIVibeMessage(expectedBalanceBeforeIncome, yesterdayTransactions, billsBeforeIncome, firstName);
     message += `\n\n`;
 
-    // ACTION ITEM
-    message += `🚀 ACTION ITEM\n━━━━━━━━━━━━━━━━━━\n`;
+    // ACTION ITEM (renamed from ACTION ITEM but same emoji)
+    message += `✅ ACTION ITEM\n━━━━━━━━━━━━━━━━━━\n`;
     const actionItems = generateActionItems(categoryPacingData, merchantPacingData, billsBeforeIncome || [], expectedBalanceBeforeIncome);
     if (actionItems.length > 0) {
       message += actionItems[0]; // Show first action item
