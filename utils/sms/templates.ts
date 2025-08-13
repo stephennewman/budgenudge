@@ -2012,9 +2012,12 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     }
 
     // Calculate expected balance and daily spending limits
-    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + (nextIncome?.expected_amount || 0);
-    const daysUntilIncome = nextIncome ? Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
-    const maxDailySpend = expectedBalanceBeforeIncome / Math.max(daysUntilIncome, 1);
+    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + Number(nextIncome?.expected_amount || 0);
+    const daysUntilIncomeRaw = nextIncome && nextIncome.next_predicted_date
+      ? Math.ceil((new Date(nextIncome.next_predicted_date + 'T12:00:00').getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : 30;
+    const daysUntilIncome = Math.max(1, daysUntilIncomeRaw);
+    const maxDailySpend = expectedBalanceBeforeIncome / daysUntilIncome;
 
     // Get category pacing data for display
     let categoryPacingData: any[] = [];
@@ -2163,16 +2166,19 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
 
     // INCOME FORECAST
     message += `💰 INCOME FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
-    if (nextIncome) {
-      const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      message += `$${(nextIncome.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days\n\n`;
+    if (nextIncome && nextIncome.next_predicted_date) {
+      const incomeDate = new Date(nextIncome.next_predicted_date + 'T12:00:00');
+      const daysUntilIncome = Math.max(0, Math.ceil((incomeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+      message += `$${Number(nextIncome.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days\n\n`;
     } else {
       message += `No income patterns detected\n\n`;
     }
 
     // UPCOMING EXPENSES
     message += `💸 UPCOMING EXPENSES\n━━━━━━━━━━━━━━━━━━\n`;
-    if (billsBeforeIncome && billsBeforeIncome.length > 0) {
+    if (billsBeforeIncome && billsBeforeIncome.length > 0 && nextIncome && nextIncome.next_predicted_date) {
+      const incomeDate = new Date(nextIncome.next_predicted_date + 'T12:00:00');
+      const daysUntilIncome = Math.max(0, Math.ceil((incomeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
       message += `(${billsBeforeIncome.length}) expenses for $${(totalBillsBeforeIncome || 0).toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
       
       // Show individual bills with dates
@@ -2625,7 +2631,7 @@ function findNextIncome(incomeCandidates: any[]): any {
     console.log('🔍 Using structured income data');
     // Use structured income data
     const now = new Date();
-    const upcomingIncomes = [];
+    const upcomingIncomes: Array<{ source_name: string; expected_amount: number; next_predicted_date: string }>= [];
 
     for (const source of incomeCandidates) {
       console.log('🔍 Processing income source:', source.source_name);
@@ -2675,16 +2681,16 @@ function findNextIncome(incomeCandidates: any[]): any {
       console.log('🔍 Calculated next date for', source.source_name, ':', nextDate.toISOString());
 
       upcomingIncomes.push({
-        source: source.source_name,
-        expectedAmount: source.expected_amount,
-        nextDate: nextDate
+        source_name: source.source_name,
+        expected_amount: Number(source.expected_amount || 0),
+        next_predicted_date: nextDate.toISOString().split('T')[0]
       });
     }
 
     console.log('🔍 All upcoming incomes:', JSON.stringify(upcomingIncomes, null, 2));
 
     // Return the soonest income
-    const result = upcomingIncomes.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime())[0] || null;
+    const result = upcomingIncomes.sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime())[0] || null;
     console.log('🔍 Selected income result:', JSON.stringify(result, null, 2));
     return result;
   }
@@ -2709,7 +2715,7 @@ function findNextIncome(incomeCandidates: any[]): any {
 
   console.log('🔍 Grouped income sources:', Array.from(incomeGroups.keys()));
 
-  const incomePredictions = [];
+  const incomePredictions: Array<{ source_name: string; expected_amount: number; next_predicted_date: string; confidence: number }> = [];
 
   for (const [sourceKey, transactions] of incomeGroups.entries()) {
     if (transactions.length === 0) continue;
@@ -2761,15 +2767,15 @@ function findNextIncome(incomeCandidates: any[]): any {
     }
 
     incomePredictions.push({
-      source: sourceKey,
-      expectedAmount: expectedAmount,
-      nextDate: nextDate,
-      confidence: Math.min(transactions.length / 3, 1) // Higher confidence with more transactions
+      source_name: sourceKey,
+      expected_amount: Number(expectedAmount || 0),
+      next_predicted_date: nextDate.toISOString().split('T')[0],
+      confidence: Math.min(transactions.length / 3, 1)
     });
   }
 
   // Sort by next date (soonest first)
-  incomePredictions.sort((a, b) => a.nextDate.getTime() - b.nextDate.getTime());
+  incomePredictions.sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
 
   console.log('🔍 Income predictions:', JSON.stringify(incomePredictions, null, 2));
 
