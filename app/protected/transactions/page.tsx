@@ -89,6 +89,19 @@ export default function TransactionsPage() {
   
   const supabase = createSupabaseClient();
 
+  // Quick filter helpers for click-to-filter behavior
+  const setCategoryFilter = useCallback((category: string) => {
+    setColumnFilters([{ id: 'ai_category_tag', value: category }]);
+  }, []);
+
+  const setSubcategoryFilter = useCallback((subcategory: string) => {
+    setColumnFilters([{ id: 'subcategory', value: subcategory }]);
+  }, []);
+
+  const setMerchantFilter = useCallback((merchant: string) => {
+    setGlobalFilter(merchant);
+  }, []);
+
   // Helper function to get account info for a transaction
   const getAccountInfo = (accountId: string) => {
     // Try multiple possible mappings between transaction account_id and account records
@@ -436,7 +449,14 @@ export default function TransactionsPage() {
           </button>
         );
       },
-      enableSorting: false,
+      enableSorting: true,
+      sortingFn: (rowA: { original: TransactionWithAnalytics }, rowB: { original: TransactionWithAnalytics }) => {
+        const aId = rowA.original.plaid_transaction_id;
+        const bId = rowB.original.plaid_transaction_id;
+        const aStar = aId ? (transactionStarredStatus.get(aId) || false) : false;
+        const bStar = bId ? (transactionStarredStatus.get(bId) || false) : false;
+        return Number(bStar) - Number(aStar);
+      },
       size: 60,
     },
     {
@@ -493,25 +513,22 @@ export default function TransactionsPage() {
               )}
             </div>
             
-            {/* Merchant name */}
-            <div>
-              {aiMerchant ? (
-                                  <button
-                    onClick={() => handleEditTags(transaction)}
-                    className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded font-medium hover:bg-purple-200 transition-colors cursor-pointer text-left justify-start"
-                    title="Click to edit AI tags"
-                  >
-                    {aiMerchant}
-                  </button>
-              ) : (
-                <button
-                  onClick={() => handleEditTags(transaction)}
-                  className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer text-left justify-start"
-                  title="Click to add AI tags"
-                >
-                  Not tagged
-                </button>
-              )}
+            {/* Merchant name with hover pencil and click-to-filter */}
+            <div className="flex items-center gap-2 group">
+              <button
+                onClick={() => setMerchantFilter(merchantName)}
+                className="text-sm font-medium text-left hover:underline"
+                title="Click to filter by this merchant"
+              >
+                {merchantName}
+              </button>
+              <button
+                onClick={() => handleEditTags(transaction)}
+                className="opacity-0 group-hover:opacity-100 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded hover:bg-purple-200 transition-opacity"
+                title="Edit AI tags"
+              >
+                ✎
+              </button>
             </div>
           </div>
         );
@@ -544,22 +561,27 @@ export default function TransactionsPage() {
       cell: ({ getValue, row }: { getValue: () => string | undefined; row: { original: Transaction } }) => {
         const aiCategory = getValue();
         const transaction = row.original;
-        return aiCategory ? (
-          <button
-            onClick={() => handleEditTags(transaction)}
-            className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium hover:bg-green-200 transition-colors cursor-pointer text-left justify-start"
-            title="Click to edit AI tags"
-          >
-            {aiCategory}
-          </button>
-        ) : (
-          <button
-            onClick={() => handleEditTags(transaction)}
-            className="text-gray-400 text-xs hover:text-gray-600 cursor-pointer text-left justify-start"
-            title="Click to add AI tags"
-          >
-            Not tagged
-          </button>
+        return (
+          <div className="flex items-center gap-2 group">
+            {aiCategory ? (
+              <button
+                onClick={() => setCategoryFilter(aiCategory)}
+                className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded font-medium hover:bg-green-200 transition-colors text-left"
+                title="Click to filter by this category"
+              >
+                {aiCategory}
+              </button>
+            ) : (
+              <span className="text-gray-400 text-xs">Not tagged</span>
+            )}
+            <button
+              onClick={() => handleEditTags(transaction)}
+              className="opacity-0 group-hover:opacity-100 text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded hover:bg-purple-200 transition-opacity"
+              title="Edit AI tags"
+            >
+              ✎
+            </button>
+          </div>
         );
       },
     },
@@ -569,9 +591,13 @@ export default function TransactionsPage() {
       cell: ({ getValue }: { getValue: () => string | undefined }) => {
         const subcategory = getValue();
         return subcategory ? (
-          <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded text-left">
+          <button
+            onClick={() => setSubcategoryFilter(subcategory)}
+            className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded text-left hover:bg-blue-200"
+            title="Click to filter by this subcategory"
+          >
             {subcategory}
-          </span>
+          </button>
         ) : (
           <span className="text-gray-400 text-left">-</span>
         );
