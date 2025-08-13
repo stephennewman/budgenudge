@@ -31,10 +31,13 @@ export default function AICategoryAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'merchants' | 'remaining'>('spending');
+  const [sortBy, setSortBy] = useState<'tracked' | 'name' | 'spent' | 'avg_tx' | 'spending' | 'transactions' | 'merchants' | 'remaining'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedCategories, setTrackedCategories] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
+  const [showMerchantsPanel, setShowMerchantsPanel] = useState(false);
+  const [panelMerchants, setPanelMerchants] = useState<Array<{ merchant: string; amount: number; count: number }>>([]);
+  const [panelCategoryName, setPanelCategoryName] = useState<string>('');
   
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -332,6 +335,18 @@ export default function AICategoryAnalysisPage() {
       processedData.sort((a, b) => {
         let comparison = 0;
         switch (sortBy) {
+          case 'tracked':
+            comparison = Number(trackedCategories.has(a.ai_category)) - Number(trackedCategories.has(b.ai_category));
+            break;
+          case 'name':
+            comparison = a.ai_category.localeCompare(b.ai_category);
+            break;
+          case 'spent':
+            comparison = a.current_month_spending - b.current_month_spending;
+            break;
+          case 'avg_tx':
+            comparison = a.avg_transaction_amount - b.avg_transaction_amount;
+            break;
           case 'spending':
             comparison = a.avg_monthly_spending - b.avg_monthly_spending;
             break;
@@ -398,13 +413,20 @@ export default function AICategoryAnalysisPage() {
     return icons[category] || '💼';
   };
 
-  const handleSort = (newSortBy: 'spending' | 'transactions' | 'merchants' | 'remaining') => {
+  const handleSort = (newSortBy: 'tracked' | 'name' | 'spent' | 'avg_tx' | 'spending' | 'transactions' | 'merchants' | 'remaining') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
     } else {
       setSortBy(newSortBy);
       setSortOrder('desc');
     }
+  };
+
+  const openMerchantsPanel = (category: AICategoryData) => {
+    setPanelCategoryName(category.ai_category);
+    // Use available top_merchants (falls back to empty array)
+    setPanelMerchants(category.top_merchants || []);
+    setShowMerchantsPanel(true);
   };
 
   if (loading) {
@@ -461,8 +483,24 @@ export default function AICategoryAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Track Pacing</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Category</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('tracked')}
+                      >
+                        <div className="flex items-center">
+                          Track Pacing
+                          {sortBy === 'tracked' && (<span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>)}
+                        </div>
+                      </th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center">
+                          Category
+                          {sortBy === 'name' && (<span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>)}
+                        </div>
+                      </th>
                       <th 
                         className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('spending')}
@@ -476,7 +514,15 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Spent This Month</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('spent')}
+                      >
+                        <div className="flex items-center">
+                          Spent This Month
+                          {sortBy === 'spent' && (<span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>)}
+                        </div>
+                      </th>
                       <th 
                         className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('remaining')}
@@ -508,7 +554,7 @@ export default function AICategoryAnalysisPage() {
                         onClick={() => handleSort('merchants')}
                       >
                         <div className="flex items-center">
-                          Total Merchants in Category
+                          Merchants Associated
                           {sortBy === 'merchants' && (
                             <span className="ml-1">
                               {sortOrder === 'desc' ? '↓' : '↑'}
@@ -516,8 +562,16 @@ export default function AICategoryAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">High Activity Merchants</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('avg_tx')}
+                      >
+                        <div className="flex items-center">
+                          Historical Avg/Transaction
+                          {sortBy === 'avg_tx' && (<span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>)}
+                        </div>
+                      </th>
+                      <th className="text-left py-3 px-2 font-medium text-gray-900">Merchants Associated</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -584,19 +638,20 @@ export default function AICategoryAnalysisPage() {
                           </button>
                         </td>
                         <td className="py-3 px-2 text-left text-gray-600">
-                          {category.unique_merchants}
+                          <button
+                            onClick={() => openMerchantsPanel(category)}
+                            className="text-blue-600 hover:text-blue-800 underline"
+                            title="View associated merchants"
+                          >
+                            {category.unique_merchants}
+                          </button>
                         </td>
                         <td className="py-3 px-2 text-left text-gray-600">
                           {formatCurrency(category.avg_transaction_amount)}
                         </td>
-                        <td className="py-3 px-2 text-left">
-                          <div className="flex flex-wrap gap-1">
-                            {category.top_merchants.slice(0, 3).map((merchant, i) => (
-                              <span key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                                {merchant.merchant} ({merchant.count})
-                              </span>
-                            ))}
-                          </div>
+                        <td className="py-3 px-2 text-left text-gray-600">
+                          {/* Replaced list with count and slide-out trigger above */}
+                          —
                         </td>
                       </tr>
                     ))}
@@ -620,6 +675,40 @@ export default function AICategoryAnalysisPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Slide-out panel for associated merchants */}
+          {showMerchantsPanel && (
+            <div className="fixed inset-0 z-50">
+              <div
+                className="absolute inset-0 bg-black/40"
+                onClick={() => setShowMerchantsPanel(false)}
+              />
+              <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl p-6 overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Merchants Associated — {panelCategoryName}</h3>
+                  <button
+                    onClick={() => setShowMerchantsPanel(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                    title="Close"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {panelMerchants.length === 0 ? (
+                    <div className="text-sm text-gray-600">No merchants found.</div>
+                  ) : (
+                    panelMerchants.map((m, i) => (
+                      <div key={i} className="flex items-center justify-between border rounded p-2">
+                        <div className="text-sm font-medium text-gray-900 truncate max-w-[70%]">{m.merchant}</div>
+                        <div className="text-xs text-gray-600">{m.count} tx</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
