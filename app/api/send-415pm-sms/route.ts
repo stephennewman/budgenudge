@@ -57,9 +57,7 @@ export async function GET(request: NextRequest) {
     // Deduplicate by user_id (users can have multiple items)
     const uniqueUserIds = Array.from(new Set((itemsWithUsers || []).map(u => u.user_id)));
 
-    // Allowlist for v2 rollout
-    const allowlistEnv = process.env.ALLOWED_DAILY_V2_USER_IDS || '';
-    const allowlist = new Set(allowlistEnv.split(',').map(s => s.trim()).filter(Boolean));
+    // v2 now default for all users
 
     // Process each user
     for (const userId of uniqueUserIds) {
@@ -110,10 +108,8 @@ export async function GET(request: NextRequest) {
 
         console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
 
-        // Generate message: use v2 for allowlisted users, else legacy special
-        const smsMessage = allowlist.has(userId)
-          ? await generateDailyReportV2(userId)
-          : await generateSMSMessage(userId, '415pm-special');
+        // Generate message using v2 for all users
+        const smsMessage = await generateDailyReportV2(userId);
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {

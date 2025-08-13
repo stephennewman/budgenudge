@@ -1,6 +1,6 @@
 # 🧠 MASTER AGENT
 
-**Last Updated:** January 28, 2025 9:50 PM EST
+**Last Updated:** August 13, 2025 7:54 AM EDT
 
 ## 📋 PROJECT OVERVIEW
 
@@ -22,6 +22,30 @@
 - 🔄 Predictive spending analysis and budgeting
 
 ## 📈 DEPLOYMENT LOG
+
+### Deployment #37: DAILY SNAPSHOT V2 (5PM) + ROUTE FIXES + PREVIEW PAGE
+**Date:** August 13, 2025 7:54 AM EDT  
+**Status:** ✅ DEPLOYED (Production via GitHub auto-deploy)  
+**Commits:** d91a230, 256a50a
+
+**Scope:**
+- New v2 5pm “Daily Snapshot” SMS template with clear sections and dynamic math
+- Category/Merchant pacing (all reds/yellows) + green counts summary
+- Reworked Daily Budget: next income(s), expenses before income, available-after-expenses, per‑day limit until income
+- Consistent section styling (emoji + divider); improved Yesterday’s Activity block
+- Route corrections: preference uses `415pm-special`, dedupe type fixed, unified sender adopted, user dedupe
+- Feature flag behavior: default ON (set `SMS_415PM_ENABLED=false` to disable)
+- Allowlist rollout: v2 content for Stephen and Ashley first (`ALLOWED_DAILY_V2_USER_IDS`)
+- Preview tools: API `GET /api/test-daily-v2-snapshot?userId=...` and page `/protected/sms-preview`
+
+**Impact:**
+- Higher clarity and accuracy for daily guidance; fully data‑driven per day
+- Safer routing (correct preferences/dedupe) and cleaner provider telemetry
+- Faster iteration via signed-in preview and test endpoint
+
+**Follow‑ups:**
+- Expand v2 to all users after short soak; optional admin preview for arbitrary user IDs
+
 
 ### Deployment #36: SMART BILL DETECTION ENHANCEMENT — INTELLIGENT ONBOARDING & SYSTEM-WIDE OPTIMIZATION
 **Date:** January 28, 2025 9:45 PM EST  

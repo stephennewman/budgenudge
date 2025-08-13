@@ -1,6 +1,6 @@
 # Documentation Agent - Krezzo
 
-**Last Updated:** January 28, 2025 9:50 PM EST
+**Last Updated:** August 13, 2025 7:54 AM EDT
 
 ## Documentation Status: CURRENT ✅
 
@@ -18,6 +18,13 @@
 - **Email Template System**: ✅ NEW - Supabase auth email font modernization with Manrope typography
 
 ## Recent Documentation Updates
+
+### August 13, 2025 - Daily Snapshot v2 & 5pm Route
+- Added v2 Daily Snapshot sections and logic to SMS docs (pacing reds/yellows + green counts)
+- Documented revised Daily Budget math (next income aggregation, expenses before income, available-after-expenses, per‑day limit)
+- Noted route fixes: `415pm-special` preference, dedupe template type, unified sender
+- Described preview endpoints: `/api/test-daily-v2-snapshot` and `/protected/sms-preview`
+- Feature flags: Default-enabled 5pm; set `SMS_415PM_ENABLED=false` to disable; allowlist via `ALLOWED_DAILY_V2_USER_IDS`
 
 ### January 28, 2025 - Smart Bill Detection System Documentation
 **Status:** ✅ COMPLETE - Comprehensive documentation for revolutionary bill detection enhancement

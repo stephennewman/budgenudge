@@ -1,9 +1,27 @@
 # ⚙️ ENGINEERING AGENT - KREZZO
 
-**Last Updated:** January 28, 2025 9:50 PM EST  
-**Current Sprint:** Smart Bill Detection Enhancement Complete  
+**Last Updated:** August 13, 2025 7:54 AM EDT  
+**Current Sprint:** Daily Snapshot v2 & 5pm Route Fixes  
 
 ## 📋 RECENT DEPLOYMENTS
+
+### Deployment #37: DAILY SNAPSHOT V2 + 5PM ROUTE FIXES
+**Date:** August 13, 2025 7:54 AM EDT  
+**Status:** ✅ SUCCESSFULLY DEPLOYED  
+**Commits:** d91a230, 256a50a  
+**Build:** `npm run build` clean (warnings only)  
+
+**Changes:**
+- `utils/sms/templates.ts`: Added `generateDailyReportV2` with sections, pacing (reds/yellows + green counts), revised daily budget (next income, expenses before income, available-after-expenses, /day limit). Unified headers. Yesterday’s Activity updated format.
+- `app/api/send-415pm-sms/route.ts`: Correct preference (`415pm-special`), dedupe type, unified sender, dedupe users, feature flag default-enabled.
+- `app/api/test-daily-v2-snapshot/route.ts`: Dry-run preview endpoint.
+- `app/protected/sms-preview/page.tsx`: Signed-in preview page.
+- `.env.example`: Added `ALLOWED_DAILY_V2_USER_IDS`; noted flag.
+
+**Notes:**
+- v2 rollout allowlisted to Stephen/Ashley via env; others use legacy special.
+- 5pm enabled by default; disable with `SMS_415PM_ENABLED=false`.
+- Lint fixed (unused var) in preview page.
 
 ### Deployment #36: SMART BILL DETECTION ENHANCEMENT
 **Date:** January 28, 2025 9:45 PM EST  
