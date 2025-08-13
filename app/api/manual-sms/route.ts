@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     let transactionsText = '';
     
     // If a valid templateType is provided, use the corresponding SMS template
-    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary','cash-flow-runway'].includes(templateType)) {
+    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary','cash-flow-runway','415pm-special'].includes(templateType)) {
       smsMessage = await generateSMSMessage(userId, templateType);
     } else if (userId && !message) {
       const { data: userItems, error: itemsError } = await supabase
