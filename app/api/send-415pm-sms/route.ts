@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateSMSMessage, generateDailyReportV2 } from '@/utils/sms/templates';
+import { generateDailyReportV2 } from '@/utils/sms/templates';
 import { sendUnifiedSMS } from '@/utils/sms/unified-sms';
 import { checkAndLogSMS } from '@/utils/sms/deduplication';
 

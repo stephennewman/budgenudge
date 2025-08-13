@@ -324,11 +324,92 @@ export default function IncomePage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const safeString = dateString && !dateString.includes('T')
+      ? `${dateString}T12:00:00`
+      : dateString;
+    return new Date(safeString).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  // Unified next predicted date calculation (source of truth)
+  const getNextPredictedDate = (source: IncomeSource): string | undefined => {
+    const today = new Date();
+    // If manual override exists and is in the future, prefer it
+    if (source.next_predicted_date) {
+      const manual = new Date(`${source.next_predicted_date}T12:00:00`);
+      if (!isNaN(manual.getTime()) && manual >= today) {
+        return manual.toISOString().split('T')[0];
+      }
+    }
+
+    // Calculate from last known pay date or inferred recent date
+    let lastDate = source.last_pay_date;
+    if (!lastDate && source.dates && source.dates.length > 0) {
+      lastDate = source.dates[source.dates.length - 1];
+    }
+    if (!lastDate) return undefined;
+
+    const base = new Date(`${lastDate}T12:00:00`);
+    if (isNaN(base.getTime())) return undefined;
+
+    const nextDate = new Date(base);
+    switch (source.frequency) {
+      case 'weekly':
+        nextDate.setDate(nextDate.getDate() + 7);
+        break;
+      case 'bi-weekly':
+        nextDate.setDate(nextDate.getDate() + 14);
+        break;
+      case 'bi-monthly': {
+        const day = base.getDate();
+        if (day <= 16) {
+          // last was around 15th, next is end of month
+          nextDate.setMonth(nextDate.getMonth() + 1, 0);
+        } else {
+          // last was end of month, next is 15th of next month
+          nextDate.setMonth(nextDate.getMonth() + 1, 15);
+        }
+        break;
+      }
+      case 'monthly':
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        break;
+      default:
+        nextDate.setDate(nextDate.getDate() + 14);
+        break;
+    }
+
+    // Ensure future date
+    while (nextDate <= today) {
+      switch (source.frequency) {
+        case 'weekly':
+          nextDate.setDate(nextDate.getDate() + 7);
+          break;
+        case 'bi-weekly':
+          nextDate.setDate(nextDate.getDate() + 14);
+          break;
+        case 'bi-monthly': {
+          const currentDay = nextDate.getDate();
+          if (currentDay <= 16) {
+            nextDate.setMonth(nextDate.getMonth() + 1, 0);
+          } else {
+            nextDate.setMonth(nextDate.getMonth() + 1, 15);
+          }
+          break;
+        }
+        case 'monthly':
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
+        default:
+          nextDate.setDate(nextDate.getDate() + 14);
+          break;
+      }
+    }
+
+    return nextDate.toISOString().split('T')[0];
   };
 
   // Function to calculate upcoming income dates
@@ -651,7 +732,7 @@ export default function IncomePage() {
       source_name: source.source_name,
       expected_amount: source.expected_amount.toString(),
       frequency: source.frequency,
-      next_predicted_date: source.next_predicted_date || '',
+      next_predicted_date: source.next_predicted_date || getNextPredictedDate(source) || '',
       is_active: true
     });
   };
@@ -1272,6 +1353,21 @@ export default function IncomePage() {
                           <span className="text-gray-600">Amount:</span>
                           <p className="font-medium">{formatCurrency(source.expected_amount)}</p>
                         </div>
+                        <div>
+                          <span className="text-gray-600">Next Predicted Date:</span>
+                          <p className="font-medium">
+                            {(() => {
+                              const next = getNextPredictedDate(source);
+                              return next ? formatDate(next) : '—';
+                            })()}
+                          </p>
+                        </div>
+                        {source.last_pay_date && (
+                          <div>
+                            <span className="text-gray-600">Last Pay Date:</span>
+                            <p className="font-medium">{formatDate(source.last_pay_date)}</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
