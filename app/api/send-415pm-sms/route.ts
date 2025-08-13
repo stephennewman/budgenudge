@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Feature flag to disable the 4:15/5pm SMS without removing the cron
-  const sms415pmEnabled = process.env.SMS_415PM_ENABLED === 'true';
+  // Feature flag (defaults to enabled). Set SMS_415PM_ENABLED=false to disable.
+  const sms415pmEnabled = process.env.SMS_415PM_ENABLED !== 'false';
   if (!sms415pmEnabled) {
     return NextResponse.json({
       success: true,
