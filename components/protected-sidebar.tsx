@@ -38,7 +38,7 @@ export default async function ProtectedSidebar() {
           },
           {
             label: "📱 Texts",
-            href: "/sms-preferences",
+            href: "/texts",
           },
         ]}
       />
