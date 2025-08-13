@@ -17,10 +17,22 @@ interface SMSPreference {
   phone_number?: string;
 }
 
-// Define active SMS template types
-const activeSmsTypes = ['bills', 'activity', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special'];
+  // Define active SMS template types for previews (activity removed)
+  const activeSmsTypes = ['bills', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special', '415-krezzo', 'five-oclock-somewhere'];
 
 const smsTypeInfo = {
+  '415-krezzo': {
+    title: '415 Krezzo',
+    description: 'Daily 5:00 PM Eastern summary (alias of Krezzo report)',
+    icon: '📊',
+    example: 'Sample 4:15 Krezzo report preview.'
+  },
+  'five-oclock-somewhere': {
+    title: "5 o'clock Somewhere",
+    description: 'Daily 5:00 PM Eastern summary (friendly alias)',
+    icon: '🕔',
+    example: 'Sample 5 o\'clock summary preview.'
+  },
   bills: {
     title: 'Bills & Payments',
     description: 'Upcoming bills and payment reminders from tagged merchants',
@@ -28,12 +40,6 @@ const smsTypeInfo = {
     example: `⭐ Recurring Bills\n9 upcoming\n\nJul 15: Disney+ - $3.41\nJul 16: Netflix - $28.30\nJul 16: Duke Energy - $308.00\nJul 16: Fccu A2a Acct - $424.61\nJul 21: Everydaydose Dose  - $36.00\nJul 22: GEICO - $114.18\nJul 23: Prudential - $30.02\nJul 27: Amazon Prime - $15.13\nJul 28: Spectrum - $118.00\n\nNEXT 7 DAYS: $800.32\nNEXT 14 DAYS: $1077.65\nNEXT 30 DAYS: $3841.29`
   },
 
-  activity: {
-    title: 'Yesterday\'s Activity',
-    description: 'All transactions from yesterday',
-    icon: '📋',
-    example: `📱 YESTERDAY'S ACTIVITY\n\nJul 16: Publix - $65.88\nJul 16: Amazon - $25.99\nJul 16: Starbucks - $8.50\nJul 16: Gas Station - $35.00\nJul 16: Restaurant - $67.89\nJul 16: Grocery Store - $89.45\n\n💰 Yesterday's Total: $292.71`
-  },
   'merchant-pacing': {
     title: 'Merchant Pacing',
     description: 'Spending pacing analysis for your tracked merchants (configure on Merchants page)',
@@ -86,10 +92,12 @@ const smsTypeInfo = {
 };
 
 export default function SMSPreferencesPage() {
+  // Retained for potential future enablement toggles; currently unused in simplified preview UI
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [preferences, setPreferences] = useState<SMSPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [liveSmsContent, setLiveSmsContent] = useState<Record<string, { content: string; loading: boolean; error?: string }>>({});
+  const [liveSmsContent, setLiveSmsContent] = useState<Record<string, { content: string; loading: boolean; error?: string; isSample?: boolean }>>({});
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -141,6 +149,9 @@ export default function SMSPreferencesPage() {
       }
 
       // Generate live SMS content using the SMS templates API
+      // Map friendly aliases to 415pm-special generator
+      const templateType = (smsType === '415-krezzo' || smsType === 'five-oclock-somewhere') ? '415pm-special' : smsType;
+
       const response = await fetch('/api/manual-sms', {
         method: 'POST',
         headers: {
@@ -148,7 +159,7 @@ export default function SMSPreferencesPage() {
         },
         body: JSON.stringify({
           userId: user.id,
-          templateType: smsType,
+          templateType,
           phoneNumber: user.user_metadata?.signupPhone || user.phone
         })
       });
@@ -158,10 +169,15 @@ export default function SMSPreferencesPage() {
       if (data.success && data.smsContent) {
         setLiveSmsContent(prev => ({
           ...prev,
-          [smsType]: { content: data.smsContent, loading: false, error: undefined }
+          [smsType]: { content: data.smsContent, loading: false, error: undefined, isSample: false }
         }));
       } else {
-        throw new Error(data.error || 'Failed to generate SMS content');
+        // Fallback to sample if no real data
+        const info = smsTypeInfo[smsType as keyof typeof smsTypeInfo];
+        setLiveSmsContent(prev => ({
+          ...prev,
+          [smsType]: { content: info?.example || 'Sample preview unavailable', loading: false, error: undefined, isSample: true }
+        }));
       }
 
     } catch (error) {
@@ -169,9 +185,10 @@ export default function SMSPreferencesPage() {
       setLiveSmsContent(prev => ({
         ...prev,
         [smsType]: { 
-          content: '', 
+          content: smsTypeInfo[smsType as keyof typeof smsTypeInfo]?.example || '', 
           loading: false, 
-          error: error instanceof Error ? error.message : 'Failed to generate SMS content' 
+          error: undefined,
+          isSample: true
         }
       }));
     }
@@ -191,7 +208,7 @@ export default function SMSPreferencesPage() {
         <div className="flex flex-col">
           <h1 className="text-2xl font-medium">📱 Texts</h1>
           <p className="text-muted-foreground mt-2">
-            Daily SMS will be sent at <span className="font-semibold">8:00 AM EST</span>.
+            Daily summary is sent every day at <span className="font-semibold">5:00 PM EST</span>.
             <br />
             Weekly summaries are sent every <span className="font-semibold">Sunday at 7:00 AM EST</span>.
             <br />
@@ -210,45 +227,22 @@ export default function SMSPreferencesPage() {
         </div>
       )}
 
-      {/* SMS Status Overview */}
+      {/* Preview first: actual data preview at top */}
       <div className="mb-6">
-        <h2 className="text-lg font-medium mb-3">📱 SMS Template Status</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {activeSmsTypes.map((smsType) => {
-            const pref = preferences.find(p => p.sms_type === smsType);
-            const info = smsTypeInfo[smsType as keyof typeof smsTypeInfo];
-            const isEnabled = pref?.enabled || false;
-            
-            return (
-              <div key={smsType} className={`p-3 rounded-lg border ${
-                isEnabled 
-                  ? 'bg-green-50 border-green-200 text-green-800' 
-                  : 'bg-gray-50 border-gray-200 text-gray-600'
-              }`}>
-                <div className="flex items-center space-x-2">
-                  <span className="text-lg">{info.icon}</span>
-                  <div className="flex-1">
-                    <div className="text-sm font-medium">{info.title}</div>
-                    <div className="text-xs">
-                      {isEnabled ? '✅ Enabled' : '❌ Disabled'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <Card className="p-4">
+          <h2 className="text-lg font-medium mb-3">🔍 Preview</h2>
+          <p className="text-sm text-gray-600 mb-3">Select a template below to generate a preview. If real data is unavailable, a clearly marked sample will be shown.</p>
+        </Card>
       </div>
 
       <div className="grid gap-6">
-        {preferences
-          .filter((pref) => activeSmsTypes.includes(pref.sms_type) && pref.enabled)
-          .map((pref) => {
-          const info = smsTypeInfo[pref.sms_type];
-          const liveContent = liveSmsContent[pref.sms_type];
+        {activeSmsTypes.map((type) => {
+          const key = type as keyof typeof smsTypeInfo;
+          const info = smsTypeInfo[key];
+          const liveContent = liveSmsContent[type];
           
           return (
-            <Card key={pref.sms_type} className="p-6">
+            <Card key={type} className="p-6">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
@@ -259,7 +253,7 @@ export default function SMSPreferencesPage() {
                     </div>
                   </div>
                   <Button
-                    onClick={() => generateLiveSMS(pref.sms_type)}
+                    onClick={() => generateLiveSMS(type)}
                     disabled={liveContent?.loading}
                     variant="outline"
                     size="sm"
@@ -275,7 +269,7 @@ export default function SMSPreferencesPage() {
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">
-                        {liveContent.error ? 'Error' : 'Live SMS Content'}
+                        {liveContent.error ? 'Error' : (liveContent.isSample ? 'Sample Preview' : 'Live SMS Content')}
                       </span>
                       {liveContent.content && (
                         <span className="text-xs text-gray-500">
