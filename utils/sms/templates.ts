@@ -1894,16 +1894,11 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       .eq('is_active', true);
 
     // Get merchant pacing data
-    const { data: merchantPacingMerchants, error: merchantError } = await supabase
+    const { data: trackedMerchants } = await supabase
       .from('merchant_pacing_tracking')
       .select('ai_merchant_name')
       .eq('user_id', userId)
       .eq('is_active', true);
-    
-    console.log('🔍 Merchant Pacing Merchants Query Result:', merchantPacingMerchants);
-    console.log('🔍 Merchant Pacing Merchants Count:', merchantPacingMerchants?.length || 0);
-    console.log('🔍 Merchant Pacing Merchants Error:', merchantError);
-    console.log('🔍 User ID being queried:', userId);
 
     // Get income streams from user_income_profiles table
     const now = new Date();
@@ -1994,76 +1989,14 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       }
     }
 
-    // Get all upcoming income sources within the next 30 days
-    let upcomingIncomes: any[] = [];
+    // Find next income
+    const nextIncome = findNextIncome(incomeCandidates);
     
-    if (incomeProfile?.profile_data?.income_sources) {
-      const incomeSources = incomeProfile.profile_data.income_sources;
-      
-      upcomingIncomes = incomeSources
-        .filter((source: any) => source.frequency !== 'irregular' && source.expected_amount > 0)
-        .map((source: any) => {
-          let nextDate: Date;
-          
-          if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
-            // Use manual override if it's in the future
-            nextDate = new Date(source.next_predicted_date);
-          } else if (source.last_pay_date) {
-            // Calculate from last payment date
-            nextDate = new Date(source.last_pay_date);
-            
-            // Add frequency-based days
-            switch (source.frequency) {
-              case 'weekly':
-                while (nextDate <= now) {
-                  nextDate.setDate(nextDate.getDate() + 7);
-                }
-                break;
-              case 'bi-weekly':
-                while (nextDate <= now) {
-                  nextDate.setDate(nextDate.getDate() + 14);
-                }
-                break;
-              case 'bi-monthly':
-                while (nextDate <= now) {
-                  nextDate.setMonth(nextDate.getMonth() + 1);
-                  nextDate.setDate(15); // Assume 15th of month
-                }
-                break;
-              case 'monthly':
-                while (nextDate <= now) {
-                  nextDate.setMonth(nextDate.getMonth() + 1);
-                }
-                break;
-              default:
-                nextDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // Default to 30 days
-            }
-          } else {
-            nextDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // Default to 30 days
-          }
-          
-          return {
-            source_name: source.source_name,
-            expected_amount: source.expected_amount,
-            frequency: source.frequency,
-            next_predicted_date: nextDate.toISOString().split('T')[0],
-            last_pay_date: source.last_pay_date,
-            confidence_score: source.confidence_score
-          };
-        })
-        .filter((source: any) => {
-          const daysUntilIncome = Math.ceil((new Date(source.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-          return daysUntilIncome <= 30; // Only show income within next 30 days
-        })
-        .sort((a: any, b: any) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
-    }
-    
-    // Get upcoming bills from tagged_merchants table
+    // Get upcoming bills
     const { data: upcomingBills } = await supabase
-      .from('tagged_merchants')
+      .from('recurring_bills')
       .select('merchant_name, expected_amount, next_predicted_date')
       .eq('user_id', userId)
-      .eq('is_active', true)
       .gte('next_predicted_date', now.toISOString().split('T')[0])
       .order('next_predicted_date', { ascending: true });
 
@@ -2071,70 +2004,40 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     let billsBeforeIncome: any[] = [];
     let totalBillsBeforeIncome = 0;
     
-    if (upcomingIncomes.length > 0 && upcomingBills) {
-      // Use the soonest income date for bill filtering
-      const soonestIncomeDate = new Date(upcomingIncomes[0].next_predicted_date);
-      const daysUntilIncome = Math.ceil((soonestIncomeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      
-      billsBeforeIncome = upcomingBills.filter(bill => {
-        const billDate = new Date(bill.next_predicted_date);
-        const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        // Only include bills due within the next X days (where X = days until income)
-        return daysUntilBill <= daysUntilIncome && daysUntilBill >= 0;
-      });
-      
+    if (nextIncome && upcomingBills) {
+      billsBeforeIncome = upcomingBills.filter(bill => 
+        new Date(bill.next_predicted_date) <= new Date(nextIncome.next_predicted_date)
+      );
       totalBillsBeforeIncome = billsBeforeIncome.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0);
     }
 
     // Calculate expected balance and daily spending limits
-    const totalExpectedIncome = upcomingIncomes.reduce((sum, income) => sum + (income.expected_amount || 0), 0);
-    const daysUntilIncome = upcomingIncomes.length > 0 ? Math.ceil((new Date(upcomingIncomes[0].next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
-    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + totalExpectedIncome;
+    const expectedBalanceBeforeIncome = totalAvailableBalance - totalBillsBeforeIncome + (nextIncome?.expected_amount || 0);
+    const daysUntilIncome = nextIncome ? Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 30;
     const maxDailySpend = expectedBalanceBeforeIncome / Math.max(daysUntilIncome, 1);
 
     // Get category pacing data for display
     let categoryPacingData: any[] = [];
     if (trackedCategories && trackedCategories.length > 0) {
       for (const category of trackedCategories) {
-        // Get current month spending for this category
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        
-        const { data: categoryTransactions } = await supabase
-          .from('transactions')
-          .select('amount')
-          .eq('plaid_item_id', userItems[0].plaid_item_id)
-          .eq('ai_category_tag', category.ai_category)
-          .gte('date', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`)
-          .lte('date', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-31`);
+        const { data: pacing } = await supabase
+          .from('category_pacing_tracking')
+          .select('current_month_spend, expected_by_now, is_active')
+          .eq('user_id', userId)
+          .eq('ai_category', category.ai_category)
+          .eq('is_active', true)
+          .single();
 
-        if (categoryTransactions && categoryTransactions.length > 0) {
-          const currentMonthSpend = categoryTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-          
-          // Calculate expected spending based on historical average (simplified)
-          // For now, we'll use a basic monthly estimate - this could be enhanced with historical analysis
-          const expectedMonthlySpend = 300; // Default estimate - could be calculated from historical data
-          const daysIntoMonth = new Date().getDate();
-          const expectedByNow = (expectedMonthlySpend / 30) * daysIntoMonth;
-          
-          const pacingPercentage = expectedByNow > 0 ? (currentMonthSpend / expectedByNow) * 100 : 0;
+        if (pacing && pacing.is_active) {
+          const currentSpend = pacing.current_month_spend || 0;
+          const expectedByNow = pacing.expected_by_now || 0;
+          const pacingPercentage = expectedByNow > 0 ? (currentSpend / expectedByNow) * 100 : 0;
           
           categoryPacingData.push({
             category: category.ai_category,
-            currentMonthSpend: currentMonthSpend,
+            currentMonthSpend: currentSpend,
             expectedByNow: expectedByNow,
             pacing: pacingPercentage
-          });
-        } else {
-          // Even if no transactions this month, show the category with $0 spending
-          const daysIntoMonth = new Date().getDate();
-          const expectedByNow = (300 / 30) * daysIntoMonth;
-          
-          categoryPacingData.push({
-            category: category.ai_category,
-            currentMonthSpend: 0,
-            expectedByNow: expectedByNow,
-            pacing: 0
           });
         }
       }
@@ -2142,24 +2045,30 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
 
     // Get merchant pacing data for display
     let merchantPacingData: any[] = [];
-    
-    if (merchantPacingMerchants && merchantPacingMerchants.length > 0) {
-      // For now, just show tracked merchants without complex pacing calculations
-      merchantPacingMerchants.forEach((merchant, index) => {
-        merchantPacingData.push({
-          merchant: merchant.ai_merchant_name,
-          currentMonthSpend: 0, // Will be calculated later if needed
-          expectedByNow: 200, // Default monthly estimate
-          pacing: 0 // Will be calculated later if needed
-        });
-      });
-      
-      console.log('🔍 Merchant Pacing Data Created:', merchantPacingData);
-    } else {
-      console.log('🔍 No merchant pacing merchants found');
+    if (trackedMerchants && trackedMerchants.length > 0) {
+      for (const merchant of trackedMerchants) {
+        const { data: pacing } = await supabase
+          .from('merchant_pacing_tracking')
+          .select('current_month_spend, expected_by_now, is_active')
+          .eq('user_id', userId)
+          .eq('ai_merchant_name', merchant.ai_merchant_name)
+          .eq('is_active', true)
+          .single();
+
+        if (pacing && pacing.is_active) {
+          const currentSpend = pacing.current_month_spend || 0;
+          const expectedByNow = pacing.expected_by_now || 0;
+          const pacingPercentage = expectedByNow > 0 ? (currentSpend / expectedByNow) * 100 : 0;
+          
+          merchantPacingData.push({
+            merchant: merchant.ai_merchant_name,
+            currentMonthSpend: currentSpend,
+            expectedByNow: expectedByNow,
+            pacing: pacingPercentage
+          });
+        }
+      }
     }
-    
-    console.log('🔍 Final merchantPacingData length:', merchantPacingData.length);
 
     // Sort by pacing (worst first)
     categoryPacingData.sort((a, b) => b.pacing - a.pacing);
@@ -2178,29 +2087,40 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       message += `No transactions posted\n`;
       message += `Total spent: $0.00\n`;
     }
-    message += `Posted Balance: $${(yesterdayBalance || 0).toFixed(2)}\n`;
-    message += `Available Balance: $${(totalAvailableBalance || 0).toFixed(2)}\n\n`;
+    message += `Balance: $${(yesterdayBalance || 0).toFixed(2)}\n\n`;
 
     // SPENDING PACE
     message += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
     if (categoryPacingData.length > 0) {
-      // Show categories ordered by pacing (worst to best)
-      categoryPacingData.forEach((cat, index) => {
-        // Only show 1 good category (the best one)
-        if (cat.pacing >= 90 || index === 0) {
-          message += `${cat.category.toUpperCase()}\n`;
-          message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
-          message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
-          
-          if (cat.pacing > 100) {
-            message += `🚨 OVER by ${Math.round((cat.pacing || 0) - 100)}%\n\n`;
-          } else if (cat.pacing >= 90) {
-            message += `⚠️ APPROACHING OVER by ${Math.round(100 - (cat.pacing || 0))}%\n\n`;
-          } else {
-            message += `✅ GOOD by ${Math.round(100 - (cat.pacing || 0))}%\n\n`;
-          }
-        }
+      // Separate categories by status
+      const overCategories = categoryPacingData.filter(cat => cat.pacing > 100);
+      const approachingCategories = categoryPacingData.filter(cat => cat.pacing >= 90 && cat.pacing <= 100);
+      const goodCategories = categoryPacingData.filter(cat => cat.pacing < 90);
+      
+      // Show all reds/over first
+      overCategories.forEach(cat => {
+        message += `${cat.category.toUpperCase()}\n`;
+        message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
+        message += `🚨 OVER by ${Math.round((cat.pacing || 0) - 100)}%\n\n`;
       });
+      
+      // Show all yellows/approaching
+      approachingCategories.forEach(cat => {
+        message += `${cat.category.toUpperCase()}\n`;
+        message += `Spent: $${(cat.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(cat.expectedByNow || 0).toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - (cat.pacing || 0))}%\n\n`;
+      });
+      
+      // Show one good category
+      if (goodCategories.length > 0) {
+        const bestCategory = goodCategories[0];
+        message += `${bestCategory.category.toUpperCase()}\n`;
+        message += `Spent: $${(bestCategory.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(bestCategory.expectedByNow || 0).toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - (bestCategory.pacing || 0))}%\n\n`;
+      }
     } else {
       message += `No categories tracked yet\n\n`;
     }
@@ -2208,105 +2128,95 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
     // MERCHANT WATCH
     message += `🏪 MERCHANT WATCH\n━━━━━━━━━━━━━━━━━━\n`;
     if (merchantPacingData.length > 0) {
-      // Show merchants ordered by pacing (worst to best)
-      merchantPacingData.forEach((merch, index) => {
-        // Only show 1 good merchant (the best one)
-        if (merch.pacing >= 90 || index === 0) {
-          message += `${merch.merchant.toUpperCase()}\n`;
-          message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
-          message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
-          
-          if (merch.pacing > 100) {
-            message += `🚨 OVER by ${Math.round((merch.pacing || 0) - 100)}%\n\n`;
-          } else if (merch.pacing >= 90) {
-            message += `⚠️ APPROACHING OVER by ${Math.round(100 - (merch.pacing || 0))}%\n\n`;
-          } else {
-            message += `✅ GOOD by ${Math.round(100 - (merch.pacing || 0))}%\n\n`;
-          }
-        }
+      // Separate merchants by status
+      const overMerchants = merchantPacingData.filter(merch => merch.pacing > 100);
+      const approachingMerchants = merchantPacingData.filter(merch => merch.pacing >= 90 && merch.pacing <= 100);
+      const goodMerchants = merchantPacingData.filter(merch => merch.pacing < 90);
+      
+      // Show all reds/over first
+      overMerchants.forEach(merch => {
+        message += `${merch.merchant.toUpperCase()}\n`;
+        message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
+        message += `🚨 OVER by ${Math.round((merch.pacing || 0) - 100)}%\n\n`;
       });
+      
+      // Show all yellows/approaching
+      approachingMerchants.forEach(merch => {
+        message += `${merch.merchant.toUpperCase()}\n`;
+        message += `Spent: $${(merch.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(merch.expectedByNow || 0).toFixed(0)}\n`;
+        message += `⚠️ APPROACHING OVER by ${Math.round(100 - (merch.pacing || 0))}%\n\n`;
+      });
+      
+      // Show one good merchant
+      if (goodMerchants.length > 0) {
+        const bestMerchant = goodMerchants[0];
+        message += `${bestMerchant.merchant.toUpperCase()}\n`;
+        message += `Spent: $${(bestMerchant.currentMonthSpend || 0).toFixed(0)}\n`;
+        message += `Expected: $${(bestMerchant.expectedByNow || 0).toFixed(0)}\n`;
+        message += `✅ GOOD by ${Math.round(100 - (bestMerchant.pacing || 0))}%\n\n`;
+      }
     } else {
       message += `No merchants tracked yet\n\n`;
     }
 
-    // FORECAST (Combined Income + Expenses)
-    message += `🔮 FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
-    if (upcomingIncomes.length > 0) {
-      // Group income sources by date
-      const incomeByDate = new Map<string, { sources: any[], total: number }>();
-      
-      upcomingIncomes.forEach(income => {
-        const date = income.next_predicted_date;
-        if (!incomeByDate.has(date)) {
-          incomeByDate.set(date, { sources: [], total: 0 });
-        }
-        incomeByDate.get(date)!.sources.push(income);
-        incomeByDate.get(date)!.total += income.expected_amount;
-      });
-      
-      // Show income sources grouped by date
-      incomeByDate.forEach((dateData, date) => {
-        const daysUntilIncome = Math.ceil((new Date(date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (dateData.sources.length === 1) {
-          // Single income source on this date
-          const income = dateData.sources[0];
-          message += `$${(income.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days (${income.source_name})\n`;
-        } else {
-          // Multiple income sources on the same date
-          message += `$${dateData.total.toFixed(0)} expected income in ${daysUntilIncome} days\n`;
-          dateData.sources.forEach(income => {
-            message += `  • ${income.source_name}: $${(income.expected_amount || 0).toFixed(0)}\n`;
-          });
-        }
-      });
+    // INCOME FORECAST
+    message += `💰 INCOME FORECAST\n━━━━━━━━━━━━━━━━━━\n`;
+    if (nextIncome) {
+      const daysUntilIncome = Math.ceil((new Date(nextIncome.next_predicted_date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      message += `$${(nextIncome.expected_amount || 0).toFixed(0)} expected income in ${daysUntilIncome} days\n\n`;
     } else {
-      message += `No income patterns detected\n`;
+      message += `No income patterns detected\n\n`;
     }
-    
+
+    // UPCOMING EXPENSES
+    message += `💸 UPCOMING EXPENSES\n━━━━━━━━━━━━━━━━━━\n`;
     if (billsBeforeIncome && billsBeforeIncome.length > 0) {
       message += `(${billsBeforeIncome.length}) expenses for $${(totalBillsBeforeIncome || 0).toFixed(0)} expected next ${daysUntilIncome} days\n\n`;
       
-      // Show individual bills with actual dates
+      // Show individual bills with dates
       billsBeforeIncome.forEach(bill => {
         const billDate = new Date(bill.next_predicted_date + 'T12:00:00');
+        const daysUntilBill = Math.ceil((billDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
         const billName = bill.merchant_name || 'Unknown Bill';
         const billAmount = Number(bill.expected_amount || 0).toFixed(0);
         
-        // Format the actual date (e.g., "Dec 15", "Jan 3")
-        const month = billDate.toLocaleDateString('en-US', { month: 'short' });
-        const day = billDate.getDate();
-        const formattedDate = `${month} ${day}`;
-        
-        message += `${formattedDate}: ${billName} - $${billAmount}\n`;
+        if (daysUntilBill === 0) {
+          message += `TODAY: ${billName} - $${billAmount}\n`;
+        } else if (daysUntilBill === 1) {
+          message += `TOMORROW: ${billName} - $${billAmount}\n`;
+        } else {
+          message += `Day ${daysUntilBill}: ${billName} - $${billAmount}\n`;
+        }
       });
       message += `\n`;
       
-      // Add available after expenses and daily budget
-      const availableAfterExpenses = totalAvailableBalance - totalBillsBeforeIncome;
-      message += `Available after expenses: $${availableAfterExpenses.toFixed(0)}\n`;
-      
-      // Debug: Show the calculation components
-      message += `(Debug: Balance $${totalAvailableBalance.toFixed(0)} - Bills $${totalBillsBeforeIncome.toFixed(0)} = $${availableAfterExpenses.toFixed(0)})\n`;
-      
-      // Calculate daily spending limit: Available after expenses ÷ Days until income
-      let dailySpendLimit = 0;
-      if (availableAfterExpenses > 0 && daysUntilIncome > 0) {
-        dailySpendLimit = availableAfterExpenses / daysUntilIncome;
-      }
-      
-      message += `Max spend per day: $${dailySpendLimit.toFixed(0)}\n\n`;
+      // Add micro-budget calculation
+      message += `Your micro-budget: $${(maxDailySpend || 0).toFixed(0)} per day × ${daysUntilIncome} days = $${((maxDailySpend || 0) * daysUntilIncome).toFixed(0)} total available\n\n`;
     } else {
       message += `No bills before next income\n\n`;
     }
 
-    // INSPIRATION (renamed from DAILY INSIGHT)
-    message += `🙌 INSPIRATION\n━━━━━━━━━━━━━━━━━━\n`;
+
+
+    // Status
+    if (maxDailySpend < 50) {
+      message += `🔴 STATUS: Tight daily budget - prioritize essentials\n`;
+    } else if (maxDailySpend < 100) {
+      message += `🟡 STATUS: Moderate daily spending flexibility\n`;
+    } else {
+      message += `🟢 STATUS: Good daily spending flexibility\n`;
+    }
+    message += `\n`;
+
+    // DAILY INSIGHT
+    message += `🎯 DAILY INSIGHT\n━━━━━━━━━━━━━━━━━━\n`;
     message += generateEnhancedAIVibeMessage(expectedBalanceBeforeIncome, yesterdayTransactions, billsBeforeIncome, firstName);
     message += `\n\n`;
 
-    // ACTION ITEM (renamed from ACTION ITEM but same emoji)
-    message += `✅ ACTION ITEM\n━━━━━━━━━━━━━━━━━━\n`;
+    // ACTION ITEM
+    message += `🚀 ACTION ITEM\n━━━━━━━━━━━━━━━━━━\n`;
     const actionItems = generateActionItems(categoryPacingData, merchantPacingData, billsBeforeIncome || [], expectedBalanceBeforeIncome);
     if (actionItems.length > 0) {
       message += actionItems[0]; // Show first action item
@@ -2326,6 +2236,381 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
   } catch (error) {
     console.error('❌ Error generating 5:30 PM special SMS:', error);
     return `📊 KREZZO REPORT\n\nHey there! 👋\n\nSorry, I encountered an error while generating your financial report. Please try again later or contact support if the issue persists.`;
+  }
+}
+
+// ===================================
+// 9b. DAILY SNAPSHOT (V2) - from scratch, concise
+// ===================================
+export async function generateDailyReportV2(userId: string): Promise<string> {
+  try {
+    // First name
+    const { data: authUser } = await supabase.auth.admin.getUserById(userId);
+    const firstName = authUser?.user?.user_metadata?.firstName || authUser?.user?.user_metadata?.first_name || 'there';
+
+    // Items
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+
+    if (!userItems || userItems.length === 0) {
+      return `📊 Daily snapshot\n\nHey ${firstName}!\nNo bank accounts connected yet. Connect to see your daily insights.`;
+    }
+
+    const itemDbIds = userItems.map(i => i.id);
+    const plaidItemIds = userItems.map(i => i.plaid_item_id);
+
+    // Available balance (depository only)
+    const { data: accounts } = await supabase
+      .from('accounts')
+      .select('type, subtype, available_balance')
+      .in('item_id', itemDbIds);
+
+    const availableBalance = (accounts || [])
+      .filter(acc => acc.type === 'depository' && (!acc.subtype || acc.subtype === 'checking' || acc.subtype === 'savings'))
+      .reduce((sum, acc) => sum + (acc.available_balance || 0), 0);
+
+    // Tagged recurring merchants for exclusion + bills
+    const todayISO = new Date().toISOString().split('T')[0];
+    const { data: taggedMerchants } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name, expected_amount, next_predicted_date, is_active')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    const recurringMerchantSet = new Set<string>((taggedMerchants || []).map(tm => (tm.merchant_name || '').toLowerCase()));
+
+    // Yesterday non-bill spend
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yISO = yesterday.toISOString().split('T')[0];
+
+    const { data: yesterdayTx } = await supabase
+      .from('transactions')
+      .select('date, merchant_name, name, amount')
+      .in('plaid_item_id', plaidItemIds)
+      .eq('date', yISO)
+      .gt('amount', 0) // spending only
+      .order('amount', { ascending: false });
+
+    const nonBillTx = (yesterdayTx || []).filter(tx => {
+      const merchant = (tx.merchant_name || tx.name || '').toLowerCase();
+      return merchant && !recurringMerchantSet.has(merchant);
+    });
+
+    const totalNonBillSpent = nonBillTx.reduce((sum, t) => sum + (t.amount || 0), 0);
+    const totalYesterdayAll = (yesterdayTx || []).reduce((sum, t) => sum + (t.amount || 0), 0);
+    const topYesterdayAll = (yesterdayTx || [])
+      .slice()
+      .sort((a, b) => (b.amount || 0) - (a.amount || 0))
+      .slice(0, 2);
+
+    // Next income (prefer profile, fallback to 30-day horizon)
+    const now = new Date();
+    let nextIncomeDate: Date | null = null;
+    const { data: incomeProfile } = await supabase
+      .from('user_income_profiles')
+      .select('profile_data')
+      .eq('user_id', userId)
+      .single();
+
+    const sources = incomeProfile?.profile_data?.income_sources || [];
+    try {
+      const structured = sources
+        .filter((s: any) => s && s.expected_amount > 0 && s.frequency && s.frequency !== 'irregular');
+      const candidates: Date[] = [];
+      structured.forEach((s: any) => {
+        let d: Date | null = null;
+        if (s.next_predicted_date && new Date(s.next_predicted_date) >= now) {
+          d = new Date(s.next_predicted_date);
+        } else if (s.last_pay_date) {
+          const base = new Date(s.last_pay_date);
+          const freq = (s.frequency || '').toLowerCase();
+          d = new Date(base);
+          const advance = (days: number) => {
+            while (d! <= now) d!.setDate(d!.getDate() + days);
+          };
+          if (freq === 'weekly') advance(7);
+          else if (freq === 'bi-weekly' || freq === 'biweekly') advance(14);
+          else if (freq === 'monthly') {
+            while (d <= now) d.setMonth(d.getMonth() + 1);
+          } else {
+            // default monthly
+            while (d <= now) d.setMonth(d.getMonth() + 1);
+          }
+        }
+        if (d) candidates.push(d);
+      });
+      candidates.sort((a, b) => a.getTime() - b.getTime());
+      nextIncomeDate = candidates[0] || null;
+    } catch {}
+
+    // Horizon (next income date if available, else 30 days)
+    const horizonDate = nextIncomeDate ? new Date(nextIncomeDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    // Days BEFORE income (exclude income day). Use date-only math to avoid TZ issues
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfHorizon = new Date(horizonDate.getFullYear(), horizonDate.getMonth(), horizonDate.getDate());
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const rawDiffDays = Math.floor((startOfHorizon.getTime() - startOfToday.getTime()) / msPerDay);
+    const daysBeforeIncome = Math.max(1, rawDiffDays);
+
+    // Bills until the day BEFORE income
+    let totalBills = 0;
+    let billsCount = 0;
+    if (taggedMerchants && taggedMerchants.length > 0) {
+      const { data: billsWindow } = await supabase
+        .from('tagged_merchants')
+        .select('expected_amount, next_predicted_date')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .gte('next_predicted_date', todayISO)
+        .lt('next_predicted_date', horizonDate.toISOString().split('T')[0]);
+
+      const list = billsWindow || [];
+      billsCount = list.length;
+      totalBills = list.reduce((sum, b) => sum + Number(b.expected_amount || 0), 0);
+    }
+
+    // Daily non-bill budget: use available now minus bills due before income, divided by days before income
+    const availableAfterBills = Math.max(0, availableBalance - totalBills);
+    const dailyBudget = Math.max(0, Math.floor(availableAfterBills / daysBeforeIncome));
+
+    // ---------- Category pacing (reliable-only) ----------
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startISO = startOfMonth.toISOString().split('T')[0];
+    const endISO = endOfMonth.toISOString().split('T')[0];
+
+    // Pull tracked categories
+    const { data: trackedCategories } = await supabase
+      .from('category_pacing_tracking')
+      .select('ai_category')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    type PaceRow = { label: string; current: number; expected: number; pacing: number };
+    const categoryPace: PaceRow[] = [];
+
+    if (trackedCategories && trackedCategories.length > 0) {
+      for (const cat of trackedCategories) {
+        // Current month spend for category
+        const { data: catTx } = await supabase
+          .from('transactions')
+          .select('amount, date')
+          .in('plaid_item_id', plaidItemIds)
+          .eq('ai_category_tag', cat.ai_category)
+          .gte('date', startISO)
+          .lte('date', endISO);
+
+        const current = (catTx || []).reduce((sum, t) => sum + Math.max(0, t.amount || 0), 0);
+
+        // Historical monthly average (last 90 days) for expected
+        const lookbackStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        lookbackStart.setDate(lookbackStart.getDate() - 90);
+        const lbISO = lookbackStart.toISOString().split('T')[0];
+        const { data: histCatTx } = await supabase
+          .from('transactions')
+          .select('amount, date')
+          .in('plaid_item_id', plaidItemIds)
+          .eq('ai_category_tag', cat.ai_category)
+          .gte('date', lbISO)
+          .lt('date', startISO);
+
+        const byMonth = new Map<string, number>();
+        for (const t of histCatTx || []) {
+          const d = new Date(t.date + 'T12:00:00');
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          byMonth.set(key, (byMonth.get(key) || 0) + Math.max(0, t.amount || 0));
+        }
+        const months = Array.from(byMonth.values());
+        const monthlyAvg = months.length > 0 ? months.reduce((a, b) => a + b, 0) / months.length : 0;
+
+        const dayOfMonth = now.getDate();
+        const expected = (monthlyAvg / 30) * dayOfMonth;
+        const pacing = expected > 0 ? (current / expected) * 100 : 0;
+        if (expected > 0) {
+          categoryPace.push({ label: cat.ai_category, current, expected, pacing });
+        }
+      }
+      categoryPace.sort((a, b) => b.pacing - a.pacing);
+    }
+
+    // ---------- Merchant pacing (reliable-only) ----------
+    const { data: trackedMerchants } = await supabase
+      .from('merchant_pacing_tracking')
+      .select('ai_merchant_name')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+
+    const merchantPace: PaceRow[] = [];
+
+    if (trackedMerchants && trackedMerchants.length > 0) {
+      for (const m of trackedMerchants) {
+        // Current month spend for merchant
+        const { data: merchTx } = await supabase
+          .from('transactions')
+          .select('amount, date, merchant_name, name')
+          .in('plaid_item_id', plaidItemIds)
+          .eq('merchant_name', m.ai_merchant_name)
+          .gte('date', startISO)
+          .lte('date', endISO);
+
+        const current = (merchTx || []).reduce((sum, t) => sum + Math.max(0, t.amount || 0), 0);
+
+        // Historical monthly average (last 90 days)
+        const lookbackStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        lookbackStart.setDate(lookbackStart.getDate() - 90);
+        const lbISO = lookbackStart.toISOString().split('T')[0];
+        const { data: histMerchTx } = await supabase
+          .from('transactions')
+          .select('amount, date')
+          .in('plaid_item_id', plaidItemIds)
+          .eq('merchant_name', m.ai_merchant_name)
+          .gte('date', lbISO)
+          .lt('date', startISO);
+
+        const byMonth = new Map<string, number>();
+        for (const t of histMerchTx || []) {
+          const d = new Date(t.date + 'T12:00:00');
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          byMonth.set(key, (byMonth.get(key) || 0) + Math.max(0, t.amount || 0));
+        }
+        const months = Array.from(byMonth.values());
+        const monthlyAvg = months.length > 0 ? months.reduce((a, b) => a + b, 0) / months.length : 0;
+
+        const dayOfMonth = now.getDate();
+        const expected = (monthlyAvg / 30) * dayOfMonth;
+        const pacing = expected > 0 ? (current / expected) * 100 : 0;
+        if (expected > 0) {
+          merchantPace.push({ label: m.ai_merchant_name, current, expected, pacing });
+        }
+      }
+      merchantPace.sort((a, b) => b.pacing - a.pacing);
+    }
+
+    // Compose message with old 4:15 visual sections
+    let msg = `📊 DAILY SNAPSHOT\n\nHey ${firstName}! Here's your daily financial snapshot.\n\n`;
+    msg += `📋 YESTERDAY'S ACTIVITY\n━━━━━━━━━━━━━━━━━━\n`;
+    msg += `Balance: $${availableBalance.toFixed(0)}\n`;
+    msg += `Transactions: ${(yesterdayTx || []).length}\n`;
+    msg += `Total spent: $${totalYesterdayAll.toFixed(0)}\n\n`;
+
+    // Category pacing section (show all red/yellow)
+    msg += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
+    if (categoryPace.length > 0) {
+      const reds = categoryPace.filter(c => c.pacing > 100).sort((a,b) => b.pacing - a.pacing);
+      const yellows = categoryPace.filter(c => c.pacing >= 90 && c.pacing <= 100).sort((a,b) => b.pacing - a.pacing);
+      const greens = categoryPace.filter(c => c.pacing < 90).sort((a,b) => b.pacing - a.pacing);
+
+      const print = (c: PaceRow) => {
+        msg += `${c.label.toUpperCase()}\n`;
+        msg += `Spent: $${c.current.toFixed(0)} | Expected: $${c.expected.toFixed(0)}\n`;
+        if (c.pacing > 100) msg += `🚨 OVER by ${Math.round(c.pacing - 100)}%\n`;
+        else if (c.pacing >= 90) msg += `⚠️ APPROACHING by ${Math.round(100 - c.pacing)}%\n`;
+        else msg += `✅ GOOD by ${Math.round(100 - c.pacing)}%\n`;
+      };
+
+      if (reds.length === 0 && yellows.length === 0 && greens.length > 0) {
+        // If nothing concerning, show the top good one
+        print(greens[0]);
+      } else {
+        reds.forEach(print);
+        yellows.forEach(print);
+      }
+      if (greens.length > 0) {
+        msg += `${greens.length} Tracked Categories Good ${'✅'.repeat(greens.length)}\n`;
+      }
+      msg += `\n`;
+    } else {
+      msg += `No categories tracked yet\n\n`;
+    }
+
+    // Merchant pacing section (show all red/yellow)
+    msg += `🏪 MERCHANT WATCH\n━━━━━━━━━━━━━━━━━━\n`;
+    if (merchantPace.length > 0) {
+      const redsM = merchantPace.filter(m => m.pacing > 100).sort((a,b) => b.pacing - a.pacing);
+      const yellowsM = merchantPace.filter(m => m.pacing >= 90 && m.pacing <= 100).sort((a,b) => b.pacing - a.pacing);
+      const greensM = merchantPace.filter(m => m.pacing < 90).sort((a,b) => b.pacing - a.pacing);
+
+      const printM = (m: PaceRow) => {
+        msg += `${m.label.toUpperCase()}\n`;
+        msg += `Spent: $${m.current.toFixed(0)} | Expected: $${m.expected.toFixed(0)}\n`;
+        if (m.pacing > 100) msg += `🚨 OVER by ${Math.round(m.pacing - 100)}%\n`;
+        else if (m.pacing >= 90) msg += `⚠️ APPROACHING by ${Math.round(100 - m.pacing)}%\n`;
+        else msg += `✅ GOOD by ${Math.round(100 - m.pacing)}%\n`;
+      };
+
+      if (redsM.length === 0 && yellowsM.length === 0 && greensM.length > 0) {
+        printM(greensM[0]);
+      } else {
+        redsM.forEach(printM);
+        yellowsM.forEach(printM);
+      }
+      if (greensM.length > 0) {
+        msg += `${greensM.length} Tracked Merchants Good ${'✅'.repeat(greensM.length)}\n`;
+      }
+      msg += `\n`;
+    } else {
+      msg += `No merchants tracked yet\n\n`;
+    }
+
+    // Daily budget / forecast section
+    // Build next income summary (list all incomes on the earliest income date if available)
+    let nextIncomeSummary = 'No income patterns detected';
+    if (nextIncomeDate && incomeProfile?.profile_data?.income_sources) {
+      const sources = incomeProfile.profile_data.income_sources
+        .filter((s: any) => s && s.expected_amount > 0 && s.frequency && s.frequency !== 'irregular');
+      const earliestISO = horizonDate.toISOString().split('T')[0];
+      const incomesOnEarliest = sources
+        .map((s: any) => {
+          // compute next date same as above
+          let d: Date | null = null;
+          if (s.next_predicted_date && new Date(s.next_predicted_date) >= now) d = new Date(s.next_predicted_date);
+          else if (s.last_pay_date) {
+            const base = new Date(s.last_pay_date);
+            const freq = (s.frequency || '').toLowerCase();
+            const dd = new Date(base);
+            const adv = (days: number) => { while (dd <= now) dd.setDate(dd.getDate() + days); };
+            if (freq === 'weekly') adv(7);
+            else if (freq === 'bi-weekly' || freq === 'biweekly') adv(14);
+            else { while (dd <= now) dd.setMonth(dd.getMonth() + 1); }
+            d = dd;
+          }
+          return d ? { dateISO: d.toISOString().split('T')[0], amount: Number(s.expected_amount || 0), name: s.source_name || '' } : null;
+        })
+        .filter(Boolean)
+        .filter((x: any) => x.dateISO === earliestISO) as Array<{ dateISO: string; amount: number; name: string }>;
+
+      if (incomesOnEarliest.length > 0) {
+        const dateLabel = new Date(earliestISO + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const parts = incomesOnEarliest.map(x => `$${Math.round(x.amount).toLocaleString()}`);
+        const total = incomesOnEarliest.reduce((s, x) => s + x.amount, 0);
+        nextIncomeSummary = `${dateLabel}: ${parts.join(' + ')} (total $${Math.round(total).toLocaleString()})`;
+      }
+    }
+
+    const horizonLabel = nextIncomeDate ? `${horizonDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : `30 days`;
+    msg += `💵 DAILY BUDGET\n━━━━━━━━━━━━━━━━━━\n`;
+    msg += `Next income: ${nextIncomeSummary}\n`;
+    msg += `Upcoming expenses before then: ${billsCount} for $${totalBills.toFixed(0)}\n`;
+    msg += `Available now: $${Math.round(availableBalance)}\n`;
+    msg += `After expenses: $${Math.round(availableAfterBills)}\n`;
+    msg += `Daily spend limit: $${dailyBudget}/day for ${daysBeforeIncome} day${daysBeforeIncome !== 1 ? 's' : ''} (until ${horizonLabel})\n\n`;
+
+    // Inspiration
+    msg += `🙌 INSPIRATION\n━━━━━━━━━━━━━━━━━━\n`;
+    msg += generateEnhancedAIVibeMessage(availableBalance, nonBillTx, null, firstName) + `\n\n`;
+
+    // Action item
+    msg += `✅ ACTION ITEM\n━━━━━━━━━━━━━━━━━━\n`;
+    msg += `Aim to keep today's non-bill spend ≤ $${dailyBudget}.`;
+
+    return msg;
+  } catch (err) {
+    console.error('❌ Error in generateDailyReportV2:', err);
+    return `📊 Daily snapshot\n\nHey there!\nWe couldn't generate your snapshot right now. Please try again later.`;
   }
 }
 

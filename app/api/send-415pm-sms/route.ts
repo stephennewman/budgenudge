@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { generateSMSMessage } from '@/utils/sms/templates';
-import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { generateSMSMessage, generateDailyReportV2 } from '@/utils/sms/templates';
+import { sendUnifiedSMS } from '@/utils/sms/unified-sms';
 import { checkAndLogSMS } from '@/utils/sms/deduplication';
 
 // Create Supabase client with service role for server-side operations
@@ -15,9 +15,18 @@ export async function GET(request: NextRequest) {
   const isVercelCron = request.headers.get('x-vercel-cron');
   const authHeader = request.headers.get('authorization');
   const CRON_SECRET = process.env.CRON_SECRET;
-  
   if (!isVercelCron && authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Feature flag to disable the 4:15/5pm SMS without removing the cron
+  const sms415pmEnabled = process.env.SMS_415PM_ENABLED === 'true';
+  if (!sms415pmEnabled) {
+    return NextResponse.json({
+      success: true,
+      disabled: true,
+      message: '4:15/5pm SMS is disabled via SMS_415PM_ENABLED'
+    });
   }
 
   console.log('🌅 Starting 5:30 PM Special SMS processing...');
@@ -45,18 +54,24 @@ export async function GET(request: NextRequest) {
 
           console.log(`👥 Found ${itemsWithUsers.length} users for 5:30 PM SMS`);
 
+    // Deduplicate by user_id (users can have multiple items)
+    const uniqueUserIds = Array.from(new Set((itemsWithUsers || []).map(u => u.user_id)));
+
+    // Allowlist for v2 rollout
+    const allowlistEnv = process.env.ALLOWED_DAILY_V2_USER_IDS || '';
+    const allowlist = new Set(allowlistEnv.split(',').map(s => s.trim()).filter(Boolean));
+
     // Process each user
-    for (const userItem of itemsWithUsers) {
+    for (const userId of uniqueUserIds) {
       try {
-        const userId = userItem.user_id;
         usersProcessed++;
 
-        // Check if user has enabled activity SMS (used for 4:15 PM daily report)
+        // Check if user has enabled 4:15/5pm special template via preferences
         const { data: templatePref } = await supabase
           .from('user_sms_preferences')
           .select('enabled')
           .eq('user_id', userId)
-          .eq('sms_type', 'activity')
+          .eq('sms_type', '415pm-special')
           .single();
         
         // Default to enabled for new users
@@ -82,7 +97,7 @@ export async function GET(request: NextRequest) {
         // Check deduplication
         const dedupeResult = await checkAndLogSMS({
           phoneNumber: userPhoneNumber,
-          templateType: 'activity',
+          templateType: '415pm-special',
           userId,
           sourceEndpoint: '415pm-special',
           success: true
@@ -94,9 +109,11 @@ export async function GET(request: NextRequest) {
         }
 
         console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
-        
-        // Generate message using activity template for 4:15 PM daily report
-        const smsMessage = await generateSMSMessage(userId, 'activity');
+
+        // Generate message: use v2 for allowlisted users, else legacy special
+        const smsMessage = allowlist.has(userId)
+          ? await generateDailyReportV2(userId)
+          : await generateSMSMessage(userId, '415pm-special');
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
@@ -108,18 +125,19 @@ export async function GET(request: NextRequest) {
         console.log(`📱 Sending 5:30 PM special SMS to user ${userId}`);
         console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
-        // Send SMS
-        const smsResult = await sendEnhancedSlickTextSMS({
+        // Send SMS via unified sender
+        const smsResult = await sendUnifiedSMS({
           phoneNumber: userPhoneNumber,
           message: smsMessage,
-          userId: userId
+          userId: userId,
+          context: '415pm-special'
         });
 
         if (smsResult.success) {
           smsSent++;
           logDetails.push({ 
             userId, 
-            templateType: 'activity', 
+            templateType: '415pm-special', 
             sent: true, 
             preview: smsMessage.substring(0, 100),
             logId: dedupeResult.logId,
@@ -130,7 +148,7 @@ export async function GET(request: NextRequest) {
           smsFailed++;
           logDetails.push({ 
             userId, 
-            templateType: 'activity', 
+            templateType: '415pm-special', 
             sent: false, 
             error: smsResult.error,
             logId: dedupeResult.logId
@@ -143,8 +161,8 @@ export async function GET(request: NextRequest) {
 
       } catch (userError) {
         const errorMsg = userError instanceof Error ? userError.message : String(userError);
-        logDetails.push({ userId: userItem.user_id, error: errorMsg });
-        console.error(`❌ Error processing 4:15 PM SMS for user ${userItem.user_id}:`, userError);
+        logDetails.push({ userId, error: errorMsg });
+        console.error(`❌ Error processing 4:15 PM SMS for user ${userId}:`, userError);
       }
     }
 
