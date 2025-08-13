@@ -33,10 +33,11 @@ export default function AIMerchantAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'frequency' | 'remaining'>('spending');
+  const [sortBy, setSortBy] = useState<'spending' | 'transactions' | 'frequency' | 'remaining' | 'tracked' | 'name' | 'spent_this_month' | 'avg_tx' | 'category'>('spending');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [trackedMerchants, setTrackedMerchants] = useState<Set<string>>(new Set());
   const [trackingLoading, setTrackingLoading] = useState<Set<string>>(new Set());
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   
   // Modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -228,7 +229,7 @@ export default function AIMerchantAnalysisPage() {
       });
 
       // Convert to array and calculate metrics
-      const processedData: AIMerchantData[] = Array.from(merchantMap.entries()).map(([aiMerchant, data]) => {
+      let processedData: AIMerchantData[] = Array.from(merchantMap.entries()).map(([aiMerchant, data]) => {
         const avgDailySpending = data.totalSpending / daysOfData;
         const avgMonthlySpending = avgDailySpending * 30;
         const avgTransactionAmount = data.totalSpending / data.transactionCount;
@@ -321,6 +322,11 @@ export default function AIMerchantAnalysisPage() {
         };
       });
 
+      // Filter by category if set
+      if (categoryFilter) {
+        processedData = processedData.filter(m => m.categories.some(c => c.category === categoryFilter));
+      }
+
       // Sort data
       processedData.sort((a, b) => {
         let comparison = 0;
@@ -339,6 +345,24 @@ export default function AIMerchantAnalysisPage() {
             const bRemaining = b.avg_monthly_spending - b.current_month_spending;
             comparison = aRemaining - bRemaining;
             break;
+          case 'tracked':
+            comparison = Number(trackedMerchants.has(a.ai_merchant)) - Number(trackedMerchants.has(b.ai_merchant));
+            break;
+          case 'name':
+            comparison = a.ai_merchant.localeCompare(b.ai_merchant);
+            break;
+          case 'spent_this_month':
+            comparison = a.current_month_spending - b.current_month_spending;
+            break;
+          case 'avg_tx':
+            comparison = a.avg_transaction_amount - b.avg_transaction_amount;
+            break;
+          case 'category': {
+            const aCat = (a.categories[0]?.category || '').toLowerCase();
+            const bCat = (b.categories[0]?.category || '').toLowerCase();
+            comparison = aCat.localeCompare(bCat);
+            break;
+          }
         }
         return sortOrder === 'desc' ? -comparison : comparison;
       });
@@ -434,7 +458,7 @@ export default function AIMerchantAnalysisPage() {
     return icons[merchant] || '🏢';
   };
 
-  const handleSort = (newSortBy: 'spending' | 'transactions' | 'frequency' | 'remaining') => {
+  const handleSort = (newSortBy: 'spending' | 'transactions' | 'frequency' | 'remaining' | 'tracked' | 'name' | 'spent_this_month' | 'avg_tx' | 'category') => {
     if (sortBy === newSortBy) {
       setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
     } else {
@@ -480,6 +504,17 @@ export default function AIMerchantAnalysisPage() {
             )}
           </p>
         </div>
+        <div className="flex items-center gap-2">
+          {categoryFilter && (
+            <button
+              onClick={() => setCategoryFilter(null)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+              title="Clear category filter"
+            >
+              Clear Filter
+            </button>
+          )}
+        </div>
       </div>
 
       {merchantData.length === 0 ? (
@@ -497,8 +532,28 @@ export default function AIMerchantAnalysisPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Track Pacing</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Merchant</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('tracked')}
+                      >
+                        <div className="flex items-center">
+                          Track Pacing
+                          {sortBy === 'tracked' && (
+                            <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center">
+                          Merchant
+                          {sortBy === 'name' && (
+                            <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                          )}
+                        </div>
+                      </th>
                       <th 
                         className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('spending')}
@@ -512,7 +567,17 @@ export default function AIMerchantAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Spent This Month</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('spent_this_month')}
+                      >
+                        <div className="flex items-center">
+                          Spent This Month
+                          {sortBy === 'spent_this_month' && (
+                            <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                          )}
+                        </div>
+                      </th>
                       <th 
                         className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
                         onClick={() => handleSort('remaining')}
@@ -539,8 +604,28 @@ export default function AIMerchantAnalysisPage() {
                           )}
                         </div>
                       </th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Historical Avg/Transaction</th>
-                      <th className="text-left py-3 px-2 font-medium text-gray-900">Associated Category</th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('avg_tx')}
+                      >
+                        <div className="flex items-center">
+                          Historical Avg/Transaction
+                          {sortBy === 'avg_tx' && (
+                            <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="text-left py-3 px-2 font-medium text-gray-900 cursor-pointer hover:bg-gray-50 select-none"
+                        onClick={() => handleSort('category')}
+                      >
+                        <div className="flex items-center">
+                          Associated Category
+                          {sortBy === 'category' && (
+                            <span className="ml-1">{sortOrder === 'desc' ? '↓' : '↑'}</span>
+                          )}
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -612,9 +697,13 @@ export default function AIMerchantAnalysisPage() {
                         <td className="py-3 px-2 text-left">
                           <div className="flex flex-wrap gap-1">
                             {merchant.categories.slice(0, 2).map((cat, i) => (
-                              <span key={i} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                              <button key={i}
+                                onClick={() => setCategoryFilter(cat.category)}
+                                className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-200"
+                                title={`Filter by ${cat.category}`}
+                              >
                                 {cat.category}
-                              </span>
+                              </button>
                             ))}
                           </div>
                         </td>
