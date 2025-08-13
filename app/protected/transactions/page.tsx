@@ -427,6 +427,10 @@ export default function TransactionsPage() {
     {
       id: 'star',
       header: 'Track Bill',
+      accessorFn: (row: TransactionWithAnalytics) => {
+        const txId = row.plaid_transaction_id;
+        return txId ? Number(transactionStarredStatus.get(txId) || false) : 0;
+      },
       cell: ({ row }: { row: { original: TransactionWithAnalytics } }) => {
         const transaction = row.original;
         const merchantName = transaction.merchant_name || transaction.name;
@@ -450,13 +454,16 @@ export default function TransactionsPage() {
         );
       },
       enableSorting: true,
-      sortingFn: (rowA: { original: TransactionWithAnalytics }, rowB: { original: TransactionWithAnalytics }) => {
-        const aId = rowA.original.plaid_transaction_id;
-        const bId = rowB.original.plaid_transaction_id;
-        const aStar = aId ? (transactionStarredStatus.get(aId) || false) : false;
-        const bStar = bId ? (transactionStarredStatus.get(bId) || false) : false;
-        return Number(bStar) - Number(aStar);
+      sortingFn: (
+        rowA: { getValue: (id: string) => unknown },
+        rowB: { getValue: (id: string) => unknown },
+        columnId: string
+      ) => {
+        const a = Number(rowA.getValue(columnId) ?? 0);
+        const b = Number(rowB.getValue(columnId) ?? 0);
+        return b - a;
       },
+      sortDescFirst: true,
       size: 60,
     },
     {
