@@ -334,12 +334,18 @@ export default function IncomePage() {
     });
   };
 
+  // Parse a YYYY-MM-DD date string in a timezone-safe way (no midnight DST shifts)
+  const parseDateSafe = (dateString: string) => {
+    if (!dateString) return new Date(NaN);
+    return new Date(dateString.includes('T') ? dateString : `${dateString}T12:00:00`);
+  };
+
   // Unified next predicted date calculation (source of truth)
   const getNextPredictedDate = (source: IncomeSource): string | undefined => {
     const today = new Date();
     // If manual override exists and is in the future, prefer it
     if (source.next_predicted_date) {
-      const manual = new Date(`${source.next_predicted_date}T12:00:00`);
+      const manual = parseDateSafe(source.next_predicted_date);
       if (!isNaN(manual.getTime()) && manual >= today) {
         return manual.toISOString().split('T')[0];
       }
@@ -352,7 +358,7 @@ export default function IncomePage() {
     }
     if (!lastDate) return undefined;
 
-    const base = new Date(`${lastDate}T12:00:00`);
+    const base = parseDateSafe(lastDate);
     if (isNaN(base.getTime())) return undefined;
 
     const nextDate = new Date(base);
@@ -484,18 +490,18 @@ export default function IncomePage() {
       // Prioritize manual override first, then fall back to calculated date
       let nextDate;
       let isManualOverride = false;
-      if (source.next_predicted_date && new Date(source.next_predicted_date) >= today) {
+      if (source.next_predicted_date && parseDateSafe(source.next_predicted_date) >= today) {
         // Use manual override if it's in the future
-        nextDate = new Date(source.next_predicted_date);
+        nextDate = parseDateSafe(source.next_predicted_date);
         isManualOverride = true;
         console.log(`📅 Using manual override for "${source.source_name}": ${source.next_predicted_date}`);
       } else {
         // Calculate from last payment if no valid override
-        nextDate = new Date(lastDate);
+        nextDate = parseDateSafe(lastDate);
         
         // For bi-weekly, ensure we land on the same day of week as the last payment
         if (source.frequency === 'bi-weekly') {
-          const lastPaymentDate = new Date(lastDate);
+          const lastPaymentDate = parseDateSafe(lastDate);
           const dayOfWeek = lastPaymentDate.getDay(); // 0=Sunday, 5=Friday
           
           // Calculate how many days to add to get to today or future
@@ -534,7 +540,7 @@ export default function IncomePage() {
         // If we're using a manual override, start from there; otherwise determine pattern
         if (!source.next_predicted_date || new Date(source.next_predicted_date) < today) {
           // No manual override or it's in the past - determine pattern from last payment
-          const lastPayDate = new Date(lastDate);
+          const lastPayDate = parseDateSafe(lastDate);
           const lastDay = lastPayDate.getDate();
           
           if (lastDay <= 16) {
@@ -596,27 +602,23 @@ export default function IncomePage() {
             nextDate.setDate(nextDate.getDate() + 14);
           }
         } else {
-          // Calculate interval days for weekly and monthly
-          let intervalDays = 30; // default monthly
-          switch (source.frequency) {
-            case 'weekly':
-              intervalDays = 7;
-              break;
-            case 'monthly':
-              intervalDays = 30;
-              break;
-          }
-
-          // Generate upcoming dates
-          while (nextDate <= endDate) {
-            if (nextDate >= today) {
-              upcomingIncomes.push({
-                date: new Date(nextDate),
-                source: source,
-                amount: source.expected_amount
-              });
+          // Weekly and monthly generation using calendar increments
+          if (source.frequency === 'weekly') {
+            while (nextDate <= endDate) {
+              if (nextDate >= today) {
+                upcomingIncomes.push({ date: new Date(nextDate), source, amount: source.expected_amount });
+              }
+              nextDate.setDate(nextDate.getDate() + 7);
             }
-            nextDate.setDate(nextDate.getDate() + intervalDays);
+          } else if (source.frequency === 'monthly') {
+            while (nextDate <= endDate) {
+              if (nextDate >= today) {
+                upcomingIncomes.push({ date: new Date(nextDate), source, amount: source.expected_amount });
+              }
+              const d: Date = new Date(nextDate);
+              d.setMonth(d.getMonth() + 1);
+              nextDate = d;
+            }
           }
         }
       } // end else block
