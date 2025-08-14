@@ -1,6 +1,6 @@
 # 🧠 MASTER AGENT
 
-**Last Updated:** August 13, 2025 7:54 AM EDT
+**Last Updated:** August 14, 2025 02:46 PM EDT
 
 ## 📋 PROJECT OVERVIEW
 
@@ -22,6 +22,49 @@
 - 🔄 Predictive spending analysis and budgeting
 
 ## 📈 DEPLOYMENT LOG
+
+### Deployment #39: 5pm Daily Snapshot — Yesterday's transactions listed + preview alignment
+**Date:** August 14, 2025 02:46 PM EDT  
+**Status:** ✅ DEPLOYED (GitHub auto-deploy)
+
+**Scope:**
+- Daily Krezzo (5pm) SMS now includes a line-by-line list of yesterday's posted transactions under "Yesterday's Activity"
+- Format: "Merchant: $Amount" (e.g., "Amazon: $31.04")
+- Updated preferences preview sample to match V2 content and correct 5:00 PM ET description
+
+**Impact:**
+- Higher clarity and transparency for users seeing exactly what posted yesterday
+- Consistency between live SMS, in-app preview, and manual send
+
+**Files changed:**
+- `utils/sms/templates.ts` (V2 generator output for Yesterday's Activity)
+- `app/protected/sms-preferences/page.tsx` (sample text and description)
+
+**Build:** `npm run build` clean; GitHub auto-deploy triggered
+
+### Deployment #38: Income Date Consistency + Transactions UX + Merchants/Categories sorting + New Texts page + Krezzo V2 SMS fixes
+**Date:** August 13, 2025 04:46 PM EDT  
+**Status:** ✅ DEPLOYED (Forced prod deploy)  
+**Commits:** 2ec648c, b5f4a1c, be5e4a6, 0216d78, d965ec2
+
+**Scope:**
+- Income page: unified Next Predicted Date parsing and schedule seeding; calendar-month increments; timezone-safe parsing
+- Transactions: “Track Bill” column sortable; click-to-filter merchant/category/subcategory; hover edit icons; Clear Filters behavior
+- Merchants page: sorting for tracked/name/spent/avg-tx/category; category badge filters + clear
+- Categories page: sortable track/name/spent/avg-tx; “Merchants Associated” count with slide-out list
+- Texts: new `/protected/texts` page showing only live templates (Krezzo 5pm, weekly, monthly) with real previews and “Send to my phone”
+- SMS: align manual 415pm sends to use V2 preview generator; fix NaN days and guards in Krezzo report
+
+**Impact:**
+- Date displays match across income edit vs upcoming schedule
+- Better transactions usability and accurate star sorting
+- Consistent sorting/filtering across merchants and categories views
+- Texts page reflects only live templates with working test-send
+- Krezzo SMS content parity between on-screen preview and manual sends
+
+**URLs:**
+- New Texts page: `/protected/texts`
+- Latest prod: budgenudge-5gx5ljpbn-krezzo.vercel.app
 
 ### Deployment #37: DAILY SNAPSHOT V2 (5PM) + ROUTE FIXES + PREVIEW PAGE
 **Date:** August 13, 2025 7:54 AM EDT  

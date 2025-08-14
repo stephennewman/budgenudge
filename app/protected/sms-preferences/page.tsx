@@ -71,10 +71,10 @@ const smsTypeInfo = {
     example: `🛤️ CASH FLOW RUNWAY\n9 days until next paycheck (Jul 29)\nBills before then: $842\nProjected spend: $567\nStatus: At risk\nTip: Reduce discretionary by ~$63/day to stay on track.\n\n⚠️ Predictions based on historical data`
   },
   '415pm-special': {
-    title: 'Krezzo Report (4:15 PM)',
-    description: 'Daily at 4:15 PM EST. Comprehensive financial report with transactions, pacing, income, and expenses.',
+    title: 'Krezzo Report (Daily)',
+    description: 'Daily at 5:00 PM Eastern. Comprehensive snapshot with transactions, pacing, income, and expenses.',
     icon: '📊',
-    example: `📊 KREZZO REPORT\n\n💳 Transactions: https://get.krezzo.com/protected/transactions\nPosted yesterday: 3 transactions for $156.78 total\nBalance as of yesterday: $3,083.26\n\n📊 Category Pacing: https://get.krezzo.com/protected/ai-category-analysis\n✅ All categories on track\n\n🏪 Merchant Pacing: https://get.krezzo.com/protected/ai-merchant-analysis\n✅ All merchants on track\n\n💰 Income: https://get.krezzo.com/protected/income\nIn 9 days for $4,020\n\n💸 Expenses: https://get.krezzo.com/protected/recurring-bills\nNext 9 days: 5 for $842 total\n\nExpected balance before next income: $2,241\nMax spend per day: $249\n\n🎯 You're crushing it! 💪 Strong balance, no spending today. Keep this momentum going!`
+    example: `📊 DAILY SNAPSHOT\n\nHey there! Here's your daily financial snapshot.\n\n📋 YESTERDAY'S ACTIVITY\n━━━━━━━━━━━━━━━━━━\nBalance: $3,083\nTotal posted transactions: 3\nPublix: $45.12\nAmazon: $28.99\nShell: $52.67\nTotal spend: $126.78\n\n📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\nGROCERIES\nSpent: $288 | Expected: $210\n🚨 OVER by 37%\n\n🏪 MERCHANT WATCH\n━━━━━━━━━━━━━━━━━━\nAMAZON\nSpent: $156 | Expected: $142\n⚠️ APPROACHING by 10%\n\n💵 DAILY BUDGET\n━━━━━━━━━━━━━━━━━━\nNext income: Jul 29: $4,020\nUpcoming expenses before then: 5 for $842\nAvailable now: $3,083\nAfter expenses: $2,241\nDaily spend limit: $249/day for 9 days (until Jul 29)\n\n🙌 INSPIRATION\n━━━━━━━━━━━━━━━━━━\nYou're doing great! 🌟 Keep monitoring your spending and stay within your daily budget.`
   },
   // TEMPORARILY DISABLED - Paycheck templates
   // 'paycheck-efficiency': {

@@ -1,8 +1,15 @@
 # Product Agent - KREZZO
 
-**Last Updated:** January 28, 2025 9:50 PM EST
+**Last Updated:** August 13, 2025 04:46 PM EDT
 
 ## Product Status: FULLY OPERATIONAL ✅
+### New Enhancements (Aug 13, 2025)
+- Income date consistency: single source of truth across edit vs schedule (reduces confusion) — Impact: 80/100, Effort: 30/100
+- Transactions UX: star sorting + click-to-filter + hover edit — Impact: 75/100, Effort: 35/100
+- Merchants/Categories: consistent sorting and association list — Impact: 70/100, Effort: 30/100
+- Texts page: new `/protected/texts` with only live templates + working “Send to my phone” — Impact: 85/100, Effort: 25/100
+- Krezzo SMS alignment: preview and manual now match (V2) — Impact: 80/100, Effort: 20/100
+
 
 ### Recent Major Enhancement (Jan 28, 2025)
 - **Smart Bill Detection System:** ✅ Revolutionary enhancement transforming 10% to 87% bill detection accuracy

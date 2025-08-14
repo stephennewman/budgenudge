@@ -1822,7 +1822,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
     case 'onboarding-day-before':
       return await generateOnboardingDayBeforeMessage(userId);
     case '415pm-special':
-      return await generate415pmSpecialMessage(userId);
+      // Align manual sends with on-screen preview and cron: use V2
+      return await generateDailyReportV2(userId);
     // TEMPORARILY DISABLED - Paycheck templates
     // case 'paycheck-efficiency':
     //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
@@ -2500,8 +2501,15 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     let msg = `📊 DAILY SNAPSHOT\n\nHey ${firstName}! Here's your daily financial snapshot.\n\n`;
     msg += `📋 YESTERDAY'S ACTIVITY\n━━━━━━━━━━━━━━━━━━\n`;
     msg += `Balance: $${availableBalance.toFixed(0)}\n`;
-    msg += `Transactions: ${(yesterdayTx || []).length}\n`;
-    msg += `Total spent: $${totalYesterdayAll.toFixed(0)}\n\n`;
+    msg += `Total posted transactions: ${(yesterdayTx || []).length}\n`;
+    if (yesterdayTx && yesterdayTx.length > 0) {
+      for (const t of yesterdayTx) {
+        const merchant = String((t as any).merchant_name || (t as any).name || 'Transaction').slice(0, 24);
+        const amt = Number((t as any).amount || 0).toFixed(2);
+        msg += `${merchant}: $${amt}\n`;
+      }
+    }
+    msg += `Total spend: $${totalYesterdayAll.toFixed(2)}\n\n`;
 
     // Category pacing section (show all red/yellow)
     msg += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;

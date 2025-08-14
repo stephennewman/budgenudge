@@ -1,6 +1,6 @@
 # Documentation Agent - Krezzo
 
-**Last Updated:** August 13, 2025 7:54 AM EDT
+**Last Updated:** August 13, 2025 04:46 PM EDT
 
 ## Documentation Status: CURRENT ✅
 
@@ -18,6 +18,13 @@
 - **Email Template System**: ✅ NEW - Supabase auth email font modernization with Manrope typography
 
 ## Recent Documentation Updates
+
+### August 13, 2025 - Income/Transactions/Text & SMS alignment
+- Documented income date parsing (`parseDateSafe`) and unified schedule seeding
+- Updated transactions table docs: star sorting via accessor, click-to-filter behaviors
+- Added `/protected/texts` page to user guide; shows only live templates (Krezzo/weekly/monthly)
+- Manual SMS alignment: '415pm-special' routes to V2 generator to match preview
+- Krezzo report: documented guards to prevent NaN days and empty sections
 
 ### August 13, 2025 - Daily Snapshot v2 & 5pm Route
 - Added v2 Daily Snapshot sections and logic to SMS docs (pacing reds/yellows + green counts)

@@ -1,9 +1,42 @@
 # ⚙️ ENGINEERING AGENT - KREZZO
 
-**Last Updated:** August 13, 2025 7:54 AM EDT  
-**Current Sprint:** Daily Snapshot v2 & 5pm Route Fixes  
+**Last Updated:** August 14, 2025 02:46 PM EDT  
+**Current Sprint:** Income date consistency, Transactions UX, Texts page, Krezzo V2 alignment  
 
 ## 📋 RECENT DEPLOYMENTS
+
+### Deployment #39: 5pm Daily Snapshot — Yesterday's transactions list + format tweak
+**Date:** August 14, 2025 02:46 PM EDT  
+**Status:** ✅ SUCCESSFULLY DEPLOYED (GitHub auto-deploy)  
+**Build:** `npm run build` clean
+
+Changes:
+- `utils/sms/templates.ts`: V2 Krezzo report now prints each of yesterday's posted transactions in the format `Merchant: $Amount` under "Yesterday's Activity"; updated totals line
+- `app/protected/sms-preferences/page.tsx`: Preview example updated; description reflects 5:00 PM Eastern
+
+Notes:
+- `/protected/texts` and `/protected/sms-preview` render live V2, so previews update automatically
+- No schema changes; minimal, targeted edits
+
+### Deployment #38: Income/Transactions/Merchants/Categories/Text & SMS fixes
+**Date:** August 13, 2025 04:46 PM EDT  
+**Status:** ✅ SUCCESSFULLY DEPLOYED (forced)  
+**Commits:** 2ec648c, b5f4a1c, be5e4a6, 0216d78, d965ec2  
+**Build:** `npm run build` clean (warnings only)
+
+Changes:
+- `app/protected/income/page.tsx`: add `parseDateSafe`; seed upcoming schedule from unified next; monthly increments
+- `app/protected/transactions/page.tsx`: star column accessor + typed sorting; click-to-filter; hover edit icon; clear filters
+- `app/protected/ai-merchant-analysis/page.tsx`: added sorts + category filter/click/clear
+- `app/protected/ai-category-analysis/page.tsx`: added sorts; “Merchants Associated” count + slide-out
+- `app/protected/texts/page.tsx`: new page with real previews (Krezzo/weekly/monthly)
+- `components/send-test-sms-button.tsx`: working manual send via `/api/manual-sms`
+- `components/protected-sidebar.tsx`: Texts link → `/protected/texts`
+- `utils/sms/templates.ts`: manual '415pm-special' now uses V2; fixed NaN/guards; standardized next income structure
+
+Notes:
+- Parity achieved between on-screen preview and manual “Send to my phone” for Krezzo report
+- No schema changes; only UI and generator logic
 
 ### Deployment #37: DAILY SNAPSHOT V2 + 5PM ROUTE FIXES
 **Date:** August 13, 2025 7:54 AM EDT  
