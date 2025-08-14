@@ -2525,6 +2525,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
         if (c.pacing > 100) msg += `🚨 OVER by ${Math.round(c.pacing - 100)}%\n`;
         else if (c.pacing >= 90) msg += `⚠️ APPROACHING by ${Math.round(100 - c.pacing)}%\n`;
         else msg += `✅ GOOD by ${Math.round(100 - c.pacing)}%\n`;
+        msg += `\n`; // blank line between categories
       };
 
       if (reds.length === 0 && yellows.length === 0 && greens.length > 0) {
