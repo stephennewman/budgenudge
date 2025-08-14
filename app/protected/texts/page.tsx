@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { generateDailyReportV2, generateSMSMessage } from '@/utils/sms/templates';
 import SendTestSMSButton from '@/components/send-test-sms-button';
 import AddRecipientButton from '@/components/add-recipient-button';
+import RecipientsPanel from '@/components/recipients-panel';
 
 export default async function TextsPage() {
   const supabase = await createSupabaseClient();
@@ -99,6 +100,9 @@ export default async function TextsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Recipients management moved to bottom */}
+      <RecipientsPanel />
     </div>
   );
 }
