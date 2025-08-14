@@ -1,9 +1,24 @@
 # ⚙️ ENGINEERING AGENT - KREZZO
 
-**Last Updated:** August 14, 2025 02:46 PM EDT  
+**Last Updated:** August 14, 2025 04:58 PM EDT  
 **Current Sprint:** Income date consistency, Transactions UX, Texts page, Krezzo V2 alignment  
 
 ## 📋 RECENT DEPLOYMENTS
+
+### Deployment #40: Monthly summary math fix (texts preview) — correct month window, exclude pending, accurate daily avg
+**Date:** August 14, 2025 04:58 PM EDT  
+**Status:** ✅ SUCCESSFULLY DEPLOYED (GitHub auto-deploy)  
+**Build:** `npm run build` clean
+
+Changes:
+- `utils/sms/templates.ts`: Fix monthly spending summary calculations
+  - Use inclusive start to exclusive next-month start to avoid timezone off-by-one
+  - Exclude pending transactions (`.eq('pending', false)`) from spend totals
+  - Compute days-in-month via local Date arithmetic for accurate daily average
+
+Notes:
+- Affects `/protected/texts` monthly preview and live monthly summary SMS
+- Minimal, targeted edits; no schema changes
 
 ### Deployment #39: 5pm Daily Snapshot — Yesterday's transactions list + format tweak
 **Date:** August 14, 2025 02:46 PM EDT  

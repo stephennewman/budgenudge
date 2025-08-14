@@ -858,40 +858,47 @@ export async function generateMonthlySpendingSummaryMessage(userId: string): Pro
       0
     );
 
-    // Calculate previous month boundaries
+    // Calculate month boundaries using local dates and exclusive upper bounds to avoid timezone issues
     const now = new Date();
-    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthStart = new Date(lastMonth.getFullYear(), lastMonth.getMonth(), 1);
-    const lastMonthEnd = new Date(lastMonth.getFullYear(), lastMonth.getMonth() + 1, 0, 23, 59, 59, 999);
-    
-    // Calculate month before last for comparison
-    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    const twoMonthsAgoStart = new Date(twoMonthsAgo.getFullYear(), twoMonthsAgo.getMonth(), 1);
-    const twoMonthsAgoEnd = new Date(twoMonthsAgo.getFullYear(), twoMonthsAgo.getMonth() + 1, 0, 23, 59, 59, 999);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1); // start of last month (local)
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1); // start of current month (local)
+    // For comparison window: month before last (two months ago)
+    const twoMonthsAgoStart = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const lastMonthStartForComparison = new Date(now.getFullYear(), now.getMonth() - 1, 1);
 
-    // Get previous month's transactions
-    const lastMonthStartStr = lastMonthStart.toISOString().split('T')[0];
-    const lastMonthEndStr = lastMonthEnd.toISOString().split('T')[0];
+    // Local YYYY-MM-DD formatter to avoid UTC date shifting
+    const formatLocalDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    // Get previous month's transactions (inclusive start, exclusive next-month start)
+    const lastMonthStartStr = formatLocalDate(lastMonthStart);
+    const thisMonthStartStr = formatLocalDate(thisMonthStart);
 
     const { data: lastMonthTransactions } = await supabase
       .from('transactions')
       .select('date, merchant_name, name, amount, ai_category_tag, ai_merchant_name')
       .in('plaid_item_id', itemIds)
       .gte('date', lastMonthStartStr)
-      .lte('date', lastMonthEndStr)
+      .lt('date', thisMonthStartStr)
+      .eq('pending', false) // Only posted transactions
       .gt('amount', 0) // Only spending transactions
       .order('amount', { ascending: false });
 
-    // Get month before last for comparison
-    const twoMonthsAgoStartStr = twoMonthsAgoStart.toISOString().split('T')[0];
-    const twoMonthsAgoEndStr = twoMonthsAgoEnd.toISOString().split('T')[0];
+    // Get month before last for comparison (inclusive start, exclusive end at lastMonthStart)
+    const twoMonthsAgoStartStr = formatLocalDate(twoMonthsAgoStart);
+    const lastMonthStartStrForComparison = formatLocalDate(lastMonthStartForComparison);
 
     const { data: twoMonthsAgoTransactions } = await supabase
       .from('transactions')
       .select('amount')
       .in('plaid_item_id', itemIds)
       .gte('date', twoMonthsAgoStartStr)
-      .lte('date', twoMonthsAgoEndStr)
+      .lt('date', lastMonthStartStrForComparison)
+      .eq('pending', false)
       .gt('amount', 0);
 
     const lastMonthTotal = lastMonthTransactions?.reduce((sum, t) => sum + t.amount, 0) || 0;
@@ -979,8 +986,8 @@ export async function generateMonthlySpendingSummaryMessage(userId: string): Pro
       }
     }
 
-    // Daily average
-    const daysInMonth = lastMonthEnd.getDate();
+    // Daily average (use days in the last month via Date arithmetic without relying on UTC conversion)
+    const daysInMonth = new Date(lastMonthStart.getFullYear(), lastMonthStart.getMonth() + 1, 0).getDate();
     const dailyAverage = lastMonthTotal / daysInMonth;
     message += `\n\n📊 Daily Average: $${dailyAverage.toFixed(0)}`;
 

@@ -1,6 +1,6 @@
 # 🧠 MASTER AGENT
 
-**Last Updated:** August 14, 2025 02:46 PM EDT
+**Last Updated:** August 14, 2025 04:58 PM EDT
 
 ## 📋 PROJECT OVERVIEW
 
@@ -22,6 +22,24 @@
 - 🔄 Predictive spending analysis and budgeting
 
 ## 📈 DEPLOYMENT LOG
+
+### Deployment #40: Monthly summary math fix — accurate totals and averages
+**Date:** August 14, 2025 04:58 PM EDT  
+**Status:** ✅ DEPLOYED (GitHub auto-deploy)
+
+**Scope:**
+- Correct monthly spending summary math used by `/protected/texts` preview and monthly SMS
+- Fixed month range to [start, next-start) with local dates to avoid UTC off-by-one
+- Excluded pending transactions from spending totals; correct days-in-month for daily average
+
+**Impact:**
+- Accurate month totals, weekly breakdown alignment, and daily average on the Monthly Spending Summary
+- Resolves user-reported discrepancy on `/protected/texts`
+
+**Files changed:**
+- `utils/sms/templates.ts`
+
+**Build:** `npm run build` clean; GitHub auto-deploy triggered
 
 ### Deployment #39: 5pm Daily Snapshot — Yesterday's transactions listed + preview alignment
 **Date:** August 14, 2025 02:46 PM EDT  
