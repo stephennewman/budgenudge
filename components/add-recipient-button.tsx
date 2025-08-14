@@ -5,29 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
-export default function AddRecipientButton() {
+export default function AddRecipientButton({ onSuccess }: { onSuccess?: () => void }) {
   const [open, setOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string | null>(null);
-
-  const refreshStatus = async () => {
-    try {
-      const res = await fetch('/api/sms-recipient');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.raw_present) setStatus(`Added: ${data.additional_phone}`);
-        else setStatus(null);
-      }
-    } catch {
-      // no-op
-    }
-  };
-
-  // Load current status on mount/open
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useState(() => { refreshStatus(); return undefined; });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +27,7 @@ export default function AddRecipientButton() {
       }
       setOpen(false);
       setPhone('');
-      await refreshStatus();
+      if (onSuccess) onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
@@ -62,11 +44,6 @@ export default function AddRecipientButton() {
         <DialogHeader>
           <DialogTitle>Add recipient</DialogTitle>
         </DialogHeader>
-        {status && (
-          <div className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2 mb-2">
-            {status}
-          </div>
-        )}
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="text-sm mb-1 block">Phone number</label>

@@ -56,7 +56,7 @@ export default function RecipientsPanel() {
               Remove recipient
             </Button>
           )}
-          <AddRecipientButton />
+          <AddRecipientButton onSuccess={refresh} />
         </div>
       </div>
     </Card>
