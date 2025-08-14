@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
+import { ChevronRight } from 'lucide-react';
 
 
 interface TaggedMerchant {
@@ -64,6 +65,7 @@ export default function RecurringBillsManager() {
   // Split modal state
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
+  const [expandedRecentByMerchant, setExpandedRecentByMerchant] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     fetchTaggedMerchants();
@@ -343,7 +345,7 @@ export default function RecurringBillsManager() {
           onClick={() => setShowAddForm(!showAddForm)}
           className="bg-green-600 hover:bg-green-700"
         >
-          ➕ Add Custom Bill
+          + Expense
         </Button>
       </div>
 
@@ -517,25 +519,44 @@ export default function RecurringBillsManager() {
                 ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
                   <div className="px-3 pb-3">
                     <div className="bg-white border rounded-md p-3">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-sm font-medium text-gray-700">📋 Recent Transactions</h4>
+                      <div className="flex items-center mb-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 text-sm font-medium text-gray-700 group"
+                          aria-expanded={Boolean(expandedRecentByMerchant[merchant.id])}
+                          aria-controls={`recent-${merchant.id}`}
+                          onClick={() =>
+                            setExpandedRecentByMerchant(prev => ({
+                              ...prev,
+                              [merchant.id]: !prev[merchant.id]
+                            }))
+                          }
+                        >
+                          <ChevronRight
+                            className={`h-4 w-4 transition-transform duration-200 ${expandedRecentByMerchant[merchant.id] ? 'rotate-90' : ''}`}
+                            aria-hidden="true"
+                          />
+                          <span>📋 Recent Transactions</span>
+                        </button>
                       </div>
-                      <ul className="space-y-0.5">
-                        {merchantTransactions[merchant.id].map((transaction) => (
-                          <li key={transaction.id} className={`text-xs py-1 px-2 rounded ${
-                            merchant.account_identifier && transaction.is_tracked_for_this_split 
-                              ? 'bg-blue-50 border-l-2 border-l-blue-400' 
-                              : merchant.account_identifier
-                              ? 'bg-gray-50 opacity-75'
-                              : ''
-                          }`}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-gray-600">{transaction.date}</span>
-                              <span className="font-medium">${Math.abs(transaction.amount).toFixed(2)}</span>
-                            </div>
-                          </li>
-                        ))}
-                                              </ul>
+                      {expandedRecentByMerchant[merchant.id] && (
+                        <ul id={`recent-${merchant.id}`} className="space-y-0.5">
+                          {merchantTransactions[merchant.id].map((transaction) => (
+                            <li key={transaction.id} className={`text-xs py-1 px-2 rounded ${
+                              merchant.account_identifier && transaction.is_tracked_for_this_split 
+                                ? 'bg-blue-50 border-l-2 border-l-blue-400' 
+                                : merchant.account_identifier
+                                ? 'bg-gray-50 opacity-75'
+                                : ''
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-600">{transaction.date}</span>
+                                <span className="font-medium">${Math.abs(transaction.amount).toFixed(2)}</span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       </div>
                   </div>
                 ) : (
