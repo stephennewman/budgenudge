@@ -2500,16 +2500,17 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     // Compose message with old 4:15 visual sections
     let msg = `📊 DAILY SNAPSHOT\n\nHey ${firstName}! Here's your daily financial snapshot.\n\n`;
     msg += `📋 YESTERDAY'S ACTIVITY\n━━━━━━━━━━━━━━━━━━\n`;
-    msg += `Balance: $${availableBalance.toFixed(0)}\n`;
-    msg += `Total posted transactions: ${(yesterdayTx || []).length}\n`;
+    msg += `Total posted transactions: ${(yesterdayTx || []).length}\n\n`;
     if (yesterdayTx && yesterdayTx.length > 0) {
       for (const t of yesterdayTx) {
         const merchant = String((t as any).merchant_name || (t as any).name || 'Transaction').slice(0, 24);
         const amt = Number((t as any).amount || 0).toFixed(2);
         msg += `${merchant}: $${amt}\n`;
       }
+      msg += `\n`;
     }
-    msg += `Total spend: $${totalYesterdayAll.toFixed(2)}\n\n`;
+    msg += `Total spend: $${totalYesterdayAll.toFixed(2)}\n`;
+    msg += `Balance: $${availableBalance.toFixed(0)}\n\n`;
 
     // Category pacing section (show all red/yellow)
     msg += `📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\n`;
