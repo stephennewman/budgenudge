@@ -5,6 +5,7 @@ import { createSupabaseClient } from '@/utils/supabase/client';
 import { Card } from '@/components/ui/card';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import { Button } from '@/components/ui/button';
+// Removed add-recipient UI; it now lives on /protected/texts
 
 interface SMSPreference {
   id?: number;
@@ -252,14 +253,17 @@ export default function SMSPreferencesPage() {
                       <p className="text-gray-600">{info.description}</p>
                     </div>
                   </div>
-                  <Button
-                    onClick={() => generateLiveSMS(type)}
-                    disabled={liveContent?.loading}
-                    variant="outline"
-                    size="sm"
-                  >
-                    {liveContent?.loading ? 'Generating...' : 'Show Live SMS'}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={() => generateLiveSMS(type)}
+                      disabled={liveContent?.loading}
+                      variant="outline"
+                      size="sm"
+                    >
+                      {liveContent?.loading ? 'Generating...' : 'Show Live SMS'}
+                    </Button>
+                    {/* Add recipient lives on /protected/texts */}
+                  </div>
                 </div>
 
                 {/* Live SMS Content */}
@@ -307,3 +311,5 @@ export default function SMSPreferencesPage() {
     </div>
   );
 } 
+
+// (Add recipient UI removed)

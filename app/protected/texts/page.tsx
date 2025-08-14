@@ -2,6 +2,7 @@ import { createSupabaseClient } from '@/utils/supabase/server';
 import { Card, CardContent } from '@/components/ui/card';
 import { generateDailyReportV2, generateSMSMessage } from '@/utils/sms/templates';
 import SendTestSMSButton from '@/components/send-test-sms-button';
+import AddRecipientButton from '@/components/add-recipient-button';
 
 export default async function TextsPage() {
   const supabase = await createSupabaseClient();
@@ -56,7 +57,10 @@ export default async function TextsPage() {
               <h2 className="text-lg font-semibold">Krezzo Report (Daily)</h2>
               <p className="text-sm text-muted-foreground">Sent every day at 5:00 PM Eastern</p>
             </div>
-            <SendTestSMSButton userId={user.id} templateType="415pm-special" label="Send to my phone" />
+            <div className="flex items-center gap-2">
+              <SendTestSMSButton userId={user.id} templateType="415pm-special" label="Send to my phone" />
+              <AddRecipientButton />
+            </div>
           </div>
           <div className="rounded-md border p-4 whitespace-pre-wrap text-sm">
             {krezz}

@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
         // Get user's phone number
         const { data: settings } = await supabase
           .from('user_sms_settings')
-          .select('phone_number')
+          .select('phone_number, additional_phone')
           .eq('user_id', userId)
           .single();
 
@@ -152,8 +152,39 @@ export async function GET(request: NextRequest) {
           console.log(`❌ Failed to send 5:30 PM special SMS to user ${userId}:`, smsResult.error);
         }
 
-        // Add small delay between SMS sends
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // MVP: also send to additional recipient if present
+        const additionalPhone = (settings as { additional_phone?: string } | null)?.additional_phone ?? null;
+        if (additionalPhone && additionalPhone.trim() !== '') {
+          const addDedupe = await checkAndLogSMS({
+            phoneNumber: additionalPhone,
+            templateType: '415pm-special',
+            userId,
+            sourceEndpoint: '415pm-special',
+            success: true,
+            dedupeKeyOverride: `415pm-special|subject:${String(userId).slice(0,8)}`
+          });
+          if (addDedupe.canSend) {
+            const addResult = await sendUnifiedSMS({
+              phoneNumber: additionalPhone,
+              message: smsMessage,
+              userId: userId,
+              context: '415pm-special'
+            });
+            if (addResult.success) {
+              smsSent++;
+              logDetails.push({ userId, templateType: '415pm-special', sent_additional: true });
+            } else {
+              smsFailed++;
+              logDetails.push({ userId, templateType: '415pm-special', sent_additional: false, error: addResult.error });
+            }
+          } else {
+            logDetails.push({ userId, templateType: '415pm-special', additional_skipped: true, reason: addDedupe.reason });
+          }
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Add small delay between users
+        await new Promise(resolve => setTimeout(resolve, 300));
 
       } catch (userError) {
         const errorMsg = userError instanceof Error ? userError.message : String(userError);

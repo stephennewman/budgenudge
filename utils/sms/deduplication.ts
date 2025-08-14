@@ -20,6 +20,12 @@ export interface SMSSendRecord {
   sourceEndpoint: SMSSourceEndpoint;
   messageId?: string;
   success: boolean;
+  /**
+   * Optional override used solely for deduplication/logging keys to avoid collisions
+   * when the same phone number legitimately receives multiple users' messages.
+   * Example: `${templateType}|subject:${userId.slice(0, 8)}`
+   */
+  dedupeKeyOverride?: string;
 }
 
 /**
@@ -27,8 +33,8 @@ export interface SMSSendRecord {
  * Returns true if SMS can be sent, false if already sent today
  */
 export async function canSendSMS(
-  phoneNumber: string, 
-  templateType: SMSTemplateType,
+  phoneNumber: string,
+  templateType: SMSTemplateType | string,
   checkDate?: Date
 ): Promise<{ canSend: boolean; reason?: string }> {
   try {
@@ -72,7 +78,8 @@ export async function logSMSSend(record: SMSSendRecord): Promise<{ success: bool
     
     const { data: logId, error } = await supabase.rpc('log_sms_send', {
       p_phone_number: record.phoneNumber,
-      p_template_type: record.templateType,
+      // Use override if provided to isolate dedupe keys across different subject users
+      p_template_type: record.dedupeKeyOverride || record.templateType,
       p_user_id: record.userId,
       p_source_endpoint: record.sourceEndpoint,
       p_message_id: record.messageId || null,
@@ -104,7 +111,8 @@ export async function checkAndLogSMS(record: SMSSendRecord): Promise<{
   error?: string;
 }> {
   // First check if we can send
-  const { canSend, reason } = await canSendSMS(record.phoneNumber, record.templateType);
+  const effectiveTemplateKey = record.dedupeKeyOverride || record.templateType;
+  const { canSend, reason } = await canSendSMS(record.phoneNumber, effectiveTemplateKey);
   
   if (!canSend) {
     return { canSend, reason };

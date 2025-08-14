@@ -184,7 +184,7 @@ export async function GET(request: NextRequest) {
         // Get both send_time and phone_number in a single query
         const { data: settings, error: settingsError } = await supabase
           .from('user_sms_settings')
-          .select('send_time, phone_number')
+          .select('*')
           .eq('user_id', userId)
           .single();
         
@@ -392,8 +392,39 @@ export async function GET(request: NextRequest) {
               console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
             }
 
-            // Add small delay between SMS sends to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Fan-out to additional recipient if present (MVP)
+            const additionalPhone = (settings as { additional_phone?: string } | null)?.additional_phone ?? null;
+            if (additionalPhone && additionalPhone.trim() !== '') {
+              // Use dedupe override to avoid collisions across multiple kids per parent phone
+              const addDedupe = await checkAndLogSMS({
+                phoneNumber: additionalPhone,
+                templateType,
+                userId,
+                sourceEndpoint: 'scheduled',
+                success: true,
+                dedupeKeyOverride: `${templateType}|subject:${String(userId).slice(0,8)}`
+              });
+              if (addDedupe.canSend) {
+                const addResult = await sendEnhancedSlickTextSMS({
+                  phoneNumber: additionalPhone,
+                  message: smsMessage,
+                  userId: userId
+                });
+                if (addResult.success) {
+                  smsSent++;
+                  logDetails.push({ userId, templateType, sent_additional: true });
+                } else {
+                  smsFailed++;
+                  logDetails.push({ userId, templateType, sent_additional: false, error: addResult.error });
+                }
+              } else {
+                logDetails.push({ userId, templateType, additional_skipped: true, reason: addDedupe.reason });
+              }
+              await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            // Add small delay between users to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 300));
 
           } catch (smsError) {
             smsFailed++;
