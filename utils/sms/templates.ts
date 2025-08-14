@@ -2555,6 +2555,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
         if (m.pacing > 100) msg += `🚨 OVER by ${Math.round(m.pacing - 100)}%\n`;
         else if (m.pacing >= 90) msg += `⚠️ APPROACHING by ${Math.round(100 - m.pacing)}%\n`;
         else msg += `✅ GOOD by ${Math.round(100 - m.pacing)}%\n`;
+        msg += `\n`; // add blank line between merchants
       };
 
       if (redsM.length === 0 && yellowsM.length === 0 && greensM.length > 0) {
