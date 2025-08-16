@@ -40,7 +40,11 @@ export default function ProtectedLayout({
     },
     {
       label: "📱 Texts",
-      href: "/sms-preferences",
+      href: "/texts",
+    },
+    {
+      label: "🛒 Deals",
+      href: "/deals",
     },
   ];
 
