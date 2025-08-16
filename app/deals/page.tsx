@@ -110,7 +110,7 @@ export default async function DealsPage() {
   return (
     <div className="min-h-[70vh] px-4 py-10 max-w-5xl mx-auto">
       <h1 className="text-4xl sm:text-5xl font-bold mb-6">Deals</h1>
-      <p className="text-lg text-gray-600 mb-8">Latest Publix Weekly Ad deals we’ve ingested.</p>
+      <p className="text-lg text-gray-600 mb-8">Latest Publix Weekly Ad deals, organized by AI.</p>
 
 
 
