@@ -125,22 +125,24 @@ export default async function DealsPage() {
       {deals.length === 0 ? (
         <div className="text-gray-600">No deals saved yet. Use the scraper preview then POST to /api/deals/save.</div>
       ) : (
-        <div className="space-y-4">
-          {(['Produce', 'Dairy', 'Meat', 'Seafood', 'Dry Goods', 'Frozen Foods', 'Bakery', 'Beverages', 'Snacks', 'Deli', 'Misc'] as GroceryCategory[]).map((section) => (
-            grouped[section].length > 0 && (
-              <div key={section}>
-                <h3 className="text-lg font-semibold mb-2 text-green-700">{section}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {(['Produce', 'Dairy', 'Meat', 'Seafood', 'Dry Goods', 'Frozen Foods', 'Bakery', 'Beverages', 'Snacks', 'Deli', 'Misc'] as GroceryCategory[])
+            .map(section => ({ section, count: grouped[section].length }))
+            .filter(item => item.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .map(({ section }) => (
+              <div key={section} className="bg-white border rounded-lg p-4">
+                <h3 className="text-lg font-semibold mb-3 text-green-700 border-b pb-1">{section} ({grouped[section].length})</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
                   {grouped[section].map((d) => (
-                    <div key={d.id} className="bg-gray-50 rounded p-2 text-sm">
+                    <div key={d.id} className="text-sm border-b border-gray-100 pb-1 last:border-b-0">
                       <div className="font-medium text-gray-900 leading-tight">{d.title?.replace(/,.*BOGO.*/, '') || 'Deal'}</div>
                       <div className="text-xs text-green-600 font-semibold">{d.price_text?.replace(/.*BOGO\s*/, 'BOGO ') || 'BOGO'}</div>
                     </div>
                   ))}
                 </div>
               </div>
-            )
-          ))}
+            ))}
         </div>
       )}
 
