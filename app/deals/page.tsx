@@ -121,23 +121,23 @@ export default async function DealsPage() {
         ))}
       </div>
 
-      <h2 className="text-2xl font-bold mb-4">Newest Post BOGOs</h2>
+      <h2 className="text-2xl font-bold mb-4">Current Week BOGOs</h2>
       {deals.length === 0 ? (
         <div className="text-gray-600">No deals saved yet. Use the scraper preview then POST to /api/deals/save.</div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {(['Produce', 'Dairy', 'Meat', 'Seafood', 'Dry Goods', 'Frozen Foods', 'Bakery', 'Beverages', 'Snacks', 'Deli', 'Misc'] as GroceryCategory[]).map((section) => (
             grouped[section].length > 0 && (
               <div key={section}>
-                <h3 className="text-xl font-semibold mb-2">{section}</h3>
-                <ul className="space-y-2">
+                <h3 className="text-lg font-semibold mb-2 text-green-700">{section}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                   {grouped[section].map((d) => (
-                    <li key={d.id} className="border rounded-lg p-3">
-                      <div className="font-medium">{d.title}</div>
-                      <div className="text-sm text-gray-600">{d.price_text || 'BOGO'}</div>
-                    </li>
+                    <div key={d.id} className="bg-gray-50 rounded p-2 text-sm">
+                      <div className="font-medium text-gray-900 leading-tight">{d.title?.replace(/,.*BOGO.*/, '') || 'Deal'}</div>
+                      <div className="text-xs text-green-600 font-semibold">{d.price_text?.replace(/.*BOGO\s*/, 'BOGO ') || 'BOGO'}</div>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )
           ))}
