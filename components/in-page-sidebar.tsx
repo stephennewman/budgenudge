@@ -13,6 +13,7 @@ type Item = {
   label: string;
   href: string;
   disabled?: boolean;
+  external?: boolean;
 };
 
 export default function InPageSidebar({
@@ -36,23 +37,24 @@ export default function InPageSidebar({
              {/* Navigation */}
        <div className="flex-1 p-4">
          <div className="flex flex-col gap-1">
-           {items.map((item, index) => {
-             const { label, href, disabled = false } = item;
-             const fullHref = `${basePath}${href}`;
-             const isActive =
-               href === "/"
-                 ? pathname === basePath || pathname === `${basePath}/`
-                 : pathname === fullHref;
-             return (
-               <SidebarLink
-                 key={`sidebar-item-${item.href}-${index}`}
-                 href={fullHref}
-                 label={label}
-                 isActive={isActive}
-                 isDisabled={disabled}
-               />
-             );
-           })}
+                     {items.map((item, index) => {
+            const { label, href, disabled = false, external = false } = item;
+            const fullHref = external ? href : `${basePath}${href}`;
+            const isActive = external 
+              ? pathname === href
+              : href === "/"
+                ? pathname === basePath || pathname === `${basePath}/`
+                : pathname === fullHref;
+            return (
+              <SidebarLink
+                key={`sidebar-item-${item.href}-${index}`}
+                href={fullHref}
+                label={label}
+                isActive={isActive}
+                isDisabled={disabled}
+              />
+            );
+          })}
          </div>
        </div>
 
