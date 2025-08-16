@@ -9,21 +9,22 @@ export const metadata: Metadata = {
 
 export default async function DealsPage() {
   const supabase = await createSupabaseClient();
-  const { data: latestPosts } = await supabase
+  
+  // Get the most recent post and its deals
+  const { data: latestPost } = await supabase
     .from('deal_posts')
-    .select('id, url, title, published_at, created_at')
-    .order('published_at', { ascending: false, nullsFirst: false })
+    .select('id')
     .order('created_at', { ascending: false })
-    .limit(5);
+    .limit(1)
+    .single();
 
   // Fetch deals for the newest post (if any)
   let deals: Array<{ id: number; title: string; price_text: string | null; promo_type: string | null }> = [];
-  if (latestPosts && latestPosts.length > 0) {
-    const newest = latestPosts[0];
+  if (latestPost) {
     const { data } = await supabase
       .from('deals')
       .select('id, title, price_text, promo_type')
-      .eq('post_id', newest.id)
+      .eq('post_id', latestPost.id)
       .ilike('promo_type', '%BOGO%')
       .limit(300);
     deals = (data as typeof deals) || [];
@@ -111,15 +112,7 @@ export default async function DealsPage() {
       <h1 className="text-4xl sm:text-5xl font-bold mb-6">Deals</h1>
       <p className="text-lg text-gray-600 mb-8">Latest Publix Weekly Ad deals we’ve ingested.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        {latestPosts?.map((p) => (
-          <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" className="block border rounded-xl p-4 hover:border-blue-300 transition-colors">
-            <div className="text-sm text-gray-500">Post</div>
-            <div className="font-semibold">{p.title || p.url}</div>
-            <div className="text-sm text-gray-500">{p.published_at ? new Date(p.published_at).toLocaleDateString() : ''}</div>
-          </a>
-        ))}
-      </div>
+
 
       <h2 className="text-2xl font-bold mb-4">Current Week BOGOs</h2>
       {deals.length === 0 ? (
