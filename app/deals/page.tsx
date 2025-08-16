@@ -154,9 +154,14 @@ export default async function DealsPage() {
         </div>
       )}
 
-      <div className="mt-10 flex gap-4">
-        <Link href="/sign-up" className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white font-semibold hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 transition-colors">Get started free</Link>
-        <Link href="/" className="inline-flex items-center px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50">Learn more</Link>
+      <div className="mt-10 flex flex-col sm:flex-row gap-4 items-center">
+        <Link href="/bogo-dinner-plan" className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold hover:from-green-700 hover:to-blue-700 transition-colors">
+          🍽️ BOGO Dinner Plan
+        </Link>
+        <div className="flex gap-4">
+          <Link href="/sign-up" className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white font-semibold hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 transition-colors">Get started free</Link>
+          <Link href="/" className="inline-flex items-center px-6 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50">Learn more</Link>
+        </div>
       </div>
     </div>
   );

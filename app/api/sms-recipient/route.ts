@@ -49,7 +49,8 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       sourceEndpoint: 'manual',
       success: true,
-      dedupeKeyOverride: `onboarding-immediate|subject:${String(user.id).slice(0,8)}`
+      // Ensure re-adding the same day still sends a confirmation by using a unique key per action
+      dedupeKeyOverride: `subscription-confirmation|subject:${String(user.id).slice(0,8)}|ts:${Date.now()}`
     });
 
     if (dedupe.canSend) {
