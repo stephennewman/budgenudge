@@ -40,6 +40,10 @@ export default async function ProtectedSidebar() {
             label: "📱 Texts",
             href: "/texts",
           },
+          {
+            label: "🛒 Deals",
+            href: "/deals",
+          },
         ]}
       />
     </div>

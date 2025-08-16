@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { generateBOGODinnerPlan } from '@/utils/bogo-dinner-plan';
 
 // Create Supabase client for server-side operations
 const supabase = createClient(
@@ -1804,7 +1805,7 @@ function calculateVarianceForTemplate(numbers: number[]): number {
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special', force415pmReport: boolean = false): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special' | 'bogo-dinner-plan', force415pmReport: boolean = false): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -1831,6 +1832,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
     case '415pm-special':
       // Align manual sends with on-screen preview and cron: use V2
       return await generateDailyReportV2(userId);
+    case 'bogo-dinner-plan':
+      return await generateBOGODinnerPlanSMS();
     // TEMPORARILY DISABLED - Paycheck templates
     // case 'paycheck-efficiency':
     //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
@@ -2928,4 +2931,67 @@ function generateActionItems(categoryPacingData: any[], merchantPacingData: any[
   
   // Limit to 3 most important actions
   return actionItems.slice(0, 3);
+}
+
+// ===================================
+// BOGO DINNER PLAN TEMPLATE
+// ===================================
+export async function generateBOGODinnerPlanSMS(): Promise<string> {
+  try {
+    // Get the most recent post and its deals
+    const { data: latestPost } = await supabase
+      .from('deal_posts')
+      .select('id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!latestPost) {
+      return '🍽️ BOGO Dinner Plan\n\nNo deals available at the moment.';
+    }
+
+    // Fetch BOGO deals
+    const { data: deals } = await supabase
+      .from('deals')
+      .select('id, title, price_text')
+      .eq('post_id', latestPost.id)
+      .ilike('promo_type', '%BOGO%')
+      .limit(300);
+
+    if (!deals || deals.length === 0) {
+      return '🍽️ BOGO Dinner Plan\n\nNo BOGO deals available this week.';
+    }
+
+    // Add basic categorization and generate dinner plan
+    const bogoDeals = deals.map(deal => ({
+      ...deal,
+      category: 'misc' // Basic categorization
+    }));
+
+    const dinnerPlan = generateBOGODinnerPlan(bogoDeals);
+    
+    // Format for SMS (condensed version)
+    let smsText = '🍽️ BOGO Dinner Plan Sample\n\n';
+    
+    // Show first 3 main meals
+    const mainMeals = dinnerPlan.mainMeals.slice(0, 3);
+    mainMeals.forEach(meal => {
+      smsText += `📍 ${meal.day}: ${meal.theme}\n`;
+      meal.items.forEach(item => {
+        const cleanName = item.name.split(',')[0]; // Take first part before comma
+        smsText += `${item.emoji} ${cleanName} (BOGO ${item.price})\n`;
+      });
+      smsText += `💰 Get ${meal.totalItems} items, pay for ${meal.items.length} = $${meal.totalCost} for 2 dinners\n\n`;
+    });
+
+    // Add summary
+    smsText += `🎯 Every item is BOGO = 50% off everything!\n`;
+    smsText += `See full 7-day plan: budgenudge.com/bogo-dinner-plan`;
+
+    return smsText;
+
+  } catch (error) {
+    console.error('Error generating BOGO dinner plan SMS:', error);
+    return '🍽️ BOGO Dinner Plan\n\nError generating meal plan. Please try again later.';
+  }
 }
