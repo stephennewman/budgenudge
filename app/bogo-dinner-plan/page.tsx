@@ -157,7 +157,7 @@ export default async function BOGODinnerPlanPage() {
       {/* Call to Action */}
       <div className="text-center space-y-4">
         <Link 
-          href="/deals" 
+          href="/protected/deals" 
           className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-blue-600 text-white font-semibold hover:from-green-700 hover:to-blue-700 transition-colors"
         >
           📋 View All BOGO Deals

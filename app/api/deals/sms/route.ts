@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     const emoji = cuisineEmoji(cuisine);
     const header = `${emoji} ${cuisine} BOGOs at Publix`;
     const lines = chosen.map(d => `- ${d.title.replace(/\s+/g, ' ').trim()} — BOGO`);
-    const url = process.env.NEXT_PUBLIC_BASE_URL ? `${process.env.NEXT_PUBLIC_BASE_URL}/deals` : 'https://get.krezzo.com/deals';
+    const url = process.env.NEXT_PUBLIC_BASE_URL ? `${process.env.NEXT_PUBLIC_BASE_URL}/protected/deals` : 'https://get.krezzo.com/protected/deals';
     let message = `${header}\n` + lines.join('\n');
     const tail = `\nSee all: ${url}`;
     if (message.length + tail.length <= 300) message += tail;

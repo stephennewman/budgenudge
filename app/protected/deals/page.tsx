@@ -109,19 +109,6 @@ export default async function DealsPage() {
 
   return (
     <div className="min-h-[70vh] px-4 py-10 max-w-5xl mx-auto">
-      {/* Navigation Header */}
-      <div className="flex items-center justify-between mb-6">
-        <Link 
-          href="/protected" 
-          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to App
-        </Link>
-      </div>
-      
       <h1 className="text-4xl sm:text-5xl font-bold mb-6">Deals</h1>
       <p className="text-lg text-gray-600 mb-8">Latest Publix Weekly Ad deals, organized by AI.</p>
 

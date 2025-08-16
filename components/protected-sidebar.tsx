@@ -43,7 +43,6 @@ export default async function ProtectedSidebar() {
           {
             label: "🛒 Deals",
             href: "/deals",
-            external: true,
           },
         ]}
       />
