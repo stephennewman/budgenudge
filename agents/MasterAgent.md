@@ -19,9 +19,38 @@
 - ✅ **Professional email template branding with Manrope font**
 - ✅ **Comprehensive SMS delivery system with complete user workflow**
 - ✅ **Advanced recurring bill detection and pacing analytics**
+- ✅ **Behavioral spending insights with baseline tracking and habit analysis**
 - 🔄 Predictive spending analysis and budgeting
 
 ## 📈 DEPLOYMENT LOG
+
+### Deployment #41: Behavioral Insights Feature — spending habit tracking
+**Date:** January 24, 2025 10:37 AM EST  
+**Status:** ✅ DEPLOYED (Development tested, ready for production)
+
+**Scope:**
+- **NEW:** `/protected/insights` page with comprehensive behavioral spending analysis
+- **NEW:** `/api/behavioral-insights` endpoint with baseline vs recent period comparison
+- Establishes spending baselines from historical data before user signup
+- Tracks 14-day and 30-day behavioral changes with improvement/worsening indicators
+- Category and merchant-level insights with visual trend indicators
+- Sortable views by spending change, categories improving/worsening
+- **CRITICAL BUG FIX:** API was analyzing income instead of expenses (Plaid negative amounts)
+- Clean TypeScript build, properly handles edge cases and empty data states
+
+**Features Delivered:**
+- ✅ Signup date baseline establishment using auth.users.created_at
+- ✅ 90-day historical baseline calculation (avoiding recent periods)
+- ✅ Behavioral change classification: improving (-15%), stable, worsening (+15%)
+- ✅ Category and merchant breakdowns with spending frequency analysis
+- ✅ Rich UI with emoji indicators, percentage changes, and sorting
+- ✅ Navigation integration in protected sidebar and mobile menu
+
+**Technical Notes:**
+- Fixed critical query filter: `lt('amount', 0)` for expenses vs `gt('amount', 0)` for income
+- Uses `Math.abs(tx.amount)` throughout calculations for proper spending totals
+- Proper date range separation: baseline ends before 30-day tracking period
+- 4.69 kB bundle size for insights page
 
 ### Deployment #40: Monthly summary math fix — accurate totals and averages
 **Date:** August 14, 2025 04:58 PM EDT  

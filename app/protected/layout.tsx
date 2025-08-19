@@ -1,5 +1,7 @@
 import ProtectedSidebar from "@/components/protected-sidebar";
 import MobileNavMenu from "@/components/mobile-nav-menu";
+import { createSupabaseClient } from "@/utils/supabase/server";
+import { isSuperAdmin } from "@/utils/auth/superadmin";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -8,12 +10,22 @@ export const metadata: Metadata = {
   keywords: "money texts dashboard, financial overview, transaction history, Krezzo account",
 };
 
-export default function ProtectedLayout({
+export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const navItems = [
+  // Check if current user is superadmin to show Feed in mobile nav
+  let isUserSuperAdmin = false;
+  try {
+    const supabase = await createSupabaseClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    isUserSuperAdmin = user ? isSuperAdmin(user.id) : false;
+  } catch (error) {
+    console.error('Error checking superadmin status for mobile nav:', error);
+  }
+
+  const baseNavItems = [
     {
       label: "🏠 Account",
       href: "/",
@@ -39,6 +51,10 @@ export default function ProtectedLayout({
       href: "/ai-category-analysis",
     },
     {
+      label: "📊 Insights",
+      href: "/insights",
+    },
+    {
       label: "📱 Texts",
       href: "/texts",
     },
@@ -47,6 +63,17 @@ export default function ProtectedLayout({
       href: "/deals",
     },
   ];
+
+  // Add Feed for superadmin only
+  const navItems = isUserSuperAdmin 
+    ? [
+        ...baseNavItems,
+        {
+          label: "📡 Feed",
+          href: "/admin-feed",
+        }
+      ]
+    : baseNavItems;
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full">
