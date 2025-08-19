@@ -37,22 +37,51 @@ export async function GET() {
       .order('sent_at', { ascending: false })
       .limit(100); // Last 100 SMS sends across ALL users
 
-    // Debug: Check for specific phone number +15084934141
-    const { data: debugLogs } = await supabase
+    // Debug: Check for Ashley's phone in multiple formats (SlickText vs E.164)
+    const ashleyPhoneFormats = ['+15084934141', '15084934141', '5084934141', '508-493-4141', '(508) 493-4141'];
+    let debugLogs: { id: number; phone_number: string; template_type: string; sent_at: string; success: boolean }[] = [];
+    
+    for (const phoneFormat of ashleyPhoneFormats) {
+      const { data: formatLogs } = await supabase
+        .from('sms_send_log')
+        .select('id, phone_number, template_type, sent_at, success')
+        .eq('phone_number', phoneFormat)
+        .order('sent_at', { ascending: false })
+        .limit(5);
+      
+      if (formatLogs && formatLogs.length > 0) {
+        debugLogs.push(...formatLogs);
+        console.log(`🎯 Found ${formatLogs.length} SMS logs for Ashley's phone in format: ${phoneFormat}`);
+      }
+    }
+
+    // Also search for any phone containing "5084934141" digits
+    const { data: wildcardLogs } = await supabase
       .from('sms_send_log')
       .select('id, phone_number, template_type, sent_at, success')
-      .eq('phone_number', '+15084934141')
+      .like('phone_number', '%5084934141%')
       .order('sent_at', { ascending: false })
-      .limit(10);
+      .limit(5);
+
+    if (wildcardLogs && wildcardLogs.length > 0) {
+      debugLogs.push(...wildcardLogs);
+      console.log(`🔍 Wildcard search found ${wildcardLogs.length} SMS logs containing "5084934141"`);
+    }
+
+    // Remove duplicates and sort by most recent
+    debugLogs = debugLogs
+      .filter((log, index, self) => index === self.findIndex(l => l.id === log.id))
+      .sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())
+      .slice(0, 10);
 
     // Debug: Get total count
     const { count: totalCount } = await supabase
       .from('sms_send_log')
       .select('*', { count: 'exact', head: true });
 
-    console.log(`🔍 Debug phone +15084934141: Found ${debugLogs?.length || 0} logs, Total SMS logs: ${totalCount || 0}`);
+    console.log(`🔍 Ashley phone debug: Found ${debugLogs?.length || 0} total logs across all formats, Total SMS logs: ${totalCount || 0}`);
     if (debugLogs && debugLogs.length > 0) {
-      console.log(`📱 Most recent SMS to +15084934141:`, debugLogs[0]);
+      console.log(`📱 Most recent SMS to Ashley (format: ${debugLogs[0].phone_number}):`, debugLogs[0]);
     }
 
     if (fetchError) {
@@ -100,9 +129,11 @@ export async function GET() {
         },
         debug: {
           totalSMSInDatabase: totalCount || 0,
-          debugPhoneNumber: '+15084934141',
+          debugPhoneNumber: 'Ashley: 508-493-4141',
           debugPhoneLogCount: debugLogs?.length || 0,
           debugPhoneMostRecent: debugLogs?.[0]?.sent_at || 'No logs found',
+          debugPhoneActualFormat: debugLogs?.[0]?.phone_number || 'N/A',
+          ashleyFormatsSearched: ashleyPhoneFormats,
           showingLast100Only: true
         }
       }

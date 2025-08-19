@@ -36,6 +36,8 @@ interface SMSFeedData {
     debugPhoneNumber: string;
     debugPhoneLogCount: number;
     debugPhoneMostRecent: string;
+    debugPhoneActualFormat?: string;
+    ashleyFormatsSearched?: string[];
     showingLast100Only: boolean;
   };
 }
@@ -236,11 +238,15 @@ export default function AdminFeedPage() {
         <Card className="bg-yellow-50 border-yellow-200">
           <CardContent className="p-4">
             <div className="text-sm">
-              <div className="font-medium text-yellow-800 mb-2">🔍 Debug Info for +15084934141:</div>
+              <div className="font-medium text-yellow-800 mb-2">🔍 Debug Info for Ashley (508-493-4141):</div>
               <div className="space-y-1 text-yellow-700">
                 <div>• Total SMS in database: <strong>{data.debug.totalSMSInDatabase}</strong></div>
-                <div>• SMS logs for +15084934141: <strong>{data.debug.debugPhoneLogCount}</strong></div>
+                <div>• SMS logs for Ashley: <strong>{data.debug.debugPhoneLogCount}</strong></div>
                 <div>• Most recent: <strong>{data.debug.debugPhoneMostRecent}</strong></div>
+                {data.debug.debugPhoneActualFormat && (
+                  <div>• Actual phone format in DB: <strong>{data.debug.debugPhoneActualFormat}</strong></div>
+                )}
+                <div>• Formats searched: <strong>{data.debug.ashleyFormatsSearched?.join(', ') || 'N/A'}</strong></div>
                 <div>• Showing: <strong>Last 100 SMS only</strong></div>
               </div>
             </div>
