@@ -31,6 +31,13 @@ interface SMSFeedStats {
 interface SMSFeedData {
   entries: SMSFeedEntry[];
   stats: SMSFeedStats;
+  debug?: {
+    totalSMSInDatabase: number;
+    debugPhoneNumber: string;
+    debugPhoneLogCount: number;
+    debugPhoneMostRecent: string;
+    showingLast100Only: boolean;
+  };
 }
 
 export default function AdminFeedPage() {
@@ -223,6 +230,23 @@ export default function AdminFeedPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Debug Info (if available) */}
+      {data.debug && (
+        <Card className="bg-yellow-50 border-yellow-200">
+          <CardContent className="p-4">
+            <div className="text-sm">
+              <div className="font-medium text-yellow-800 mb-2">🔍 Debug Info for +15084934141:</div>
+              <div className="space-y-1 text-yellow-700">
+                <div>• Total SMS in database: <strong>{data.debug.totalSMSInDatabase}</strong></div>
+                <div>• SMS logs for +15084934141: <strong>{data.debug.debugPhoneLogCount}</strong></div>
+                <div>• Most recent: <strong>{data.debug.debugPhoneMostRecent}</strong></div>
+                <div>• Showing: <strong>Last 100 SMS only</strong></div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* SMS Feed Table */}
       <Card>

@@ -30,12 +30,30 @@ export async function GET() {
 
     console.log(`📡 SMS Feed request from superadmin: ${user.id}`);
 
-    // Query recent SMS sends from sms_send_log
+    // Query recent SMS sends from sms_send_log (ALL USERS - not filtered by user_id)
     const { data: smsLogs, error: fetchError } = await supabase
       .from('sms_send_log')
       .select('id, phone_number, template_type, user_id, sent_at, source_endpoint, message_id, success')
       .order('sent_at', { ascending: false })
-      .limit(100); // Last 100 SMS sends
+      .limit(100); // Last 100 SMS sends across ALL users
+
+    // Debug: Check for specific phone number +15084934141
+    const { data: debugLogs } = await supabase
+      .from('sms_send_log')
+      .select('id, phone_number, template_type, sent_at, success')
+      .eq('phone_number', '+15084934141')
+      .order('sent_at', { ascending: false })
+      .limit(10);
+
+    // Debug: Get total count
+    const { count: totalCount } = await supabase
+      .from('sms_send_log')
+      .select('*', { count: 'exact', head: true });
+
+    console.log(`🔍 Debug phone +15084934141: Found ${debugLogs?.length || 0} logs, Total SMS logs: ${totalCount || 0}`);
+    if (debugLogs && debugLogs.length > 0) {
+      console.log(`📱 Most recent SMS to +15084934141:`, debugLogs[0]);
+    }
 
     if (fetchError) {
       console.error('❌ Error fetching SMS logs:', fetchError);
@@ -79,6 +97,13 @@ export async function GET() {
           successRate,
           todayCount: todayEntries.length,
           lastUpdate: new Date().toISOString()
+        },
+        debug: {
+          totalSMSInDatabase: totalCount || 0,
+          debugPhoneNumber: '+15084934141',
+          debugPhoneLogCount: debugLogs?.length || 0,
+          debugPhoneMostRecent: debugLogs?.[0]?.sent_at || 'No logs found',
+          showingLast100Only: true
         }
       }
     });
