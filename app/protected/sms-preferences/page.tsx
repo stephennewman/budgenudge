@@ -99,7 +99,7 @@ const smsTypeInfo = {
 };
 
 export default function SMSPreferencesPage() {
-  const [preferences, setPreferences] = useState<SMSPreference[]>([]);
+  // const [preferences, setPreferences] = useState<SMSPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [liveSmsContent, setLiveSmsContent] = useState<Record<string, { content: string; loading: boolean; error?: string; isSample?: boolean }>>({});
@@ -129,8 +129,6 @@ export default function SMSPreferencesPage() {
       const data = await response.json();
 
       if (data.success) {
-        setPreferences(data.preferences);
-        
         // Build subscription status map
         const statusMap: Record<string, boolean> = {};
         activeSmsTypes.forEach(type => {

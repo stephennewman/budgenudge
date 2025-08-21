@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export default function MorningExpensesTestPage() {
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{success: boolean; error?: string; message?: string; result?: unknown} | null>(null);
   const [previewMessage, setPreviewMessage] = useState<string>('');
 
   const testMorningSMS = async () => {
