@@ -146,10 +146,19 @@ export async function GET(request: NextRequest) {
     // Cash Flow Runway: DISABLED - was daily at 5pm EST (replaced by Krezzo Report)
     // const isCashFlowRunwayTime = nowEST.hour === 17 && nowEST.minute <= 10;
     
+    // ✅ Morning Expenses: Daily at 8:00 AM EST
+    const isMorningExpensesTime = nowEST.hour === 8 && nowEST.minute <= 10;
+    
     // ✅ DISABLED: Only Krezzo Report at 5:00 PM is active now
     // All other templates are disabled to avoid SMS spam
     // Daily templates: DISABLED (recurring, recent, merchant-pacing, category-pacing)
     templatesToSend = [];
+    
+    // Morning Expenses: 8:00 AM EST
+    if (isMorningExpensesTime) {
+      console.log('🌅 8am EST: Adding morning-expenses to template list');
+      templatesToSend.push('morning-expenses');
+    }
     
     // Monthly Summary: DISABLED
     // if (isMonthlySummaryTime) {
@@ -213,7 +222,7 @@ export async function GET(request: NextRequest) {
         }
 
         // ✅ FIX: Handle both special templates (monthly/weekly) and daily templates
-        const specialTemplates = ['monthly-summary', 'weekly-summary', 'cash-flow-runway'];
+        const specialTemplates = ['monthly-summary', 'weekly-summary', 'cash-flow-runway', 'morning-expenses'];
         const dailyTemplates = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
         
         const hasSpecialTemplates = templatesToSend.some(t => specialTemplates.includes(t));
@@ -303,6 +312,9 @@ export async function GET(request: NextRequest) {
                 break;
               case 'cash-flow-runway':
                 preferenceType = 'cash-flow-runway';
+                break;
+              case 'morning-expenses':
+                preferenceType = 'morning-expenses';
                 break;
               default:
                 preferenceType = templateType;

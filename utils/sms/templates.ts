@@ -1805,7 +1805,7 @@ function calculateVarianceForTemplate(numbers: number[]): number {
 // ===================================
 // UNIFIED TEMPLATE SELECTOR (UPDATED)
 // ===================================
-export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special' | 'bogo-dinner-plan', force415pmReport: boolean = false): Promise<string> {
+export async function generateSMSMessage(userId: string, templateType: 'recurring' | 'recent' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | 'onboarding-immediate' | 'onboarding-analysis-complete' | 'onboarding-day-before' | '415pm-special' | 'bogo-dinner-plan' | 'morning-expenses', force415pmReport: boolean = false): Promise<string> {
   switch (templateType) {
     case 'recurring':
       return await generateRecurringTransactionsMessage(userId);
@@ -1834,6 +1834,8 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return await generateDailyReportV2(userId);
     case 'bogo-dinner-plan':
       return await generateBOGODinnerPlanSMS();
+    case 'morning-expenses':
+      return await generateMorningExpensesMessage(userId);
     // TEMPORARILY DISABLED - Paycheck templates
     // case 'paycheck-efficiency':
     //   return await generateSMSMessageForUser(userId, 'paycheck-efficiency');
@@ -1841,6 +1843,211 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
       return "📱 Krezzo\n\nInvalid template type.";
   }
 } 
+
+// ===================================
+// MORNING EXPENSES SNAPSHOT TEMPLATE
+// ===================================
+async function generateMorningExpensesMessage(userId: string): Promise<string> {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  // Calculate rest of month date range
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  
+  let message = `🌅 MORNING SNAPSHOT\n\n`;
+  
+  // UPCOMING EXPENSES (rest of the month only)
+  const upcomingExpenses = await getMorningUpcomingExpenses(userId, today, endOfMonth);
+  const unpaidTotal = upcomingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  
+  message += `💸 UPCOMING EXPENSES (rest of the month only)\n`;
+  if (upcomingExpenses.length > 0) {
+    upcomingExpenses.forEach(expense => {
+      const date = new Date(expense.date);
+      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+      message += `${dateStr}: ${expense.merchant} $${expense.amount.toFixed(2)}\n`;
+    });
+    message += `\nUnpaid: $${unpaidTotal.toFixed(2)}\n\n`;
+  } else {
+    message += `No upcoming expenses found\n\nUnpaid: $0.00\n\n`;
+  }
+  
+  // RECENTLY PAID (show historical expenses that are now paid)
+  const recentlyPaid = await getMorningRecentlyPaidExpenses(userId);
+  const paidTotal = recentlyPaid.reduce((sum, expense) => sum + expense.amount, 0);
+  
+  message += `✅ RECENTLY PAID\n`;
+  if (recentlyPaid.length > 0) {
+    recentlyPaid.forEach(expense => {
+      const date = new Date(expense.date);
+      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
+      message += `${dateStr}: ${expense.merchant} $${expense.amount.toFixed(2)}\n`;
+    });
+    message += `\nPaid: $${paidTotal.toFixed(2)}`;
+  } else {
+    message += `No recently paid expenses found\n\nPaid: $0.00`;
+  }
+  
+  return message;
+}
+
+async function getMorningUpcomingExpenses(userId: string, startDate: Date, endDate: Date): Promise<Array<{
+  merchant: string;
+  amount: number;
+  date: string;
+}>> {
+  const expenses: Array<{
+    merchant: string;
+    amount: number;
+    date: string;
+  }> = [];
+  
+  try {
+    // Get upcoming bills from tagged_merchants table (predicted future expenses)
+    const { data: taggedMerchants, error } = await supabase
+      .from('tagged_merchants')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('next_predicted_date', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching tagged merchants:', error);
+      return expenses;
+    }
+    
+    if (taggedMerchants && taggedMerchants.length > 0) {
+      taggedMerchants.forEach(merchant => {
+        const predictedDate = new Date(merchant.next_predicted_date + 'T12:00:00');
+        predictedDate.setHours(0, 0, 0, 0);
+        
+        // Filter out shopping/non-bill merchants from upcoming expenses too
+        const shoppingMerchants = ['amazon', 'apple', 'target', 'walmart', 'costco', 'publix', 'kroger'];
+        const merchantNameLower = merchant.merchant_name.toLowerCase();
+        const isShoppingMerchant = shoppingMerchants.some(shopping => 
+          merchantNameLower.includes(shopping)
+        );
+        
+        // Only include bills for rest of month (today through end of month) and exclude shopping
+        if (predictedDate >= startDate && predictedDate <= endDate && !isShoppingMerchant) {
+          expenses.push({
+            merchant: merchant.merchant_name,
+            amount: Number(merchant.expected_amount),
+            date: merchant.next_predicted_date
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error in getMorningUpcomingExpenses:', error);
+  }
+  
+  return expenses.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+async function getMorningRecentlyPaidExpenses(userId: string): Promise<Array<{
+  merchant: string;
+  amount: number;
+  date: string;
+}>> {
+  const expenses: Array<{
+    merchant: string;
+    amount: number;
+    date: string;
+  }> = [];
+  
+  const now = new Date();
+  
+  try {
+    // Get tracked merchants (the ones we're monitoring)
+    const { data: trackedMerchants, error: merchantError } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name')
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    
+    if (merchantError) {
+      console.error('Error fetching tracked merchants:', merchantError);
+      return expenses;
+    }
+    
+    if (!trackedMerchants || trackedMerchants.length === 0) {
+      console.log('No tracked merchants found for user');
+      return expenses;
+    }
+    
+    // Get user's items to find their transactions
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+    
+    if (!userItems || userItems.length === 0) {
+      console.log('No items found for user');
+      return expenses;
+    }
+    
+    const itemIds = userItems.map(item => item.plaid_item_id);
+    
+    // Get recent transactions from tracked merchants - entire current month
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStartStr = monthStart.toISOString().split('T')[0];
+    
+    const { data: recentTransactions } = await supabase
+      .from('transactions')
+      .select('date, merchant_name, name, amount')
+      .in('plaid_item_id', itemIds)
+      .gte('date', monthStartStr)
+      .order('date', { ascending: false })
+      .limit(1000); // Get all transactions for the month
+    
+    if (recentTransactions && recentTransactions.length > 0) {
+      // Match transactions to tracked merchants
+      const trackedMerchantNames = trackedMerchants.map(m => m.merchant_name.toLowerCase());
+      
+      recentTransactions.forEach(transaction => {
+        const transactionMerchant = (transaction.merchant_name || transaction.name || '').toLowerCase();
+        
+        // Check if this transaction matches any of our tracked merchants
+        const matchedMerchant = trackedMerchantNames.find(tracked => 
+          transactionMerchant.includes(tracked.toLowerCase()) || 
+          tracked.toLowerCase().includes(transactionMerchant)
+        );
+        
+        // Filter out shopping/non-bill merchants
+        const shoppingMerchants = ['amazon', 'apple', 'target', 'walmart', 'costco', 'publix', 'kroger'];
+        const transactionMerchantLower = (transaction.merchant_name || transaction.name || '').toLowerCase();
+        const isShoppingMerchant = shoppingMerchants.some(shopping => 
+          transactionMerchantLower.includes(shopping)
+        );
+        
+        if (matchedMerchant && transaction.amount > 0 && !isShoppingMerchant) { // Only include bills/expenses, not shopping
+          expenses.push({
+            merchant: transaction.merchant_name || transaction.name || 'Unknown',
+            amount: Math.abs(transaction.amount),
+            date: transaction.date
+          });
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error in getMorningRecentlyPaidExpenses:', error);
+  }
+  
+  // Group by date and merchant to avoid showing duplicate entries but keep all transactions
+  const uniqueExpenses = expenses.filter((expense, index, self) => 
+    index === self.findIndex(e => 
+      e.merchant === expense.merchant && 
+      e.date === expense.date && 
+      e.amount === expense.amount
+    )
+  );
+  
+  return uniqueExpenses
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 30); // Show all August transactions
+}
 
 // ===================================
 // 9. 5:30 PM KREZZO REPORT TEMPLATE (IMPROVED)

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 interface SMSPreference {
   id?: number;
   user_id: string;
-  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | '415pm-special';
+  sms_type: 'bills' | 'activity' | 'merchant-pacing' | 'category-pacing' | 'weekly-summary' | 'monthly-summary' | 'cash-flow-runway' | '415pm-special' | 'morning-expenses';
   // TEMPORARILY DISABLED - Paycheck templates
   // | 'paycheck-efficiency' | 'cash-flow-runway';
   enabled: boolean;
@@ -19,7 +19,7 @@ interface SMSPreference {
 }
 
   // Define active SMS template types for previews (activity removed)
-  const activeSmsTypes = ['bills', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special', '415-krezzo', 'five-oclock-somewhere'];
+  const activeSmsTypes = ['bills', 'merchant-pacing', 'category-pacing', 'weekly-summary', 'monthly-summary', 'cash-flow-runway', '415pm-special', '415-krezzo', 'five-oclock-somewhere', 'morning-expenses'];
 
 const smsTypeInfo = {
   '415-krezzo': {
@@ -77,6 +77,12 @@ const smsTypeInfo = {
     icon: '📊',
     example: `📊 DAILY SNAPSHOT\n\nHey there! Here's your daily financial snapshot.\n\n📋 YESTERDAY'S ACTIVITY\n━━━━━━━━━━━━━━━━━━\nTotal posted transactions: 3\n\nPublix: $45.12\nAmazon: $28.99\nShell: $52.67\n\nTotal spend: $126.78\nBalance: $3,083\n\n📊 SPENDING PACE\n━━━━━━━━━━━━━━━━━━\nGROCERIES\nSpent: $288 | Expected: $210\n🚨 OVER by 37%\n\n🏪 MERCHANT WATCH\n━━━━━━━━━━━━━━━━━━\nAMAZON\nSpent: $156 | Expected: $142\n⚠️ APPROACHING by 10%\n\n💵 DAILY BUDGET\n━━━━━━━━━━━━━━━━━━\nNext income: Jul 29: $4,020\nUpcoming expenses before then: 5 for $842\nAvailable now: $3,083\nAfter expenses: $2,241\nDaily spend limit: $249/day for 9 days (until Jul 29)\n\n🙌 INSPIRATION\n━━━━━━━━━━━━━━━━━━\nYou're doing great! 🌟 Keep monitoring your spending and stay within your daily budget.`
   },
+  'morning-expenses': {
+    title: 'Morning Expenses Snapshot',
+    description: 'Daily morning text with upcoming expenses for rest of month and recently paid bills.',
+    icon: '🌅',
+    example: `🌅 MORNING SNAPSHOT\n\n💸 UPCOMING EXPENSES (rest of the month only)\n8/21: GEICO $114.18\n8/22: Supabase Singapore $54.98\n8/22: Prudential $30.02\n8/27: Spectrum $118.00\n8/27: Compassion Int'l Ci $43.00\n8/29: Gsuite Krezzo. $16.80\n\nUnpaid: $376.98\n\n✅ RECENTLY PAID\n8/17: Duke Energy $335.00\n8/17: T-Mobile $131.80\n8/15: Netflix $28.30\n8/14: Disney+ $12.45\n8/13: Peacock $9.05\n8/12: Vercel Inc. $20.00\n8/10: Slicktext $136.38\n8/9: T-Mobile $118.00\n\nPaid: $790.98`
+  },
   // TEMPORARILY DISABLED - Paycheck templates
   // 'paycheck-efficiency': {
   //   title: 'Paycheck Efficiency Analysis',
@@ -93,12 +99,12 @@ const smsTypeInfo = {
 };
 
 export default function SMSPreferencesPage() {
-  // Retained for potential future enablement toggles; currently unused in simplified preview UI
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [preferences, setPreferences] = useState<SMSPreference[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [liveSmsContent, setLiveSmsContent] = useState<Record<string, { content: string; loading: boolean; error?: string; isSample?: boolean }>>({});
+  const [subscriptionStatus, setSubscriptionStatus] = useState<Record<string, boolean>>({});
+  const [updatingSubscription, setUpdatingSubscription] = useState<Record<string, boolean>>({});
   const supabase = createSupabaseClient();
 
   useEffect(() => {
@@ -124,6 +130,14 @@ export default function SMSPreferencesPage() {
 
       if (data.success) {
         setPreferences(data.preferences);
+        
+        // Build subscription status map
+        const statusMap: Record<string, boolean> = {};
+        activeSmsTypes.forEach(type => {
+          const pref = data.preferences.find((p: SMSPreference) => p.sms_type === type);
+          statusMap[type] = pref ? pref.enabled : false;
+        });
+        setSubscriptionStatus(statusMap);
       } else {
         setMessage({ type: 'error', text: data.error || 'Failed to load preferences' });
       }
@@ -195,6 +209,60 @@ export default function SMSPreferencesPage() {
     }
   };
 
+  const updateSubscription = async (smsType: string, enabled: boolean) => {
+    try {
+      setUpdatingSubscription(prev => ({ ...prev, [smsType]: true }));
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update subscription via API
+      const response = await fetch('/api/sms-preferences', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          preferences: [{
+            sms_type: smsType,
+            enabled: enabled,
+            frequency: 'daily' // default frequency
+          }]
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update local state
+        setSubscriptionStatus(prev => ({ ...prev, [smsType]: enabled }));
+        setMessage({ 
+          type: 'success', 
+          text: `${enabled ? 'Subscribed to' : 'Unsubscribed from'} ${smsTypeInfo[smsType as keyof typeof smsTypeInfo]?.title || smsType}` 
+        });
+        
+        // Clear message after 3 seconds
+        setTimeout(() => setMessage(null), 3000);
+      } else {
+        throw new Error(data.error || 'Failed to update subscription');
+      }
+
+    } catch (error) {
+      console.error(`Error updating ${smsType} subscription:`, error);
+      setMessage({ 
+        type: 'error', 
+        text: `Failed to ${enabled ? 'subscribe to' : 'unsubscribe from'} ${smsType}` 
+      });
+      setTimeout(() => setMessage(null), 5000);
+    } finally {
+      setUpdatingSubscription(prev => ({ ...prev, [smsType]: false }));
+    }
+  };
+
   if (loading) {
     return (
       <div className="relative min-h-[600px]">
@@ -262,7 +330,19 @@ export default function SMSPreferencesPage() {
                     >
                       {liveContent?.loading ? 'Generating...' : 'Show Live SMS'}
                     </Button>
-                    {/* Add recipient lives on /protected/texts */}
+                    
+                    {/* Subscription Toggle */}
+                    <Button
+                      onClick={() => updateSubscription(type, !subscriptionStatus[type])}
+                      disabled={updatingSubscription[type]}
+                      variant={subscriptionStatus[type] ? "default" : "outline"}
+                      size="sm"
+                      className={subscriptionStatus[type] ? "bg-green-600 hover:bg-green-700" : ""}
+                    >
+                      {updatingSubscription[type] ? 'Updating...' : (
+                        subscriptionStatus[type] ? '✓ Subscribed' : 'Subscribe'
+                      )}
+                    </Button>
                   </div>
                 </div>
 

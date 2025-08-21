@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     let smsMessage = message || `🔔 MANUAL SMS - Krezzo Alert!\n\nTriggered at: ${new Date().toLocaleString()}\n\nThis is a test message from your Krezzo app.`;
     let transactionsText = '';
 
-    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary','cash-flow-runway','415pm-special'].includes(templateType)) {
+    if (userId && templateType && ['recurring','recent','merchant-pacing','category-pacing','weekly-summary','monthly-summary','cash-flow-runway','415pm-special','morning-expenses'].includes(templateType)) {
       smsMessage = await generateSMSMessage(userId, templateType);
     } else if (userId && !message) {
       const { data: userItems } = await supabase
