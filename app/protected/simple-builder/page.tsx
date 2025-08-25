@@ -593,9 +593,9 @@ export default function SimpleBuilderPage() {
           <>
             {/* Template Management - All in one row */}
             <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 {/* Template Selection */}
-                <div className="flex-1">
+                <div className="md:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Template
                   </label>
@@ -620,17 +620,20 @@ export default function SimpleBuilderPage() {
                 </div>
 
                 {/* New Template Button */}
-                <div className="flex-shrink-0">
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 opacity-0">
+                    &nbsp;
+                  </label>
                   <button
                     onClick={createNewTemplate}
-                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
+                    className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
                   >
                     + New Template
                   </button>
                 </div>
 
                 {/* Template Name Input */}
-                <div className="flex-1">
+                <div className="md:col-span-1">
                   <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-2">
                     Template Name
                   </label>
@@ -645,40 +648,45 @@ export default function SimpleBuilderPage() {
                 </div>
 
                 {/* Save/Cancel Buttons */}
-                <div className="flex-shrink-0 flex items-end gap-2">
-                  {hasUnsavedChanges ? (
-                    <>
-                      <button
-                        onClick={handleSaveTemplate}
-                        disabled={isSaving || !templateName.trim() || !previewText.trim()}
-                        className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                        title="Save Template"
-                      >
-                        {isSaving ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          '✓'
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (currentTemplateId) {
-                            loadTemplate(savedTemplates.find(t => t.id === currentTemplateId)!);
-                          } else {
-                            createNewTemplate();
-                          }
-                        }}
-                        className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                        title="Cancel Changes"
-                      >
-                        ✕
-                      </button>
-                    </>
-                  ) : (
-                    <div className="px-3 py-2 text-gray-400 text-sm">
-                      No changes
-                    </div>
-                  )}
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 opacity-0">
+                    &nbsp;
+                  </label>
+                  <div className="flex gap-2">
+                    {hasUnsavedChanges ? (
+                      <>
+                        <button
+                          onClick={handleSaveTemplate}
+                          disabled={isSaving || !templateName.trim() || !previewText.trim()}
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                          title="Save Template"
+                        >
+                          {isSaving ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>
+                          ) : (
+                            '✓'
+                          )}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (currentTemplateId) {
+                              loadTemplate(savedTemplates.find(t => t.id === currentTemplateId)!);
+                            } else {
+                              createNewTemplate();
+                            }
+                          }}
+                          className="flex-1 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                          title="Cancel Changes"
+                        >
+                          ✕
+                        </button>
+                      </>
+                    ) : (
+                      <div className="w-full px-3 py-2 text-gray-400 text-sm text-center bg-gray-100 rounded-md">
+                        No changes
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
