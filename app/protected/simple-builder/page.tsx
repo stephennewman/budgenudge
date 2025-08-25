@@ -51,18 +51,102 @@ export default function SimpleBuilderPage() {
   
   // Track if template has unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  
-  // Scheduling state
-  const [schedule, setSchedule] = useState<ScheduleConfig>({
-    cadence_type: 'weekly',
-    cadence_config: { day: 'monday' },
-    send_time: '12:00',
-    timezone: 'America/New_York',
-    is_active: false
-  });
-  const [currentSchedule, setCurrentSchedule] = useState<TemplateSchedule | null>(null);
-  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
-  const [sendFirstSmsNow, setSendFirstSmsNow] = useState(false);
+
+  // Function to fetch variable data directly from Supabase
+  const fetchVariableData = async (variableId: string): Promise<string> => {
+    const supabase = createClientComponentClient();
+    
+    try {
+      switch (variableId) {
+        case 'today-date':
+          return new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          
+        case 'account-count':
+          // Get user's Plaid items first, then count accounts linked to those items
+          const { data: userItems } = await supabase
+            .from('items')
+            .select('id')
+            .limit(10);
+          
+          if (userItems && userItems.length > 0) {
+            const itemIds = userItems.map(item => item.id);
+            const { count: accountCount } = await supabase
+              .from('accounts')
+              .select('*', { count: 'exact', head: true })
+              .in('item_id', itemIds)
+              .is('deleted_at', null);
+            return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
+          }
+          return '0 accounts connected';
+          
+        case 'last-transaction-date':
+          // Get user's Plaid items first, then get transactions linked to those items
+          const { data: userItemsForTx } = await supabase
+            .from('items')
+            .select('plaid_item_id')
+            .limit(10);
+          
+          if (userItemsForTx && userItemsForTx.length > 0) {
+            const plaidItemIds = userItemsForTx.map(item => item.plaid_item_id);
+            const { data: lastTransaction } = await supabase
+              .from('transactions')
+              .select('date')
+              .in('plaid_item_id', plaidItemIds)
+              .order('date', { ascending: false })
+              .limit(1)
+              .single();
+            
+            if (lastTransaction) {
+              const date = new Date(lastTransaction.date);
+              return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long', 
+                day: 'numeric'
+              });
+            }
+          }
+          return 'No transactions found';
+          
+        case 'total-balance':
+          // Get user's Plaid items first, then get account balances linked to those items
+          const { data: userItemsForBalance } = await supabase
+            .from('items')
+            .select('id')
+            .limit(10);
+          
+          if (userItemsForBalance && userItemsForBalance.length > 0) {
+            const itemIds = userItemsForBalance.map(item => item.id);
+            const { data: accounts } = await supabase
+              .from('accounts')
+              .select('available_balance, current_balance')
+              .in('item_id', itemIds)
+              .is('deleted_at', null);
+            
+            if (accounts && accounts.length > 0) {
+              const totalBalance = accounts.reduce((sum, acc) => {
+                const balance = acc.available_balance ?? acc.current_balance ?? 0;
+                return sum + balance;
+              }, 0);
+              return `$${totalBalance.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              })}`;
+            }
+          }
+          return 'No accounts found';
+          
+        default:
+          return `[${variableId} - Unknown Variable]`;
+      }
+    } catch (error) {
+      console.error(`Error fetching variable ${variableId}:`, error);
+      return `[${variableId} - Error]`;
+    }
+  };
 
   // Load saved templates on component mount
   useEffect(() => {
@@ -250,101 +334,17 @@ export default function SimpleBuilderPage() {
     });
   };
 
-  // Function to fetch variable data directly from Supabase
-  const fetchVariableData = async (variableId: string): Promise<string> => {
-    const supabase = createClientComponentClient();
-    
-    try {
-      switch (variableId) {
-        case 'today-date':
-          return new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          });
-          
-        case 'account-count':
-          // Get user's Plaid items first, then count accounts linked to those items
-          const { data: userItems } = await supabase
-            .from('items')
-            .select('id')
-            .limit(10);
-          
-          if (userItems && userItems.length > 0) {
-            const itemIds = userItems.map(item => item.id);
-            const { count: accountCount } = await supabase
-              .from('accounts')
-              .select('*', { count: 'exact', head: true })
-              .in('item_id', itemIds)
-              .is('deleted_at', null);
-            return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
-          }
-          return '0 accounts connected';
-          
-        case 'last-transaction-date':
-          // Get user's Plaid items first, then get transactions linked to those items
-          const { data: userItemsForTx } = await supabase
-            .from('items')
-            .select('plaid_item_id')
-            .limit(10);
-          
-          if (userItemsForTx && userItemsForTx.length > 0) {
-            const plaidItemIds = userItemsForTx.map(item => item.plaid_item_id);
-            const { data: lastTransaction } = await supabase
-              .from('transactions')
-              .select('date')
-              .in('plaid_item_id', plaidItemIds)
-              .order('date', { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (lastTransaction) {
-              const date = new Date(lastTransaction.date);
-              return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long', 
-                day: 'numeric'
-              });
-            }
-          }
-          return 'No transactions found';
-          
-        case 'total-balance':
-          // Get user's Plaid items first, then get account balances linked to those items
-          const { data: userItemsForBalance } = await supabase
-            .from('items')
-            .select('id')
-            .limit(10);
-          
-          if (userItemsForBalance && userItemsForBalance.length > 0) {
-            const itemIds = userItemsForBalance.map(item => item.id);
-            const { data: accounts } = await supabase
-              .from('accounts')
-              .select('available_balance, current_balance')
-              .in('item_id', itemIds)
-              .is('deleted_at', null);
-            
-            if (accounts && accounts.length > 0) {
-              const totalBalance = accounts.reduce((sum, acc) => {
-                const balance = acc.available_balance ?? acc.current_balance ?? 0;
-                return sum + balance;
-              }, 0);
-              return `$${totalBalance.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}`;
-            }
-          }
-          return 'No accounts found';
-          
-        default:
-          return `[${variableId} - Unknown Variable]`;
-      }
-    } catch (error) {
-      console.error(`Error fetching variable ${variableId}:`, error);
-      return `[${variableId} - Error]`;
-    }
-  };
+  // Scheduling state
+  const [schedule, setSchedule] = useState<ScheduleConfig>({
+    cadence_type: 'weekly',
+    cadence_config: { day: 'monday' },
+    send_time: '12:00',
+    timezone: 'America/New_York',
+    is_active: false
+  });
+  const [currentSchedule, setCurrentSchedule] = useState<TemplateSchedule | null>(null);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+  const [sendFirstSmsNow, setSendFirstSmsNow] = useState(false);
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { over, active } = event;
