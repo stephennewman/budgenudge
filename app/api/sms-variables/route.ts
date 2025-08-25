@@ -213,12 +213,20 @@ export async function GET() {
       recurring_bills: {
         count: recurringBills?.length || 0,
         total_monthly: recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0) || 0,
-        sample: recurringBills?.slice(0, 3) || []
+        sample: recurringBills?.slice(0, 3).map(bill => ({
+          name: bill.merchant_name || 'Unknown',
+          amount: bill.expected_amount || 0,
+          frequency: bill.prediction_frequency || 'monthly'
+        })) || []
       },
       income_sources: {
         count: incomeSources?.length || 0,
         total_monthly: incomeSources?.reduce((sum, income) => sum + (income.amount || 0), 0) || 0,
-        sample: incomeSources?.slice(0, 3) || []
+        sample: incomeSources?.slice(0, 3).map(income => ({
+          name: income.name || 'Unknown',
+          amount: income.amount || 0,
+          frequency: income.frequency || 'monthly'
+        })) || []
       },
       spending_analysis: {
         top_categories: spendingCategories
