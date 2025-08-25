@@ -55,6 +55,10 @@ export default async function ProtectedLayout({
       href: "/insights",
     },
     {
+      label: "💰 Flow",
+      href: "/flow",
+    },
+    {
       label: "📱 Texts",
       href: "/texts",
     },
