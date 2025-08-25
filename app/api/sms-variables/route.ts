@@ -86,21 +86,21 @@ export async function GET() {
       .order('date', { ascending: false })
       .limit(10);
 
-    // Sample 3: Recurring Bills
+    // Sample 3: Recurring Bills (using tagged_merchants table like the recurring bills page)
     const { data: recurringBills } = await supabase
-      .from('recurring_bills')
+      .from('tagged_merchants')
       .select(`
         id,
-        name,
-        amount,
-        frequency,
-        next_due_date,
-        category,
         merchant_name,
+        expected_amount,
+        prediction_frequency,
+        next_predicted_date,
+        confidence_score,
+        is_active,
         created_at
       `)
       .eq('user_id', user.id)
-      .is('deleted_at', null)
+      .eq('is_active', true)
       .limit(5);
 
     // Sample 4: Spending Categories
@@ -114,21 +114,42 @@ export async function GET() {
       .in('plaid_item_id', plaidItemIds)
       .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
-    // Sample 5: Income Sources
-    const { data: incomeSources } = await supabase
-      .from('income_sources')
-      .select(`
-        id,
-        name,
-        amount,
-        frequency,
-        next_pay_date,
-        category,
-        created_at
-      `)
+    // Sample 5: Income Sources (using user_income_profiles table like the income page)
+    const { data: incomeProfile } = await supabase
+      .from('user_income_profiles')
+      .select('profile_data')
       .eq('user_id', user.id)
-      .is('deleted_at', null)
-      .limit(5);
+      .single();
+
+    let incomeSources: Array<{
+      id: string;
+      name: string;
+      amount: number;
+      frequency: string;
+      next_pay_date: string | null;
+      category: string;
+      created_at: string;
+    }> = [];
+    if (incomeProfile?.profile_data?.income_sources) {
+      incomeSources = incomeProfile.profile_data.income_sources.map((source: {
+        id?: string;
+        source_name?: string;
+        expected_amount?: number;
+        amount?: number;
+        frequency?: string;
+        pattern_type?: string;
+        next_predicted_date?: string | null;
+        category?: string;
+      }) => ({
+        id: source.id || `source_${source.source_name?.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+        name: source.source_name || 'Unknown Source',
+        amount: source.expected_amount || source.amount || 0,
+        frequency: source.frequency || source.pattern_type || 'irregular',
+        next_pay_date: source.next_predicted_date || null,
+        category: source.category || 'income',
+        created_at: new Date().toISOString()
+      })).slice(0, 5);
+    }
 
     // Sample 6: Merchant Analytics
     const { data: topMerchants } = await supabase
@@ -191,7 +212,7 @@ export async function GET() {
       },
       recurring_bills: {
         count: recurringBills?.length || 0,
-        total_monthly: recurringBills?.reduce((sum, bill) => sum + (bill.amount || 0), 0) || 0,
+        total_monthly: recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0) || 0,
         sample: recurringBills?.slice(0, 3) || []
       },
       income_sources: {
@@ -272,7 +293,7 @@ export async function GET() {
           id: 'recurring-bills-total',
           name: 'Recurring Bills Total',
           description: 'Total monthly recurring bill amount',
-          example: `$${recurringBills?.reduce((sum, bill) => sum + (bill.amount || 0), 0).toLocaleString() || 0}`
+          example: `$${recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0).toLocaleString() || 0}`
         },
         {
           id: 'income-sources-count',
