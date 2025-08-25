@@ -28,6 +28,10 @@ interface DataSample {
       amount: number;
       category: string | null;
       merchant_name: string | null;
+      ai_merchant_name?: string | null;
+      ai_category_tag?: string | null;
+      date: string;
+      pending: boolean;
     }>;
   };
   recurring_bills: {
@@ -37,6 +41,7 @@ interface DataSample {
       name: string;
       amount: number;
       frequency: string;
+      next_date?: string;
     }>;
   };
   income_sources: {
@@ -46,11 +51,21 @@ interface DataSample {
       name: string;
       amount: number;
       frequency: string;
+      next_date?: string;
     }>;
   };
   spending_analysis: {
     top_categories: Array<{ category: string; amount: number }>;
     top_merchants: Array<{ merchant: string; amount: number }>;
+  };
+  pending_transactions: {
+    count: number;
+    sample: Array<{
+      name: string;
+      amount: number;
+      merchant_name: string | null;
+      date: string;
+    }>;
   };
   suggested_variables: Array<{
     id: string;
@@ -139,7 +154,7 @@ export default function DataSamplePage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">📊 SMS Builder Data Sample</h1>
           <p className="text-gray-600">
-            Real financial data available for SMS Builder variables
+            Real financial data available for SMS Builder variables - Updated in real-time
           </p>
         </div>
 
@@ -208,7 +223,7 @@ export default function DataSamplePage() {
                 <div className="space-y-2">
                   {dataSample.accounts.sample.map((account, index) => (
                     <div key={index} className="text-sm text-gray-600">
-                      {account.name} - {account.institution_name} (${(account.available_balance || account.current_balance || 0).toLocaleString()})
+                      {account.name} - {account.institution_name || 'Unknown Institution'} (${(account.available_balance || account.current_balance || 0).toLocaleString()})
                     </div>
                   ))}
                 </div>
@@ -248,6 +263,71 @@ export default function DataSamplePage() {
           </div>
         </div>
 
+        {/* Recent Transactions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">📝 Recent Transactions</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merchant</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.transactions.sample.map((transaction, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(transaction.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.ai_merchant_name || transaction.merchant_name || 'Unknown'}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                      transaction.amount < 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ${Math.abs(transaction.amount).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {transaction.ai_category_tag || 'Uncategorized'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        transaction.pending 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {transaction.pending ? 'Pending' : 'Posted'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Pending Transactions */}
+        {dataSample.pending_transactions.count > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">⏳ Pending Transactions ({dataSample.pending_transactions.count})</h2>
+            <div className="space-y-3">
+              {dataSample.pending_transactions.sample.map((transaction, index) => (
+                <div key={index} className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div>
+                    <p className="font-medium text-gray-900">{transaction.merchant_name || 'Unknown Merchant'}</p>
+                    <p className="text-sm text-gray-600">{new Date(transaction.date).toLocaleDateString()}</p>
+                  </div>
+                  <span className="text-lg font-semibold text-gray-900">${Math.abs(transaction.amount).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Recurring Bills & Income */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -269,6 +349,11 @@ export default function DataSamplePage() {
                   {dataSample.recurring_bills.sample.map((bill, index) => (
                     <div key={index} className="text-sm text-gray-600">
                       {bill.name}: ${bill.amount.toLocaleString()} ({bill.frequency})
+                      {bill.next_date && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          Next: {new Date(bill.next_date).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -295,6 +380,11 @@ export default function DataSamplePage() {
                   {dataSample.income_sources.sample.map((income, index) => (
                     <div key={index} className="text-sm text-gray-600">
                       {income.name}: ${income.amount.toLocaleString()} ({income.frequency})
+                      {income.next_date && (
+                        <span className="text-xs text-gray-500 ml-2">
+                          Next: {new Date(income.next_date).toLocaleDateString()}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -302,6 +392,21 @@ export default function DataSamplePage() {
             )}
           </div>
         </div>
+
+        {/* Top Merchants */}
+        {dataSample.spending_analysis.top_merchants.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">🏪 Top Spending Merchants</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {dataSample.spending_analysis.top_merchants.slice(0, 8).map((merchant, index) => (
+                <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h3 className="font-medium text-gray-900 mb-2">{merchant.merchant}</h3>
+                  <p className="text-2xl font-bold text-blue-600">${merchant.amount.toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="mt-8 text-center">

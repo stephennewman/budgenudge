@@ -16,7 +16,7 @@ export async function GET() {
     // Get user's Plaid items first (this is the correct data flow)
     const { data: userItems } = await supabase
       .from('items')
-      .select('id, plaid_item_id')
+      .select('id, plaid_item_id, institution_name')
       .eq('user_id', user.id)
       .is('deleted_at', null)
       .limit(10);
@@ -66,14 +66,14 @@ export async function GET() {
       `)
       .in('item_id', itemDbIds)
       .is('deleted_at', null)
-      .limit(5);
+      .limit(10);
 
     console.log('🔍 Accounts query result:', accounts?.length || 0, 'accounts found');
     if (accounts && accounts.length > 0) {
       console.log('🔍 First account sample:', accounts[0]);
     }
 
-    // Sample 2: Recent Transactions
+    // Sample 2: Recent Transactions with AI categorization
     const { data: recentTransactions } = await supabase
       .from('transactions')
       .select(`
@@ -84,12 +84,14 @@ export async function GET() {
         category,
         subcategory,
         merchant_name,
+        ai_merchant_name,
+        ai_category_tag,
         pending,
         created_at
       `)
       .in('plaid_item_id', plaidItemIds)
       .order('date', { ascending: false })
-      .limit(10);
+      .limit(15);
 
     // Sample 3: Recurring Bills (using tagged_merchants table like the recurring bills page)
     const { data: recurringBills } = await supabase
@@ -106,70 +108,56 @@ export async function GET() {
       `)
       .eq('user_id', user.id)
       .eq('is_active', true)
-      .limit(5);
+      .eq('type', 'expense')
+      .limit(10);
 
-    // Sample 4: Spending Categories
+    // Sample 4: Income Sources (using tagged_income_sources table)
+    const { data: incomeSources } = await supabase
+      .from('tagged_income_sources')
+      .select(`
+        id,
+        income_source_name,
+        expected_amount,
+        frequency,
+        next_predicted_date,
+        confidence_score,
+        is_active
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .limit(10);
+
+    // Sample 5: Spending Categories (last 30 days with AI categorization)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
     const { data: spendingCategories } = await supabase
       .from('transactions')
       .select(`
-        category,
-        subcategory,
-        amount
+        ai_category_tag,
+        ai_merchant_name,
+        amount,
+        date
       `)
       .in('plaid_item_id', plaidItemIds)
-      .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+      .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+      .not('ai_category_tag', 'is', null);
 
-    // Sample 5: Income Sources (using user_income_profiles table like the income page)
-    const { data: incomeProfile } = await supabase
-      .from('user_income_profiles')
-      .select('profile_data')
-      .eq('user_id', user.id)
-      .single();
-
-    let incomeSources: Array<{
-      id: string;
-      name: string;
-      amount: number;
-      frequency: string;
-      next_pay_date: string | null;
-      category: string;
-      created_at: string;
-    }> = [];
-    if (incomeProfile?.profile_data?.income_sources) {
-      incomeSources = incomeProfile.profile_data.income_sources.map((source: {
-        id?: string;
-        source_name?: string;
-        expected_amount?: number;
-        amount?: number;
-        frequency?: string;
-        pattern_type?: string;
-        next_predicted_date?: string | null;
-        category?: string;
-      }) => ({
-        id: source.id || `source_${source.source_name?.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-        name: source.source_name || 'Unknown Source',
-        amount: source.expected_amount || source.amount || 0,
-        frequency: source.frequency || source.pattern_type || 'irregular',
-        next_pay_date: source.next_predicted_date || null,
-        category: source.category || 'income',
-        created_at: new Date().toISOString()
-      })).slice(0, 5);
-    }
-
-    // Sample 6: Merchant Analytics
+    // Sample 6: Merchant Analytics (top spending merchants)
     const { data: topMerchants } = await supabase
       .from('transactions')
       .select(`
-        merchant_name,
+        ai_merchant_name,
         amount,
-        category
+        ai_category_tag,
+        date
       `)
       .in('plaid_item_id', plaidItemIds)
-      .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-      .not('merchant_name', 'is', null)
-      .limit(10);
+      .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+      .not('ai_merchant_name', 'is', null)
+      .limit(15);
 
-    // Sample 7: Account Types
+    // Sample 7: Account Types Summary
     const { data: accountTypes } = await supabase
       .from('accounts')
       .select(`
@@ -179,23 +167,144 @@ export async function GET() {
       .in('item_id', itemDbIds)
       .is('deleted_at', null);
 
-    // Sample 8: Transaction Patterns (commented out for now)
-    // const { data: transactionPatterns } = await supabase
-    //   .from('transactions')
-    //   .select(`
-    //     date,
-    //     amount,
-    //     category
-    //   `)
-    //   .eq('user_id', user.id)
-    //   .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-    //   .order('date', { ascending: false });
+    // Sample 8: Pending Transactions
+    const { data: pendingTransactions } = await supabase
+      .from('transactions')
+      .select(`
+        id,
+        name,
+        amount,
+        merchant_name,
+        date
+      `)
+      .in('plaid_item_id', plaidItemIds)
+      .eq('pending', true)
+      .order('date', { ascending: false })
+      .limit(5);
 
-    // Calculate some derived metrics
-    const totalBalance = accounts?.reduce((sum, acc) => sum + (acc.available_balance || acc.current_balance || 0), 0) || 0;
-    const monthlySpending = spendingCategories?.reduce((sum, tx) => sum + Math.abs(tx.amount || 0), 0) || 0;
-    const uniqueCategories = [...new Set(spendingCategories?.map(tx => tx.category).filter(Boolean))];
-    const uniqueMerchants = [...new Set(topMerchants?.map(tx => tx.merchant_name).filter(Boolean))];
+    // Calculate derived metrics
+    const totalBalance = accounts?.reduce((sum, acc) => {
+      const balance = acc.available_balance ?? acc.current_balance ?? 0;
+      return sum + balance;
+    }, 0) || 0;
+
+    const monthlySpending = spendingCategories?.reduce((sum, tx) => {
+      return sum + Math.abs(tx.amount || 0);
+    }, 0) || 0;
+
+    const uniqueCategories = [...new Set(spendingCategories?.map(tx => tx.ai_category_tag).filter(Boolean))];
+    const uniqueMerchants = [...new Set(topMerchants?.map(tx => tx.ai_merchant_name).filter(Boolean))];
+
+    // Enhanced spending analysis with AI categorization
+    const categorySpending = spendingCategories?.reduce((acc, tx) => {
+      const cat = tx.ai_category_tag || 'Uncategorized';
+      acc[cat] = (acc[cat] || 0) + Math.abs(tx.amount || 0);
+      return acc;
+    }, {} as Record<string, number>) || {};
+
+    const topCategories = Object.entries(categorySpending)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 8)
+      .map(([category, amount]) => ({ category, amount }));
+
+    const merchantSpending = topMerchants?.reduce((acc, tx) => {
+      const merchant = tx.ai_merchant_name || 'Unknown';
+      acc[merchant] = (acc[merchant] || 0) + Math.abs(tx.amount || 0);
+      return acc;
+    }, {} as Record<string, number>) || {};
+
+    const topMerchantsList = Object.entries(merchantSpending)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 8)
+      .map(([merchant, amount]) => ({ merchant, amount }));
+
+    // Enhanced suggested variables with real data
+    const suggestedVariables = [
+      {
+        id: 'account-names',
+        name: 'Account Names',
+        description: 'List of connected account names',
+        example: accounts?.map(acc => acc.name).join(', ') || 'No accounts'
+      },
+      {
+        id: 'institution-count',
+        name: 'Institution Count',
+        description: 'Number of different financial institutions',
+        example: `${new Set(accounts?.map(acc => acc.institution_name).filter(Boolean)).size} institutions`
+      },
+      {
+        id: 'monthly-spending',
+        name: 'Monthly Spending',
+        description: 'Total spending in the last 30 days',
+        example: `$${monthlySpending.toLocaleString()}`
+      },
+      {
+        id: 'top-spending-category',
+        name: 'Top Spending Category',
+        description: 'Category with highest spending this month',
+        example: topCategories.length > 0 ? `${topCategories[0].category}: $${topCategories[0].amount.toLocaleString()}` : 'None'
+      },
+      {
+        id: 'recurring-bills-count',
+        name: 'Recurring Bills Count',
+        description: 'Number of recurring bills',
+        example: `${recurringBills?.length || 0} bills`
+      },
+      {
+        id: 'recurring-bills-total',
+        name: 'Recurring Bills Total',
+        description: 'Total monthly recurring bill amount',
+        example: `$${recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0).toLocaleString() || 0}`
+      },
+      {
+        id: 'income-sources-count',
+        name: 'Income Sources Count',
+        description: 'Number of income sources',
+        example: `${incomeSources?.length || 0} sources`
+      },
+      {
+        id: 'income-sources-total',
+        name: 'Income Sources Total',
+        description: 'Total monthly income',
+        example: `$${incomeSources?.reduce((sum, income) => sum + (income.expected_amount || 0), 0).toLocaleString() || 0}`
+      },
+      {
+        id: 'unique-categories',
+        name: 'Unique Categories',
+        description: 'Number of unique spending categories',
+        example: `${uniqueCategories.length} categories`
+      },
+      {
+        id: 'unique-merchants',
+        name: 'Unique Merchants',
+        description: 'Number of unique merchants',
+        example: `${uniqueMerchants.length} merchants`
+      },
+      {
+        id: 'account-types',
+        name: 'Account Types',
+        description: 'Types of accounts connected',
+        example: accounts?.map(acc => `${acc.type} (${acc.subtype})`).join(', ') || 'None'
+      },
+      {
+        id: 'pending-transactions',
+        name: 'Pending Transactions',
+        description: 'Number of pending transactions',
+        example: `${pendingTransactions?.length || 0} pending`
+      },
+      {
+        id: 'total-balance',
+        name: 'Total Balance',
+        description: 'Combined balance from all accounts',
+        example: `$${totalBalance.toLocaleString()}`
+      },
+      {
+        id: 'last-transaction-date',
+        name: 'Last Transaction Date',
+        description: 'Most recent transaction date',
+        example: (recentTransactions && recentTransactions.length > 0) ? new Date(recentTransactions[0].date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'None'
+      }
+    ];
 
     const dataSample = {
       user: {
@@ -206,145 +315,44 @@ export async function GET() {
         count: accounts?.length || 0,
         total_balance: totalBalance,
         types: accountTypes?.map(acc => ({ type: acc.type, subtype: acc.subtype })) || [],
-        sample: accounts?.slice(0, 3) || []
+        sample: accounts?.slice(0, 5) || []
       },
       transactions: {
         recent_count: recentTransactions?.length || 0,
         monthly_spending: monthlySpending,
         unique_categories: uniqueCategories.length,
         unique_merchants: uniqueMerchants.length,
-        sample: recentTransactions?.slice(0, 5) || []
+        sample: recentTransactions?.slice(0, 8) || []
       },
       recurring_bills: {
         count: recurringBills?.length || 0,
         total_monthly: recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0) || 0,
-        sample: recurringBills?.slice(0, 3).map(bill => ({
+        sample: recurringBills?.slice(0, 5).map(bill => ({
           name: bill.merchant_name || 'Unknown',
           amount: bill.expected_amount || 0,
-          frequency: bill.prediction_frequency || 'monthly'
+          frequency: bill.prediction_frequency || 'monthly',
+          next_date: bill.next_predicted_date
         })) || []
       },
       income_sources: {
         count: incomeSources?.length || 0,
-        total_monthly: incomeSources?.reduce((sum, income) => sum + (income.amount || 0), 0) || 0,
-        sample: incomeSources?.slice(0, 3).map(income => ({
-          name: income.name || 'Unknown',
-          amount: income.amount || 0,
-          frequency: income.frequency || 'monthly'
+        total_monthly: incomeSources?.reduce((sum, income) => sum + (income.expected_amount || 0), 0) || 0,
+        sample: incomeSources?.slice(0, 5).map(income => ({
+          name: income.income_source_name || 'Unknown',
+          amount: income.expected_amount || 0,
+          frequency: income.frequency || 'monthly',
+          next_date: income.next_predicted_date
         })) || []
       },
       spending_analysis: {
-        top_categories: spendingCategories
-          ?.reduce((acc, tx) => {
-            const cat = tx.category || 'Uncategorized';
-            acc[cat] = (acc[cat] || 0) + Math.abs(tx.amount || 0);
-            return acc;
-          }, {} as Record<string, number>)
-          ? Object.entries(spendingCategories.reduce((acc, tx) => {
-              const cat = tx.category || 'Uncategorized';
-              acc[cat] = (acc[cat] || 0) + Math.abs(tx.amount || 0);
-              return acc;
-            }, {} as Record<string, number>))
-            .sort(([,a], [,b]) => (b as number) - (a as number))
-            .slice(0, 5)
-            .map(([category, amount]) => ({ category, amount: amount as number }))
-          : [],
-        top_merchants: topMerchants
-          ?.reduce((acc, tx) => {
-            const merchant = tx.merchant_name || 'Unknown';
-            acc[merchant] = (acc[merchant] || 0) + Math.abs(tx.amount || 0);
-            return acc;
-          }, {} as Record<string, number>)
-          ? Object.entries(topMerchants.reduce((acc, tx) => {
-              const merchant = tx.merchant_name || 'Unknown';
-              acc[merchant] = (acc[merchant] || 0) + Math.abs(tx.amount || 0);
-              return acc;
-            }, {} as Record<string, number>))
-            .sort(([,a], [,b]) => (b as number) - (a as number))
-            .slice(0, 5)
-            .map(([merchant, amount]) => ({ merchant, amount: amount as number }))
-          : []
+        top_categories: topCategories,
+        top_merchants: topMerchantsList
       },
-      suggested_variables: [
-        {
-          id: 'account-names',
-          name: 'Account Names',
-          description: 'List of connected account names',
-          example: accounts?.map(acc => acc.name).join(', ') || 'No accounts'
-        },
-        {
-          id: 'institution-count',
-          name: 'Institution Count',
-          description: 'Number of different financial institutions',
-          example: `${new Set(accounts?.map(acc => acc.institution_name).filter(Boolean)).size} institutions`
-        },
-        {
-          id: 'monthly-spending',
-          name: 'Monthly Spending',
-          description: 'Total spending in the last 30 days',
-          example: `$${monthlySpending.toLocaleString()}`
-        },
-        {
-          id: 'top-spending-category',
-          name: 'Top Spending Category',
-          description: 'Category with highest spending this month',
-          example: spendingCategories?.length ? 
-            Object.entries(spendingCategories.reduce((acc, tx) => {
-              const cat = tx.category || 'Uncategorized';
-              acc[cat] = (acc[cat] || 0) + Math.abs(tx.amount || 0);
-              return acc;
-            }, {} as Record<string, number>))
-            .sort(([,a], [,b]) => b - a)[0]?.[0] || 'None' : 'None'
-        },
-        {
-          id: 'recurring-bills-count',
-          name: 'Recurring Bills Count',
-          description: 'Number of recurring bills',
-          example: `${recurringBills?.length || 0} bills`
-        },
-        {
-          id: 'recurring-bills-total',
-          name: 'Recurring Bills Total',
-          description: 'Total monthly recurring bill amount',
-          example: `$${recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0).toLocaleString() || 0}`
-        },
-        {
-          id: 'income-sources-count',
-          name: 'Income Sources Count',
-          description: 'Number of income sources',
-          example: `${incomeSources?.length || 0} sources`
-        },
-        {
-          id: 'income-sources-total',
-          name: 'Income Sources Total',
-          description: 'Total monthly income',
-          example: `$${incomeSources?.reduce((sum, income) => sum + (income.amount || 0), 0).toLocaleString() || 0}`
-        },
-        {
-          id: 'unique-categories',
-          name: 'Unique Categories',
-          description: 'Number of unique spending categories',
-          example: `${uniqueCategories.length} categories`
-        },
-        {
-          id: 'unique-merchants',
-          name: 'Unique Merchants',
-          description: 'Number of unique merchants',
-          example: `${uniqueMerchants.length} merchants`
-        },
-        {
-          id: 'account-types',
-          name: 'Account Types',
-          description: 'Types of accounts connected',
-          example: accounts?.map(acc => `${acc.type} (${acc.subtype})`).join(', ') || 'None'
-        },
-        {
-          id: 'pending-transactions',
-          name: 'Pending Transactions',
-          description: 'Number of pending transactions',
-          example: `${recentTransactions?.filter(tx => tx.pending).length || 0} pending`
-        }
-      ]
+      pending_transactions: {
+        count: pendingTransactions?.length || 0,
+        sample: pendingTransactions || []
+      },
+      suggested_variables: suggestedVariables
     };
 
     return NextResponse.json(dataSample);
