@@ -588,7 +588,7 @@ export default function DataSamplePage() {
         {/* Current Variables Section */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">🔄 Current SMS Builder Variables</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-medium text-blue-900">Today&apos;s Date</h3>
               <p className="text-blue-700 text-sm">{new Date().toLocaleDateString('en-US', { 
@@ -618,6 +618,10 @@ export default function DataSamplePage() {
                   : 'No transactions found'
                 }
               </p>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg">
+              <h3 className="font-medium text-red-900">Recurring Bills</h3>
+              <p className="text-red-700 text-sm">{dataSample.recurring_bills.count} bills</p>
             </div>
           </div>
         </div>
