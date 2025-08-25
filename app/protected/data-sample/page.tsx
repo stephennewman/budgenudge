@@ -14,7 +14,6 @@ interface DataSample {
     types: Array<{ type: string; subtype: string }>;
     sample: Array<{
       name: string;
-      institution_name: string | null;
       available_balance: number | null;
       current_balance: number | null;
     }>;
@@ -102,10 +101,10 @@ export default function DataSamplePage() {
 
       console.log('🔍 Sampling data for user:', user.id);
 
-      // Get user's Plaid items first (this is the correct data flow)
+      // Get user's Plaid items first
       const { data: userItems } = await supabase
         .from('items')
-        .select('id, plaid_item_id, institution_name')
+        .select('id, plaid_item_id')
         .eq('user_id', user.id)
         .is('deleted_at', null)
         .limit(10);
@@ -177,7 +176,6 @@ export default function DataSamplePage() {
         available_balance: number | null;
         current_balance: number | null;
         mask: string | null;
-        institution_name: string | null;
         created_at: string;
       }> = [];
 
@@ -198,7 +196,6 @@ export default function DataSamplePage() {
             available_balance,
             current_balance,
             mask,
-            institution_name,
             created_at
           `)
           .in('item_id', itemIds)
@@ -398,7 +395,7 @@ export default function DataSamplePage() {
           id: 'institution-count',
           name: 'Institution Count',
           description: 'Number of different financial institutions',
-          example: `${new Set(accounts?.map(acc => acc.institution_name).filter(Boolean)).size} institutions`
+          example: `${userItems?.length || 0} institutions`
         },
         {
           id: 'monthly-spending',
@@ -665,9 +662,9 @@ export default function DataSamplePage() {
               <div className="mt-4">
                 <h4 className="font-medium text-gray-900 mb-2">Sample Accounts:</h4>
                 <div className="space-y-2">
-                  {dataSample.accounts.sample.map((account, index) => (
-                    <div key={index} className="text-sm text-gray-600">
-                      {account.name} - {account.institution_name || 'Unknown Institution'} (${(account.available_balance || account.current_balance || 0).toLocaleString()})
+                  {dataSample.accounts.sample.map((account) => (
+                    <div key={account.name} className="text-sm text-gray-600">
+                      {account.name} (${(account.available_balance || account.current_balance || 0).toLocaleString()})
                     </div>
                   ))}
                 </div>
