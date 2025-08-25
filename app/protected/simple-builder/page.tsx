@@ -378,13 +378,91 @@ export default function SimpleBuilderPage() {
       // Add the variable to canvas
       setCanvasItems(prev => [...prev, variableId]);
       
-      // Fetch the variable value directly from Supabase
-      try {
-        const variableValue = await fetchVariableData(variableId);
-        setPreviewText(prev => prev + (prev ? '\n' : '') + variableValue);
-      } catch (error) {
-        console.error('Error fetching variable value:', error);
-        setPreviewText(prev => prev + (prev ? '\n' : '') + `[${variableId} - Error]`);
+      // Check if it's a formatting variable or data variable
+      const isFormattingVariable = [
+        'line-break', 'divider-line', 'double-divider', 'dotted-line', 'arrow-separator',
+        'star-separator', 'diamond-separator', 'section-header', 'bullet-point', 'checkmark',
+        'warning-icon', 'info-icon', 'money-icon', 'calendar-icon', 'bank-icon', 'sparkle',
+        'fire', 'rocket', 'trophy', 'heart'
+      ].includes(variableId);
+      
+      if (isFormattingVariable) {
+        // For formatting variables, insert the predefined value directly
+        let formatValue = '';
+        switch (variableId) {
+          case 'line-break':
+            formatValue = '\n';
+            break;
+          case 'divider-line':
+            formatValue = '──────────';
+            break;
+          case 'double-divider':
+            formatValue = '══════════';
+            break;
+          case 'dotted-line':
+            formatValue = '••••••••••';
+            break;
+          case 'arrow-separator':
+            formatValue = '➜ ➜ ➜ ➜ ➜';
+            break;
+          case 'star-separator':
+            formatValue = '⭐ ⭐ ⭐ ⭐ ⭐';
+            break;
+          case 'diamond-separator':
+            formatValue = '💎 💎 💎 💎 💎';
+            break;
+          case 'section-header':
+            formatValue = '📋 SECTION\n──────────';
+            break;
+          case 'bullet-point':
+            formatValue = '• ';
+            break;
+          case 'checkmark':
+            formatValue = '✅ ';
+            break;
+          case 'warning-icon':
+            formatValue = '⚠️ ';
+            break;
+          case 'info-icon':
+            formatValue = 'ℹ️ ';
+            break;
+          case 'money-icon':
+            formatValue = '💵 ';
+            break;
+          case 'calendar-icon':
+            formatValue = '📅 ';
+            break;
+          case 'bank-icon':
+            formatValue = '🏦 ';
+            break;
+          case 'sparkle':
+            formatValue = '✨ ';
+            break;
+          case 'fire':
+            formatValue = '🔥 ';
+            break;
+          case 'rocket':
+            formatValue = '🚀 ';
+            break;
+          case 'trophy':
+            formatValue = '🏆 ';
+            break;
+          case 'heart':
+            formatValue = '❤️ ';
+            break;
+          default:
+            formatValue = '';
+        }
+        setPreviewText(prev => prev + (prev ? '\n' : '') + formatValue);
+      } else {
+        // For data variables, fetch the variable value directly from Supabase
+        try {
+          const variableValue = await fetchVariableData(variableId);
+          setPreviewText(prev => prev + (prev ? '\n' : '') + variableValue);
+        } catch (error) {
+          console.error('Error fetching variable value:', error);
+          setPreviewText(prev => prev + (prev ? '\n' : '') + `[${variableId} - Error]`);
+        }
       }
     }
   };
@@ -430,7 +508,7 @@ export default function SimpleBuilderPage() {
       // Convert real values back to placeholders for storage
       let templateContent = previewText;
       
-      // Replace real values with placeholders
+      // Replace real values with placeholders (only for data variables)
       const variableRegex = /{{([^}]+)}}/g;
       const matches = previewText.match(variableRegex);
       
@@ -447,6 +525,9 @@ export default function SimpleBuilderPage() {
           }
         }
       }
+
+      // Note: Formatting variables are preserved as-is since they don't have placeholders
+      // They are inserted directly as their final values
 
       const response = await fetch('/api/custom-sms-templates', {
         method: 'POST',
@@ -767,24 +848,63 @@ export default function SimpleBuilderPage() {
 
 // Draggable Variable Component
 function DraggableVariable() {
-  const [variables] = useState([
-    { id: 'today-date', label: 'Today\'s Date', icon: '📅', description: 'Current date in long format' },
-    { id: 'account-count', label: 'Account Count', icon: '🏦', description: 'Number of connected accounts' },
-    { id: 'last-transaction-date', label: 'Last Transaction', icon: '💳', description: 'Most recent transaction date' },
-    { id: 'total-balance', label: 'Total Balance', icon: '💰', description: 'Combined balance from all accounts' }
+  const [variables] = useState<Array<{ id: string; label: string; icon: string; description: string; type: 'data' | 'format'; value?: string }>>([
+    { id: 'today-date', label: 'Today\'s Date', icon: '📅', description: 'Current date in long format', type: 'data' as const },
+    { id: 'account-count', label: 'Account Count', icon: '🏦', description: 'Number of connected accounts', type: 'data' as const },
+    { id: 'last-transaction-date', label: 'Last Transaction', icon: '💳', description: 'Most recent transaction date', type: 'data' as const },
+    { id: 'total-balance', label: 'Total Balance', icon: '💰', description: 'Combined balance from all accounts', type: 'data' as const }
+  ]);
+
+  const [formattingVariables] = useState<Array<{ id: string; label: string; icon: string; description: string; type: 'data' | 'format'; value?: string }>>([
+    { id: 'line-break', label: 'Line Break', icon: '↵', description: 'Add a blank line for spacing', type: 'format' as const, value: '\n' },
+    { id: 'divider-line', label: 'Divider Line', icon: '➖', description: 'Horizontal line separator', type: 'format' as const, value: '──────────' },
+    { id: 'double-divider', label: 'Double Divider', icon: '═', description: 'Thick horizontal separator', type: 'format' as const, value: '══════════' },
+    { id: 'dotted-line', label: 'Dotted Line', icon: '⋯', description: 'Dotted line separator', type: 'format' as const, value: '••••••••••' },
+    { id: 'arrow-separator', label: 'Arrow Separator', icon: '➜', description: 'Arrow-style separator', type: 'format' as const, value: '➜ ➜ ➜ ➜ ➜' },
+    { id: 'star-separator', label: 'Star Separator', icon: '⭐', description: 'Star-style separator', type: 'format' as const, value: '⭐ ⭐ ⭐ ⭐ ⭐' },
+    { id: 'diamond-separator', label: 'Diamond Separator', icon: '💎', description: 'Diamond-style separator', type: 'format' as const, value: '💎 💎 💎 💎 💎' },
+    { id: 'section-header', label: 'Section Header', icon: '📋', description: 'Section header with underline', type: 'format' as const, value: '📋 SECTION\n──────────' },
+    { id: 'bullet-point', label: 'Bullet Point', icon: '•', description: 'Bullet point for lists', type: 'format' as const, value: '• ' },
+    { id: 'checkmark', label: 'Checkmark', icon: '✅', description: 'Checkmark for completed items', type: 'format' as const, value: '✅ ' },
+    { id: 'warning-icon', label: 'Warning Icon', icon: '⚠️', description: 'Warning icon for alerts', type: 'format' as const, value: '⚠️ ' },
+    { id: 'info-icon', label: 'Info Icon', icon: 'ℹ️', description: 'Information icon', type: 'format' as const, value: 'ℹ️ ' },
+    { id: 'money-icon', label: 'Money Icon', icon: '💵', description: 'Money icon for financial items', type: 'format' as const, value: '💵 ' },
+    { id: 'calendar-icon', label: 'Calendar Icon', icon: '📅', description: 'Calendar icon for dates', type: 'format' as const, value: '📅 ' },
+    { id: 'bank-icon', label: 'Bank Icon', icon: '🏦', description: 'Bank icon for accounts', type: 'format' as const, value: '🏦 ' },
+    { id: 'sparkle', label: 'Sparkle', icon: '✨', description: 'Sparkle for emphasis', type: 'format' as const, value: '✨ ' },
+    { id: 'fire', label: 'Fire', icon: '🔥', description: 'Fire for urgency/hot deals', type: 'format' as const, value: '🔥 ' },
+    { id: 'rocket', label: 'Rocket', icon: '🚀', description: 'Rocket for growth/success', type: 'format' as const, value: '🚀 ' },
+    { id: 'trophy', label: 'Trophy', icon: '🏆', description: 'Trophy for achievements', type: 'format' as const, value: '🏆 ' },
+    { id: 'heart', label: 'Heart', icon: '❤️', description: 'Heart for positive feelings', type: 'format' as const, value: '❤️ ' }
   ]);
 
   return (
-    <div className="space-y-3">
-      {variables.map((variable) => (
-        <DraggableVariableItem key={variable.id} variable={variable} />
-      ))}
+    <div className="space-y-6">
+      {/* Data Variables */}
+      <div>
+        <h3 className="text-sm font-medium text-gray-700 mb-3 border-b border-gray-200 pb-2">📊 Data Variables</h3>
+        <div className="space-y-3">
+          {variables.map((variable) => (
+            <DraggableVariableItem key={variable.id} variable={variable} />
+          ))}
+        </div>
+      </div>
+
+      {/* Formatting Variables */}
+      <div>
+        <h3 className="text-sm font-medium text-gray-700 mb-3 border-b border-gray-200 pb-2">🎨 Formatting</h3>
+        <div className="space-y-3">
+          {formattingVariables.map((variable) => (
+            <DraggableVariableItem key={variable.id} variable={variable} />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
 // Individual Draggable Variable Item
-function DraggableVariableItem({ variable }: { variable: { id: string; label: string; icon: string; description: string } }) {
+function DraggableVariableItem({ variable }: { variable: { id: string; label: string; icon: string; description: string; type: 'data' | 'format'; value?: string } }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: variable.id,
   });
@@ -793,13 +913,15 @@ function DraggableVariableItem({ variable }: { variable: { id: string; label: st
     transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
   } : undefined;
 
+  const bgColor = variable.type === 'format' ? 'bg-purple-50 border-purple-200 hover:bg-purple-100' : 'bg-blue-50 border-blue-200 hover:bg-blue-100';
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      className={`p-3 bg-blue-50 border-2 border-blue-200 rounded-lg cursor-grab hover:bg-blue-100 transition-colors ${
+      className={`p-3 ${bgColor} border-2 rounded-lg cursor-grab transition-colors ${
         isDragging ? 'opacity-50' : ''
       }`}
     >
@@ -825,6 +947,7 @@ function DropZone({ canvasItems, onRemoveVariable }: {
 
   const getVariableLabel = (variableId: string) => {
     switch (variableId) {
+      // Data Variables
       case 'today-date':
         return '📅 Today\'s Date';
       case 'account-count':
@@ -833,6 +956,49 @@ function DropZone({ canvasItems, onRemoveVariable }: {
         return '💳 Last Transaction';
       case 'total-balance':
         return '💰 Total Balance';
+      
+      // Formatting Variables
+      case 'line-break':
+        return '↵ Line Break';
+      case 'divider-line':
+        return '➖ Divider Line';
+      case 'double-divider':
+        return '═ Double Divider';
+      case 'dotted-line':
+        return '⋯ Dotted Line';
+      case 'arrow-separator':
+        return '➜ Arrow Separator';
+      case 'star-separator':
+        return '⭐ Star Separator';
+      case 'diamond-separator':
+        return '💎 Diamond Separator';
+      case 'section-header':
+        return '📋 Section Header';
+      case 'bullet-point':
+        return '• Bullet Point';
+      case 'checkmark':
+        return '✅ Checkmark';
+      case 'warning-icon':
+        return '⚠️ Warning Icon';
+      case 'info-icon':
+        return 'ℹ️ Info Icon';
+      case 'money-icon':
+        return '💵 Money Icon';
+      case 'calendar-icon':
+        return '📅 Calendar Icon';
+      case 'bank-icon':
+        return '🏦 Bank Icon';
+      case 'sparkle':
+        return '✨ Sparkle';
+      case 'fire':
+        return '🔥 Fire';
+      case 'rocket':
+        return '🚀 Rocket';
+      case 'trophy':
+        return '🏆 Trophy';
+      case 'heart':
+        return '❤️ Heart';
+      
       default:
         return `📱 ${variableId}`;
     }
