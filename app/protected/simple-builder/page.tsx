@@ -58,6 +58,15 @@ export default function SimpleBuilderPage() {
     const supabase = createClientComponentClient();
     
     try {
+      // Get current user once at the beginning
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.error('❌ Auth error in fetchVariableData:', authError);
+        return '[Authentication Error]';
+      }
+      
+      console.log('✅ User authenticated:', user.id);
+      
       switch (variableId) {
         case 'today-date':
           return new Date().toLocaleDateString('en-US', { 
@@ -68,12 +77,6 @@ export default function SimpleBuilderPage() {
           
         case 'account-count':
           // Get user's Plaid items first, then count accounts linked to those items
-          const { data: { user }, error: authError } = await supabase.auth.getUser();
-          if (authError || !user) {
-            console.error('❌ Auth error in account-count:', authError);
-            return '[Authentication Error]';
-          }
-          
           const { data: userItems } = await supabase
             .from('items')
             .select('id')
@@ -83,27 +86,26 @@ export default function SimpleBuilderPage() {
           
           if (userItems && userItems.length > 0) {
             const itemIds = userItems.map(item => item.id);
+            console.log('🔍 Looking for accounts with item IDs:', itemIds);
+            
             const { count: accountCount } = await supabase
               .from('accounts')
               .select('*', { count: 'exact', head: true })
               .in('item_id', itemIds)
               .is('deleted_at', null);
+              
+            console.log('🔍 Found account count:', accountCount);
             return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
           }
+          console.log('🔍 No user items found');
           return '0 accounts connected';
           
         case 'last-transaction-date':
           // Get user's Plaid items first, then get transactions linked to those items
-          const { data: { user: userForTx }, error: authErrorTx } = await supabase.auth.getUser();
-          if (authErrorTx || !userForTx) {
-            console.error('❌ Auth error in last-transaction-date:', authErrorTx);
-            return '[Authentication Error]';
-          }
-          
           const { data: userItemsForTx } = await supabase
             .from('items')
             .select('plaid_item_id')
-            .eq('user_id', userForTx.id)
+            .eq('user_id', user.id)
             .is('deleted_at', null)
             .limit(10);
           
@@ -130,16 +132,10 @@ export default function SimpleBuilderPage() {
           
         case 'total-balance':
           // Get user's Plaid items first, then get account balances linked to those items
-          const { data: { user: userForBalance }, error: authErrorBalance } = await supabase.auth.getUser();
-          if (authErrorBalance || !userForBalance) {
-            console.error('❌ Auth error in total-balance:', authErrorBalance);
-            return '[Authentication Error]';
-          }
-          
           const { data: userItemsForBalance } = await supabase
             .from('items')
             .select('id')
-            .eq('user_id', userForBalance.id)
+            .eq('user_id', user.id)
             .is('deleted_at', null)
             .limit(10);
           
