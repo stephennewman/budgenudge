@@ -24,6 +24,9 @@ interface BalanceDiagnostic {
   missing_stored_data: boolean;
   missing_plaid_current: boolean;
   missing_plaid_available: boolean;
+  pending_transactions_count: number;
+  pending_transactions_amount: number;
+  pending_impact_on_available: number | null;
 }
 
 interface DiagnosticError {
@@ -40,6 +43,9 @@ interface DiagnosticResult {
     available_balance_accuracy: string;
     accounts_stale_over_1hr: number;
     data_freshness_issues: boolean;
+    pending_transactions_total?: number;
+    accounts_with_pending?: number;
+    pending_amount_total?: number;
   };
   diagnostics: (BalanceDiagnostic | DiagnosticError)[];
   recommendations: string[];
@@ -150,6 +156,12 @@ export default function BalanceDiagnosticPage() {
                     {result.summary.data_freshness_issues ? '🚨 Yes' : '✅ No'}
                   </span>
                 </p>
+                {result.summary.pending_transactions_total !== undefined && (
+                  <p><span className="font-medium">Pending Transactions:</span> {result.summary.pending_transactions_total} 
+                    {result.summary.pending_amount_total !== undefined && 
+                      ` (${formatCurrency(result.summary.pending_amount_total)})`}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -219,6 +231,17 @@ export default function BalanceDiagnosticPage() {
                         <p>Last Updated: {diagnostic.stored_last_updated ? 
                           new Date(diagnostic.stored_last_updated).toLocaleString() : 'Never'}</p>
                         <p>Account Type: {diagnostic.account_type}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="font-medium mb-1">⏳ Pending Transactions</p>
+                        <p>Count: {diagnostic.pending_transactions_count}</p>
+                        <p>Amount: {formatCurrency(diagnostic.pending_transactions_amount)}</p>
+                        {diagnostic.pending_transactions_count > 0 && (
+                          <p className="text-orange-600 text-sm mt-1">
+                            ⚠️ These affect available balance but are excluded from KREZZO calculations
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>

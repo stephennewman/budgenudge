@@ -23,6 +23,9 @@ interface BalanceDiagnostic {
   missing_stored_data: boolean;
   missing_plaid_current: boolean;
   missing_plaid_available: boolean;
+  pending_transactions_count: number;
+  pending_transactions_amount: number;
+  pending_impact_on_available: number | null;
 }
 
 interface DiagnosticError {
@@ -93,6 +96,15 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Found ${storedAccounts?.length || 0} stored accounts`);
 
+    // Get pending transactions for analysis
+    const { data: pendingTransactions } = await supabase
+      .from('transactions')
+      .select('account_id, amount, name, date, pending, plaid_transaction_id')
+      .eq('pending', true)
+      .in('plaid_item_id', items?.map(i => i.plaid_item_id) || []);
+
+    console.log(`⏳ Found ${pendingTransactions?.length || 0} pending transactions`);
+
     const diagnostics: (BalanceDiagnostic | DiagnosticError)[] = [];
 
     // Check each item for real-time vs stored balance discrepancies
@@ -121,6 +133,14 @@ export async function GET(request: NextRequest) {
           const hoursStale = lastUpdated 
             ? Math.round((now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60))
             : null;
+
+          // Calculate pending transaction impact for this account
+          const accountPendingTxns = pendingTransactions?.filter(
+            tx => tx.account_id === realTimeAccount.account_id
+          ) || [];
+          
+          const pendingAmount = accountPendingTxns.reduce((sum, tx) => sum + tx.amount, 0);
+          const pendingCount = accountPendingTxns.length;
 
           const diagnostic: BalanceDiagnostic = {
             account_id: realTimeAccount.account_id,
@@ -158,7 +178,14 @@ export async function GET(request: NextRequest) {
             // Missing data flags
             missing_stored_data: !storedAccount,
             missing_plaid_current: realTimeAccount.balances.current === null,
-            missing_plaid_available: realTimeAccount.balances.available === null
+            missing_plaid_available: realTimeAccount.balances.available === null,
+            
+            // Pending transaction analysis
+            pending_transactions_count: pendingCount,
+            pending_transactions_amount: pendingAmount,
+            pending_impact_on_available: realTimeAccount.balances.available !== null && storedAccount?.available_balance !== null 
+              ? (realTimeAccount.balances.available - storedAccount!.available_balance) 
+              : null,
           };
 
           diagnostics.push(diagnostic);
@@ -203,18 +230,37 @@ export async function GET(request: NextRequest) {
 
     console.log(`📊 Balance diagnostic complete:`, summary);
 
+    // Calculate pending transaction metrics
+    const totalPendingTxns = validDiagnostics.reduce((sum, d) => sum + d.pending_transactions_count, 0);
+    const accountsWithPending = validDiagnostics.filter(d => d.pending_transactions_count > 0).length;
+    const totalPendingAmount = validDiagnostics.reduce((sum, d) => sum + Math.abs(d.pending_transactions_amount), 0);
+
+    const recommendations = [
+      summary.data_freshness_issues ? "🚨 Balance data is stale - recommend implementing real-time balance refresh" : "✅ Balance data is fresh",
+      summary.current_balance_accuracy !== '100%' ? "⚠️ Current balance mismatches detected" : "✅ Current balances match",
+      summary.available_balance_accuracy !== '100%' ? "⚠️ Available balance mismatches detected" : "✅ Available balances match"
+    ];
+
+    if (totalPendingTxns > 0) {
+      recommendations.push(`⏳ Found ${totalPendingTxns} pending transactions ($${totalPendingAmount.toFixed(2)}) across ${accountsWithPending} accounts - these affect available balance but are excluded from KREZZO calculations`);
+      recommendations.push("🎯 KEY INSIGHT: Pending transactions are likely the main cause of balance discrepancies");
+      recommendations.push("💡 Recommend including pending transactions in balance calculations and UI");
+    }
+
+    recommendations.push("💡 Consider switching from accountsGet() to balanceGet() for real-time data");
+    recommendations.push("💡 Add scheduled balance refresh cron job");
+    recommendations.push("💡 Add balance staleness indicators in UI");
+
     return NextResponse.json({
       success: true,
-      summary,
+      summary: {
+        ...summary,
+        pending_transactions_total: totalPendingTxns,
+        accounts_with_pending: accountsWithPending,
+        pending_amount_total: totalPendingAmount
+      },
       diagnostics,
-      recommendations: [
-        summary.data_freshness_issues ? "🚨 Balance data is stale - recommend implementing real-time balance refresh" : "✅ Balance data is fresh",
-        summary.current_balance_accuracy !== '100%' ? "⚠️ Current balance mismatches detected" : "✅ Current balances match",
-        summary.available_balance_accuracy !== '100%' ? "⚠️ Available balance mismatches detected" : "✅ Available balances match",
-        "💡 Consider switching from accountsGet() to balanceGet() for real-time data",
-        "💡 Add scheduled balance refresh cron job",
-        "💡 Add balance staleness indicators in UI"
-      ]
+      recommendations
     });
 
   } catch (error) {
