@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
+import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 
 export async function POST(request: NextRequest) {
   try {
-    const { templateId, schedule } = await request.json();
+    const { templateId, schedule, sendFirstSmsNow } = await request.json();
     
     if (!templateId || !schedule) {
       return NextResponse.json({ 
@@ -55,9 +56,75 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Schedule saved successfully:`, data);
     
+    // Send first SMS immediately if requested
+    if (sendFirstSmsNow && schedule.is_active) {
+      try {
+        // Get the template content
+        const { data: template, error: templateError } = await supabase
+          .from('custom_sms_templates')
+          .select('template_name, template_content, variables_used')
+          .eq('id', templateId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (templateError || !template) {
+          console.error('❌ Failed to fetch template for immediate send:', templateError);
+        } else {
+          // Get user's phone number
+          const { data: settings } = await supabase
+            .from('user_sms_settings')
+            .select('phone_number')
+            .eq('user_id', user.id)
+            .single();
+
+          if (settings?.phone_number) {
+            // Replace variables in template content
+            let finalMessage = template.template_content;
+            
+            // Process variables
+            for (const variable of template.variables_used) {
+              switch (variable) {
+                case 'today-date':
+                  const todayDate = new Date().toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long', 
+                    day: 'numeric'
+                  });
+                  finalMessage = finalMessage.replace('${today-date}', todayDate);
+                  break;
+                default:
+                  console.log(`⚠️ Unknown variable: ${variable}`);
+              }
+            }
+            
+            // Format message with template name
+            const formattedMessage = `🧪 ${template.template_name}: \n\n${finalMessage}`;
+            
+            // Send the SMS
+            const smsResult = await sendEnhancedSlickTextSMS({
+              phoneNumber: settings.phone_number,
+              message: formattedMessage,
+              userId: user.id
+            });
+            
+            if (smsResult.success) {
+              console.log(`✅ First SMS sent immediately for template "${template.template_name}"`);
+            } else {
+              console.error(`❌ Failed to send first SMS:`, smsResult.error);
+            }
+          } else {
+            console.log(`📭 No phone number found for user ${user.id}, skipping immediate SMS`);
+          }
+        }
+      } catch (smsError) {
+        console.error('❌ Error sending first SMS:', smsError);
+        // Don't fail the whole request if SMS fails
+      }
+    }
+    
     return NextResponse.json({ 
       success: true, 
-      message: 'Schedule saved successfully!',
+      message: sendFirstSmsNow && schedule.is_active ? 'Schedule saved and first SMS sent!' : 'Schedule saved successfully!',
       schedule: data
     });
     

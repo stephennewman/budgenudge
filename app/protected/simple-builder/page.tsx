@@ -58,6 +58,7 @@ export default function SimpleBuilderPage() {
   });
   const [currentSchedule, setCurrentSchedule] = useState<TemplateSchedule | null>(null);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+  const [sendFirstSmsNow, setSendFirstSmsNow] = useState(false);
 
   // Load saved templates on component mount
   useEffect(() => {
@@ -173,7 +174,8 @@ export default function SimpleBuilderPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId: currentTemplateId,
-          schedule: schedule
+          schedule: schedule,
+          sendFirstSmsNow: sendFirstSmsNow
         })
       });
 
@@ -181,7 +183,8 @@ export default function SimpleBuilderPage() {
       
       if (response.ok) {
         setCurrentSchedule(result.schedule);
-        setSaveMessage('✅ Schedule saved successfully!');
+        setSaveMessage(result.message || '✅ Schedule saved successfully!');
+        setSendFirstSmsNow(false); // Reset checkbox after successful save
         setTimeout(() => setSaveMessage(''), 3000);
       } else {
         setSaveMessage(`❌ ${result.error || 'Failed to save schedule'}`);
@@ -509,33 +512,46 @@ export default function SimpleBuilderPage() {
               </div>
             </div>
 
-            {/* Save Schedule Button & Status */}
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                {currentSchedule && schedule.is_active ? (
-                  <span>Next SMS: <strong>{formatNextSend()}</strong></span>
-                ) : (
-                  <span>Schedule inactive</span>
-                )}
-              </div>
-              
-              <button
-                onClick={handleSaveSchedule}
-                disabled={isSavingSchedule}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              >
-                {isSavingSchedule ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    📅 Save Schedule
-                  </>
-                )}
-              </button>
-            </div>
+                                    {/* Send First SMS Option */}
+                        <div className="mt-4 flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={sendFirstSmsNow}
+                              onChange={(e) => setSendFirstSmsNow(e.target.checked)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Send first SMS now (test the schedule immediately)</span>
+                          </label>
+                        </div>
+
+                        {/* Save Schedule Button & Status */}
+                        <div className="mt-4 flex items-center justify-between">
+                          <div className="text-sm text-gray-600">
+                            {currentSchedule && schedule.is_active ? (
+                              <span>Next SMS: <strong>{formatNextSend()}</strong></span>
+                            ) : (
+                              <span>Schedule inactive</span>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={handleSaveSchedule}
+                            disabled={isSavingSchedule}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                          >
+                            {isSavingSchedule ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                📅 {sendFirstSmsNow ? 'Save & Send Now' : 'Save Schedule'}
+                              </>
+                            )}
+                          </button>
+                        </div>
           </div>
         )}
         
