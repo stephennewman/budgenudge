@@ -14,7 +14,7 @@ interface DataSample {
     types: Array<{ type: string; subtype: string }>;
     sample: Array<{
       name: string;
-      institution_name: string;
+      institution_name: string | null;
       available_balance: number | null;
       current_balance: number | null;
     }>;
@@ -142,6 +142,23 @@ export default function DataSamplePage() {
       console.log('🔍 Using Plaid item IDs:', plaidItemIds);
       console.log('🔍 User ID being used:', user.id);
 
+      // Debug: Check transaction structure and relationships
+      if (plaidItemIds.length > 0) {
+        const { data: sampleTransactions, error: txError } = await supabase
+          .from('transactions')
+          .select('id, plaid_item_id, account_id, name, amount, date')
+          .in('plaid_item_id', plaidItemIds)
+          .limit(5);
+        
+        console.log('🔍 Sample transactions structure:', sampleTransactions);
+        console.log('🔍 Transaction error:', txError);
+        
+        if (sampleTransactions && sampleTransactions.length > 0) {
+          const uniqueAccountIds = [...new Set(sampleTransactions.map(tx => tx.account_id).filter(Boolean))];
+          console.log('🔍 Unique account IDs from sample transactions:', uniqueAccountIds);
+        }
+      }
+
       // Debug: Check if accounts exist at all for this user
       const { data: allUserAccounts, error: accountsError } = await supabase
         .from('accounts')
@@ -151,72 +168,84 @@ export default function DataSamplePage() {
       console.log('🔍 All accounts in database:', allUserAccounts);
       console.log('🔍 Accounts error:', accountsError);
 
-      // Sample 1: Account Information (using itemDbIds like the working transactions API)
-      let { data: accounts } = await supabase
-        .from('accounts')
-        .select(`
-          id,
-          name,
-          type,
-          subtype,
-          available_balance,
-          current_balance,
-          mask,
-          institution_name,
-          created_at
-        `)
-        .in('item_id', itemDbIds)
-        .is('deleted_at', null)
-        .limit(10);
-
-      console.log('🔍 Accounts query result:', accounts?.length || 0, 'accounts found');
-      console.log('🔍 Accounts query parameters:', { itemDbIds, user_id: user.id });
-      if (accounts && accounts.length > 0) {
-        console.log('🔍 First account sample:', accounts[0]);
-      } else {
-        console.log('🔍 No accounts found for item IDs:', itemDbIds);
+      // Sample 1: Account Information - Get accounts via transactions using plaid_item_id
+      let accounts: Array<{
+        id: string;
+        name: string;
+        type: string;
+        subtype: string;
+        available_balance: number | null;
+        current_balance: number | null;
+        mask: string | null;
+        institution_name: string | null;
+        created_at: string;
+      }> = [];
+      
+      if (plaidItemIds.length > 0) {
+        // Step 1: Get account IDs from transactions
+        const { data: transactionAccounts } = await supabase
+          .from('transactions')
+          .select('account_id')
+          .in('plaid_item_id', plaidItemIds)
+          .not('account_id', 'is', null);
         
-        // Try alternative approach: get accounts from transactions
-        if (plaidItemIds.length > 0) {
-          const { data: transactionAccounts } = await supabase
-            .from('transactions')
-            .select('account_id, plaid_item_id')
-            .in('plaid_item_id', plaidItemIds)
-            .not('account_id', 'is', null)
-            .limit(5);
+        if (transactionAccounts && transactionAccounts.length > 0) {
+          const uniqueAccountIds = [...new Set(transactionAccounts.map(tx => tx.account_id).filter(Boolean))];
+          console.log('🔍 Unique account IDs from transactions:', uniqueAccountIds);
           
-          console.log('🔍 Transaction accounts found:', transactionAccounts);
-          
-          if (transactionAccounts && transactionAccounts.length > 0) {
-            const uniqueAccountIds = [...new Set(transactionAccounts.map(tx => tx.account_id).filter(Boolean))];
-            console.log('🔍 Unique account IDs from transactions:', uniqueAccountIds);
+          if (uniqueAccountIds.length > 0) {
+            // Step 2: Get account details using the account IDs
+            const { data: accountsData } = await supabase
+              .from('accounts')
+              .select(`
+                id,
+                name,
+                type,
+                subtype,
+                available_balance,
+                current_balance,
+                mask,
+                institution_name,
+                created_at
+              `)
+              .in('id', uniqueAccountIds)
+              .is('deleted_at', null);
             
-            if (uniqueAccountIds.length > 0) {
-              const { data: accountsFromTransactions } = await supabase
-                .from('accounts')
-                .select(`
-                  id,
-                  name,
-                  type,
-                  subtype,
-                  available_balance,
-                  current_balance,
-                  mask,
-                  institution_name,
-                  created_at
-                `)
-                .in('id', uniqueAccountIds)
-                .is('deleted_at', null);
-              
-              console.log('🔍 Accounts found via transactions:', accountsFromTransactions);
-              
-              if (accountsFromTransactions && accountsFromTransactions.length > 0) {
-                // Use these accounts instead
-                accounts = accountsFromTransactions;
-                console.log('🔍 Using accounts from transactions:', accounts);
-              }
+            if (accountsData && accountsData.length > 0) {
+              accounts = accountsData;
+              console.log('🔍 Accounts found via transactions:', accounts.length);
+              console.log('🔍 First account sample:', accounts[0]);
             }
           }
+        }
+      }
+      
+      // Fallback: Try direct accounts query if no accounts found via transactions
+      if (!accounts || accounts.length === 0) {
+        console.log('🔍 No accounts found via transactions, trying direct query');
+        
+        const { data: directAccounts } = await supabase
+          .from('accounts')
+          .select(`
+            id,
+            name,
+            type,
+            subtype,
+            available_balance,
+            current_balance,
+            mask,
+            institution_name,
+            created_at
+          `)
+          .in('item_id', itemDbIds)
+          .is('deleted_at', null)
+          .limit(10);
+        
+        if (directAccounts && directAccounts.length > 0) {
+          accounts = directAccounts;
+          console.log('🔍 Fallback: Direct accounts query found:', accounts.length);
+        } else {
+          console.log('🔍 No accounts found via any method');
         }
       }
 
