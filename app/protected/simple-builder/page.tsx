@@ -264,76 +264,45 @@ export default function SimpleBuilderPage() {
           });
           
         case 'account-count':
-          // Get user's Plaid items first, then count accounts linked to those items
-          const { data: userItems } = await supabase
-            .from('items')
-            .select('id')
-            .limit(10);
-          
-          if (userItems && userItems.length > 0) {
-            const itemIds = userItems.map(item => item.id);
-            const { count: accountCount } = await supabase
-              .from('accounts')
-              .select('*', { count: 'exact', head: true })
-              .in('item_id', itemIds)
-              .is('deleted_at', null);
-            return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
-          }
-          return '0 accounts connected';
+          const { count: accountCount } = await supabase
+            .from('accounts')
+            .select('*', { count: 'exact', head: true })
+            .is('deleted_at', null);
+          return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
           
         case 'last-transaction-date':
-          // Get user's Plaid items first, then get transactions linked to those items
-          const { data: userItemsForTx } = await supabase
-            .from('items')
-            .select('plaid_item_id')
-            .limit(10);
+          const { data: lastTransaction } = await supabase
+            .from('transactions')
+            .select('date')
+            .order('date', { ascending: false })
+            .limit(1)
+            .single();
           
-          if (userItemsForTx && userItemsForTx.length > 0) {
-            const plaidItemIds = userItemsForTx.map(item => item.plaid_item_id);
-            const { data: lastTransaction } = await supabase
-              .from('transactions')
-              .select('date')
-              .in('plaid_item_id', plaidItemIds)
-              .order('date', { ascending: false })
-              .limit(1)
-              .single();
-            
-            if (lastTransaction) {
-              const date = new Date(lastTransaction.date);
-              return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long', 
-                day: 'numeric'
-              });
-            }
+          if (lastTransaction) {
+            const date = new Date(lastTransaction.date);
+            return date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long', 
+              day: 'numeric'
+            });
           }
           return 'No transactions found';
           
         case 'total-balance':
-          // Get user's Plaid items first, then get account balances linked to those items
-          const { data: userItemsForBalance } = await supabase
-            .from('items')
-            .select('id')
-            .limit(10);
+          const { data: accounts } = await supabase
+            .from('accounts')
+            .select('available_balance, current_balance')
+            .is('deleted_at', null);
           
-          if (userItemsForBalance && userItemsForBalance.length > 0) {
-            const itemIds = userItemsForBalance.map(item => item.id);
-            const { data: accounts } = await supabase
-              .from('accounts')
-              .select('available_balance, current_balance')
-              .in('item_id', itemIds)
-              .is('deleted_at', null);
-            
-            if (accounts && accounts.length > 0) {
-              const totalBalance = accounts.reduce((sum, acc) => {
-                const balance = acc.available_balance ?? acc.current_balance ?? 0;
-                return sum + balance;
-              }, 0);
-              return `$${totalBalance.toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              })}`;
-            }
+          if (accounts && accounts.length > 0) {
+            const totalBalance = accounts.reduce((sum, acc) => {
+              const balance = acc.available_balance ?? acc.current_balance ?? 0;
+              return sum + balance;
+            }, 0);
+            return `$${totalBalance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}`;
           }
           return 'No accounts found';
           

@@ -28,77 +28,107 @@ export async function GET(request: NextRequest) {
 
     switch (variableType) {
       case 'account-count':
-        // Get count of connected accounts
-        const { count: accountCount, error: accountError } = await supabase
-          .from('accounts')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .is('deleted_at', null);
+        // Get count of connected accounts through items
+        const { data: userItems, error: itemsError } = await supabase
+          .from('items')
+          .select('id')
+          .eq('user_id', user.id);
 
-        if (accountError) {
-          console.error('❌ Error fetching account count:', accountError);
-          result = { error: 'Failed to fetch account count' };
+        if (itemsError || !userItems || userItems.length === 0) {
+          result = { error: 'No connected accounts found' };
         } else {
-          result = { 
-            value: `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`,
-            raw: accountCount || 0
-          };
+          const itemIds = userItems.map(item => item.id);
+          const { count: accountCount, error: accountError } = await supabase
+            .from('accounts')
+            .select('*', { count: 'exact', head: true })
+            .in('item_id', itemIds)
+            .is('deleted_at', null);
+
+          if (accountError) {
+            console.error('❌ Error fetching account count:', accountError);
+            result = { error: 'Failed to fetch account count' };
+          } else {
+            result = { 
+              value: `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`,
+              raw: accountCount || 0
+            };
+          }
         }
         break;
 
       case 'last-transaction-date':
-        // Get most recent transaction date
-        const { data: lastTransaction, error: transactionError } = await supabase
-          .from('transactions')
-          .select('date')
-          .eq('user_id', user.id)
-          .order('date', { ascending: false })
-          .limit(1)
-          .single();
+        // Get most recent transaction date through items
+        const { data: userItemsForTx, error: itemsTxError } = await supabase
+          .from('items')
+          .select('plaid_item_id')
+          .eq('user_id', user.id);
 
-        if (transactionError || !lastTransaction) {
-          console.error('❌ Error fetching last transaction date:', transactionError);
-          result = { error: 'No transactions found' };
+        if (itemsTxError || !userItemsForTx || userItemsForTx.length === 0) {
+          result = { error: 'No connected accounts found' };
         } else {
-          const date = new Date(lastTransaction.date);
-          result = { 
-            value: date.toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            }),
-            raw: lastTransaction.date
-          };
+          const plaidItemIds = userItemsForTx.map(item => item.plaid_item_id);
+          const { data: lastTransaction, error: transactionError } = await supabase
+            .from('transactions')
+            .select('date')
+            .in('plaid_item_id', plaidItemIds)
+            .order('date', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (transactionError || !lastTransaction) {
+            console.error('❌ Error fetching last transaction date:', transactionError);
+            result = { error: 'No transactions found' };
+          } else {
+            const date = new Date(lastTransaction.date);
+            result = { 
+              value: date.toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              }),
+              raw: lastTransaction.date
+            };
+          }
         }
         break;
 
       case 'total-balance':
-        // Get total balance from all accounts
-        const { data: accounts, error: balanceError } = await supabase
-          .from('accounts')
-          .select('available_balance, current_balance')
-          .eq('user_id', user.id)
-          .is('deleted_at', null);
+        // Get total balance from all accounts through items
+        const { data: userItemsForBalance, error: itemsBalanceError } = await supabase
+          .from('items')
+          .select('id')
+          .eq('user_id', user.id);
 
-        if (balanceError) {
-          console.error('❌ Error fetching account balances:', balanceError);
-          result = { error: 'Failed to fetch balances' };
-        } else if (!accounts || accounts.length === 0) {
-          result = { error: 'No accounts found' };
+        if (itemsBalanceError || !userItemsForBalance || userItemsForBalance.length === 0) {
+          result = { error: 'No connected accounts found' };
         } else {
-          const totalBalance = accounts.reduce((sum, acc) => {
-            // Use available_balance if present, fallback to current_balance
-            const balance = acc.available_balance ?? acc.current_balance ?? 0;
-            return sum + balance;
-          }, 0);
-          
-          result = { 
-            value: `$${totalBalance.toLocaleString('en-US', { 
-              minimumFractionDigits: 2, 
-              maximumFractionDigits: 2 
-            })}`,
-            raw: totalBalance
-          };
+          const itemIds = userItemsForBalance.map(item => item.id);
+          const { data: accounts, error: balanceError } = await supabase
+            .from('accounts')
+            .select('available_balance, current_balance')
+            .in('item_id', itemIds)
+            .is('deleted_at', null);
+
+          if (balanceError) {
+            console.error('❌ Error fetching account balances:', balanceError);
+            result = { error: 'Failed to fetch balances' };
+          } else if (!accounts || accounts.length === 0) {
+            result = { error: 'No accounts found' };
+          } else {
+            const totalBalance = accounts.reduce((sum, acc) => {
+              // Use available_balance if present, fallback to current_balance
+              const balance = acc.available_balance ?? acc.current_balance ?? 0;
+              return sum + balance;
+            }, 0);
+            
+            result = { 
+              value: `$${totalBalance.toLocaleString('en-US', { 
+                minimumFractionDigits: 2, 
+                maximumFractionDigits: 2 
+              })}`,
+              raw: totalBalance
+            };
+          }
         }
         break;
 
