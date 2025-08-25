@@ -183,9 +183,14 @@ export default function DataSamplePage() {
       
       // Get user's Plaid items first, then get accounts linked to those items (same as SMS builder)
       if (userItems && userItems.length > 0) {
+        // Try different possible relationships between items and accounts
         const itemIds = userItems.map(item => item.id);
-        console.log('🔍 Using item IDs for accounts query:', itemIds);
+        const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
         
+        console.log('🔍 Trying accounts query with item IDs:', itemIds);
+        console.log('🔍 Also have Plaid item IDs:', plaidItemIds);
+        
+        // First try: Query accounts using item_id (database ID)
         const { data: accountsData, error: accountsError } = await supabase
           .from('accounts')
           .select(`
@@ -204,17 +209,48 @@ export default function DataSamplePage() {
           .limit(20);
         
         if (accountsError) {
-          console.error('🔍 Accounts query error:', accountsError);
+          console.error('🔍 Accounts query error with item_id:', accountsError);
         }
         
         if (accountsData && accountsData.length > 0) {
           accounts = accountsData;
-          console.log('🔍 Accounts found via items:', accounts.length);
+          console.log('🔍 Accounts found via item_id:', accounts.length);
           console.log('🔍 First account sample:', accounts[0]);
         } else {
-          console.log('🔍 No accounts found via items query');
-          console.log('🔍 Item IDs used:', itemIds);
-          console.log('🔍 User ID:', user.id);
+          console.log('🔍 No accounts found via item_id, trying plaid_item_id');
+          
+          // Second try: Query accounts using plaid_item_id
+          const { data: accountsData2, error: accountsError2 } = await supabase
+            .from('accounts')
+            .select(`
+              id,
+              name,
+              type,
+              subtype,
+              available_balance,
+              current_balance,
+              mask,
+              institution_name,
+              created_at
+            `)
+            .in('plaid_item_id', plaidItemIds)
+            .is('deleted_at', null)
+            .limit(20);
+          
+          if (accountsError2) {
+            console.error('🔍 Accounts query error with plaid_item_id:', accountsError2);
+          }
+          
+          if (accountsData2 && accountsData2.length > 0) {
+            accounts = accountsData2;
+            console.log('🔍 Accounts found via plaid_item_id:', accounts.length);
+            console.log('🔍 First account sample:', accounts[0]);
+          } else {
+            console.log('🔍 No accounts found via any method');
+            console.log('🔍 Item IDs used:', itemIds);
+            console.log('🔍 Plaid Item IDs used:', plaidItemIds);
+            console.log('🔍 User ID:', user.id);
+          }
         }
       } else {
         console.log('🔍 No user items found for user:', user.id);
