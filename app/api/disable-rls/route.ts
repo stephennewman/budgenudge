@@ -19,20 +19,51 @@ export async function POST() {
     
     console.log(`📊 Testing data access for target user: ${targetUserId}`);
     
-    // Check accounts access before
-    const { data: accountsBefore, error: accountsErrorBefore, count: accountsCountBefore } = await supabase
-      .from('accounts')
+    // First, get the user's Plaid items
+    const { data: userItems, error: itemsError, count: itemsCount } = await supabase
+      .from('items')
       .select('*', { count: 'exact' })
       .eq('user_id', targetUserId)
-      .is('deleted_at', null)
       .limit(5);
 
-    // Check transactions access before
-    const { data: transactionsBefore, error: transactionsErrorBefore, count: transactionsCountBefore } = await supabase
-      .from('transactions')
-      .select('*', { count: 'exact' })
-      .eq('user_id', targetUserId)
-      .limit(5);
+    console.log(`📊 User has ${itemsCount || 0} Plaid items`);
+    
+    // Check accounts access through items (accounts table has item_id, not user_id)
+    let accountsBefore: Array<{ id: string; name: string; type: string; current_balance: number; available_balance: number }> = [];
+    let accountsCountBefore = 0;
+    let accountsErrorBefore = null;
+    
+    if (userItems && userItems.length > 0) {
+      const itemIds = userItems.map(item => item.id);
+      const { data: userAccounts, error: accountsError, count: accountsCount } = await supabase
+        .from('accounts')
+        .select('*', { count: 'exact' })
+        .in('item_id', itemIds)
+        .is('deleted_at', null)
+        .limit(5);
+      
+      accountsBefore = userAccounts || [];
+      accountsCountBefore = accountsCount || 0;
+      accountsErrorBefore = accountsError;
+    }
+
+    // Check transactions access through items (transactions table has plaid_item_id)
+    let transactionsBefore: Array<{ id: string; date: string; amount: number; merchant_name: string; category: string }> = [];
+    let transactionsCountBefore = 0;
+    let transactionsErrorBefore = null;
+    
+    if (userItems && userItems.length > 0) {
+      const plaidItemIds = userItems.map(item => item.plaid_item_id);
+      const { data: userTransactions, error: transactionsError, count: transactionsCount } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact' })
+        .in('plaid_item_id', plaidItemIds)
+        .limit(5);
+      
+      transactionsBefore = userTransactions || [];
+      transactionsCountBefore = transactionsCount || 0;
+      transactionsErrorBefore = transactionsError;
+    }
 
     // Check total data in tables (without user filter)
     const { count: totalAccounts } = await supabase
@@ -43,8 +74,12 @@ export async function POST() {
       .from('transactions')
       .select('*', { count: 'exact', head: true });
 
-    console.log(`📊 Before RLS fix - Accounts: ${accountsCountBefore || 0}, Transactions: ${transactionsCountBefore || 0}`);
-    console.log(`📊 Total in tables - Accounts: ${totalAccounts || 0}, Transactions: ${totalTransactions || 0}`);
+    const { count: totalItems } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true });
+
+    console.log(`📊 Before RLS fix - Items: ${itemsCount || 0}, Accounts: ${accountsCountBefore || 0}, Transactions: ${transactionsCountBefore || 0}`);
+    console.log(`📊 Total in tables - Items: ${totalItems || 0}, Accounts: ${totalAccounts || 0}, Transactions: ${totalTransactions || 0}`);
 
     // Since we can't run SQL commands directly, let's provide instructions
     const instructions = `
@@ -53,27 +88,33 @@ export async function POST() {
     1. Go to your Supabase Dashboard > SQL Editor
     2. Run this SQL:
 
-    -- Disable RLS on accounts table
+    -- Disable RLS on all related tables
+    ALTER TABLE items DISABLE ROW LEVEL SECURITY;
     ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
-    
-    -- Disable RLS on transactions table  
     ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
     
     -- Grant SELECT permissions
+    GRANT SELECT ON items TO authenticated;
     GRANT SELECT ON accounts TO authenticated;
     GRANT SELECT ON transactions TO authenticated;
     
-    -- Verify the fix
+    -- Verify the fix by checking the data flow
+    SELECT 
+        'items' as table_name,
+        COUNT(*) as total_count,
+        COUNT(CASE WHEN user_id = 'bc474c8b-4b47-4c7d-b202-f469330af2a2' THEN 1 END) as user_count
+    FROM items
+    UNION ALL
     SELECT 
         'accounts' as table_name,
         COUNT(*) as total_count,
-        COUNT(CASE WHEN user_id = 'bc474c8b-4b47-4c7d-b202-f469330af2a2' THEN 1 END) as user_count
+        COUNT(CASE WHEN item_id IN (SELECT id FROM items WHERE user_id = 'bc474c8b-4b47-4c7d-b202-f469330af2a2') THEN 1 END) as user_count
     FROM accounts
     UNION ALL
     SELECT 
         'transactions' as table_name,
         COUNT(*) as total_count,
-        COUNT(CASE WHEN user_id = 'bc474c8b-4b47-4c7d-b202-f469330af2a2' THEN 1 END) as user_count
+        COUNT(CASE WHEN plaid_item_id IN (SELECT plaid_item_id FROM items WHERE user_id = 'bc474c8b-4b47-4c7d-b202-f469330af2a2') THEN 1 END) as user_count
     FROM transactions;
     `;
 
@@ -82,6 +123,11 @@ export async function POST() {
       message: 'RLS diagnostic complete - manual fix required',
       targetUser: targetUserId,
       beforeFix: {
+        items: {
+          count: itemsCount || 0,
+          sample: userItems?.slice(0, 3) || [],
+          error: itemsError?.message
+        },
         accounts: {
           count: accountsCountBefore || 0,
           sample: accountsBefore?.slice(0, 3) || [],
@@ -94,13 +140,17 @@ export async function POST() {
         }
       },
       totalInTables: {
+        items: totalItems || 0,
         accounts: totalAccounts || 0,
         transactions: totalTransactions || 0
       },
       diagnosis: {
-        hasData: (totalAccounts || 0) > 0 || (totalTransactions || 0) > 0,
-        canAccessTargetUserData: (accountsCountBefore || 0) > 0 || (transactionsCountBefore || 0) > 0,
-        issue: (totalAccounts || 0) > 0 && (accountsCountBefore || 0) === 0 ? 'RLS blocking access' : 'No data in tables'
+        hasData: (totalItems || 0) > 0 || (totalAccounts || 0) > 0 || (totalTransactions || 0) > 0,
+        canAccessTargetUserData: (itemsCount || 0) > 0 && (accountsCountBefore || 0) > 0 && (transactionsCountBefore || 0) > 0,
+        issue: (totalItems || 0) > 0 && (itemsCount || 0) === 0 ? 'RLS blocking access to items' : 
+               (totalAccounts || 0) > 0 && (accountsCountBefore || 0) === 0 ? 'RLS blocking access to accounts' :
+               (totalTransactions || 0) > 0 && (transactionsCountBefore || 0) === 0 ? 'RLS blocking access to transactions' :
+               'No data in tables or data flow issue'
       },
       fixInstructions: instructions
     });
