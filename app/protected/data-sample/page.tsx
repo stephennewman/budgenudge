@@ -261,8 +261,7 @@ export default function DataSamplePage() {
         `)
         .eq('user_id', user.id)
         .eq('is_active', true)
-        .eq('type', 'expense')
-        .limit(10);
+        .eq('type', 'expense');
 
       // Sample 4: Income Sources (using tagged_income_sources table)
       const { data: incomeSources } = await supabase
@@ -491,7 +490,16 @@ export default function DataSamplePage() {
         },
         recurring_bills: {
           count: recurringBills?.length || 0,
-          total_monthly: recurringBills?.reduce((sum, bill) => sum + (bill.expected_amount || 0), 0) || 0,
+          total_monthly: recurringBills?.reduce((sum, bill) => {
+            const frequency = bill.prediction_frequency || 'monthly';
+            if (frequency === 'monthly') return sum + (bill.expected_amount || 0);
+            if (frequency === 'weekly') return sum + ((bill.expected_amount || 0) / 4); // Approximate weekly
+            if (frequency === 'bi-weekly') return sum + ((bill.expected_amount || 0) / 2); // Approximate bi-weekly
+            if (frequency === 'quarterly') return sum + ((bill.expected_amount || 0) / 3); // Approximate quarterly
+            if (frequency === 'semi-annually') return sum + ((bill.expected_amount || 0) / 6); // Approximate semi-annually
+            if (frequency === 'annually') return sum + ((bill.expected_amount || 0) / 12); // Approximate annually
+            return sum; // Default to monthly if frequency is unexpected
+          }, 0) || 0,
           sample: recurringBills?.slice(0, 5).map(bill => ({
             name: bill.merchant_name || 'Unknown',
             amount: bill.expected_amount || 0,
