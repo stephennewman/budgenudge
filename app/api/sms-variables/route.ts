@@ -43,14 +43,14 @@ export async function GET() {
       });
     }
 
-    const itemIds = userItems.map(item => item.id);
-    const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
+    const itemDbIds = userItems.map(item => item.id); // Database IDs for accounts
+    const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean); // Plaid IDs for transactions
 
-    console.log('🔍 Using item IDs:', itemIds);
+    console.log('🔍 Using database item IDs:', itemDbIds);
     console.log('🔍 Using Plaid item IDs:', plaidItemIds);
     console.log('🔍 User ID being used:', user.id);
 
-    // Sample 1: Account Information
+    // Sample 1: Account Information (using itemDbIds like the working transactions API)
     const { data: accounts } = await supabase
       .from('accounts')
       .select(`
@@ -64,9 +64,14 @@ export async function GET() {
         institution_name,
         created_at
       `)
-      .in('item_id', itemIds)
+      .in('item_id', itemDbIds)
       .is('deleted_at', null)
       .limit(5);
+
+    console.log('🔍 Accounts query result:', accounts?.length || 0, 'accounts found');
+    if (accounts && accounts.length > 0) {
+      console.log('🔍 First account sample:', accounts[0]);
+    }
 
     // Sample 2: Recent Transactions
     const { data: recentTransactions } = await supabase
@@ -171,7 +176,7 @@ export async function GET() {
         type,
         subtype
       `)
-      .in('item_id', itemIds)
+      .in('item_id', itemDbIds)
       .is('deleted_at', null);
 
     // Sample 8: Transaction Patterns (commented out for now)
