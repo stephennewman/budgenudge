@@ -93,6 +93,54 @@ export async function POST(request: NextRequest) {
                   });
                   finalMessage = finalMessage.replace('${today-date}', todayDate);
                   break;
+                case 'account-count':
+                  // Fetch account count
+                  const { count: accountCount } = await supabase
+                    .from('accounts')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null);
+                  const accountText = `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
+                  finalMessage = finalMessage.replace('${account-count}', accountText);
+                  break;
+                case 'last-transaction-date':
+                  // Fetch last transaction date
+                  const { data: lastTransaction } = await supabase
+                    .from('transactions')
+                    .select('date')
+                    .eq('user_id', user.id)
+                    .order('date', { ascending: false })
+                    .limit(1)
+                    .single();
+                  if (lastTransaction) {
+                    const date = new Date(lastTransaction.date);
+                    const dateText = date.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long', 
+                      day: 'numeric'
+                    });
+                    finalMessage = finalMessage.replace('${last-transaction-date}', dateText);
+                  }
+                  break;
+                case 'total-balance':
+                  // Fetch total balance
+                  const { data: accounts } = await supabase
+                    .from('accounts')
+                    .select('available_balance, current_balance')
+                    .eq('user_id', user.id)
+                    .is('deleted_at', null);
+                  if (accounts && accounts.length > 0) {
+                    const totalBalance = accounts.reduce((sum, acc) => {
+                      const balance = acc.available_balance ?? acc.current_balance ?? 0;
+                      return sum + balance;
+                    }, 0);
+                    const balanceText = `$${totalBalance.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })}`;
+                    finalMessage = finalMessage.replace('${total-balance}', balanceText);
+                  }
+                  break;
                 default:
                   console.log(`⚠️ Unknown variable: ${variable}`);
               }

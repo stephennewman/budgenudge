@@ -237,19 +237,71 @@ export default function SimpleBuilderPage() {
     });
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { over } = event;
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { over, active } = event;
     
     if (over?.id === 'canvas') {
-      // Add the date variable to canvas
-      setCanvasItems(['today-date']);
-      const dateText = new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-      setPreviewText(dateText);
-      // Note: hasUnsavedChanges will be updated by the useEffect
+      const variableId = active.id as string;
+      
+      // Add the variable to canvas
+      setCanvasItems(prev => [...prev, variableId]);
+      
+      // Fetch the variable value from API
+      try {
+        const response = await fetch(`/api/sms-variables?type=${variableId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data.value) {
+            setPreviewText(prev => prev + (prev ? '\n' : '') + data.data.value);
+          } else {
+            // Fallback for today-date or API errors
+            let fallbackValue = '';
+            switch (variableId) {
+              case 'today-date':
+                fallbackValue = new Date().toLocaleDateString('en-US', { 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                });
+                break;
+              default:
+                fallbackValue = `[${variableId}]`;
+            }
+            setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
+          }
+        } else {
+          // API error, use fallback
+          let fallbackValue = '';
+          switch (variableId) {
+            case 'today-date':
+              fallbackValue = new Date().toLocaleDateString('en-US', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              });
+              break;
+            default:
+              fallbackValue = `[${variableId}]`;
+          }
+          setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
+        }
+      } catch (error) {
+        console.error('Error fetching variable value:', error);
+        // Use fallback on error
+        let fallbackValue = '';
+        switch (variableId) {
+          case 'today-date':
+            fallbackValue = new Date().toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            });
+            break;
+          default:
+            fallbackValue = `[${variableId}]`;
+        }
+        setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
+      }
     }
   };
 
@@ -279,12 +331,6 @@ export default function SimpleBuilderPage() {
       alert('Error sending SMS');
       console.error('SMS error:', error);
     }
-  };
-
-  const handleClear = () => {
-    setCanvasItems([]);
-    setPreviewText('');
-    // Note: hasUnsavedChanges will be updated by the useEffect
   };
 
   const handleSaveTemplate = async () => {
@@ -600,7 +646,17 @@ export default function SimpleBuilderPage() {
             {/* Canvas */}
             <div className="bg-white rounded-lg p-4 border-2">
               <h2 className="font-semibold mb-4">🎨 Canvas</h2>
-              <DropZone canvasItems={canvasItems} onClear={handleClear} />
+              <DropZone 
+                canvasItems={canvasItems} 
+                onRemoveVariable={(index) => {
+                  const newItems = canvasItems.filter((_, i) => i !== index);
+                  setCanvasItems(newItems);
+                  // Also need to update preview text - remove the corresponding line
+                  const lines = previewText.split('\n');
+                  lines.splice(index, 1);
+                  setPreviewText(lines.join('\n'));
+                }} 
+              />
             </div>
 
             {/* Preview */}
@@ -622,8 +678,26 @@ export default function SimpleBuilderPage() {
 
 // Draggable Variable Component
 function DraggableVariable() {
+  const [variables] = useState([
+    { id: 'today-date', label: 'Today\'s Date', icon: '📅', description: 'Current date in long format' },
+    { id: 'account-count', label: 'Account Count', icon: '🏦', description: 'Number of connected accounts' },
+    { id: 'last-transaction-date', label: 'Last Transaction', icon: '💳', description: 'Most recent transaction date' },
+    { id: 'total-balance', label: 'Total Balance', icon: '💰', description: 'Combined balance from all accounts' }
+  ]);
+
+  return (
+    <div className="space-y-3">
+      {variables.map((variable) => (
+        <DraggableVariableItem key={variable.id} variable={variable} />
+      ))}
+    </div>
+  );
+}
+
+// Individual Draggable Variable Item
+function DraggableVariableItem({ variable }: { variable: { id: string; label: string; icon: string; description: string } }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: 'today-date',
+    id: variable.id,
   });
 
   const style = transform ? {
@@ -641,16 +715,10 @@ function DraggableVariable() {
       }`}
     >
       <div className="flex items-center space-x-2">
-        <span className="text-xl">📅</span>
+        <span className="text-xl">{variable.icon}</span>
         <div>
-          <p className="font-medium">Today&apos;s Date</p>
-          <p className="text-sm text-gray-500">
-            {new Date().toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric', 
-              year: 'numeric' 
-            })}
-          </p>
+          <p className="font-medium">{variable.label}</p>
+          <p className="text-sm text-gray-500">{variable.description}</p>
         </div>
       </div>
     </div>
@@ -658,13 +726,28 @@ function DraggableVariable() {
 }
 
 // Drop Zone Component
-function DropZone({ canvasItems, onClear }: { 
+function DropZone({ canvasItems, onRemoveVariable }: { 
   canvasItems: string[]; 
-  onClear: () => void; 
+  onRemoveVariable: (index: number) => void;
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'canvas',
   });
+
+  const getVariableLabel = (variableId: string) => {
+    switch (variableId) {
+      case 'today-date':
+        return '📅 Today\'s Date';
+      case 'account-count':
+        return '🏦 Account Count';
+      case 'last-transaction-date':
+        return '💳 Last Transaction';
+      case 'total-balance':
+        return '💰 Total Balance';
+      default:
+        return `📱 ${variableId}`;
+    }
+  };
 
   return (
     <div 
@@ -679,16 +762,16 @@ function DropZone({ canvasItems, onClear }: {
         <div className="h-full flex items-center justify-center text-gray-500">
           <div className="text-center">
             <div className="text-3xl mb-2">📱</div>
-            <p>Drop the date variable here</p>
+            <p>Drop variables here</p>
           </div>
         </div>
       ) : (
         <div className="space-y-2">
           {canvasItems.map((item, index) => (
             <div key={index} className="p-2 bg-blue-100 rounded border flex items-center justify-between">
-              <span>📅 Today&apos;s Date</span>
+              <span>{getVariableLabel(item)}</span>
               <button 
-                onClick={onClear}
+                onClick={() => onRemoveVariable(index)}
                 className="text-red-500 hover:text-red-700 px-2"
                 title="Remove"
               >
