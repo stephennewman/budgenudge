@@ -48,6 +48,9 @@ export default function SimpleBuilderPage() {
   const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(true);
   
+  // Track if template has unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
   // Scheduling state
   const [schedule, setSchedule] = useState<ScheduleConfig>({
     cadence_type: 'weekly',
@@ -64,6 +67,25 @@ export default function SimpleBuilderPage() {
   useEffect(() => {
     loadSavedTemplates();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Track changes to template content
+  useEffect(() => {
+    if (currentTemplateId) {
+      // Check if current content differs from saved template
+      const currentTemplate = savedTemplates.find(t => t.id === currentTemplateId);
+      if (currentTemplate) {
+        const contentChanged = currentTemplate.template_content !== previewText;
+        const nameChanged = currentTemplate.template_name !== templateName;
+        const variablesChanged = JSON.stringify(currentTemplate.variables_used) !== JSON.stringify(canvasItems);
+        setHasUnsavedChanges(contentChanged || nameChanged || variablesChanged);
+      } else {
+        setHasUnsavedChanges(false);
+      }
+    } else {
+      // New template - mark as having changes if there's content
+      setHasUnsavedChanges(previewText.trim().length > 0 || templateName.trim().length > 0);
+    }
+  }, [previewText, templateName, canvasItems, currentTemplateId, savedTemplates]);
 
   const loadSavedTemplates = async (autoLoadRecent: boolean = true) => {
     setIsLoadingTemplates(true);
@@ -115,6 +137,7 @@ export default function SimpleBuilderPage() {
     setCanvasItems([]);
     setPreviewText('');
     setSaveMessage('');
+    setHasUnsavedChanges(false);
   };
 
   const loadTemplate = (template: SavedTemplate) => {
@@ -123,6 +146,7 @@ export default function SimpleBuilderPage() {
     setPreviewText(template.template_content);
     setCanvasItems(template.variables_used);
     setSaveMessage('');
+    setHasUnsavedChanges(false);
     
     // Load template schedule if it exists
     loadTemplateSchedule(template.id);
@@ -225,6 +249,7 @@ export default function SimpleBuilderPage() {
         day: 'numeric' 
       });
       setPreviewText(dateText);
+      // Note: hasUnsavedChanges will be updated by the useEffect
     }
   };
 
@@ -259,6 +284,7 @@ export default function SimpleBuilderPage() {
   const handleClear = () => {
     setCanvasItems([]);
     setPreviewText('');
+    // Note: hasUnsavedChanges will be updated by the useEffect
   };
 
   const handleSaveTemplate = async () => {
@@ -298,6 +324,9 @@ export default function SimpleBuilderPage() {
         if (result.template && !currentTemplateId) {
           setCurrentTemplateId(result.template.id);
         }
+        
+        // Reset unsaved changes state
+        setHasUnsavedChanges(false);
         
         // Refresh the templates list without auto-loading
         await loadSavedTemplates(false);
@@ -384,8 +413,12 @@ export default function SimpleBuilderPage() {
             />
             <button
               onClick={handleSaveTemplate}
-              disabled={isSaving || !templateName.trim() || !previewText.trim()}
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              disabled={isSaving || !templateName.trim() || !previewText.trim() || !hasUnsavedChanges}
+              className={`px-4 py-2 text-white rounded-md transition-colors flex items-center gap-2 ${
+                hasUnsavedChanges 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-gray-400 cursor-not-allowed'
+              } disabled:bg-gray-300 disabled:cursor-not-allowed`}
             >
               {isSaving ? (
                 <>
@@ -394,7 +427,7 @@ export default function SimpleBuilderPage() {
                 </>
               ) : (
                 <>
-                  💾 Save Template
+                  💾 {hasUnsavedChanges ? 'Save Template' : 'No Changes'}
                 </>
               )}
             </button>
