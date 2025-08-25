@@ -54,6 +54,7 @@ export default function SimpleBuilderPage() {
 
   // Function to fetch variable data directly from Supabase
   const fetchVariableData = async (variableId: string): Promise<string> => {
+    console.log('🔍 fetchVariableData called with:', variableId);
     const supabase = createClientComponentClient();
     
     try {
@@ -858,47 +859,14 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
   onSendTest: () => void; 
 }) {
   const [realPreviewText, setRealPreviewText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Update preview with real values
+  // Update preview when previewText changes
   useEffect(() => {
-    const updatePreview = async () => {
-      if (previewText.trim()) {
-        setIsLoading(true);
-        
-        try {
-          let result = previewText;
-          
-          // Replace placeholders with real values
-          const variableRegex = /{{([^}]+)}}/g;
-          const matches = previewText.match(variableRegex);
-          
-          if (matches) {
-            for (const match of matches) {
-              const variableName = match.slice(2, -2); // Remove {{ and }}
-              
-              try {
-                const variableValue = await fetchVariableData(variableName);
-                result = result.replace(new RegExp(`{{${variableName}}}`, 'g'), variableValue);
-              } catch (error) {
-                console.error(`Error fetching variable ${variableName}:`, error);
-              }
-            }
-          }
-          
-          setRealPreviewText(result);
-        } catch (error) {
-          console.error('Error updating preview:', error);
-          setRealPreviewText(previewText);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setRealPreviewText('');
-      }
-    };
-
-    updatePreview();
+    if (previewText.trim()) {
+      setRealPreviewText(previewText);
+    } else {
+      setRealPreviewText('');
+    }
   }, [previewText]);
 
   // Format the full message as it will appear in SMS
@@ -915,14 +883,9 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
       <div className="bg-gray-900 rounded-2xl p-4">
         <div className="bg-gray-800 rounded-xl p-3 min-h-[120px]">
           <div className="bg-blue-500 rounded-xl p-2 text-white text-sm whitespace-pre-line">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-16">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                <span className="ml-2">Loading variables...</span>
-              </div>
-            ) : (
-              fullMessage
-            )}
+            {realPreviewText 
+              ? fullMessage
+              : 'Your message preview will appear here...'}
           </div>
         </div>
       </div>
@@ -950,7 +913,7 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
       {/* Send Button */}
       <button
         onClick={onSendTest}
-        disabled={!realPreviewText || isLoading}
+        disabled={!realPreviewText}
         className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         📤 Send Test SMS
