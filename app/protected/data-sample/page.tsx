@@ -168,7 +168,7 @@ export default function DataSamplePage() {
       console.log('🔍 All accounts in database:', allUserAccounts);
       console.log('🔍 Accounts error:', accountsError);
 
-      // Sample 1: Account Information - Use the exact same logic as the SMS builder
+      // Sample 1: Account Information - Try multiple approaches to find accounts
       let accounts: Array<{
         id: string;
         name: string;
@@ -181,46 +181,46 @@ export default function DataSamplePage() {
         created_at: string;
       }> = [];
       
-      // Get user's Plaid items first, then get accounts linked to those items (same as SMS builder)
-      if (userItems && userItems.length > 0) {
-        // Try different possible relationships between items and accounts
-        const itemIds = userItems.map(item => item.id);
-        const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
+      // Approach 1: Try to get accounts directly for this user (bypass items relationship)
+      console.log('🔍 Trying direct accounts query for user:', user.id);
+      const { data: directUserAccounts, error: directError } = await supabase
+        .from('accounts')
+        .select(`
+          id,
+          name,
+          type,
+          subtype,
+          available_balance,
+          current_balance,
+          mask,
+          institution_name,
+          created_at
+        `)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .limit(20);
+      
+      if (directError) {
+        console.error('🔍 Direct accounts query error:', directError);
+      }
+      
+      if (directUserAccounts && directUserAccounts.length > 0) {
+        accounts = directUserAccounts;
+        console.log('🔍 Accounts found via direct user_id query:', accounts.length);
+        console.log('🔍 First account sample:', accounts[0]);
+      } else {
+        console.log('🔍 No accounts found via direct user_id query');
         
-        console.log('🔍 Trying accounts query with item IDs:', itemIds);
-        console.log('🔍 Also have Plaid item IDs:', plaidItemIds);
-        
-        // First try: Query accounts using item_id (database ID)
-        const { data: accountsData, error: accountsError } = await supabase
-          .from('accounts')
-          .select(`
-            id,
-            name,
-            type,
-            subtype,
-            available_balance,
-            current_balance,
-            mask,
-            institution_name,
-            created_at
-          `)
-          .in('item_id', itemIds)
-          .is('deleted_at', null)
-          .limit(20);
-        
-        if (accountsError) {
-          console.error('🔍 Accounts query error with item_id:', accountsError);
-        }
-        
-        if (accountsData && accountsData.length > 0) {
-          accounts = accountsData;
-          console.log('🔍 Accounts found via item_id:', accounts.length);
-          console.log('🔍 First account sample:', accounts[0]);
-        } else {
-          console.log('🔍 No accounts found via item_id, trying plaid_item_id');
+        // Approach 2: Try different relationships between items and accounts
+        if (userItems && userItems.length > 0) {
+          const itemIds = userItems.map(item => item.id);
+          const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
           
-          // Second try: Query accounts using plaid_item_id
-          const { data: accountsData2, error: accountsError2 } = await supabase
+          console.log('🔍 Trying accounts query with item IDs:', itemIds);
+          console.log('🔍 Also have Plaid item IDs:', plaidItemIds);
+          
+          // Try item_id relationship
+          const { data: accountsData, error: accountsError } = await supabase
             .from('accounts')
             .select(`
               id,
@@ -233,28 +233,65 @@ export default function DataSamplePage() {
               institution_name,
               created_at
             `)
-            .in('plaid_item_id', plaidItemIds)
+            .in('item_id', itemIds)
             .is('deleted_at', null)
             .limit(20);
           
-          if (accountsError2) {
-            console.error('🔍 Accounts query error with plaid_item_id:', accountsError2);
+          if (accountsError) {
+            console.error('🔍 Accounts query error with item_id:', accountsError);
           }
           
-          if (accountsData2 && accountsData2.length > 0) {
-            accounts = accountsData2;
-            console.log('🔍 Accounts found via plaid_item_id:', accounts.length);
+          if (accountsData && accountsData.length > 0) {
+            accounts = accountsData;
+            console.log('🔍 Accounts found via item_id:', accounts.length);
             console.log('🔍 First account sample:', accounts[0]);
           } else {
-            console.log('🔍 No accounts found via any method');
-            console.log('🔍 Item IDs used:', itemIds);
-            console.log('🔍 Plaid Item IDs used:', plaidItemIds);
-            console.log('🔍 User ID:', user.id);
+            console.log('🔍 No accounts found via item_id, trying plaid_item_id');
+            
+            // Try plaid_item_id relationship
+            const { data: accountsData2, error: accountsError2 } = await supabase
+              .from('accounts')
+              .select(`
+                id,
+                name,
+                type,
+                subtype,
+                available_balance,
+                current_balance,
+                mask,
+                institution_name,
+                created_at
+              `)
+              .in('plaid_item_id', plaidItemIds)
+              .is('deleted_at', null)
+              .limit(20);
+            
+            if (accountsError2) {
+              console.error('🔍 Accounts query error with plaid_item_id:', accountsError2);
+            }
+            
+            if (accountsData2 && accountsData2.length > 0) {
+              accounts = accountsData2;
+              console.log('🔍 Accounts found via plaid_item_id:', accounts.length);
+              console.log('🔍 First account sample:', accountsData2[0]);
+            } else {
+              console.log('🔍 No accounts found via any method');
+              console.log('🔍 Item IDs used:', itemIds);
+              console.log('🔍 Plaid Item IDs used:', plaidItemIds);
+              console.log('🔍 User ID:', user.id);
+            }
           }
+        } else {
+          console.log('🔍 No user items found for user:', user.id);
         }
-      } else {
-        console.log('🔍 No user items found for user:', user.id);
       }
+      
+      // Debug: Show what we found
+      console.log('🔍 Final accounts result:', {
+        count: accounts.length,
+        accounts: accounts,
+        user_id: user.id
+      });
 
       // Sample 2: Recent Transactions with AI categorization
       const { data: recentTransactions } = await supabase
@@ -310,7 +347,7 @@ export default function DataSamplePage() {
         .eq('is_active', true)
         .limit(10);
 
-      // Sample 5: Spending Categories (last 30 days with AI categorization)
+      // Sample 5: Spending Categories (last 30 days with AI categorization) - ONLY EXPENSES
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
@@ -324,9 +361,10 @@ export default function DataSamplePage() {
         `)
         .in('plaid_item_id', plaidItemIds)
         .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
-        .not('ai_category_tag', 'is', null);
+        .not('ai_category_tag', 'is', null)
+        .lt('amount', 0); // Only negative amounts (expenses)
 
-      // Sample 6: Merchant Analytics (top spending merchants)
+      // Sample 6: Merchant Analytics (top spending merchants) - ONLY EXPENSES
       const { data: topMerchants } = await supabase
         .from('transactions')
         .select(`
@@ -338,6 +376,7 @@ export default function DataSamplePage() {
         .in('plaid_item_id', plaidItemIds)
         .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
         .not('ai_merchant_name', 'is', null)
+        .lt('amount', 0) // Only negative amounts (expenses)
         .limit(15);
 
       // Sample 7: Account Types Summary
@@ -379,6 +418,7 @@ export default function DataSamplePage() {
       });
 
       const monthlySpending = spendingCategories?.reduce((sum, tx) => {
+        // Since we filtered for negative amounts (expenses), we need to make them positive for display
         return sum + Math.abs(tx.amount || 0);
       }, 0) || 0;
 
@@ -388,6 +428,7 @@ export default function DataSamplePage() {
       // Enhanced spending analysis with AI categorization
       const categorySpending = spendingCategories?.reduce((acc, tx) => {
         const cat = tx.ai_category_tag || 'Uncategorized';
+        // Since we filtered for negative amounts (expenses), we need to make them positive for display
         acc[cat] = (acc[cat] || 0) + Math.abs(tx.amount || 0);
         return acc;
       }, {} as Record<string, number>) || {};
@@ -399,6 +440,7 @@ export default function DataSamplePage() {
 
       const merchantSpending = topMerchants?.reduce((acc, tx) => {
         const merchant = tx.ai_merchant_name || 'Unknown';
+        // Since we filtered for negative amounts (expenses), we need to make them positive for display
         acc[merchant] = (acc[merchant] || 0) + Math.abs(tx.amount || 0);
         return acc;
       }, {} as Record<string, number>) || {};
