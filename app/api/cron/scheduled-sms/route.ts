@@ -180,7 +180,168 @@ export async function GET(request: NextRequest) {
 
     console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
 
-    // Process each user
+    // ==================================================
+    // CUSTOM TEMPLATE SCHEDULING SYSTEM
+    // ==================================================
+    console.log('🎯 Checking for custom scheduled templates...');
+    
+    // Get all active custom template schedules that are due to be sent
+    const { data: dueSchedules, error: schedulesError } = await supabase
+      .from('template_schedules')
+      .select(`
+        *,
+        custom_sms_templates!inner(
+          id,
+          template_name,
+          template_content,
+          variables_used,
+          user_id
+        )
+      `)
+      .eq('is_active', true)
+      .not('next_send_at', 'is', null)
+      .lte('next_send_at', new Date().toISOString());
+
+    if (schedulesError) {
+      console.error('❌ Error fetching due schedules:', schedulesError);
+    } else if (dueSchedules && dueSchedules.length > 0) {
+      console.log(`📅 Found ${dueSchedules.length} custom templates due to be sent`);
+      
+      // Process each due schedule
+      for (const schedule of dueSchedules) {
+        try {
+          const template = schedule.custom_sms_templates;
+          const userId = template.user_id;
+          
+          console.log(`📱 Processing custom template "${template.template_name}" for user ${userId}`);
+          
+          // Get user's phone number
+          const { data: settings } = await supabase
+            .from('user_sms_settings')
+            .select('phone_number, additional_phone')
+            .eq('user_id', userId)
+            .single();
+          
+          if (!settings?.phone_number) {
+            console.log(`📭 Skipping custom template for user ${userId} (no phone number)`);
+            continue;
+          }
+          
+          // Replace variables in template content with actual data
+          let finalMessage = template.template_content;
+          
+          // Process each variable used in the template
+          for (const variable of template.variables_used) {
+            switch (variable) {
+              case 'today-date':
+                const todayDate = new Date().toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long', 
+                  day: 'numeric'
+                });
+                finalMessage = finalMessage.replace('${today-date}', todayDate);
+                break;
+              // Add more variables as needed in the future
+              default:
+                console.log(`⚠️ Unknown variable: ${variable}`);
+            }
+          }
+          
+          // Add template name prefix as in test SMS
+          const formattedMessage = `🧪 ${template.template_name}: \n\n${finalMessage}`;
+          
+          smsAttempted++;
+          
+          // Send the SMS
+          const smsResult = await sendEnhancedSlickTextSMS({
+            phoneNumber: settings.phone_number,
+            message: formattedMessage,
+            userId: userId
+          });
+          
+          if (smsResult.success) {
+            smsSent++;
+            logDetails.push({
+              userId,
+              templateType: 'custom-template',
+              templateName: template.template_name,
+              sent: true,
+              preview: formattedMessage.substring(0, 100),
+              messageId: smsResult.messageId
+            });
+            console.log(`✅ Custom template "${template.template_name}" sent to user ${userId}`);
+          } else {
+            smsFailed++;
+            logDetails.push({
+              userId,
+              templateType: 'custom-template', 
+              templateName: template.template_name,
+              sent: false,
+              error: smsResult.error
+            });
+            console.log(`❌ Failed to send custom template to user ${userId}:`, smsResult.error);
+          }
+          
+          // Calculate and update next send time
+          const nextSendTime = calculateNextSendTime(schedule);
+          
+          await supabase
+            .from('template_schedules')
+            .update({
+              last_sent_at: new Date().toISOString(),
+              next_send_at: nextSendTime,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', schedule.id);
+          
+          console.log(`📅 Updated next send time for "${template.template_name}": ${nextSendTime}`);
+          
+          // Handle additional phone if present
+          if (settings.additional_phone?.trim()) {
+            const addResult = await sendEnhancedSlickTextSMS({
+              phoneNumber: settings.additional_phone,
+              message: formattedMessage,
+              userId: userId
+            });
+            
+            if (addResult.success) {
+              smsSent++;
+              logDetails.push({ 
+                userId, 
+                templateType: 'custom-template',
+                templateName: template.template_name,
+                sent_additional: true 
+              });
+            } else {
+              smsFailed++;
+              logDetails.push({ 
+                userId, 
+                templateType: 'custom-template',
+                templateName: template.template_name,
+                sent_additional: false, 
+                error: addResult.error 
+              });
+            }
+          }
+          
+          // Small delay between sends
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+        } catch (scheduleError) {
+          smsFailed++;
+          console.error(`❌ Error processing custom schedule:`, scheduleError);
+          logDetails.push({
+            scheduleId: schedule.id,
+            templateName: schedule.custom_sms_templates?.template_name,
+            error: scheduleError instanceof Error ? scheduleError.message : String(scheduleError)
+          });
+        }
+      }
+    } else {
+      console.log('📭 No custom templates due to be sent');
+    }
+
+    // Process each user (for traditional templates)
     for (const userItem of itemsWithUsers) {
       try {
         const userId = userItem.user_id;
@@ -527,4 +688,90 @@ export async function POST(req: NextRequest) {
   
   // For manual testing, just call the GET method
   return GET(req);
+}
+
+// Helper function to calculate next send time for custom templates
+interface ScheduleConfig {
+  cadence_type: string;
+  cadence_config: {
+    day?: string;
+    interval?: number;
+    day_of_month?: number;
+  };
+  send_time: string;
+  timezone: string;
+  is_active: boolean;
+}
+
+function calculateNextSendTime(schedule: ScheduleConfig): string | null {
+  if (!schedule.is_active) return null;
+
+  const now = new Date();
+  const [hours, minutes] = schedule.send_time.split(':');
+  
+  // Create a date for today at the specified time
+  const nextSend = new Date();
+  nextSend.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+  switch (schedule.cadence_type) {
+    case 'daily':
+      // If time has passed today, schedule for tomorrow
+      if (nextSend <= now) {
+        nextSend.setDate(nextSend.getDate() + 1);
+      }
+      break;
+      
+    case 'weekly':
+      const targetDay = getDayNumber(schedule.cadence_config.day || 'monday');
+      const currentDay = nextSend.getDay();
+      
+      // Calculate days until target day
+      let daysUntilTarget = (targetDay - currentDay + 7) % 7;
+      
+      // If it's the target day but time has passed, schedule for next week
+      if (daysUntilTarget === 0 && nextSend <= now) {
+        daysUntilTarget = 7;
+      }
+      
+      nextSend.setDate(nextSend.getDate() + daysUntilTarget);
+      break;
+      
+    case 'bi-weekly':
+      // Similar to weekly but add 14 days instead of 7
+      const biWeeklyTargetDay = getDayNumber(schedule.cadence_config.day || 'monday');
+      const biWeeklyCurrentDay = nextSend.getDay();
+      
+      let daysUntilBiWeeklyTarget = (biWeeklyTargetDay - biWeeklyCurrentDay + 7) % 7;
+      
+      if (daysUntilBiWeeklyTarget === 0 && nextSend <= now) {
+        daysUntilBiWeeklyTarget = 14;
+      }
+      
+      nextSend.setDate(nextSend.getDate() + daysUntilBiWeeklyTarget);
+      break;
+      
+    case 'monthly':
+      // Set to first day of next month (simplified)
+      nextSend.setMonth(nextSend.getMonth() + 1, 1);
+      break;
+      
+    default:
+      return null;
+  }
+
+  return nextSend.toISOString();
+}
+
+// Helper function to convert day name to number (0 = Sunday)
+function getDayNumber(dayName: string): number {
+  const days = {
+    'sunday': 0,
+    'monday': 1,
+    'tuesday': 2,
+    'wednesday': 3,
+    'thursday': 4,
+    'friday': 5,
+    'saturday': 6
+  };
+  return days[dayName.toLowerCase() as keyof typeof days] || 1;
 } 

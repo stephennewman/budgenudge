@@ -49,7 +49,7 @@
 **Date:** January 25, 2025 6:16 AM EST  
 **Status:** ✅ SUCCESSFULLY DEPLOYED (GitHub auto-deploy)  
 **Commit:** 6276d2a - Add balance diagnostic endpoint to investigate Plaid balance data staleness  
-**Production URL:** https://get.krezzo.com  
+**Production URL:** https://get.krezzo.com
 
 **🎯 CRITICAL DIAGNOSTIC TOOL:** Successfully implemented comprehensive balance diagnostic system to identify and resolve user-reported balance data discrepancies between stored database values and real-time bank account balances.
 

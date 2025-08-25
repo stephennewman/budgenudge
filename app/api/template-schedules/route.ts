@@ -1,0 +1,202 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createSupabaseClient } from '@/utils/supabase/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const { templateId, schedule } = await request.json();
+    
+    if (!templateId || !schedule) {
+      return NextResponse.json({ 
+        error: 'Template ID and schedule configuration are required' 
+      }, { status: 400 });
+    }
+
+    // Create Supabase client with proper server-side authentication
+    const supabase = await createSupabaseClient();
+    
+    // Get current user (uses cookies automatically)
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    console.log(`📅 Saving schedule for template ${templateId} for user: ${user.id}`);
+
+    // Calculate next send time based on schedule
+    const nextSendAt = calculateNextSendTime(schedule);
+
+    // Upsert the schedule (create or update)
+    const { data, error } = await supabase
+      .from('template_schedules')
+      .upsert({
+        template_id: templateId,
+        user_id: user.id,
+        cadence_type: schedule.cadence_type,
+        cadence_config: schedule.cadence_config,
+        send_time: schedule.send_time + ':00', // Add seconds for TIME format
+        timezone: schedule.timezone,
+        is_active: schedule.is_active,
+        next_send_at: nextSendAt,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'template_id',
+        ignoreDuplicates: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('❌ Failed to save schedule:', error);
+      return NextResponse.json({ 
+        error: 'Failed to save schedule' 
+      }, { status: 500 });
+    }
+
+    console.log(`✅ Schedule saved successfully:`, data);
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Schedule saved successfully!',
+      schedule: data
+    });
+    
+  } catch (error) {
+    console.error('❌ Save schedule API error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error while saving schedule' 
+    }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    // Create Supabase client with proper server-side authentication
+    const supabase = await createSupabaseClient();
+    
+    // Get current user (uses cookies automatically)
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    console.log(`📋 Fetching schedules for user: ${user.id}`);
+
+    // Get user's template schedules
+    const { data: schedules, error } = await supabase
+      .from('template_schedules')
+      .select(`
+        *,
+        custom_sms_templates!inner(template_name)
+      `)
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Failed to fetch schedules:', error);
+      return NextResponse.json({ 
+        error: 'Failed to fetch schedules' 
+      }, { status: 500 });
+    }
+
+    console.log(`✅ Found ${schedules?.length || 0} schedules`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      schedules: schedules || []
+    });
+    
+  } catch (error) {
+    console.error('❌ Get schedules API error:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error while fetching schedules' 
+    }, { status: 500 });
+  }
+}
+
+interface ScheduleConfig {
+  cadence_type: string;
+  cadence_config: {
+    day?: string;
+    interval?: number;
+    day_of_month?: number;
+  };
+  send_time: string;
+  timezone: string;
+  is_active: boolean;
+}
+
+// Helper function to calculate next send time
+function calculateNextSendTime(schedule: ScheduleConfig): string | null {
+  if (!schedule.is_active) return null;
+
+  const now = new Date();
+  const [hours, minutes] = schedule.send_time.split(':');
+  
+  // Create a date for today at the specified time
+  const nextSend = new Date();
+  nextSend.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+  switch (schedule.cadence_type) {
+    case 'daily':
+      // If time has passed today, schedule for tomorrow
+      if (nextSend <= now) {
+        nextSend.setDate(nextSend.getDate() + 1);
+      }
+      break;
+      
+    case 'weekly':
+      const targetDay = getDayNumber(schedule.cadence_config.day || 'monday');
+      const currentDay = nextSend.getDay();
+      
+      // Calculate days until target day
+      let daysUntilTarget = (targetDay - currentDay + 7) % 7;
+      
+      // If it's the target day but time has passed, schedule for next week
+      if (daysUntilTarget === 0 && nextSend <= now) {
+        daysUntilTarget = 7;
+      }
+      
+      nextSend.setDate(nextSend.getDate() + daysUntilTarget);
+      break;
+      
+    case 'bi-weekly':
+      // Similar to weekly but add 14 days instead of 7
+      const biWeeklyTargetDay = getDayNumber(schedule.cadence_config.day || 'monday');
+      const biWeeklyCurrentDay = nextSend.getDay();
+      
+      let daysUntilBiWeeklyTarget = (biWeeklyTargetDay - biWeeklyCurrentDay + 7) % 7;
+      
+      if (daysUntilBiWeeklyTarget === 0 && nextSend <= now) {
+        daysUntilBiWeeklyTarget = 14;
+      }
+      
+      nextSend.setDate(nextSend.getDate() + daysUntilBiWeeklyTarget);
+      break;
+      
+    case 'monthly':
+      // Set to first day of next month (simplified)
+      nextSend.setMonth(nextSend.getMonth() + 1, 1);
+      break;
+      
+    default:
+      return null;
+  }
+
+  return nextSend.toISOString();
+}
+
+// Helper function to convert day name to number (0 = Sunday)
+function getDayNumber(dayName: string): number {
+  const days = {
+    'sunday': 0,
+    'monday': 1,
+    'tuesday': 2,
+    'wednesday': 3,
+    'thursday': 4,
+    'friday': 5,
+    'saturday': 6
+  };
+  return days[dayName.toLowerCase() as keyof typeof days] || 1;
+}

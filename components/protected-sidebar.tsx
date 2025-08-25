@@ -57,6 +57,10 @@ export default async function ProtectedSidebar() {
       href: "/texts",
     },
     {
+      label: "🧪 SMS Builder",
+      href: "/simple-builder",
+    },
+    {
       label: "🛒 Deals",
       href: "/deals",
     },
