@@ -252,7 +252,9 @@ export default function SimpleBuilderPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data.value) {
-            setPreviewText(prev => prev + (prev ? '\n' : '') + data.data.value);
+            // Store the variable in the format that will be replaced later
+            const variablePlaceholder = `{{${variableId}}}`;
+            setPreviewText(prev => prev + (prev ? '\n' : '') + variablePlaceholder);
           } else {
             // Fallback for today-date or API errors
             let fallbackValue = '';
@@ -265,7 +267,7 @@ export default function SimpleBuilderPage() {
                 });
                 break;
               default:
-                fallbackValue = `[${variableId}]`;
+                fallbackValue = `{{${variableId}}}`;
             }
             setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
           }
@@ -281,7 +283,7 @@ export default function SimpleBuilderPage() {
               });
               break;
             default:
-              fallbackValue = `[${variableId}]`;
+              fallbackValue = `{{${variableId}}}`;
           }
           setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
         }
@@ -298,7 +300,7 @@ export default function SimpleBuilderPage() {
             });
             break;
           default:
-            fallbackValue = `[${variableId}]`;
+            fallbackValue = `{{${variableId}}}`;
         }
         setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
       }
@@ -791,9 +793,57 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
   templateName: string;
   onSendTest: () => void; 
 }) {
+  const [realPreviewText, setRealPreviewText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch real variable values when previewText changes
+  useEffect(() => {
+    const updatePreview = async () => {
+      if (previewText) {
+        setIsLoading(true);
+        try {
+          let result = previewText;
+          
+          // Replace all variable placeholders with real values
+          const variableRegex = /{{([^}]+)}}/g;
+          const matches = previewText.match(variableRegex);
+          
+          if (matches) {
+            for (const match of matches) {
+              const variableName = match.slice(2, -2); // Remove {{ and }}
+              
+              try {
+                const response = await fetch(`/api/sms-variables?type=${variableName}`);
+                if (response.ok) {
+                  const data = await response.json();
+                  if (data.success && data.data.value) {
+                    result = result.replace(new RegExp(`{{${variableName}}}`, 'g'), data.data.value);
+                  }
+                }
+              } catch (error) {
+                console.error(`Error fetching variable ${variableName}:`, error);
+              }
+            }
+          }
+          
+          setRealPreviewText(result);
+        } catch (error) {
+          console.error('Error updating preview:', error);
+          setRealPreviewText(previewText);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        setRealPreviewText('');
+      }
+    };
+
+    updatePreview();
+  }, [previewText]);
+
   // Format the full message as it will appear in SMS
-  const fullMessage = previewText 
-    ? `🧪 ${templateName}: \n\n${previewText}`
+  const fullMessage = realPreviewText 
+    ? `🧪 ${templateName}: \n\n${realPreviewText}`
     : 'Your message preview will appear here...';
     
   const characterCount = fullMessage.length;
@@ -805,7 +855,14 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
       <div className="bg-gray-900 rounded-2xl p-4">
         <div className="bg-gray-800 rounded-xl p-3 min-h-[120px]">
           <div className="bg-blue-500 rounded-xl p-2 text-white text-sm whitespace-pre-line">
-            {fullMessage}
+            {isLoading ? (
+              <div className="flex items-center justify-center h-16">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span className="ml-2">Loading variables...</span>
+              </div>
+            ) : (
+              fullMessage
+            )}
           </div>
         </div>
       </div>
@@ -833,13 +890,13 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
       {/* Send Button */}
       <button
         onClick={onSendTest}
-        disabled={!previewText}
+        disabled={!realPreviewText || isLoading}
         className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
       >
         📤 Send Test SMS
       </button>
       
-      {previewText && (
+      {realPreviewText && (
         <p className="text-xs text-gray-500 text-center">
           Test SMS will be sent to your registered phone number
         </p>

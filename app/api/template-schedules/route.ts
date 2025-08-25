@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
                     month: 'long', 
                     day: 'numeric'
                   });
-                  finalMessage = finalMessage.replace('${today-date}', todayDate);
+                  finalMessage = finalMessage.replace(/{{today-date}}/g, todayDate);
                   break;
                 case 'account-count':
                   // Fetch account count
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
                     .eq('user_id', user.id)
                     .is('deleted_at', null);
                   const accountText = `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
-                  finalMessage = finalMessage.replace('${account-count}', accountText);
+                  finalMessage = finalMessage.replace(/{{account-count}}/g, accountText);
                   break;
                 case 'last-transaction-date':
                   // Fetch last transaction date
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
                       month: 'long', 
                       day: 'numeric'
                     });
-                    finalMessage = finalMessage.replace('${last-transaction-date}', dateText);
+                    finalMessage = finalMessage.replace(/{{last-transaction-date}}/g, dateText);
                   }
                   break;
                 case 'total-balance':
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2
                     })}`;
-                    finalMessage = finalMessage.replace('${total-balance}', balanceText);
+                    finalMessage = finalMessage.replace(/{{total-balance}}/g, balanceText);
                   }
                   break;
                 default:
