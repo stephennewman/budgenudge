@@ -13,6 +13,43 @@ export async function GET() {
 
     console.log('🔍 Sampling data for user:', user.id);
 
+    // Get user's Plaid items first (this is the correct data flow)
+    const { data: userItems } = await supabase
+      .from('items')
+      .select('id, plaid_item_id')
+      .eq('user_id', user.id)
+      .is('deleted_at', null)
+      .limit(10);
+
+    console.log('🔍 Found user items:', userItems?.length || 0);
+
+    if (!userItems || userItems.length === 0) {
+      console.log('❌ No Plaid items found for user');
+      return NextResponse.json({
+        user: { id: user.id, email: user.email },
+        accounts: { count: 0, total_balance: 0, types: [], sample: [] },
+        transactions: { recent_count: 0, monthly_spending: 0, unique_categories: 0, unique_merchants: 0, sample: [] },
+        recurring_bills: { count: 0, total_monthly: 0, sample: [] },
+        income_sources: { count: 0, total_monthly: 0, sample: [] },
+        spending_analysis: { top_categories: [], top_merchants: [] },
+        suggested_variables: [
+          {
+            id: 'no-accounts',
+            name: 'No Accounts Connected',
+            description: 'You need to connect your bank accounts first',
+            example: 'Please connect your bank accounts via Plaid to see financial data'
+          }
+        ]
+      });
+    }
+
+    const itemIds = userItems.map(item => item.id);
+    const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
+
+    console.log('🔍 Using item IDs:', itemIds);
+    console.log('🔍 Using Plaid item IDs:', plaidItemIds);
+    console.log('🔍 User ID being used:', user.id);
+
     // Sample 1: Account Information
     const { data: accounts } = await supabase
       .from('accounts')
@@ -27,7 +64,7 @@ export async function GET() {
         institution_name,
         created_at
       `)
-      .eq('user_id', user.id)
+      .in('item_id', itemIds)
       .is('deleted_at', null)
       .limit(5);
 
@@ -45,7 +82,7 @@ export async function GET() {
         pending,
         created_at
       `)
-      .eq('user_id', user.id)
+      .in('plaid_item_id', plaidItemIds)
       .order('date', { ascending: false })
       .limit(10);
 
@@ -74,7 +111,7 @@ export async function GET() {
         subcategory,
         amount
       `)
-      .eq('user_id', user.id)
+      .in('plaid_item_id', plaidItemIds)
       .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
 
     // Sample 5: Income Sources
@@ -101,7 +138,7 @@ export async function GET() {
         amount,
         category
       `)
-      .eq('user_id', user.id)
+      .in('plaid_item_id', plaidItemIds)
       .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
       .not('merchant_name', 'is', null)
       .limit(10);
@@ -111,10 +148,9 @@ export async function GET() {
       .from('accounts')
       .select(`
         type,
-        subtype,
-        count
+        subtype
       `)
-      .eq('user_id', user.id)
+      .in('item_id', itemIds)
       .is('deleted_at', null);
 
     // Sample 8: Transaction Patterns (commented out for now)
