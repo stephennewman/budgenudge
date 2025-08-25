@@ -591,11 +591,10 @@ export default function SimpleBuilderPage() {
           </div>
         ) : (
           <>
-            {/* Template Management - All in one row */}
+            {/* Template Management */}
             <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-                {/* Template Selection */}
-                <div className="md:col-span-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Template
                   </label>
@@ -608,7 +607,7 @@ export default function SimpleBuilderPage() {
                         if (template) loadTemplate(template);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {!currentTemplateId && <option value="">Select a template...</option>}
                     {savedTemplates.map((template) => (
@@ -618,76 +617,12 @@ export default function SimpleBuilderPage() {
                     ))}
                   </select>
                 </div>
-
-                {/* New Template Button */}
-                <div className="md:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 opacity-0">
-                    &nbsp;
-                  </label>
-                  <button
-                    onClick={createNewTemplate}
-                    className="w-full px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
-                  >
-                    + New Template
-                  </button>
-                </div>
-
-                {/* Template Name Input */}
-                <div className="md:col-span-1">
-                  <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-2">
-                    Template Name
-                  </label>
-                  <input
-                    id="template-name"
-                    type="text"
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Enter template name..."
-                  />
-                </div>
-
-                {/* Save/Cancel Buttons */}
-                <div className="md:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 opacity-0">
-                    &nbsp;
-                  </label>
-                  <div className="flex gap-2">
-                    {hasUnsavedChanges ? (
-                      <>
-                        <button
-                          onClick={handleSaveTemplate}
-                          disabled={isSaving || !templateName.trim() || !previewText.trim()}
-                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                          title="Save Template"
-                        >
-                          {isSaving ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mx-auto"></div>
-                          ) : (
-                            '✓'
-                          )}
-                        </button>
-                        <button
-                          onClick={() => {
-                            if (currentTemplateId) {
-                              loadTemplate(savedTemplates.find(t => t.id === currentTemplateId)!);
-                            } else {
-                              createNewTemplate();
-                            }
-                          }}
-                          className="flex-1 px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
-                          title="Cancel Changes"
-                        >
-                          ✕
-                        </button>
-                      </>
-                    ) : (
-                      <div className="w-full px-3 py-2 text-gray-400 text-sm text-center bg-gray-100 rounded-md">
-                        No changes
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <button
+                  onClick={createNewTemplate}
+                  className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
+                >
+                  + New Template
+                </button>
               </div>
               
               {savedTemplates.length > 0 && (
@@ -695,20 +630,58 @@ export default function SimpleBuilderPage() {
                   {savedTemplates.length} saved template{savedTemplates.length !== 1 ? 's' : ''}
                 </div>
               )}
-
-              {/* Save Message */}
-              {saveMessage && (
-                <div className="mt-3">
-                  <p className={`text-sm font-medium ${
-                    saveMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {saveMessage}
-                  </p>
-                </div>
-              )}
             </div>
           </>
         )}
+        
+        {/* Template Name Input */}
+        <div className="mb-6">
+          <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-2">
+            Template Name
+          </label>
+          <div className="flex gap-3 items-start">
+            <input
+              id="template-name"
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              className="flex-1 max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Enter template name..."
+            />
+            <button
+              onClick={handleSaveTemplate}
+              disabled={isSaving || !templateName.trim() || !previewText.trim() || !hasUnsavedChanges}
+              className={`px-4 py-2 text-white rounded-md transition-colors flex items-center gap-2 ${
+                hasUnsavedChanges 
+                  ? 'bg-green-600 hover:bg-green-700' 
+                  : 'bg-gray-400 cursor-not-allowed'
+              } disabled:bg-gray-300 disabled:cursor-not-allowed`}
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  💾 {hasUnsavedChanges ? 'Save Template' : 'No Changes'}
+                </>
+              )}
+            </button>
+          </div>
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              This name will appear in your test SMS messages
+            </p>
+            {saveMessage && (
+              <p className={`text-sm font-medium ${
+                saveMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {saveMessage}
+              </p>
+            )}
+          </div>
+        </div>
         
         {/* Tab Navigation */}
         <div className="mb-6">
