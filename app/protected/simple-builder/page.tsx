@@ -2,6 +2,7 @@
 
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
 import { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface SavedTemplate {
   id: string;
@@ -150,13 +151,8 @@ export default function SimpleBuilderPage() {
     // Replace variable placeholders with actual values for display
     for (const variableId of template.variables_used) {
       try {
-        const response = await fetch(`/api/sms-variables?type=${variableId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data.value) {
-            displayText = displayText.replace(new RegExp(`{{${variableId}}}`, 'g'), data.data.value);
-          }
-        }
+        const variableValue = await fetchVariableData(variableId);
+        displayText = displayText.replace(new RegExp(`{{${variableId}}}`, 'g'), variableValue);
       } catch (error) {
         console.error(`Error fetching variable ${variableId}:`, error);
       }
@@ -254,6 +250,71 @@ export default function SimpleBuilderPage() {
     });
   };
 
+  // Function to fetch variable data directly from Supabase
+  const fetchVariableData = async (variableId: string): Promise<string> => {
+    const supabase = createClientComponentClient();
+    
+    try {
+      switch (variableId) {
+        case 'today-date':
+          return new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          
+        case 'account-count':
+          const { count: accountCount } = await supabase
+            .from('accounts')
+            .select('*', { count: 'exact', head: true })
+            .is('deleted_at', null);
+          return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
+          
+        case 'last-transaction-date':
+          const { data: lastTransaction } = await supabase
+            .from('transactions')
+            .select('date')
+            .order('date', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (lastTransaction) {
+            const date = new Date(lastTransaction.date);
+            return date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long', 
+              day: 'numeric'
+            });
+          }
+          return 'No transactions found';
+          
+        case 'total-balance':
+          const { data: accounts } = await supabase
+            .from('accounts')
+            .select('available_balance, current_balance')
+            .is('deleted_at', null);
+          
+          if (accounts && accounts.length > 0) {
+            const totalBalance = accounts.reduce((sum, acc) => {
+              const balance = acc.available_balance ?? acc.current_balance ?? 0;
+              return sum + balance;
+            }, 0);
+            return `$${totalBalance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2
+            })}`;
+          }
+          return 'No accounts found';
+          
+        default:
+          return `[${variableId} - Unknown Variable]`;
+      }
+    } catch (error) {
+      console.error(`Error fetching variable ${variableId}:`, error);
+      return `[${variableId} - Error]`;
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { over, active } = event;
     
@@ -263,62 +324,13 @@ export default function SimpleBuilderPage() {
       // Add the variable to canvas
       setCanvasItems(prev => [...prev, variableId]);
       
-      // Fetch the variable value from API
+      // Fetch the variable value directly from Supabase
       try {
-        const response = await fetch(`/api/sms-variables?type=${variableId}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.data.value) {
-            // Set the preview text to the actual value, not a placeholder
-            setPreviewText(prev => prev + (prev ? '\n' : '') + data.data.value);
-          } else {
-            // Fallback for today-date or API errors
-            let fallbackValue = '';
-            switch (variableId) {
-              case 'today-date':
-                fallbackValue = new Date().toLocaleDateString('en-US', { 
-                  year: 'numeric', 
-                  month: 'long', 
-                  day: 'numeric' 
-                });
-                break;
-              default:
-                fallbackValue = `[${variableId} - API Error]`;
-            }
-            setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
-          }
-        } else {
-          // API error, use fallback
-          let fallbackValue = '';
-          switch (variableId) {
-            case 'today-date':
-              fallbackValue = new Date().toLocaleDateString('en-US', { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              });
-              break;
-            default:
-              fallbackValue = `[${variableId} - API Error]`;
-          }
-          setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
-        }
+        const variableValue = await fetchVariableData(variableId);
+        setPreviewText(prev => prev + (prev ? '\n' : '') + variableValue);
       } catch (error) {
         console.error('Error fetching variable value:', error);
-        // Use fallback on error
-        let fallbackValue = '';
-        switch (variableId) {
-          case 'today-date':
-            fallbackValue = new Date().toLocaleDateString('en-US', { 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            });
-            break;
-          default:
-            fallbackValue = `[${variableId} - Network Error]`;
-        }
-        setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
+        setPreviewText(prev => prev + (prev ? '\n' : '') + `[${variableId} - Error]`);
       }
     }
   };
@@ -374,13 +386,10 @@ export default function SimpleBuilderPage() {
       for (const [variableId, placeholder] of Object.entries(variableMapping)) {
         if (previewText.includes(variableId)) {
           // Check if this variable is actually used in the content
-          const response = await fetch(`/api/sms-variables?type=${variableId}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data.value && previewText.includes(data.data.value)) {
-              templateContent = templateContent.replace(new RegExp(data.data.value, 'g'), placeholder);
-              variablesUsed.push(variableId);
-            }
+          const variableValue = await fetchVariableData(variableId);
+          if (previewText.includes(variableValue)) {
+            templateContent = templateContent.replace(new RegExp(variableValue, 'g'), placeholder);
+            variablesUsed.push(variableId);
           }
         }
       }
