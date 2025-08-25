@@ -372,11 +372,19 @@ export default function SimpleBuilderPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { over, active } = event;
     
+    console.log('🔍 Drag event:', { over, active, variableId: active.id });
+    
     if (over?.id === 'canvas') {
       const variableId = active.id as string;
       
+      console.log('✅ Variable dropped on canvas:', variableId);
+      
       // Add the variable to canvas
-      setCanvasItems(prev => [...prev, variableId]);
+      setCanvasItems(prev => {
+        const newItems = [...prev, variableId];
+        console.log('📝 Updated canvas items:', newItems);
+        return newItems;
+      });
       
       // Check if it's a formatting variable or data variable
       const isFormattingVariable = [
@@ -385,6 +393,8 @@ export default function SimpleBuilderPage() {
         'warning-icon', 'info-icon', 'money-icon', 'calendar-icon', 'bank-icon', 'sparkle',
         'fire', 'rocket', 'trophy', 'heart'
       ].includes(variableId);
+      
+      console.log('🔍 Is formatting variable:', isFormattingVariable);
       
       if (isFormattingVariable) {
         // For formatting variables, insert the predefined value directly
@@ -453,7 +463,13 @@ export default function SimpleBuilderPage() {
           default:
             formatValue = '';
         }
-        setPreviewText(prev => prev + (prev ? '\n' : '') + formatValue);
+        
+        console.log('🎨 Formatting variable value:', formatValue);
+        setPreviewText(prev => {
+          const newText = prev + (prev ? '\n' : '') + formatValue;
+          console.log('📝 Updated preview text:', newText);
+          return newText;
+        });
       } else {
         // For data variables, fetch the variable value directly from Supabase
         try {
@@ -464,6 +480,8 @@ export default function SimpleBuilderPage() {
           setPreviewText(prev => prev + (prev ? '\n' : '') + `[${variableId} - Error]`);
         }
       }
+    } else {
+      console.log('❌ Variable not dropped on canvas:', over?.id);
     }
   };
 
@@ -804,13 +822,17 @@ export default function SimpleBuilderPage() {
           </div>
         )}
         
-        <DndContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-96">
+        <DndContext 
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Variables Library */}
             <div className="bg-white rounded-lg p-4 border-2">
               <h2 className="font-semibold mb-4">📦 Variables</h2>
-              <DraggableVariable />
+              <div className="max-h-96 overflow-y-auto">
+                <DraggableVariable />
+              </div>
             </div>
 
             {/* Canvas */}
@@ -1007,7 +1029,7 @@ function DropZone({ canvasItems, onRemoveVariable }: {
   return (
     <div 
       ref={setNodeRef}
-      className={`min-h-[200px] border-2 border-dashed rounded-lg p-4 transition-colors ${
+      className={`min-h-[300px] border-2 border-dashed rounded-lg p-4 transition-colors ${
         isOver 
           ? 'border-blue-400 bg-blue-50' 
           : 'border-gray-300 bg-gray-50'
@@ -1018,6 +1040,7 @@ function DropZone({ canvasItems, onRemoveVariable }: {
           <div className="text-center">
             <div className="text-3xl mb-2">📱</div>
             <p>Drop variables here</p>
+            <p className="text-sm text-gray-400 mt-1">Drag variables from the left panel</p>
           </div>
         </div>
       ) : (
