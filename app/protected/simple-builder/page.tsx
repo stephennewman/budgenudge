@@ -2,7 +2,7 @@
 
 import { DndContext, DragEndEvent, useDraggable, useDroppable } from '@dnd-kit/core';
 import { useState, useEffect } from 'react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createSupabaseClient } from '@/utils/supabase/client';
 
 interface SavedTemplate {
   id: string;
@@ -53,7 +53,7 @@ export default function SimpleBuilderPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   // Create single Supabase client instance
-  const supabase = createClientComponentClient();
+  const supabase = createSupabaseClient();
 
   // Function to fetch variable data directly from Supabase
   const fetchVariableData = async (variableId: string): Promise<string> => {
