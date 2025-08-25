@@ -609,7 +609,12 @@ export default function DataSamplePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-medium text-blue-900">Today&apos;s Date</h3>
-              <p className="text-blue-700 text-sm">Dynamic date formatting</p>
+              <p className="text-blue-700 text-sm">{new Date().toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}</p>
             </div>
             <div className="bg-green-50 p-4 rounded-lg">
               <h3 className="font-medium text-green-900">Account Count</h3>
@@ -621,7 +626,16 @@ export default function DataSamplePage() {
             </div>
             <div className="bg-orange-50 p-4 rounded-lg">
               <h3 className="font-medium text-orange-900">Last Transaction</h3>
-              <p className="text-orange-700 text-sm">Most recent transaction date</p>
+              <p className="text-orange-700 text-sm">
+                {dataSample.transactions.sample.length > 0 
+                  ? new Date(dataSample.transactions.sample[0].date).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })
+                  : 'No transactions found'
+                }
+              </p>
             </div>
           </div>
         </div>
