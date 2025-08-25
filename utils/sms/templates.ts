@@ -1856,6 +1856,38 @@ async function generateMorningExpensesMessage(userId: string): Promise<string> {
   
   let message = `🌅 MORNING SNAPSHOT\n\n`;
   
+  // AVAILABLE BALANCE
+  try {
+    const { data: items } = await supabase
+      .from('items')
+      .select(`
+        accounts!inner(available_balance, name, current_balance)
+      `)
+      .eq('user_id', userId)
+      .is('deleted_at', null);
+
+    if (items && items.length > 0) {
+      let totalAvailable = 0;
+      let totalCurrent = 0;
+      
+      items.forEach(item => {
+        if (item.accounts && Array.isArray(item.accounts)) {
+          item.accounts.forEach(account => {
+            totalAvailable += account.available_balance || 0;
+            totalCurrent += account.current_balance || 0;
+          });
+        }
+      });
+
+      message += `💰 AVAILABLE BALANCE\n`;
+      message += `Available: $${totalAvailable.toFixed(2)}\n`;
+      message += `Current: $${totalCurrent.toFixed(2)}\n\n`;
+    }
+  } catch (error) {
+    console.error('Error fetching balance for morning snapshot:', error);
+    // Continue without balance if there's an error
+  }
+  
   // UPCOMING EXPENSES (rest of the month only)
   const upcomingExpenses = await getMorningUpcomingExpenses(userId, today, endOfMonth);
   const unpaidTotal = upcomingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
