@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { DateTime } from 'luxon';
 
 export async function POST(request: NextRequest) {
   try {
@@ -198,24 +199,29 @@ interface ScheduleConfig {
 function calculateNextSendTime(schedule: ScheduleConfig): string | null {
   if (!schedule.is_active) return null;
 
-  const now = new Date();
+  // Get current time in user's timezone using luxon
+  const now = DateTime.now().setZone(schedule.timezone);
   const [hours, minutes] = schedule.send_time.split(':');
   
-  // Create a date for today at the specified time
-  const nextSend = new Date();
-  nextSend.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  // Create next send time for today at the specified time in user's timezone
+  let nextSend = now.set({ 
+    hour: parseInt(hours), 
+    minute: parseInt(minutes), 
+    second: 0, 
+    millisecond: 0 
+  });
 
   switch (schedule.cadence_type) {
     case 'daily':
       // If time has passed today, schedule for tomorrow
       if (nextSend <= now) {
-        nextSend.setDate(nextSend.getDate() + 1);
+        nextSend = nextSend.plus({ days: 1 });
       }
       break;
       
     case 'weekly':
-      const targetDay = getDayNumber(schedule.cadence_config.day || 'monday');
-      const currentDay = nextSend.getDay();
+      const targetDay = getLuxonWeekday(schedule.cadence_config.day || 'monday');
+      const currentDay = nextSend.weekday;
       
       // Calculate days until target day
       let daysUntilTarget = (targetDay - currentDay + 7) % 7;
@@ -225,13 +231,13 @@ function calculateNextSendTime(schedule: ScheduleConfig): string | null {
         daysUntilTarget = 7;
       }
       
-      nextSend.setDate(nextSend.getDate() + daysUntilTarget);
+      nextSend = nextSend.plus({ days: daysUntilTarget });
       break;
       
     case 'bi-weekly':
       // Similar to weekly but add 14 days instead of 7
-      const biWeeklyTargetDay = getDayNumber(schedule.cadence_config.day || 'monday');
-      const biWeeklyCurrentDay = nextSend.getDay();
+      const biWeeklyTargetDay = getLuxonWeekday(schedule.cadence_config.day || 'monday');
+      const biWeeklyCurrentDay = nextSend.weekday;
       
       let daysUntilBiWeeklyTarget = (biWeeklyTargetDay - biWeeklyCurrentDay + 7) % 7;
       
@@ -239,31 +245,31 @@ function calculateNextSendTime(schedule: ScheduleConfig): string | null {
         daysUntilBiWeeklyTarget = 14;
       }
       
-      nextSend.setDate(nextSend.getDate() + daysUntilBiWeeklyTarget);
+      nextSend = nextSend.plus({ days: daysUntilBiWeeklyTarget });
       break;
       
     case 'monthly':
       // Set to first day of next month (simplified)
-      nextSend.setMonth(nextSend.getMonth() + 1, 1);
+      nextSend = nextSend.plus({ months: 1 }).set({ day: 1 });
       break;
       
     default:
       return null;
   }
 
-  return nextSend.toISOString();
+  return nextSend.toISO();
 }
 
-// Helper function to convert day name to number (0 = Sunday)
-function getDayNumber(dayName: string): number {
+// Helper function to convert day name to luxon weekday number (1 = Monday, 7 = Sunday)
+function getLuxonWeekday(dayName: string): number {
   const days = {
-    'sunday': 0,
     'monday': 1,
     'tuesday': 2,
     'wednesday': 3,
     'thursday': 4,
     'friday': 5,
-    'saturday': 6
+    'saturday': 6,
+    'sunday': 7
   };
   return days[dayName.toLowerCase() as keyof typeof days] || 1;
 }
