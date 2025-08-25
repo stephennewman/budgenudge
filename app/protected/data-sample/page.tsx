@@ -168,7 +168,7 @@ export default function DataSamplePage() {
       console.log('🔍 All accounts in database:', allUserAccounts);
       console.log('🔍 Accounts error:', accountsError);
 
-      // Sample 1: Account Information - Try multiple approaches to find accounts
+      // Sample 1: Account Information - Use the correct pattern from working SMS builder
       let accounts: Array<{
         id: string;
         name: string;
@@ -180,110 +180,46 @@ export default function DataSamplePage() {
         institution_name: string | null;
         created_at: string;
       }> = [];
+
+      // Get user's Plaid items first, then get accounts linked to those items (correct pattern)
+      console.log('🔍 Getting accounts using correct pattern for user:', user.id);
       
-      // Approach 1: Try to get accounts directly for this user (bypass items relationship)
-      console.log('🔍 Trying direct accounts query for user:', user.id);
-      const { data: directUserAccounts, error: directError } = await supabase
-        .from('accounts')
-        .select(`
-          id,
-          name,
-          type,
-          subtype,
-          available_balance,
-          current_balance,
-          mask,
-          institution_name,
-          created_at
-        `)
-        .eq('user_id', user.id)
-        .is('deleted_at', null)
-        .limit(20);
-      
-      if (directError) {
-        console.error('🔍 Direct accounts query error:', directError);
-      }
-      
-      if (directUserAccounts && directUserAccounts.length > 0) {
-        accounts = directUserAccounts;
-        console.log('🔍 Accounts found via direct user_id query:', accounts.length);
-        console.log('🔍 First account sample:', accounts[0]);
-      } else {
-        console.log('🔍 No accounts found via direct user_id query');
+      if (userItems && userItems.length > 0) {
+        const itemIds = userItems.map(item => item.id);
+        console.log('🔍 Looking for accounts with item IDs:', itemIds);
         
-        // Approach 2: Try different relationships between items and accounts
-        if (userItems && userItems.length > 0) {
-          const itemIds = userItems.map(item => item.id);
-          const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean);
-          
-          console.log('🔍 Trying accounts query with item IDs:', itemIds);
-          console.log('🔍 Also have Plaid item IDs:', plaidItemIds);
-          
-          // Try item_id relationship
-          const { data: accountsData, error: accountsError } = await supabase
-            .from('accounts')
-            .select(`
-              id,
-              name,
-              type,
-              subtype,
-              available_balance,
-              current_balance,
-              mask,
-              institution_name,
-              created_at
-            `)
-            .in('item_id', itemIds)
-            .is('deleted_at', null)
-            .limit(20);
-          
-          if (accountsError) {
-            console.error('🔍 Accounts query error with item_id:', accountsError);
-          }
-          
-          if (accountsData && accountsData.length > 0) {
-            accounts = accountsData;
-            console.log('🔍 Accounts found via item_id:', accounts.length);
-            console.log('🔍 First account sample:', accounts[0]);
-          } else {
-            console.log('🔍 No accounts found via item_id, trying plaid_item_id');
-            
-            // Try plaid_item_id relationship
-            const { data: accountsData2, error: accountsError2 } = await supabase
-              .from('accounts')
-              .select(`
-                id,
-                name,
-                type,
-                subtype,
-                available_balance,
-                current_balance,
-                mask,
-                institution_name,
-                created_at
-              `)
-              .in('plaid_item_id', plaidItemIds)
-              .is('deleted_at', null)
-              .limit(20);
-            
-            if (accountsError2) {
-              console.error('🔍 Accounts query error with plaid_item_id:', accountsError2);
-            }
-            
-            if (accountsData2 && accountsData2.length > 0) {
-              accounts = accountsData2;
-              console.log('🔍 Accounts found via plaid_item_id:', accounts.length);
-              console.log('🔍 First account sample:', accountsData2[0]);
-            } else {
-              console.log('🔍 No accounts found via any method');
-              console.log('🔍 Item IDs used:', itemIds);
-              console.log('🔍 Plaid Item IDs used:', plaidItemIds);
-              console.log('🔍 User ID:', user.id);
-            }
-          }
-        } else {
-          console.log('🔍 No user items found for user:', user.id);
+        const { data: accountsData, error: accountsError } = await supabase
+          .from('accounts')
+          .select(`
+            id,
+            name,
+            type,
+            subtype,
+            available_balance,
+            current_balance,
+            mask,
+            institution_name,
+            created_at
+          `)
+          .in('item_id', itemIds)
+          .is('deleted_at', null)
+          .limit(20);
+        
+        if (accountsError) {
+          console.error('🔍 Accounts query error:', accountsError);
         }
+        
+        if (accountsData && accountsData.length > 0) {
+          accounts = accountsData;
+          console.log('🔍 Accounts found via item_id relationship:', accounts.length);
+          console.log('🔍 First account sample:', accounts[0]);
+        } else {
+          console.log('🔍 No accounts found via item_id relationship');
+          console.log('🔍 Item IDs used:', itemIds);
+          console.log('🔍 User ID:', user.id);
+        }
+      } else {
+        console.log('🔍 No user items found for user:', user.id);
       }
       
       // Debug: Show what we found
