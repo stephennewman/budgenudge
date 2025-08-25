@@ -418,7 +418,7 @@ export default function SimpleBuilderPage() {
           try {
             const variableValue = await fetchVariableData(variableName);
             // Replace the real value with the placeholder
-            templateContent = templateContent.replace(new RegExp(`{{${variableName}}}`, 'g'), `{{${variableName}}}`);
+            templateContent = templateContent.replace(new RegExp(variableValue, 'g'), `{{${variableName}}}`);
           } catch (error) {
             console.error(`Error processing variable ${variableName}:`, error);
           }
