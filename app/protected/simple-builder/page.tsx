@@ -68,9 +68,17 @@ export default function SimpleBuilderPage() {
           
         case 'account-count':
           // Get user's Plaid items first, then count accounts linked to those items
+          const { data: { user }, error: authError } = await supabase.auth.getUser();
+          if (authError || !user) {
+            console.error('❌ Auth error in account-count:', authError);
+            return '[Authentication Error]';
+          }
+          
           const { data: userItems } = await supabase
             .from('items')
             .select('id')
+            .eq('user_id', user.id)
+            .is('deleted_at', null)
             .limit(10);
           
           if (userItems && userItems.length > 0) {
@@ -86,9 +94,17 @@ export default function SimpleBuilderPage() {
           
         case 'last-transaction-date':
           // Get user's Plaid items first, then get transactions linked to those items
+          const { data: { user: userForTx }, error: authErrorTx } = await supabase.auth.getUser();
+          if (authErrorTx || !userForTx) {
+            console.error('❌ Auth error in last-transaction-date:', authErrorTx);
+            return '[Authentication Error]';
+          }
+          
           const { data: userItemsForTx } = await supabase
             .from('items')
             .select('plaid_item_id')
+            .eq('user_id', userForTx.id)
+            .is('deleted_at', null)
             .limit(10);
           
           if (userItemsForTx && userItemsForTx.length > 0) {
@@ -114,9 +130,17 @@ export default function SimpleBuilderPage() {
           
         case 'total-balance':
           // Get user's Plaid items first, then get account balances linked to those items
+          const { data: { user: userForBalance }, error: authErrorBalance } = await supabase.auth.getUser();
+          if (authErrorBalance || !userForBalance) {
+            console.error('❌ Auth error in total-balance:', authErrorBalance);
+            return '[Authentication Error]';
+          }
+          
           const { data: userItemsForBalance } = await supabase
             .from('items')
             .select('id')
+            .eq('user_id', userForBalance.id)
+            .is('deleted_at', null)
             .limit(10);
           
           if (userItemsForBalance && userItemsForBalance.length > 0) {
