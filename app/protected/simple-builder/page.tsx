@@ -51,11 +51,13 @@ export default function SimpleBuilderPage() {
   
   // Track if template has unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  
+  // Create single Supabase client instance
+  const supabase = createClientComponentClient();
 
   // Function to fetch variable data directly from Supabase
   const fetchVariableData = async (variableId: string): Promise<string> => {
     console.log('🔍 fetchVariableData called with:', variableId);
-    const supabase = createClientComponentClient();
     
     try {
       // Get current user once at the beginning
