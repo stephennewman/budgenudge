@@ -395,75 +395,60 @@ export default function SimpleBuilderPage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!templateName.trim() || !previewText.trim()) return;
-    
+    if (!templateName.trim()) {
+      setSaveMessage('❌ Please enter a template name');
+      setTimeout(() => setSaveMessage(''), 3000);
+      return;
+    }
+
     setIsSaving(true);
-    setSaveMessage('');
     
     try {
-      // Create a mapping of display text to variable references
-      const variableMapping: { [key: string]: string } = {
-        'today-date': '{{today-date}}',
-        'account-count': '{{account-count}}',
-        'last-transaction-date': '{{last-transaction-date}}',
-        'total-balance': '{{total-balance}}'
-      };
-      
-      // Create template content with variable placeholders for scheduled SMS
+      // Convert real values back to placeholders for storage
       let templateContent = previewText;
-      const variablesUsed: string[] = [];
       
-      // Replace actual values with variable placeholders for storage
-      for (const [variableId, placeholder] of Object.entries(variableMapping)) {
-        if (previewText.includes(variableId)) {
-          // Check if this variable is actually used in the content
-          const variableValue = await fetchVariableData(variableId);
-          if (previewText.includes(variableValue)) {
-            templateContent = templateContent.replace(new RegExp(variableValue, 'g'), placeholder);
-            variablesUsed.push(variableId);
-          }
-        }
-      }
-      
-      // Also check for any remaining variable references
+      // Replace real values with placeholders
       const variableRegex = /{{([^}]+)}}/g;
       const matches = previewText.match(variableRegex);
+      
       if (matches) {
         for (const match of matches) {
-          const variableId = match.slice(2, -2);
-          if (!variablesUsed.includes(variableId)) {
-            variablesUsed.push(variableId);
+          const variableName = match.slice(2, -2); // Remove {{ and }}
+          
+          try {
+            const variableValue = await fetchVariableData(variableName);
+            // Replace the real value with the placeholder
+            templateContent = templateContent.replace(new RegExp(`{{${variableName}}}`, 'g'), `{{${variableName}}}`);
+          } catch (error) {
+            console.error(`Error processing variable ${variableName}:`, error);
           }
         }
       }
-      
-      const response = await fetch('/api/custom-templates', {
+
+      const response = await fetch('/api/custom-sms-templates', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          templateName: templateName.trim(),
-          templateContent: templateContent, // Store with placeholders for scheduled SMS
-          variablesUsed: variablesUsed,
-        }),
+          name: templateName,
+          content: templateContent
+        })
       });
 
+      const result = await response.json();
+      
       if (response.ok) {
-        const result = await response.json();
+        setCurrentTemplateId(result.template.id);
         setSaveMessage('✅ Template saved successfully!');
-        if (result.template && !currentTemplateId) {
-          setCurrentTemplateId(result.template.id);
-        }
-        setHasUnsavedChanges(false); // Reset unsaved changes state
-        await loadSavedTemplates(false);
+        setHasUnsavedChanges(false);
+        setTimeout(() => setSaveMessage(''), 3000);
       } else {
-        const errorData = await response.json();
-        setSaveMessage(`❌ Failed to save template: ${errorData.error || 'Unknown error'}`);
+        setSaveMessage(`❌ ${result.error || 'Failed to save template'}`);
+        setTimeout(() => setSaveMessage(''), 5000);
       }
     } catch (error) {
       console.error('Error saving template:', error);
-      setSaveMessage('❌ Failed to save template: Network error');
+      setSaveMessage('❌ Error saving template');
+      setTimeout(() => setSaveMessage(''), 5000);
     } finally {
       setIsSaving(false);
     }
@@ -875,15 +860,16 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
   const [realPreviewText, setRealPreviewText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch real variable values when previewText changes
+  // Update preview with real values
   useEffect(() => {
     const updatePreview = async () => {
-      if (previewText) {
+      if (previewText.trim()) {
         setIsLoading(true);
+        
         try {
           let result = previewText;
           
-          // Replace all variable placeholders with real values
+          // Replace placeholders with real values
           const variableRegex = /{{([^}]+)}}/g;
           const matches = previewText.match(variableRegex);
           
@@ -892,13 +878,8 @@ function PreviewPanel({ previewText, templateName, onSendTest }: {
               const variableName = match.slice(2, -2); // Remove {{ and }}
               
               try {
-                const response = await fetch(`/api/sms-variables?type=${variableName}`);
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.success && data.data.value) {
-                    result = result.replace(new RegExp(`{{${variableName}}}`, 'g'), data.data.value);
-                  }
-                }
+                const variableValue = await fetchVariableData(variableName);
+                result = result.replace(new RegExp(`{{${variableName}}}`, 'g'), variableValue);
               } catch (error) {
                 console.error(`Error fetching variable ${variableName}:`, error);
               }
