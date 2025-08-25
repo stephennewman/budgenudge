@@ -52,6 +52,9 @@ export default function SimpleBuilderPage() {
   // Track if template has unsaved changes
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'builder' | 'scheduler'>('builder');
+  
   // Create single Supabase client instance
   const supabase = createSupabaseClient();
 
@@ -588,9 +591,10 @@ export default function SimpleBuilderPage() {
           </div>
         ) : (
           <>
-            {/* Template Management */}
+            {/* Template Management - All in one row */}
             <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                {/* Template Selection */}
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Select Template
@@ -604,7 +608,7 @@ export default function SimpleBuilderPage() {
                         if (template) loadTemplate(template);
                       }
                     }}
-                    className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     {!currentTemplateId && <option value="">Select a template...</option>}
                     {savedTemplates.map((template) => (
@@ -614,12 +618,68 @@ export default function SimpleBuilderPage() {
                     ))}
                   </select>
                 </div>
-                <button
-                  onClick={createNewTemplate}
-                  className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
-                >
-                  + New Template
-                </button>
+
+                {/* New Template Button */}
+                <div className="flex-shrink-0">
+                  <button
+                    onClick={createNewTemplate}
+                    className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors whitespace-nowrap"
+                  >
+                    + New Template
+                  </button>
+                </div>
+
+                {/* Template Name Input */}
+                <div className="flex-1">
+                  <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-2">
+                    Template Name
+                  </label>
+                  <input
+                    id="template-name"
+                    type="text"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter template name..."
+                  />
+                </div>
+
+                {/* Save/Cancel Buttons */}
+                <div className="flex-shrink-0 flex items-end gap-2">
+                  {hasUnsavedChanges ? (
+                    <>
+                      <button
+                        onClick={handleSaveTemplate}
+                        disabled={isSaving || !templateName.trim() || !previewText.trim()}
+                        className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                        title="Save Template"
+                      >
+                        {isSaving ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          '✓'
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (currentTemplateId) {
+                            loadTemplate(savedTemplates.find(t => t.id === currentTemplateId)!);
+                          } else {
+                            createNewTemplate();
+                          }
+                        }}
+                        className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors"
+                        title="Cancel Changes"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <div className="px-3 py-2 text-gray-400 text-sm">
+                      No changes
+                    </div>
+                  )}
+                </div>
               </div>
               
               {savedTemplates.length > 0 && (
@@ -627,242 +687,246 @@ export default function SimpleBuilderPage() {
                   {savedTemplates.length} saved template{savedTemplates.length !== 1 ? 's' : ''}
                 </div>
               )}
+
+              {/* Save Message */}
+              {saveMessage && (
+                <div className="mt-3">
+                  <p className={`text-sm font-medium ${
+                    saveMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    {saveMessage}
+                  </p>
+                </div>
+              )}
             </div>
           </>
         )}
         
-        {/* Template Name Input */}
+        {/* Tab Navigation */}
         <div className="mb-6">
-          <label htmlFor="template-name" className="block text-sm font-medium text-gray-700 mb-2">
-            Template Name
-          </label>
-          <div className="flex gap-3 items-start">
-            <input
-              id="template-name"
-              type="text"
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              className="flex-1 max-w-md px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter template name..."
-            />
-            <button
-              onClick={handleSaveTemplate}
-              disabled={isSaving || !templateName.trim() || !previewText.trim() || !hasUnsavedChanges}
-              className={`px-4 py-2 text-white rounded-md transition-colors flex items-center gap-2 ${
-                hasUnsavedChanges 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : 'bg-gray-400 cursor-not-allowed'
-              } disabled:bg-gray-300 disabled:cursor-not-allowed`}
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  💾 {hasUnsavedChanges ? 'Save Template' : 'No Changes'}
-                </>
-              )}
-            </button>
-          </div>
-          <div className="mt-1 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
-              This name will appear in your test SMS messages
-            </p>
-            {saveMessage && (
-              <p className={`text-sm font-medium ${
-                saveMessage.startsWith('✅') ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {saveMessage}
-              </p>
-            )}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('builder')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'builder'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🎨 Builder
+              </button>
+              <button
+                onClick={() => setActiveTab('scheduler')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'scheduler'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📅 Scheduler
+              </button>
+            </nav>
           </div>
         </div>
-        
-        {/* Schedule Settings */}
-        {currentTemplateId && (
-          <div className="mb-6 p-4 bg-white rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium text-gray-900">📅 Schedule Settings</h3>
-              <div className="flex items-center gap-2">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={schedule.is_active}
-                    onChange={(e) => setSchedule(prev => ({ ...prev, is_active: e.target.checked }))}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                  <span className="ml-3 text-sm font-medium text-gray-700">
-                    {schedule.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </label>
+
+        {/* Tab Content */}
+        {activeTab === 'builder' && (
+          <DndContext 
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Variables Library */}
+              <div className="bg-white rounded-lg p-4 border-2">
+                <h2 className="font-semibold mb-4">📦 Variables</h2>
+                <div className="max-h-96 overflow-y-auto">
+                  <DraggableVariable />
+                </div>
               </div>
+
+              {/* Canvas */}
+              <div className="bg-white rounded-lg p-4 border-2">
+                <h2 className="font-semibold mb-4">🎨 Canvas</h2>
+                <DropZone 
+                  canvasItems={canvasItems} 
+                  onRemoveVariable={(index) => {
+                    const newItems = canvasItems.filter((_, i) => i !== index);
+                    setCanvasItems(newItems);
+                    // Also need to update preview text - remove the corresponding line
+                    const lines = previewText.split('\n');
+                    lines.splice(index, 1);
+                    setPreviewText(lines.join('\n'));
+                  }} 
+                />
+              </div>
+
+              {/* Preview */}
+              <div className="bg-white rounded-lg p-4 border-2">
+                <h2 className="font-semibold mb-4">📱 Preview</h2>
+                <PreviewPanel 
+                  previewText={previewText}
+                  templateName={templateName}
+                  onSendTest={handleSendTest}
+                />
+              </div>
+              
             </div>
+          </DndContext>
+        )}
+
+        {activeTab === 'scheduler' && (
+          <div className="bg-white rounded-lg p-4 border-2">
+            <h2 className="font-semibold mb-4">📅 Schedule Settings</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Cadence */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Frequency
-                </label>
-                <select
-                  value={schedule.cadence_type}
-                  onChange={(e) => {
-                    const cadenceType = e.target.value as ScheduleConfig['cadence_type'];
-                    setSchedule(prev => ({
-                      ...prev,
-                      cadence_type: cadenceType,
-                      cadence_config: cadenceType === 'weekly' ? { day: 'monday' } : 
-                                     cadenceType === 'bi-weekly' ? { day: 'monday', interval: 2 } :
-                                     cadenceType === 'monthly' ? { day_of_month: 1 } : {}
-                    }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="bi-weekly">Bi-weekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
+            {currentTemplateId ? (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900">Schedule Configuration</h3>
+                  <div className="flex items-center gap-2">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={schedule.is_active}
+                        onChange={(e) => setSchedule(prev => ({ ...prev, is_active: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                      <span className="ml-3 text-sm font-medium text-gray-700">
+                        {schedule.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Cadence */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Frequency
+                    </label>
+                    <select
+                      value={schedule.cadence_type}
+                      onChange={(e) => {
+                        const cadenceType = e.target.value as ScheduleConfig['cadence_type'];
+                        setSchedule(prev => ({
+                          ...prev,
+                          cadence_type: cadenceType,
+                          cadence_config: cadenceType === 'weekly' ? { day: 'monday' } : 
+                                         cadenceType === 'bi-weekly' ? { day: 'monday', interval: 2 } :
+                                         cadenceType === 'monthly' ? { day_of_month: 1 } : {}
+                        }));
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="bi-weekly">Bi-weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
 
-              {/* Day Selection for Weekly/Bi-weekly */}
-              {(schedule.cadence_type === 'weekly' || schedule.cadence_type === 'bi-weekly') && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Day of Week
+                  {/* Day Selection for Weekly/Bi-weekly */}
+                  {(schedule.cadence_type === 'weekly' || schedule.cadence_type === 'bi-weekly') && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Day of Week
+                      </label>
+                      <select
+                        value={schedule.cadence_config?.day || 'monday'}
+                        onChange={(e) => setSchedule(prev => ({
+                          ...prev,
+                          cadence_config: { ...prev.cadence_config, day: e.target.value }
+                        }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="monday">Monday</option>
+                        <option value="tuesday">Tuesday</option>
+                        <option value="wednesday">Wednesday</option>
+                        <option value="thursday">Thursday</option>
+                        <option value="friday">Friday</option>
+                        <option value="saturday">Saturday</option>
+                        <option value="sunday">Sunday</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Time */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Time
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="time"
+                        value={schedule.send_time}
+                        onChange={(e) => setSchedule(prev => ({ ...prev, send_time: e.target.value }))}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <select
+                        value={schedule.timezone}
+                        onChange={(e) => setSchedule(prev => ({ ...prev, timezone: e.target.value }))}
+                        className="px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                      >
+                        <option value="America/New_York">EST</option>
+                        <option value="America/Chicago">CST</option>
+                        <option value="America/Denver">MST</option>
+                        <option value="America/Los_Angeles">PST</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Send First SMS Option */}
+                <div className="mt-4 flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sendFirstSmsNow}
+                      onChange={(e) => setSendFirstSmsNow(e.target.checked)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">Send first SMS now (test the schedule immediately)</span>
                   </label>
-                  <select
-                    value={schedule.cadence_config?.day || 'monday'}
-                    onChange={(e) => setSchedule(prev => ({
-                      ...prev,
-                      cadence_config: { ...prev.cadence_config, day: e.target.value }
-                    }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="monday">Monday</option>
-                    <option value="tuesday">Tuesday</option>
-                    <option value="wednesday">Wednesday</option>
-                    <option value="thursday">Thursday</option>
-                    <option value="friday">Friday</option>
-                    <option value="saturday">Saturday</option>
-                    <option value="sunday">Sunday</option>
-                  </select>
                 </div>
-              )}
 
-              {/* Time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Time
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="time"
-                    value={schedule.send_time}
-                    onChange={(e) => setSchedule(prev => ({ ...prev, send_time: e.target.value }))}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <select
-                    value={schedule.timezone}
-                    onChange={(e) => setSchedule(prev => ({ ...prev, timezone: e.target.value }))}
-                    className="px-2 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                {/* Save Schedule Button & Status */}
+                <div className="mt-4 flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    {currentSchedule && schedule.is_active ? (
+                      <span>Next SMS: <strong>{formatNextSend()}</strong></span>
+                    ) : (
+                      <span>Schedule inactive</span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={handleSaveSchedule}
+                    disabled={isSavingSchedule}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                   >
-                    <option value="America/New_York">EST</option>
-                    <option value="America/Chicago">CST</option>
-                    <option value="America/Denver">MST</option>
-                    <option value="America/Los_Angeles">PST</option>
-                  </select>
+                    {isSavingSchedule ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        📅 {sendFirstSmsNow ? 'Save & Send Now' : 'Save Schedule'}
+                      </>
+                    )}
+                  </button>
                 </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <div className="text-4xl mb-2">📝</div>
+                <p>Save a template first to configure scheduling</p>
+                <p className="text-sm mt-1">Switch to the Builder tab to create and save your template</p>
               </div>
-            </div>
-
-                                    {/* Send First SMS Option */}
-                        <div className="mt-4 flex items-center gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={sendFirstSmsNow}
-                              onChange={(e) => setSendFirstSmsNow(e.target.checked)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">Send first SMS now (test the schedule immediately)</span>
-                          </label>
-                        </div>
-
-                        {/* Save Schedule Button & Status */}
-                        <div className="mt-4 flex items-center justify-between">
-                          <div className="text-sm text-gray-600">
-                            {currentSchedule && schedule.is_active ? (
-                              <span>Next SMS: <strong>{formatNextSend()}</strong></span>
-                            ) : (
-                              <span>Schedule inactive</span>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={handleSaveSchedule}
-                            disabled={isSavingSchedule}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                          >
-                            {isSavingSchedule ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                Saving...
-                              </>
-                            ) : (
-                              <>
-                                📅 {sendFirstSmsNow ? 'Save & Send Now' : 'Save Schedule'}
-                              </>
-                            )}
-                          </button>
-                        </div>
+            )}
           </div>
         )}
-        
-        <DndContext 
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Variables Library */}
-            <div className="bg-white rounded-lg p-4 border-2">
-              <h2 className="font-semibold mb-4">📦 Variables</h2>
-              <div className="max-h-96 overflow-y-auto">
-                <DraggableVariable />
-              </div>
-            </div>
-
-            {/* Canvas */}
-            <div className="bg-white rounded-lg p-4 border-2">
-              <h2 className="font-semibold mb-4">🎨 Canvas</h2>
-              <DropZone 
-                canvasItems={canvasItems} 
-                onRemoveVariable={(index) => {
-                  const newItems = canvasItems.filter((_, i) => i !== index);
-                  setCanvasItems(newItems);
-                  // Also need to update preview text - remove the corresponding line
-                  const lines = previewText.split('\n');
-                  lines.splice(index, 1);
-                  setPreviewText(lines.join('\n'));
-                }} 
-              />
-            </div>
-
-            {/* Preview */}
-            <div className="bg-white rounded-lg p-4 border-2">
-              <h2 className="font-semibold mb-4">📱 Preview</h2>
-              <PreviewPanel 
-                previewText={previewText}
-                templateName={templateName}
-                onSendTest={handleSendTest}
-              />
-            </div>
-            
-          </div>
-        </DndContext>
       </div>
     </div>
   );
