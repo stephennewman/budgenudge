@@ -20,7 +20,7 @@ export async function GET() {
         plaid_item_id,
         plaid_access_token,
         plaid_institution_id,
-        accounts!inner(plaid_account_id, name, account_type, current_balance, available_balance)
+        accounts!inner(plaid_account_id, name, current_balance, available_balance)
       `)
       .eq('user_id', targetUserId)
       .is('deleted_at', null);
