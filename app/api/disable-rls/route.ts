@@ -3,7 +3,7 @@ import { createSupabaseClient } from '@/utils/supabase/server';
 
 export async function GET() {
   try {
-    const supabase = createSupabaseClient();
+    const supabase = await createSupabaseClient();
     
     const targetUserId = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 
