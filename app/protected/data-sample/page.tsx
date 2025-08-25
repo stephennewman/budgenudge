@@ -168,7 +168,7 @@ export default function DataSamplePage() {
       console.log('🔍 All accounts in database:', allUserAccounts);
       console.log('🔍 Accounts error:', accountsError);
 
-      // Sample 1: Account Information - Get accounts via transactions using plaid_item_id
+      // Sample 1: Account Information - Use the exact same logic as the SMS builder
       let accounts: Array<{
         id: string;
         name: string;
@@ -181,50 +181,12 @@ export default function DataSamplePage() {
         created_at: string;
       }> = [];
       
-      if (plaidItemIds.length > 0) {
-        // Step 1: Get account IDs from transactions
-        const { data: transactionAccounts } = await supabase
-          .from('transactions')
-          .select('account_id')
-          .in('plaid_item_id', plaidItemIds)
-          .not('account_id', 'is', null);
+      // Get user's Plaid items first, then get accounts linked to those items (same as SMS builder)
+      if (userItems && userItems.length > 0) {
+        const itemIds = userItems.map(item => item.id);
+        console.log('🔍 Using item IDs for accounts query:', itemIds);
         
-        if (transactionAccounts && transactionAccounts.length > 0) {
-          const uniqueAccountIds = [...new Set(transactionAccounts.map(tx => tx.account_id).filter(Boolean))];
-          console.log('🔍 Unique account IDs from transactions:', uniqueAccountIds);
-          
-          if (uniqueAccountIds.length > 0) {
-            // Step 2: Get account details using the account IDs
-            const { data: accountsData } = await supabase
-              .from('accounts')
-              .select(`
-                id,
-                name,
-                type,
-                subtype,
-                available_balance,
-                current_balance,
-                mask,
-                institution_name,
-                created_at
-              `)
-              .in('id', uniqueAccountIds)
-              .is('deleted_at', null);
-            
-            if (accountsData && accountsData.length > 0) {
-              accounts = accountsData;
-              console.log('🔍 Accounts found via transactions:', accounts.length);
-              console.log('🔍 First account sample:', accounts[0]);
-            }
-          }
-        }
-      }
-      
-      // Fallback: Try direct accounts query if no accounts found via transactions
-      if (!accounts || accounts.length === 0) {
-        console.log('🔍 No accounts found via transactions, trying direct query');
-        
-        const { data: directAccounts } = await supabase
+        const { data: accountsData, error: accountsError } = await supabase
           .from('accounts')
           .select(`
             id,
@@ -237,16 +199,25 @@ export default function DataSamplePage() {
             institution_name,
             created_at
           `)
-          .in('item_id', itemDbIds)
+          .in('item_id', itemIds)
           .is('deleted_at', null)
-          .limit(10);
+          .limit(20);
         
-        if (directAccounts && directAccounts.length > 0) {
-          accounts = directAccounts;
-          console.log('🔍 Fallback: Direct accounts query found:', accounts.length);
-        } else {
-          console.log('🔍 No accounts found via any method');
+        if (accountsError) {
+          console.error('🔍 Accounts query error:', accountsError);
         }
+        
+        if (accountsData && accountsData.length > 0) {
+          accounts = accountsData;
+          console.log('🔍 Accounts found via items:', accounts.length);
+          console.log('🔍 First account sample:', accounts[0]);
+        } else {
+          console.log('🔍 No accounts found via items query');
+          console.log('🔍 Item IDs used:', itemIds);
+          console.log('🔍 User ID:', user.id);
+        }
+      } else {
+        console.log('🔍 No user items found for user:', user.id);
       }
 
       // Sample 2: Recent Transactions with AI categorization
