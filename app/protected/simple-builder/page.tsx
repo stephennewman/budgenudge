@@ -140,16 +140,33 @@ export default function SimpleBuilderPage() {
     setHasUnsavedChanges(false);
   };
 
-  const loadTemplate = (template: SavedTemplate) => {
+  const loadTemplate = async (template: SavedTemplate) => {
     setCurrentTemplateId(template.id);
     setTemplateName(template.template_name);
-    setPreviewText(template.template_content);
+    
+    // Convert variable placeholders back to display text for immediate preview
+    let displayText = template.template_content;
+    
+    // Replace variable placeholders with actual values for display
+    for (const variableId of template.variables_used) {
+      try {
+        const response = await fetch(`/api/sms-variables?type=${variableId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data.value) {
+            displayText = displayText.replace(new RegExp(`{{${variableId}}}`, 'g'), data.data.value);
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching variable ${variableId}:`, error);
+      }
+    }
+    
+    setPreviewText(displayText);
     setCanvasItems(template.variables_used);
     setSaveMessage('');
     setHasUnsavedChanges(false);
-    
-    // Load template schedule if it exists
-    loadTemplateSchedule(template.id);
+    await loadTemplateSchedule(template.id);
   };
 
   const loadTemplateSchedule = async (templateId: string) => {
@@ -252,9 +269,8 @@ export default function SimpleBuilderPage() {
         if (response.ok) {
           const data = await response.json();
           if (data.success && data.data.value) {
-            // Store the variable in the format that will be replaced later
-            const variablePlaceholder = `{{${variableId}}}`;
-            setPreviewText(prev => prev + (prev ? '\n' : '') + variablePlaceholder);
+            // Set the preview text to the actual value, not a placeholder
+            setPreviewText(prev => prev + (prev ? '\n' : '') + data.data.value);
           } else {
             // Fallback for today-date or API errors
             let fallbackValue = '';
@@ -267,7 +283,7 @@ export default function SimpleBuilderPage() {
                 });
                 break;
               default:
-                fallbackValue = `{{${variableId}}}`;
+                fallbackValue = `[${variableId} - API Error]`;
             }
             setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
           }
@@ -283,7 +299,7 @@ export default function SimpleBuilderPage() {
               });
               break;
             default:
-              fallbackValue = `{{${variableId}}}`;
+              fallbackValue = `[${variableId} - API Error]`;
           }
           setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
         }
@@ -300,7 +316,7 @@ export default function SimpleBuilderPage() {
             });
             break;
           default:
-            fallbackValue = `{{${variableId}}}`;
+            fallbackValue = `[${variableId} - Network Error]`;
         }
         setPreviewText(prev => prev + (prev ? '\n' : '') + fallbackValue);
       }
@@ -336,57 +352,80 @@ export default function SimpleBuilderPage() {
   };
 
   const handleSaveTemplate = async () => {
-    if (!templateName.trim()) {
-      setSaveMessage('❌ Please enter a template name');
-      setTimeout(() => setSaveMessage(''), 3000);
-      return;
-    }
-
-    if (!previewText.trim()) {
-      setSaveMessage('❌ Please add some content to save');
-      setTimeout(() => setSaveMessage(''), 3000);
-      return;
-    }
-
+    if (!templateName.trim() || !previewText.trim()) return;
+    
     setIsSaving(true);
     setSaveMessage('');
-
+    
     try {
+      // Create a mapping of display text to variable references
+      const variableMapping: { [key: string]: string } = {
+        'today-date': '{{today-date}}',
+        'account-count': '{{account-count}}',
+        'last-transaction-date': '{{last-transaction-date}}',
+        'total-balance': '{{total-balance}}'
+      };
+      
+      // Create template content with variable placeholders for scheduled SMS
+      let templateContent = previewText;
+      const variablesUsed: string[] = [];
+      
+      // Replace actual values with variable placeholders for storage
+      for (const [variableId, placeholder] of Object.entries(variableMapping)) {
+        if (previewText.includes(variableId)) {
+          // Check if this variable is actually used in the content
+          const response = await fetch(`/api/sms-variables?type=${variableId}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data.value && previewText.includes(data.data.value)) {
+              templateContent = templateContent.replace(new RegExp(data.data.value, 'g'), placeholder);
+              variablesUsed.push(variableId);
+            }
+          }
+        }
+      }
+      
+      // Also check for any remaining variable references
+      const variableRegex = /{{([^}]+)}}/g;
+      const matches = previewText.match(variableRegex);
+      if (matches) {
+        for (const match of matches) {
+          const variableId = match.slice(2, -2);
+          if (!variablesUsed.includes(variableId)) {
+            variablesUsed.push(variableId);
+          }
+        }
+      }
+      
       const response = await fetch('/api/custom-templates', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           templateName: templateName.trim(),
-          templateContent: previewText,
-          variablesUsed: canvasItems
-        })
+          templateContent: templateContent, // Store with placeholders for scheduled SMS
+          variablesUsed: variablesUsed,
+        }),
       });
 
-      const result = await response.json();
-
       if (response.ok) {
+        const result = await response.json();
         setSaveMessage('✅ Template saved successfully!');
-        console.log('✅ Template saved:', result);
-        
-        // Update current template ID if this was a new template
         if (result.template && !currentTemplateId) {
           setCurrentTemplateId(result.template.id);
         }
-        
-        // Reset unsaved changes state
-        setHasUnsavedChanges(false);
-        
-        // Refresh the templates list without auto-loading
+        setHasUnsavedChanges(false); // Reset unsaved changes state
         await loadSavedTemplates(false);
       } else {
-        setSaveMessage(`❌ ${result.error || 'Failed to save template'}`);
+        const errorData = await response.json();
+        setSaveMessage(`❌ Failed to save template: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
-      setSaveMessage('❌ Error saving template');
-      console.error('Save template error:', error);
+      console.error('Error saving template:', error);
+      setSaveMessage('❌ Failed to save template: Network error');
     } finally {
       setIsSaving(false);
-      setTimeout(() => setSaveMessage(''), 5000);
     }
   };
 
