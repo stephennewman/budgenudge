@@ -142,8 +142,17 @@ export default function DataSamplePage() {
       console.log('🔍 Using Plaid item IDs:', plaidItemIds);
       console.log('🔍 User ID being used:', user.id);
 
+      // Debug: Check if accounts exist at all for this user
+      const { data: allUserAccounts, error: accountsError } = await supabase
+        .from('accounts')
+        .select('*')
+        .limit(5);
+      
+      console.log('🔍 All accounts in database:', allUserAccounts);
+      console.log('🔍 Accounts error:', accountsError);
+
       // Sample 1: Account Information (using itemDbIds like the working transactions API)
-      const { data: accounts } = await supabase
+      let { data: accounts } = await supabase
         .from('accounts')
         .select(`
           id,
@@ -166,6 +175,49 @@ export default function DataSamplePage() {
         console.log('🔍 First account sample:', accounts[0]);
       } else {
         console.log('🔍 No accounts found for item IDs:', itemDbIds);
+        
+        // Try alternative approach: get accounts from transactions
+        if (plaidItemIds.length > 0) {
+          const { data: transactionAccounts } = await supabase
+            .from('transactions')
+            .select('account_id, plaid_item_id')
+            .in('plaid_item_id', plaidItemIds)
+            .not('account_id', 'is', null)
+            .limit(5);
+          
+          console.log('🔍 Transaction accounts found:', transactionAccounts);
+          
+          if (transactionAccounts && transactionAccounts.length > 0) {
+            const uniqueAccountIds = [...new Set(transactionAccounts.map(tx => tx.account_id).filter(Boolean))];
+            console.log('🔍 Unique account IDs from transactions:', uniqueAccountIds);
+            
+            if (uniqueAccountIds.length > 0) {
+              const { data: accountsFromTransactions } = await supabase
+                .from('accounts')
+                .select(`
+                  id,
+                  name,
+                  type,
+                  subtype,
+                  available_balance,
+                  current_balance,
+                  mask,
+                  institution_name,
+                  created_at
+                `)
+                .in('id', uniqueAccountIds)
+                .is('deleted_at', null);
+              
+              console.log('🔍 Accounts found via transactions:', accountsFromTransactions);
+              
+              if (accountsFromTransactions && accountsFromTransactions.length > 0) {
+                // Use these accounts instead
+                accounts = accountsFromTransactions;
+                console.log('🔍 Using accounts from transactions:', accounts);
+              }
+            }
+          }
+        }
       }
 
       // Sample 2: Recent Transactions with AI categorization
