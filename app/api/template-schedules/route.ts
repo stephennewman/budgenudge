@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       cadence_type: schedule.cadence_type,
       cadence_config: schedule.cadence_config,
-      send_time: schedule.send_time + ':00', // Add seconds for TIME format
+      send_time: formatTimeForDatabase(schedule.send_time), // Properly format time
       timezone: schedule.timezone,
       is_active: schedule.is_active,
       next_send_at: nextSendAt,
@@ -256,6 +256,14 @@ interface ScheduleConfig {
   send_time: string;
   timezone: string;
   is_active: boolean;
+}
+
+// Helper function to format time for database storage
+function formatTimeForDatabase(timeString: string): string {
+  // Remove any existing seconds if present
+  const timeWithoutSeconds = timeString.split(':').slice(0, 2).join(':');
+  // Add seconds if not present
+  return timeWithoutSeconds + ':00';
 }
 
 // Helper function to calculate next send time
