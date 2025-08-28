@@ -311,6 +311,21 @@ export default function DataSamplePage() {
         .lt('amount', 0) // Only negative amounts (expenses)
         .limit(15);
 
+      // Sample 6.5: All-time unique categories and merchants for counting
+      const { data: allTimeCategories } = await supabase
+        .from('transactions')
+        .select('ai_category_tag')
+        .in('plaid_item_id', plaidItemIds)
+        .not('ai_category_tag', 'is', null)
+        .lt('amount', 0); // Only negative amounts (expenses)
+
+      const { data: allTimeMerchants } = await supabase
+        .from('transactions')
+        .select('ai_merchant_name')
+        .in('plaid_item_id', plaidItemIds)
+        .not('ai_merchant_name', 'is', null)
+        .lt('amount', 0); // Only negative amounts (expenses)
+
       // Sample 7: Account Types Summary
       const { data: accountTypes } = await supabase
         .from('accounts')
@@ -354,8 +369,8 @@ export default function DataSamplePage() {
         return sum + Math.abs(tx.amount || 0);
       }, 0) || 0;
 
-      const uniqueCategories = [...new Set(spendingCategories?.map(tx => tx.ai_category_tag).filter(Boolean))];
-      const uniqueMerchants = [...new Set(topMerchants?.map(tx => tx.ai_merchant_name).filter(Boolean))];
+      const uniqueCategories = [...new Set(allTimeCategories?.map(tx => tx.ai_category_tag).filter(Boolean))];
+      const uniqueMerchants = [...new Set(allTimeMerchants?.map(tx => tx.ai_merchant_name).filter(Boolean))];
 
       // Enhanced spending analysis with AI categorization
       const categorySpending = spendingCategories?.reduce((acc, tx) => {
@@ -443,13 +458,13 @@ export default function DataSamplePage() {
         {
           id: 'unique-categories',
           name: 'Unique Categories',
-          description: 'Number of unique spending categories',
+          description: 'Number of unique spending categories (all-time)',
           example: `${uniqueCategories.length} categories`
         },
         {
           id: 'unique-merchants',
           name: 'Unique Merchants',
-          description: 'Number of unique merchants',
+          description: 'Number of unique merchants (all-time)',
           example: `${uniqueMerchants.length} merchants`
         },
         {
@@ -722,11 +737,11 @@ export default function DataSamplePage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Unique Categories:</span>
-                <span className="font-semibold">{dataSample.transactions.unique_categories}</span>
+                <span className="font-semibold">{dataSample.transactions.unique_categories} (all-time)</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Unique Merchants:</span>
-                <span className="font-semibold">{dataSample.transactions.unique_merchants}</span>
+                <span className="font-semibold">{dataSample.transactions.unique_merchants} (all-time)</span>
               </div>
             </div>
             {dataSample.spending_analysis.top_categories.length > 0 && (
