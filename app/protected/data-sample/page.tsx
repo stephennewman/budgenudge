@@ -365,11 +365,12 @@ export default function DataSamplePage() {
         return acc;
       }, {} as Record<string, number>) || {};
 
-      // Filter out 'Income' category from spending analysis
+      // Filter out 'Income' and 'Transfer' categories from spending analysis
       const filteredCategorySpending = Object.fromEntries(
-        Object.entries(categorySpending).filter(([category]) => 
-          category.toLowerCase() !== 'income'
-        )
+        Object.entries(categorySpending).filter(([category]) => {
+          const lowerCategory = category.toLowerCase();
+          return lowerCategory !== 'income' && lowerCategory !== 'transfer';
+        })
       );
 
       const topCategories = Object.entries(filteredCategorySpending)
@@ -412,7 +413,7 @@ export default function DataSamplePage() {
         {
           id: 'top-spending-category',
           name: 'Top Spending Category',
-          description: 'Category with highest spending this month (excluding Income)',
+          description: 'Category with highest spending this month (excluding Income & Transfers)',
           example: topCategories.length > 0 ? `${topCategories[0].category}: $${topCategories[0].amount.toLocaleString()}` : 'None'
         },
         {
@@ -654,7 +655,7 @@ export default function DataSamplePage() {
                   ${dataSample.spending_analysis.top_categories[0].amount.toLocaleString()}
                 </p>
                 <p className="text-sm text-gray-600">
-                  Highest spending category (excluding Income)
+                  Highest spending category (excluding Income & Transfers)
                 </p>
               </div>
             </div>
@@ -730,7 +731,7 @@ export default function DataSamplePage() {
             </div>
             {dataSample.spending_analysis.top_categories.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-medium text-gray-900 mb-2">Top Spending Categories (excluding Income):</h4>
+                <h4 className="font-medium text-gray-900 mb-2">Top Spending Categories (excluding Income & Transfers):</h4>
                 <div className="space-y-1">
                   {dataSample.spending_analysis.top_categories.slice(0, 3).map((cat, index) => (
                     <div key={index} className="text-sm text-gray-600">
