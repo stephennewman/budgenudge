@@ -904,6 +904,215 @@ export default function DataSamplePage() {
           </div>
         )}
 
+        {/* All-Time Categories Data */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">📊 All-Time Categories Data</h2>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              Total Unique Categories: <span className="font-semibold">{dataSample.transactions.unique_categories}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Note: Only spending categories (excluding Income & Transfers)
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Spending</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Count</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.spending_analysis.top_categories.map((cat, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {cat.category}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${cat.amount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* We'll need to add transaction count to the data structure */}
+                      -
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* All-Time Merchants Data */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">🏪 All-Time Merchants Data</h2>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              Total Unique Merchants: <span className="font-semibold">{dataSample.transactions.unique_merchants}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Note: Only spending merchants (excluding Income & Transfers)
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merchant</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Monthly Spending</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.spending_analysis.top_merchants.map((merchant, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {merchant.merchant}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${merchant.amount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {/* We'll need to add category to the merchant data structure */}
+                      -
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Account Details */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">🏦 Account Details</h2>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              Total Accounts: <span className="font-semibold">{dataSample.accounts.count}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Total Balance: <span className="font-semibold">${dataSample.accounts.total_balance.toLocaleString()}</span>
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Account Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Available Balance</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Balance</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.accounts.sample.map((account, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {account.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {dataSample.accounts.types[index]?.type || 'Unknown'} ({dataSample.accounts.types[index]?.subtype || 'Unknown'})
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${(account.available_balance || 0).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${(account.current_balance || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Recurring Bills Details */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">📅 Recurring Bills Details</h2>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              Total Bills: <span className="font-semibold">{dataSample.recurring_bills.count}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Monthly Total: <span className="font-semibold">${dataSample.recurring_bills.total_monthly.toLocaleString()}</span>
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Merchant</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Date</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.recurring_bills.sample.map((bill, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {bill.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${bill.amount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {bill.frequency}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {bill.next_date ? new Date(bill.next_date).toLocaleDateString() : 'Unknown'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Income Sources Details */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-8">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">💰 Income Sources Details</h2>
+          <div className="mb-4">
+            <p className="text-sm text-gray-600 mb-2">
+              Total Sources: <span className="font-semibold">{dataSample.income_sources.count}</span>
+            </p>
+            <p className="text-sm text-gray-600">
+              Monthly Total: <span className="font-semibold">${dataSample.income_sources.total_monthly.toLocaleString()}</span>
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Next Date</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {dataSample.income_sources.sample.map((income, index) => (
+                  <tr key={index} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {income.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${income.expected_amount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {income.frequency}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {income.next_predicted_date ? new Date(income.next_predicted_date).toLocaleDateString() : 'Unknown'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Action Buttons */}
         <div className="mt-8 text-center">
           <button
