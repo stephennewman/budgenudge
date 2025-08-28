@@ -365,7 +365,14 @@ export default function DataSamplePage() {
         return acc;
       }, {} as Record<string, number>) || {};
 
-      const topCategories = Object.entries(categorySpending)
+      // Filter out 'Income' category from spending analysis
+      const filteredCategorySpending = Object.fromEntries(
+        Object.entries(categorySpending).filter(([category]) => 
+          category.toLowerCase() !== 'income'
+        )
+      );
+
+      const topCategories = Object.entries(filteredCategorySpending)
         .sort(([,a], [,b]) => b - a)
         .slice(0, 8)
         .map(([category, amount]) => ({ category, amount }));
@@ -405,7 +412,7 @@ export default function DataSamplePage() {
         {
           id: 'top-spending-category',
           name: 'Top Spending Category',
-          description: 'Category with highest spending this month',
+          description: 'Category with highest spending this month (excluding Income)',
           example: topCategories.length > 0 ? `${topCategories[0].category}: $${topCategories[0].amount.toLocaleString()}` : 'None'
         },
         {
@@ -634,6 +641,26 @@ export default function DataSamplePage() {
           </div>
         </div>
 
+        {/* Top Spending Category Highlight */}
+        {dataSample.spending_analysis.top_categories.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-200 p-6 mb-8">
+            <h2 className="text-xl font-semibold text-blue-900 mb-4">🏆 Top Spending Category This Month</h2>
+            <div className="text-center">
+              <div className="bg-white rounded-lg p-6 shadow-sm border border-blue-200 max-w-md mx-auto">
+                <h3 className="text-2xl font-bold text-blue-600 mb-2">
+                  {dataSample.spending_analysis.top_categories[0].category}
+                </h3>
+                <p className="text-4xl font-bold text-gray-900 mb-2">
+                  ${dataSample.spending_analysis.top_categories[0].amount.toLocaleString()}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Highest spending category (excluding Income)
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Suggested New Variables */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">🚀 Suggested New Variables</h2>
@@ -703,7 +730,7 @@ export default function DataSamplePage() {
             </div>
             {dataSample.spending_analysis.top_categories.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-medium text-gray-900 mb-2">Top Spending Categories:</h4>
+                <h4 className="font-medium text-gray-900 mb-2">Top Spending Categories (excluding Income):</h4>
                 <div className="space-y-1">
                   {dataSample.spending_analysis.top_categories.slice(0, 3).map((cat, index) => (
                     <div key={index} className="text-sm text-gray-600">
