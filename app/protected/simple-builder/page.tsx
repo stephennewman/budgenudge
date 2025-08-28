@@ -315,18 +315,23 @@ export default function SimpleBuilderPage() {
 
     setIsSavingSchedule(true);
     
+    const requestBody = {
+      templateId: currentTemplateId,
+      schedule: schedule,
+      sendFirstSmsNow: sendFirstSmsNow
+    };
+    
+    console.log('🔍 Saving schedule with data:', JSON.stringify(requestBody, null, 2));
+    
     try {
       const response = await fetch('/api/template-schedules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          templateId: currentTemplateId,
-          schedule: schedule,
-          sendFirstSmsNow: sendFirstSmsNow
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();
+      console.log('🔍 Save response:', { status: response.status, result });
       
       if (response.ok) {
         setCurrentSchedule(result.schedule);

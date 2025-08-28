@@ -24,24 +24,31 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`📅 Saving schedule for template ${templateId} for user: ${user.id}`);
+    console.log(`📅 Schedule data:`, JSON.stringify(schedule, null, 2));
 
     // Calculate next send time based on schedule
     const nextSendAt = calculateNextSendTime(schedule);
+    console.log(`📅 Calculated next send time:`, nextSendAt);
+
+    // Prepare the data to be upserted
+    const upsertData = {
+      template_id: templateId,
+      user_id: user.id,
+      cadence_type: schedule.cadence_type,
+      cadence_config: schedule.cadence_config,
+      send_time: schedule.send_time + ':00', // Add seconds for TIME format
+      timezone: schedule.timezone,
+      is_active: schedule.is_active,
+      next_send_at: nextSendAt,
+      updated_at: new Date().toISOString()
+    };
+    
+    console.log(`📅 Upsert data:`, JSON.stringify(upsertData, null, 2));
 
     // Upsert the schedule (create or update)
     const { data, error } = await supabase
       .from('template_schedules')
-      .upsert({
-        template_id: templateId,
-        user_id: user.id,
-        cadence_type: schedule.cadence_type,
-        cadence_config: schedule.cadence_config,
-        send_time: schedule.send_time + ':00', // Add seconds for TIME format
-        timezone: schedule.timezone,
-        is_active: schedule.is_active,
-        next_send_at: nextSendAt,
-        updated_at: new Date().toISOString()
-      }, {
+      .upsert(upsertData, {
         onConflict: 'template_id',
         ignoreDuplicates: false
       })
@@ -50,8 +57,16 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       console.error('❌ Failed to save schedule:', error);
+      console.error('❌ Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       return NextResponse.json({ 
-        error: 'Failed to save schedule' 
+        error: `Failed to save schedule: ${error.message}`,
+        details: error.details,
+        hint: error.hint
       }, { status: 500 });
     }
 
