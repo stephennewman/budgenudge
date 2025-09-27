@@ -40,17 +40,23 @@ export default function TrendsPage() {
     try {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        console.log('No session found');
+        return;
+      }
 
+      console.log('Fetching trends data...');
       const response = await fetch('/api/trends', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Trends data received:', data);
         setTrendsData(data);
       } else {
-        console.error('Failed to fetch trends data');
+        const errorData = await response.json();
+        console.error('Failed to fetch trends data:', response.status, errorData);
       }
     } catch (error) {
       console.error('Error fetching trends data:', error);
