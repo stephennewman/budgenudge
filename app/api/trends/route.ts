@@ -36,25 +36,14 @@ export async function GET() {
 
     console.log(`📈 Generating historical trends data for user ${user.id}`);
 
-    // Get user's item IDs to filter transactions
-    const { data: items, error: itemsError } = await supabase
-      .from('items')
-      .select('plaid_item_id')
-      .eq('user_id', user.id)
-      .is('deleted_at', null);
-
-    if (itemsError || !items?.length) {
-      return NextResponse.json({ error: 'No connected accounts found' }, { status: 400 });
-    }
-
-    const itemIds = items.map(item => item.plaid_item_id);
+    // Note: We're fetching all transactions by user_id directly, no need to filter by items
 
     // Fetch ALL transactions for the user (historical data)
     // Include both tagged and untagged transactions to ensure latest data is included
     const { data: allTransactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('id, amount, ai_merchant_name, ai_category_tag, merchant_name, name, date')
-      .in('plaid_item_id', itemIds)
+      .eq('user_id', user.id) // Use user_id instead of plaid_item_id
       .gt('amount', 0) // Only expenses (positive amounts in Plaid)
       .order('date', { ascending: true }) // Chronological order
       .limit(10000); // Explicitly set a high limit to ensure we get all data
@@ -76,12 +65,25 @@ export async function GET() {
     console.log(`📊 Processing ${allTransactions.length} historical transactions`);
     
     // Log recent transactions to verify latest data is included
-    const recentTransactions = allTransactions.slice(-5);
+    const recentTransactions = allTransactions.slice(-10);
     console.log(`📅 Most recent transactions:`, recentTransactions.map(t => ({
       date: t.date,
       merchant: t.ai_merchant_name || t.merchant_name || t.name,
       amount: t.amount
     })));
+    
+    // Check for September 2025 data specifically
+    const sept2025Transactions = allTransactions.filter(t => 
+      t.date >= '2025-09-01' && t.date <= '2025-09-30'
+    );
+    console.log(`📅 September 2025 transactions: ${sept2025Transactions.length}`);
+    if (sept2025Transactions.length > 0) {
+      console.log(`📅 September 2025 sample:`, sept2025Transactions.slice(0, 5).map(t => ({
+        date: t.date,
+        merchant: t.ai_merchant_name || t.merchant_name || t.name,
+        amount: t.amount
+      })));
+    }
 
     // Get date range
     const firstTransactionDate = allTransactions[0].date;
