@@ -243,10 +243,19 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (through current month)`);
+  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (through September 2025)`);
+  console.log(`📅 End of current month check: ${endOfCurrentMonth.toISOString()}`);
   
   const currentWeek = new Date(startOfWeek);
+  let weekCount = 0;
   while (currentWeek <= endOfCurrentMonth) {
+    weekCount++;
+    console.log(`📅 Processing week ${weekCount}: ${currentWeek.toISOString().split('T')[0]}`);
+    
+    if (weekCount > 100) { // Safety break to prevent infinite loop
+      console.error('⚠️ Breaking out of week loop - too many weeks');
+      break;
+    }
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(currentWeek.getDate() + 6); // Saturday
     weekEnd.setHours(23, 59, 59, 999);
@@ -255,6 +264,14 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
       const txDate = new Date(tx.date);
       return txDate >= currentWeek && txDate <= weekEnd;
     });
+    
+    // Special debug for September weeks
+    if (currentWeek.getMonth() === 8 && currentWeek.getFullYear() === 2025) { // September 2025
+      console.log(`🔍 September week ${formatWeekPeriod(currentWeek)}: Found ${weekTransactions.length} transactions`);
+      if (weekTransactions.length > 0) {
+        console.log(`🔍 Sample Sept transactions:`, weekTransactions.slice(0, 3).map(tx => ({ date: tx.date, amount: tx.amount })));
+      }
+    }
     
     const amount = weekTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     
@@ -267,8 +284,10 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
     // Log each week being processed for debugging
     if (weekTransactions.length > 0) {
       console.log(`📊 Week ${formatWeekPeriod(currentWeek)}: $${amount.toFixed(2)} (${weekTransactions.length} transactions)`);
+    } else {
+      console.log(`📊 Week ${formatWeekPeriod(currentWeek)}: $0.00 (0 transactions)`);
     }
-    
+
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
   
