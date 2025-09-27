@@ -50,11 +50,11 @@ export async function GET() {
     const itemIds = items.map(item => item.plaid_item_id);
 
     // Fetch ALL transactions for the user (historical data)
+    // Include both tagged and untagged transactions to ensure latest data is included
     const { data: allTransactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('id, amount, ai_merchant_name, ai_category_tag, merchant_name, name, date')
       .in('plaid_item_id', itemIds)
-      .not('ai_merchant_name', 'is', null) // Only analyze tagged transactions
       .gt('amount', 0) // Only expenses (positive amounts in Plaid)
       .order('date', { ascending: true }); // Chronological order
 
@@ -73,6 +73,14 @@ export async function GET() {
     }
 
     console.log(`📊 Processing ${allTransactions.length} historical transactions`);
+    
+    // Log recent transactions to verify latest data is included
+    const recentTransactions = allTransactions.slice(-5);
+    console.log(`📅 Most recent transactions:`, recentTransactions.map(t => ({
+      date: t.date,
+      merchant: t.ai_merchant_name || t.merchant_name || t.name,
+      amount: t.amount
+    })));
 
     // Get date range
     const firstTransactionDate = allTransactions[0].date;
@@ -110,6 +118,7 @@ function generateMerchantTimeSeries(transactions: Array<{amount: number; ai_merc
   const merchantMap = new Map<string, Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>>();
   
   transactions.forEach(transaction => {
+    // Use AI-tagged merchant name if available, otherwise fall back to original merchant name
     const merchant = transaction.ai_merchant_name || transaction.merchant_name || transaction.name || 'Unknown';
     if (!merchantMap.has(merchant)) {
       merchantMap.set(merchant, []);
@@ -144,6 +153,7 @@ function generateCategoryTimeSeries(transactions: Array<{amount: number; ai_merc
   const categoryMap = new Map<string, Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>>();
   
   transactions.forEach(transaction => {
+    // Use AI-tagged category if available, otherwise fall back to original category or 'Uncategorized'
     const category = transaction.ai_category_tag || 'Uncategorized';
     if (!categoryMap.has(category)) {
       categoryMap.set(category, []);
