@@ -249,8 +249,9 @@ function generateCategoryMonthlyData(transactions: Array<{amount: number; date: 
 
 function formatWeekPeriod(date: Date): string {
   const year = date.getFullYear();
-  const weekNumber = getWeekNumber(date);
-  return `${year}-W${weekNumber.toString().padStart(2, '0')}`;
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function formatMonthPeriod(date: Date): string {
@@ -259,8 +260,3 @@ function formatMonthPeriod(date: Date): string {
   return `${year}-${month}`;
 }
 
-function getWeekNumber(date: Date): number {
-  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
-  const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
-  return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
-}

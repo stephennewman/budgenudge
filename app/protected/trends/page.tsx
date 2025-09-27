@@ -296,8 +296,8 @@ function IndividualChart({ name, data, totalAmount, totalTransactions, formatCur
               {/* Period label */}
               <div className="text-xs text-muted-foreground mt-1 transform -rotate-45 origin-left">
                 {type === 'weekly' 
-                  ? period.period.split('-W')[1] 
-                  : period.period.split('-')[1]
+                  ? period.period.split('-')[2] // Day
+                  : period.period.split('-')[1] // Month
                 }
               </div>
               
