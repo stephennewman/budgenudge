@@ -104,13 +104,26 @@ export async function GET() {
     };
 
     console.log(`✅ Generated historical trends: ${merchants.length} merchants, ${categories.length} categories`);
+    console.log(`📊 Data structure validation:`, {
+      hasMerchants: Array.isArray(merchants),
+      hasCategories: Array.isArray(categories),
+      merchantsLength: merchants.length,
+      categoriesLength: categories.length,
+      firstDate: firstTransactionDate,
+      lastDate: lastTransactionDate
+    });
 
     return NextResponse.json(trendsData);
 
   } catch (error) {
     console.error('Error generating historical trends:', error);
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
     return NextResponse.json(
-      { error: 'Failed to generate historical trends data' },
+      { error: 'Failed to generate historical trends data', details: error.message },
       { status: 500 }
     );
   }
