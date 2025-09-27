@@ -231,26 +231,26 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   
   const start = new Date(firstDate);
   
-  // Show data through September 2025 (hardcoded for now since we have data through Sept 26)
-  const currentYear = 2025;
-  const currentMonth = 8; // September is month 8 (0-indexed)
+  // Find the actual last transaction date to determine our end range
+  const lastTxDate = transactions.length > 0 
+    ? new Date(Math.max(...transactions.map(tx => new Date(tx.date).getTime())))
+    : new Date();
   
-  // Calculate end date as last day of September 2025
-  const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of September 2025
+  // Use the last transaction date as our end boundary
+  const endOfCurrentMonth = new Date(lastTxDate);
+  endOfCurrentMonth.setHours(23, 59, 59, 999); // End of that day
   
   // Get the Sunday of the week containing the start date
   const startOfWeek = new Date(start);
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (through September 2025)`);
-  console.log(`📅 End of current month check: ${endOfCurrentMonth.toISOString()}`);
+  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (last transaction: ${lastTxDate.toISOString().split('T')[0]})`);
   
   const currentWeek = new Date(startOfWeek);
   let weekCount = 0;
   while (currentWeek <= endOfCurrentMonth) {
     weekCount++;
-    console.log(`📅 Processing week ${weekCount}: ${currentWeek.toISOString().split('T')[0]}`);
     
     if (weekCount > 100) { // Safety break to prevent infinite loop
       console.error('⚠️ Breaking out of week loop - too many weeks');
@@ -303,8 +303,13 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
   
   const start = new Date(firstDate);
   
-  // Show data through September 2025 (hardcoded for now since we have data through Sept 26)
-  const currentMonthEnd = new Date(2025, 9, 0); // Last day of September 2025
+  // Find the actual last transaction date to determine our end range
+  const lastTxDate = transactions.length > 0 
+    ? new Date(Math.max(...transactions.map(tx => new Date(tx.date).getTime())))
+    : new Date();
+  
+  // Use the last transaction date as our end boundary  
+  const currentMonthEnd = new Date(lastTxDate.getFullYear(), lastTxDate.getMonth() + 1, 0); // Last day of that month
   
   const startOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const currentMonth = new Date(startOfMonth);
