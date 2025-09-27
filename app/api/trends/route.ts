@@ -94,6 +94,22 @@ export async function GET() {
         merchant: t.ai_merchant_name || t.merchant_name || t.name,
         amount: t.amount
       })));
+      
+      // Check if September data is being processed in merchant grouping
+      const septMerchants = new Map();
+      sept2025Transactions.forEach(tx => {
+        const merchant = tx.ai_merchant_name || tx.merchant_name || tx.name || 'Unknown';
+        if (!septMerchants.has(merchant)) {
+          septMerchants.set(merchant, { total: 0, count: 0 });
+        }
+        const data = septMerchants.get(merchant);
+        data.total += tx.amount;
+        data.count += 1;
+      });
+      console.log(`📊 September merchants (top 5):`, Array.from(septMerchants.entries())
+        .sort(([,a], [,b]) => b.total - a.total)
+        .slice(0, 5)
+        .map(([name, data]) => ({ name, total: data.total, count: data.count })));
     }
 
     // Get date range
@@ -215,13 +231,12 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   
   const start = new Date(firstDate);
   
-  // Only show data through current month (September 2025)
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  const currentYear = currentDate.getFullYear();
+  // Show data through September 2025 (hardcoded for now since we have data through Sept 26)
+  const currentYear = 2025;
+  const currentMonth = 8; // September is month 8 (0-indexed)
   
-  // Calculate end date as last day of current month
-  const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of current month
+  // Calculate end date as last day of September 2025
+  const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of September 2025
   
   // Get the Sunday of the week containing the start date
   const startOfWeek = new Date(start);
@@ -269,9 +284,8 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
   
   const start = new Date(firstDate);
   
-  // Only show data through current month (September 2025)
-  const currentDate = new Date();
-  const currentMonthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0); // Last day of current month
+  // Show data through September 2025 (hardcoded for now since we have data through Sept 26)
+  const currentMonthEnd = new Date(2025, 9, 0); // Last day of September 2025
   
   const startOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const currentMonth = new Date(startOfMonth);
