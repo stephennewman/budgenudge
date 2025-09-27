@@ -155,6 +155,8 @@ export default function TrendsPage() {
               <MerchantCharts 
                 merchants={trendsData.merchants} 
                 formatCurrency={formatCurrency}
+                formatWeekLabel={formatWeekLabel}
+                formatMonthLabel={formatMonthLabel}
                 type="monthly"
               />
             </CardContent>
@@ -173,6 +175,8 @@ export default function TrendsPage() {
               <CategoryCharts 
                 categories={trendsData.categories} 
                 formatCurrency={formatCurrency}
+                formatWeekLabel={formatWeekLabel}
+                formatMonthLabel={formatMonthLabel}
                 type="weekly"
               />
             </CardContent>
@@ -191,6 +195,8 @@ export default function TrendsPage() {
               <CategoryCharts 
                 categories={trendsData.categories} 
                 formatCurrency={formatCurrency}
+                formatWeekLabel={formatWeekLabel}
+                formatMonthLabel={formatMonthLabel}
                 type="monthly"
               />
             </CardContent>
@@ -204,10 +210,12 @@ export default function TrendsPage() {
 interface MerchantChartsProps {
   merchants: MerchantTimeSeries[];
   formatCurrency: (amount: number) => string;
+  formatWeekLabel: (period: string) => string;
+  formatMonthLabel: (period: string) => string;
   type: 'weekly' | 'monthly';
 }
 
-function MerchantCharts({ merchants, formatCurrency, type }: MerchantChartsProps) {
+function MerchantCharts({ merchants, formatCurrency, formatWeekLabel, formatMonthLabel, type }: MerchantChartsProps) {
   if (merchants.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -217,7 +225,7 @@ function MerchantCharts({ merchants, formatCurrency, type }: MerchantChartsProps
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
       {merchants.map((merchant) => (
         <IndividualChart
           key={merchant.name}
@@ -226,6 +234,8 @@ function MerchantCharts({ merchants, formatCurrency, type }: MerchantChartsProps
           totalAmount={merchant.totalAmount}
           totalTransactions={merchant.totalTransactions}
           formatCurrency={formatCurrency}
+          formatWeekLabel={formatWeekLabel}
+          formatMonthLabel={formatMonthLabel}
           type={type}
         />
       ))}
@@ -236,10 +246,12 @@ function MerchantCharts({ merchants, formatCurrency, type }: MerchantChartsProps
 interface CategoryChartsProps {
   categories: CategoryTimeSeries[];
   formatCurrency: (amount: number) => string;
+  formatWeekLabel: (period: string) => string;
+  formatMonthLabel: (period: string) => string;
   type: 'weekly' | 'monthly';
 }
 
-function CategoryCharts({ categories, formatCurrency, type }: CategoryChartsProps) {
+function CategoryCharts({ categories, formatCurrency, formatWeekLabel, formatMonthLabel, type }: CategoryChartsProps) {
   if (categories.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -249,7 +261,7 @@ function CategoryCharts({ categories, formatCurrency, type }: CategoryChartsProp
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="space-y-6">
       {categories.map((category) => (
         <IndividualChart
           key={category.name}
@@ -258,6 +270,8 @@ function CategoryCharts({ categories, formatCurrency, type }: CategoryChartsProp
           totalAmount={category.totalAmount}
           totalTransactions={category.totalTransactions}
           formatCurrency={formatCurrency}
+          formatWeekLabel={formatWeekLabel}
+          formatMonthLabel={formatMonthLabel}
           type={type}
         />
       ))}
@@ -271,10 +285,12 @@ interface IndividualChartProps {
   totalAmount: number;
   totalTransactions: number;
   formatCurrency: (amount: number) => string;
+  formatWeekLabel: (period: string) => string;
+  formatMonthLabel: (period: string) => string;
   type: 'weekly' | 'monthly';
 }
 
-function IndividualChart({ name, data, totalAmount, totalTransactions, formatCurrency, type }: IndividualChartProps) {
+function IndividualChart({ name, data, totalAmount, totalTransactions, formatCurrency, formatWeekLabel, formatMonthLabel, type }: IndividualChartProps) {
   if (data.length === 0) {
     return null;
   }
@@ -283,15 +299,15 @@ function IndividualChart({ name, data, totalAmount, totalTransactions, formatCur
   const maxHeight = 120;
 
   return (
-    <div className="border rounded-lg p-4">
-      <div className="mb-3">
-        <h3 className="font-medium text-lg">{name}</h3>
+    <div className="border rounded-lg p-6">
+      <div className="mb-4">
+        <h3 className="font-medium text-xl">{name}</h3>
         <div className="text-sm text-muted-foreground">
           Total: {formatCurrency(totalAmount)} • {totalTransactions} transactions
         </div>
       </div>
       
-      <div className="flex items-end space-x-1 h-32 border-b border-l">
+      <div className="flex items-end space-x-1 h-40 border-b border-l">
         {data.map((period) => {
           const height = maxAmount > 0 ? (period.amount / maxAmount) * maxHeight : 0;
           const isSpike = period.amount > 0 && period.amount > (maxAmount * 0.7);
@@ -313,8 +329,8 @@ function IndividualChart({ name, data, totalAmount, totalTransactions, formatCur
               {/* Period label */}
               <div className="text-xs text-muted-foreground mt-1 transform -rotate-45 origin-left">
                 {type === 'weekly' 
-                  ? formatWeekLabel(period.period) // Week label
-                  : formatMonthLabel(period.period) // Month label
+                  ? formatWeekLabel(period.period)
+                  : formatMonthLabel(period.period)
                 }
               </div>
               
