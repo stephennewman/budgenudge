@@ -56,7 +56,8 @@ export async function GET() {
       .select('id, amount, ai_merchant_name, ai_category_tag, merchant_name, name, date')
       .in('plaid_item_id', itemIds)
       .gt('amount', 0) // Only expenses (positive amounts in Plaid)
-      .order('date', { ascending: true }); // Chronological order
+      .order('date', { ascending: true }) // Chronological order
+      .limit(10000); // Explicitly set a high limit to ensure we get all data
 
     if (transactionsError) {
       console.error('Error fetching transactions:', transactionsError);
