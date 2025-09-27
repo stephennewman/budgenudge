@@ -36,14 +36,25 @@ export async function GET() {
 
     console.log(`📈 Generating historical trends data for user ${user.id}`);
 
-    // Note: We're fetching all transactions by user_id directly, no need to filter by items
+    // Get user's item IDs to filter transactions
+    const { data: items, error: itemsError } = await supabase
+      .from('items')
+      .select('plaid_item_id')
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
+
+    if (itemsError || !items?.length) {
+      return NextResponse.json({ error: 'No connected accounts found' }, { status: 400 });
+    }
+
+    const itemIds = items.map(item => item.plaid_item_id);
 
     // Fetch ALL transactions for the user (historical data)
     // Include both tagged and untagged transactions to ensure latest data is included
     const { data: allTransactions, error: transactionsError } = await supabase
       .from('transactions')
       .select('id, amount, ai_merchant_name, ai_category_tag, merchant_name, name, date')
-      .eq('user_id', user.id) // Use user_id instead of plaid_item_id
+      .in('plaid_item_id', itemIds) // Use plaid_item_id to get user's transactions
       .gt('amount', 0) // Only expenses (positive amounts in Plaid)
       .order('date', { ascending: true }) // Chronological order
       .limit(10000); // Explicitly set a high limit to ensure we get all data
