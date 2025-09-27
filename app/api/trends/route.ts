@@ -189,20 +189,23 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   
   const start = new Date(firstDate);
   
+  // Only show data through current month (September 2025)
+  const currentDate = new Date();
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+  
+  // Calculate end date as last day of current month
+  const endOfCurrentMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of current month
+  
   // Get the Sunday of the week containing the start date
   const startOfWeek = new Date(start);
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  // Extend to 52 weeks (1 full year) from the start date
-  // This ensures we capture a full year of weekly data
-  const endOf52Weeks = new Date(startOfWeek);
-  endOf52Weeks.setDate(endOf52Weeks.getDate() + (52 * 7) - 1); // 52 weeks from start
-  
-  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOf52Weeks.toISOString().split('T')[0]} (52 weeks)`);
+  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (through current month)`);
   
   const currentWeek = new Date(startOfWeek);
-  while (currentWeek <= endOf52Weeks) {
+  while (currentWeek <= endOfCurrentMonth) {
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(currentWeek.getDate() + 6); // Saturday
     weekEnd.setHours(23, 59, 59, 999);
@@ -228,6 +231,9 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
   
+  // Sort by period to ensure chronological order
+  weeklyData.sort((a, b) => a.period.localeCompare(b.period));
+  
   console.log(`📈 Generated ${weeklyData.length} weekly periods`);
   return weeklyData;
 }
@@ -237,17 +243,16 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
   
   const start = new Date(firstDate);
   
+  // Only show data through current month (September 2025)
+  const currentDate = new Date();
+  const currentMonthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0); // Last day of current month
+  
   const startOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const currentMonth = new Date(startOfMonth);
   
-  // Extend to 12 months from the start month
-  // This ensures we capture a full year of monthly data
-  const endOf12Months = new Date(startOfMonth);
-  endOf12Months.setMonth(endOf12Months.getMonth() + 12);
+  console.log(`📅 Monthly data range: ${startOfMonth.toISOString().split('T')[0]} to ${currentMonthEnd.toISOString().split('T')[0]} (through current month)`);
   
-  console.log(`📅 Monthly data range: ${startOfMonth.toISOString().split('T')[0]} to ${endOf12Months.toISOString().split('T')[0]} (12 months)`);
-  
-  while (currentMonth < endOf12Months) {
+  while (currentMonth <= currentMonthEnd) {
     const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
     
     const monthTransactions = transactions.filter(tx => {
@@ -265,6 +270,9 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
     
     currentMonth.setMonth(currentMonth.getMonth() + 1);
   }
+  
+  // Sort by period to ensure chronological order
+  monthlyData.sort((a, b) => a.period.localeCompare(b.period));
   
   return monthlyData;
 }

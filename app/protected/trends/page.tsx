@@ -70,6 +70,21 @@ export default function TrendsPage() {
     }).format(amount);
   };
 
+  const formatWeekLabel = (period: string) => {
+    // Convert "2025-03-24" to "Mar 24" or "W12"
+    const date = new Date(period);
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const day = date.getDate();
+    return `${month} ${day}`;
+  };
+
+  const formatMonthLabel = (period: string) => {
+    // Convert "2025-03" to "Mar" or "Mar 2025"
+    const [year, month] = period.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return date.toLocaleDateString('en-US', { month: 'short' });
+  };
+
 
   if (isLoading) {
     return (
@@ -120,6 +135,8 @@ export default function TrendsPage() {
               <MerchantCharts 
                 merchants={trendsData.merchants} 
                 formatCurrency={formatCurrency}
+                formatWeekLabel={formatWeekLabel}
+                formatMonthLabel={formatMonthLabel}
                 type="weekly"
               />
             </CardContent>
@@ -296,8 +313,8 @@ function IndividualChart({ name, data, totalAmount, totalTransactions, formatCur
               {/* Period label */}
               <div className="text-xs text-muted-foreground mt-1 transform -rotate-45 origin-left">
                 {type === 'weekly' 
-                  ? period.period.split('-')[2] // Day
-                  : period.period.split('-')[1] // Month
+                  ? formatWeekLabel(period.period) // Week label
+                  : formatMonthLabel(period.period) // Month label
                 }
               </div>
               
