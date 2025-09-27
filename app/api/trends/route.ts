@@ -194,13 +194,12 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  // Get the most recently completed week (last Saturday)
-  const lastSaturday = new Date(end);
-  lastSaturday.setDate(end.getDate() - end.getDay() - 1); // Last Saturday
-  lastSaturday.setHours(23, 59, 59, 999);
+  // Include all weeks up to the last transaction date
+  // Don't limit to "completed weeks" - include current week if it has data
+  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`);
   
   const currentWeek = new Date(startOfWeek);
-  while (currentWeek <= lastSaturday) {
+  while (currentWeek <= end) {
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(currentWeek.getDate() + 6); // Saturday
     weekEnd.setHours(23, 59, 59, 999);
@@ -218,9 +217,15 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
       count: weekTransactions.length
     });
     
+    // Log each week being processed for debugging
+    if (weekTransactions.length > 0) {
+      console.log(`📊 Week ${formatWeekPeriod(currentWeek)}: $${amount.toFixed(2)} (${weekTransactions.length} transactions)`);
+    }
+    
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
   
+  console.log(`📈 Generated ${weeklyData.length} weekly periods`);
   return weeklyData;
 }
 
