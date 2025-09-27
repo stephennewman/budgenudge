@@ -179,15 +179,21 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   const start = new Date(firstDate);
   const end = new Date(lastDate);
   
-  // Get the Monday of the week containing the start date
+  // Get the Sunday of the week containing the start date
   const startOfWeek = new Date(start);
-  startOfWeek.setDate(start.getDate() - start.getDay() + 1); // Monday
+  startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
+  // Get the most recently completed week (last Saturday)
+  const lastSaturday = new Date(end);
+  lastSaturday.setDate(end.getDate() - end.getDay() - 1); // Last Saturday
+  lastSaturday.setHours(23, 59, 59, 999);
+  
   const currentWeek = new Date(startOfWeek);
-  while (currentWeek <= end) {
+  while (currentWeek <= lastSaturday) {
     const weekEnd = new Date(currentWeek);
-    weekEnd.setDate(currentWeek.getDate() + 6); // Sunday
+    weekEnd.setDate(currentWeek.getDate() + 6); // Saturday
+    weekEnd.setHours(23, 59, 59, 999);
     
     const weekTransactions = transactions.filter(tx => {
       const txDate = new Date(tx.date);
