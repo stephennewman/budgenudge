@@ -49,6 +49,10 @@ export default async function ProtectedSidebar() {
       href: "/insights",
     },
     {
+      label: "📈 Trends",
+      href: "/trends",
+    },
+    {
       label: "💰 Flow",
       href: "/flow",
     },
