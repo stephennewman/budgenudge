@@ -6,17 +6,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 
-interface TimeSeriesData {
-  period: string; // "2025-02-01" or "2025-W06"
-  amount: number;
-  transactionCount: number;
-  merchants: Array<{name: string; amount: number; count: number}>;
-  categories: Array<{name: string; amount: number; count: number}>;
+interface MerchantTimeSeries {
+  name: string;
+  weeklyData: Array<{period: string; amount: number; count: number}>;
+  monthlyData: Array<{period: string; amount: number; count: number}>;
+  totalAmount: number;
+  totalTransactions: number;
+}
+
+interface CategoryTimeSeries {
+  name: string;
+  weeklyData: Array<{period: string; amount: number; count: number}>;
+  monthlyData: Array<{period: string; amount: number; count: number}>;
+  totalAmount: number;
+  totalTransactions: number;
 }
 
 interface HistoricalTrendsData {
-  weeklyData: TimeSeriesData[];
-  monthlyData: TimeSeriesData[];
+  merchants: MerchantTimeSeries[];
+  categories: CategoryTimeSeries[];
   firstTransactionDate: string;
   lastTransactionDate: string;
 }
@@ -24,7 +32,7 @@ interface HistoricalTrendsData {
 export default function TrendsPage() {
   const [trendsData, setTrendsData] = useState<HistoricalTrendsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('weekly-chart');
+  const [activeTab, setActiveTab] = useState('weekly-merchants');
 
   const supabase = createSupabaseClient();
 
@@ -94,23 +102,23 @@ export default function TrendsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="weekly-chart">Weekly Chart</TabsTrigger>
-          <TabsTrigger value="monthly-chart">Monthly Chart</TabsTrigger>
-          <TabsTrigger value="weekly-details">Weekly Details</TabsTrigger>
-          <TabsTrigger value="monthly-details">Monthly Details</TabsTrigger>
+          <TabsTrigger value="weekly-merchants">Weekly Merchants</TabsTrigger>
+          <TabsTrigger value="monthly-merchants">Monthly Merchants</TabsTrigger>
+          <TabsTrigger value="weekly-categories">Weekly Categories</TabsTrigger>
+          <TabsTrigger value="monthly-categories">Monthly Categories</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="weekly-chart" className="space-y-4">
+        <TabsContent value="weekly-merchants" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Weekly Spending Over Time</CardTitle>
+              <CardTitle>Weekly Merchant Trends</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Historical weekly spending patterns
+                Individual spending charts for each merchant over time
               </p>
             </CardHeader>
             <CardContent>
-              <HistoricalChart 
-                data={trendsData.weeklyData} 
+              <MerchantCharts 
+                merchants={trendsData.merchants} 
                 formatCurrency={formatCurrency}
                 type="weekly"
               />
@@ -118,17 +126,17 @@ export default function TrendsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="monthly-chart" className="space-y-4">
+        <TabsContent value="monthly-merchants" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Spending Over Time</CardTitle>
+              <CardTitle>Monthly Merchant Trends</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Historical monthly spending patterns
+                Individual spending charts for each merchant over time
               </p>
             </CardHeader>
             <CardContent>
-              <HistoricalChart 
-                data={trendsData.monthlyData} 
+              <MerchantCharts 
+                merchants={trendsData.merchants} 
                 formatCurrency={formatCurrency}
                 type="monthly"
               />
@@ -136,17 +144,17 @@ export default function TrendsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="weekly-details" className="space-y-4">
+        <TabsContent value="weekly-categories" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Weekly Spending Details</CardTitle>
+              <CardTitle>Weekly Category Trends</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Week-by-week breakdown with top merchants and categories
+                Individual spending charts for each category over time
               </p>
             </CardHeader>
             <CardContent>
-              <HistoricalDetails 
-                data={trendsData.weeklyData} 
+              <CategoryCharts 
+                categories={trendsData.categories} 
                 formatCurrency={formatCurrency}
                 type="weekly"
               />
@@ -154,17 +162,17 @@ export default function TrendsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="monthly-details" className="space-y-4">
+        <TabsContent value="monthly-categories" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Spending Details</CardTitle>
+              <CardTitle>Monthly Category Trends</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Month-by-month breakdown with top merchants and categories
+                Individual spending charts for each category over time
               </p>
             </CardHeader>
             <CardContent>
-              <HistoricalDetails 
-                data={trendsData.monthlyData} 
+              <CategoryCharts 
+                categories={trendsData.categories} 
                 formatCurrency={formatCurrency}
                 type="monthly"
               />
@@ -176,34 +184,100 @@ export default function TrendsPage() {
   );
 }
 
-interface HistoricalChartProps {
-  data: TimeSeriesData[];
+interface MerchantChartsProps {
+  merchants: MerchantTimeSeries[];
   formatCurrency: (amount: number) => string;
   type: 'weekly' | 'monthly';
 }
 
-function HistoricalChart({ data, formatCurrency, type }: HistoricalChartProps) {
-  if (data.length === 0) {
+function MerchantCharts({ merchants, formatCurrency, type }: MerchantChartsProps) {
+  if (merchants.length === 0) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">No data available</div>
+        <div className="text-muted-foreground">No merchant data available</div>
       </div>
     );
   }
 
-  const maxAmount = Math.max(...data.map(d => d.amount));
-  const maxHeight = 200;
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {merchants.map((merchant) => (
+        <IndividualChart
+          key={merchant.name}
+          name={merchant.name}
+          data={type === 'weekly' ? merchant.weeklyData : merchant.monthlyData}
+          totalAmount={merchant.totalAmount}
+          totalTransactions={merchant.totalTransactions}
+          formatCurrency={formatCurrency}
+          type={type}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface CategoryChartsProps {
+  categories: CategoryTimeSeries[];
+  formatCurrency: (amount: number) => string;
+  type: 'weekly' | 'monthly';
+}
+
+function CategoryCharts({ categories, formatCurrency, type }: CategoryChartsProps) {
+  if (categories.length === 0) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">No category data available</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        {type === 'weekly' ? 'Weekly' : 'Monthly'} spending from {data[0]?.period} to {data[data.length - 1]?.period}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {categories.map((category) => (
+        <IndividualChart
+          key={category.name}
+          name={category.name}
+          data={type === 'weekly' ? category.weeklyData : category.monthlyData}
+          totalAmount={category.totalAmount}
+          totalTransactions={category.totalTransactions}
+          formatCurrency={formatCurrency}
+          type={type}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface IndividualChartProps {
+  name: string;
+  data: Array<{period: string; amount: number; count: number}>;
+  totalAmount: number;
+  totalTransactions: number;
+  formatCurrency: (amount: number) => string;
+  type: 'weekly' | 'monthly';
+}
+
+function IndividualChart({ name, data, totalAmount, totalTransactions, formatCurrency, type }: IndividualChartProps) {
+  if (data.length === 0) {
+    return null;
+  }
+
+  const maxAmount = Math.max(...data.map(d => d.amount));
+  const maxHeight = 120;
+
+  return (
+    <div className="border rounded-lg p-4">
+      <div className="mb-3">
+        <h3 className="font-medium text-lg">{name}</h3>
+        <div className="text-sm text-muted-foreground">
+          Total: {formatCurrency(totalAmount)} • {totalTransactions} transactions
+        </div>
       </div>
       
-      <div className="flex items-end space-x-1 h-48 border-b border-l">
+      <div className="flex items-end space-x-1 h-32 border-b border-l">
         {data.map((period) => {
           const height = maxAmount > 0 ? (period.amount / maxAmount) * maxHeight : 0;
-          const isSpike = period.amount > 0 && period.amount > (maxAmount * 0.5);
+          const isSpike = period.amount > 0 && period.amount > (maxAmount * 0.7);
           
           return (
             <div key={period.period} className="flex-1 flex flex-col items-center group relative">
@@ -216,7 +290,7 @@ function HistoricalChart({ data, formatCurrency, type }: HistoricalChartProps) {
                       : 'bg-gray-200'
                 }`}
                 style={{ height: `${height}px` }}
-                title={`${period.period}: ${formatCurrency(period.amount)} (${period.transactionCount} transactions)`}
+                title={`${period.period}: ${formatCurrency(period.amount)} (${period.count} transactions)`}
               />
               
               {/* Period label */}
@@ -236,74 +310,10 @@ function HistoricalChart({ data, formatCurrency, type }: HistoricalChartProps) {
         })}
       </div>
       
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>${formatCurrency(0)}</span>
+      <div className="flex justify-between text-xs text-muted-foreground mt-2">
+        <span>$0</span>
         <span>{formatCurrency(maxAmount)}</span>
       </div>
-    </div>
-  );
-}
-
-interface HistoricalDetailsProps {
-  data: TimeSeriesData[];
-  formatCurrency: (amount: number) => string;
-  type: 'weekly' | 'monthly';
-}
-
-function HistoricalDetails({ data, formatCurrency }: HistoricalDetailsProps) {
-  if (data.length === 0) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">No data available</div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {data.map((period) => (
-        <div key={period.period} className="border rounded-lg p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium">{period.period}</h3>
-            <div className="text-right">
-              <div className="font-medium">{formatCurrency(period.amount)}</div>
-              <div className="text-sm text-muted-foreground">
-                {period.transactionCount} transaction{period.transactionCount !== 1 ? 's' : ''}
-              </div>
-            </div>
-          </div>
-          
-          {period.amount > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Top Merchants */}
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">Top Merchants</h4>
-                <div className="space-y-1">
-                  {period.merchants.slice(0, 3).map((merchant) => (
-                    <div key={merchant.name} className="flex justify-between text-sm">
-                      <span className="truncate">{merchant.name}</span>
-                      <span className="font-medium">{formatCurrency(merchant.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Top Categories */}
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground mb-2">Top Categories</h4>
-                <div className="space-y-1">
-                  {period.categories.slice(0, 3).map((category) => (
-                    <div key={category.name} className="flex justify-between text-sm">
-                      <span className="truncate">{category.name}</span>
-                      <span className="font-medium">{formatCurrency(category.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
