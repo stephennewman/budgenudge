@@ -91,8 +91,8 @@ export async function GET() {
 
     // Generate weekly and monthly time series data
     // Generate individual merchant and category time series
-    const merchants = generateMerchantTimeSeries(allTransactions, firstTransactionDate, lastTransactionDate);
-    const categories = generateCategoryTimeSeries(allTransactions, firstTransactionDate, lastTransactionDate);
+    const merchants = generateMerchantTimeSeries(allTransactions, firstTransactionDate);
+    const categories = generateCategoryTimeSeries(allTransactions, firstTransactionDate);
 
     const trendsData: HistoricalTrendsData = {
       merchants,
@@ -114,7 +114,7 @@ export async function GET() {
   }
 }
 
-function generateMerchantTimeSeries(transactions: Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>, firstDate: string, lastDate: string): MerchantTimeSeries[] {
+function generateMerchantTimeSeries(transactions: Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>, firstDate: string): MerchantTimeSeries[] {
   // Group transactions by merchant
   const merchantMap = new Map<string, Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>>();
   
@@ -135,8 +135,8 @@ function generateMerchantTimeSeries(transactions: Array<{amount: number; ai_merc
   
   // Generate time series for each merchant
   return filteredMerchants.map(([merchantName, merchantTransactions]) => {
-    const weeklyData = generateMerchantWeeklyData(merchantTransactions, firstDate, lastDate);
-    const monthlyData = generateMerchantMonthlyData(merchantTransactions, firstDate, lastDate);
+    const weeklyData = generateMerchantWeeklyData(merchantTransactions, firstDate);
+    const monthlyData = generateMerchantMonthlyData(merchantTransactions, firstDate);
     const totalAmount = merchantTransactions.reduce((sum, t) => sum + t.amount, 0);
     
     return {
@@ -149,7 +149,7 @@ function generateMerchantTimeSeries(transactions: Array<{amount: number; ai_merc
   }).sort((a, b) => b.totalAmount - a.totalAmount); // Sort by total amount descending
 }
 
-function generateCategoryTimeSeries(transactions: Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>, firstDate: string, lastDate: string): CategoryTimeSeries[] {
+function generateCategoryTimeSeries(transactions: Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>, firstDate: string): CategoryTimeSeries[] {
   // Group transactions by category
   const categoryMap = new Map<string, Array<{amount: number; ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string; date: string}>>();
   
@@ -170,8 +170,8 @@ function generateCategoryTimeSeries(transactions: Array<{amount: number; ai_merc
   
   // Generate time series for each category
   return filteredCategories.map(([categoryName, categoryTransactions]) => {
-    const weeklyData = generateCategoryWeeklyData(categoryTransactions, firstDate, lastDate);
-    const monthlyData = generateCategoryMonthlyData(categoryTransactions, firstDate, lastDate);
+    const weeklyData = generateCategoryWeeklyData(categoryTransactions, firstDate);
+    const monthlyData = generateCategoryMonthlyData(categoryTransactions, firstDate);
     const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0);
     
     return {
@@ -184,23 +184,25 @@ function generateCategoryTimeSeries(transactions: Array<{amount: number; ai_merc
   }).sort((a, b) => b.totalAmount - a.totalAmount); // Sort by total amount descending
 }
 
-function generateMerchantWeeklyData(transactions: Array<{amount: number; date: string}>, firstDate: string, lastDate: string): Array<{period: string; amount: number; count: number}> {
+function generateMerchantWeeklyData(transactions: Array<{amount: number; date: string}>, firstDate: string): Array<{period: string; amount: number; count: number}> {
   const weeklyData: Array<{period: string; amount: number; count: number}> = [];
   
   const start = new Date(firstDate);
-  const end = new Date(lastDate);
   
   // Get the Sunday of the week containing the start date
   const startOfWeek = new Date(start);
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  // Include all weeks up to the last transaction date
-  // Don't limit to "completed weeks" - include current week if it has data
-  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${end.toISOString().split('T')[0]}`);
+  // Extend to 52 weeks (1 full year) from the start date
+  // This ensures we capture a full year of weekly data
+  const endOf52Weeks = new Date(startOfWeek);
+  endOf52Weeks.setDate(endOf52Weeks.getDate() + (52 * 7) - 1); // 52 weeks from start
+  
+  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOf52Weeks.toISOString().split('T')[0]} (52 weeks)`);
   
   const currentWeek = new Date(startOfWeek);
-  while (currentWeek <= end) {
+  while (currentWeek <= endOf52Weeks) {
     const weekEnd = new Date(currentWeek);
     weekEnd.setDate(currentWeek.getDate() + 6); // Saturday
     weekEnd.setHours(23, 59, 59, 999);
@@ -230,16 +232,22 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   return weeklyData;
 }
 
-function generateMerchantMonthlyData(transactions: Array<{amount: number; date: string}>, firstDate: string, lastDate: string): Array<{period: string; amount: number; count: number}> {
+function generateMerchantMonthlyData(transactions: Array<{amount: number; date: string}>, firstDate: string): Array<{period: string; amount: number; count: number}> {
   const monthlyData: Array<{period: string; amount: number; count: number}> = [];
   
   const start = new Date(firstDate);
-  const end = new Date(lastDate);
   
   const startOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const currentMonth = new Date(startOfMonth);
   
-  while (currentMonth <= end) {
+  // Extend to 12 months from the start month
+  // This ensures we capture a full year of monthly data
+  const endOf12Months = new Date(startOfMonth);
+  endOf12Months.setMonth(endOf12Months.getMonth() + 12);
+  
+  console.log(`📅 Monthly data range: ${startOfMonth.toISOString().split('T')[0]} to ${endOf12Months.toISOString().split('T')[0]} (12 months)`);
+  
+  while (currentMonth < endOf12Months) {
     const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
     
     const monthTransactions = transactions.filter(tx => {
@@ -261,12 +269,12 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
   return monthlyData;
 }
 
-function generateCategoryWeeklyData(transactions: Array<{amount: number; date: string}>, firstDate: string, lastDate: string): Array<{period: string; amount: number; count: number}> {
-  return generateMerchantWeeklyData(transactions, firstDate, lastDate);
+function generateCategoryWeeklyData(transactions: Array<{amount: number; date: string}>, firstDate: string): Array<{period: string; amount: number; count: number}> {
+  return generateMerchantWeeklyData(transactions, firstDate);
 }
 
-function generateCategoryMonthlyData(transactions: Array<{amount: number; date: string}>, firstDate: string, lastDate: string): Array<{period: string; amount: number; count: number}> {
-  return generateMerchantMonthlyData(transactions, firstDate, lastDate);
+function generateCategoryMonthlyData(transactions: Array<{amount: number; date: string}>, firstDate: string): Array<{period: string; amount: number; count: number}> {
+  return generateMerchantMonthlyData(transactions, firstDate);
 }
 
 function formatWeekPeriod(date: Date): string {
