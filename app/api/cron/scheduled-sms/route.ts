@@ -146,17 +146,17 @@ export async function GET(request: NextRequest) {
     // Cash Flow Runway: DISABLED - was daily at 5pm EST (replaced by Krezzo Report)
     // const isCashFlowRunwayTime = nowEST.hour === 17 && nowEST.minute <= 10;
     
-    // ✅ Morning Expenses: Daily at 8:00 AM EST
-    const isMorningExpensesTime = nowEST.hour === 8 && nowEST.minute <= 10;
+    // ✅ Morning Expenses: Daily at 7:00 AM EST
+    const isMorningExpensesTime = nowEST.hour === 7 && nowEST.minute <= 10;
     
     // ✅ DISABLED: Only Krezzo Report at 5:00 PM is active now
     // All other templates are disabled to avoid SMS spam
     // Daily templates: DISABLED (recurring, recent, merchant-pacing, category-pacing)
     templatesToSend = [];
     
-    // Morning Expenses: 8:00 AM EST
+    // Morning Expenses: 7:00 AM EST
     if (isMorningExpensesTime) {
-      console.log('🌅 8am EST: Adding morning-expenses to template list');
+      console.log('🌅 7am EST: Adding morning-expenses to template list');
       templatesToSend.push('morning-expenses');
     }
     

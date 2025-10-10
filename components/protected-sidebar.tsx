@@ -50,7 +50,7 @@ export default async function ProtectedSidebar() {
     },
     {
       label: "📈 Trends",
-      href: "/trends",
+      href: "/merchant-weekly-report",
     },
     {
       label: "💰 Flow",

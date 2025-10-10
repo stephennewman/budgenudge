@@ -68,39 +68,141 @@ async function buildMorningExpensesMessage(userId: string): Promise<string> {
   
   let message = `🌅 MORNING SNAPSHOT\n\n`;
   
+  // GET AI-DETECTED INSIGHTS
+  const insights = await getExpenseInsights(userId);
+  
+  // ALERTS SECTION (if any anomalies detected)
+  if (insights.newBills.length > 0 || insights.dormantBills.length > 0 || insights.amountChanges.length > 0) {
+    message += `⚠️ ALERTS\n`;
+    
+    if (insights.newBills.length > 0) {
+      insights.newBills.slice(0, 2).forEach(bill => {
+        message += `• NEW: ${bill.merchant} $${bill.amount.toFixed(2)}/${bill.frequency}\n`;
+      });
+    }
+    
+    if (insights.amountChanges.length > 0) {
+      insights.amountChanges.slice(0, 2).forEach(change => {
+        message += `• CHANGE: ${change.merchant} $${change.oldAmount.toFixed(2)} → $${change.newAmount.toFixed(2)}\n`;
+      });
+    }
+    
+    if (insights.dormantBills.length > 0) {
+      insights.dormantBills.slice(0, 1).forEach(bill => {
+        message += `• DORMANT: ${bill.merchant} (cancelled?)\n`;
+      });
+    }
+    
+    message += `\n`;
+  }
+  
   // UPCOMING EXPENSES (rest of the month only)
   const upcomingExpenses = await getUpcomingExpenses(userId, today, endOfMonth);
   const unpaidTotal = upcomingExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   
-  message += `💸 UPCOMING EXPENSES (rest of the month only)\n`;
+  message += `💸 UPCOMING (${upcomingExpenses.length} bills)\n`;
   if (upcomingExpenses.length > 0) {
-    upcomingExpenses.forEach(expense => {
+    upcomingExpenses.slice(0, 5).forEach(expense => {
       const date = new Date(expense.date);
       const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
       message += `${dateStr}: ${expense.merchant} $${expense.amount.toFixed(2)}\n`;
     });
+    if (upcomingExpenses.length > 5) {
+      message += `...and ${upcomingExpenses.length - 5} more\n`;
+    }
     message += `\nUnpaid: $${unpaidTotal.toFixed(2)}\n\n`;
   } else {
-    message += `No upcoming expenses found\n\nUnpaid: $0.00\n\n`;
+    message += `No upcoming expenses\nUnpaid: $0.00\n\n`;
   }
   
   // RECENTLY PAID (show historical expenses that are now paid)
   const recentlyPaid = await getRecentlyPaidExpenses(userId);
   const paidTotal = recentlyPaid.reduce((sum, expense) => sum + expense.amount, 0);
   
-  message += `✅ RECENTLY PAID\n`;
+  message += `✅ PAID THIS MONTH (${recentlyPaid.length})\n`;
   if (recentlyPaid.length > 0) {
-    recentlyPaid.forEach(expense => {
-      const date = new Date(expense.date);
-      const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-      message += `${dateStr}: ${expense.merchant} $${expense.amount.toFixed(2)}\n`;
-    });
-    message += `\nPaid: $${paidTotal.toFixed(2)}`;
+    message += `${recentlyPaid.slice(0, 5).map(e => e.merchant.split(' ')[0]).join(', ')}`;
+    if (recentlyPaid.length > 5) {
+      message += `, +${recentlyPaid.length - 5} more`;
+    }
+    message += `\n\nPaid: $${paidTotal.toFixed(2)}`;
   } else {
-    message += `No recently paid expenses found\n\nPaid: $0.00`;
+    message += `None yet\nPaid: $0.00`;
   }
   
   return message;
+}
+
+async function getExpenseInsights(userId: string): Promise<{
+  newBills: Array<{ merchant: string; amount: number; frequency: string }>;
+  dormantBills: Array<{ merchant: string }>;
+  amountChanges: Array<{ merchant: string; oldAmount: number; newAmount: number }>;
+}> {
+  const insights = {
+    newBills: [] as Array<{ merchant: string; amount: number; frequency: string }>,
+    dormantBills: [] as Array<{ merchant: string }>,
+    amountChanges: [] as Array<{ merchant: string; oldAmount: number; newAmount: number }>
+  };
+
+  try {
+    // Get bills created in last 7 days (new detections)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const { data: newBills } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name, expected_amount, prediction_frequency')
+      .eq('user_id', userId)
+      .eq('auto_detected', true)
+      .gte('created_at', sevenDaysAgo.toISOString())
+      .limit(3);
+
+    if (newBills) {
+      insights.newBills = newBills.map(bill => ({
+        merchant: bill.merchant_name,
+        amount: Number(bill.expected_amount),
+        frequency: bill.prediction_frequency
+      }));
+    }
+
+    // Get dormant bills (marked in last 7 days)
+    const { data: dormantBills } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name')
+      .eq('user_id', userId)
+      .eq('lifecycle_state', 'dormant')
+      .gte('updated_at', sevenDaysAgo.toISOString())
+      .limit(2);
+
+    if (dormantBills) {
+      insights.dormantBills = dormantBills.map(bill => ({
+        merchant: bill.merchant_name
+      }));
+    }
+
+    // Get bills with recent amount changes
+    const { data: changedBills } = await supabase
+      .from('tagged_merchants')
+      .select('merchant_name, expected_amount, amount_drift')
+      .eq('user_id', userId)
+      .not('amount_drift', 'is', null)
+      .neq('amount_drift', 0)
+      .gte('updated_at', sevenDaysAgo.toISOString())
+      .limit(2);
+
+    if (changedBills) {
+      insights.amountChanges = changedBills.map(bill => ({
+        merchant: bill.merchant_name,
+        newAmount: Number(bill.expected_amount),
+        oldAmount: Number(bill.expected_amount) - Number(bill.amount_drift)
+      }));
+    }
+
+  } catch (error) {
+    console.error('Error fetching expense insights:', error);
+  }
+
+  return insights;
 }
 
 async function getUpcomingExpenses(userId: string, startDate: Date, endDate: Date): Promise<Array<{

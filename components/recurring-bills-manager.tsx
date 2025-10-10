@@ -40,6 +40,7 @@ interface Transaction {
 export default function RecurringBillsManager() {
   const [taggedMerchants, setTaggedMerchants] = useState<TaggedMerchant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
     merchant_name: '',
@@ -91,6 +92,38 @@ export default function RecurringBillsManager() {
       
       if (data.success) {
         setTaggedMerchants(data.taggedMerchants);
+        
+        // If no bills exist, run first-time initialization
+        if (data.taggedMerchants.length === 0) {
+          console.log('🚀 First-time user detected. Initializing expense tracking...');
+          setInitializing(true);
+          
+          try {
+            const initResponse = await fetch('/api/expenses/initialize', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({})
+            });
+            
+            const initResult = await initResponse.json();
+            
+            if (initResult.success) {
+              console.log('✅ Expense tracking initialized:', initResult);
+              
+              // Re-fetch to get newly detected bills
+              const refreshResponse = await fetch('/api/tagged-merchants');
+              const refreshData = await refreshResponse.json();
+              
+              if (refreshData.success) {
+                setTaggedMerchants(refreshData.taggedMerchants);
+              }
+            }
+          } catch (initError) {
+            console.error('❌ Initialization error:', initError);
+          } finally {
+            setInitializing(false);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching tagged merchants:', error);
@@ -314,10 +347,23 @@ export default function RecurringBillsManager() {
 
 
 
-  if (loading) {
+  if (loading || initializing) {
     return (
       <div className="relative min-h-[400px]">
         <ContentAreaLoader />
+        {initializing && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+            <div className="text-center max-w-md p-6">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                🤖 AI is analyzing your expenses...
+              </h3>
+              <p className="text-sm text-gray-600">
+                Detecting recurring bills from your transaction history. This usually takes 10-20 seconds.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
