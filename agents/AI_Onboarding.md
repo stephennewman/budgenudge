@@ -81,6 +81,22 @@ Complete PostgreSQL schema with 15+ core tables:
 
 ## 📋 CONTINUOUS ACTIVITY LOG
 
+### February 12, 2026 - RECURRING BILLS 2.0: Full Regeneration ✅ DEPLOYED
+- **Time**: Evening EST
+- **What**: Complete rebuild of the recurring bills detection system
+- **Changes**:
+  - Created `/api/regenerate-recurring-bills` endpoint with smart bill detection
+  - Analyzes ALL transactions (2,492 txns) with pagination (fixes Supabase 1000-row limit)
+  - Deduplicates dual-account charges (same merchant billed to CC + bank within 5 days)
+  - Filters non-bill categories (restaurants, groceries, gas, shopping) via AI tags
+  - Filters known restaurant chains by name even when category tag is missing
+  - Consistent-amount override (CV < 0.10) preserves subscriptions miscategorized as shopping
+  - Added 'bi-weekly' to `tagged_merchants` prediction_frequency constraint
+  - Cleared 41 stale records (all with Oct 2025 prediction dates) and inserted 37 fresh detections
+- **Results**: 28 active bills ($4,875/mo), 9 dormant, all with correct next prediction dates
+- **Key bills detected**: Mortgage ($2,427), car payment ($195), utilities ($335 Duke, $120 Spectrum, $118 T-Mobile), insurance ($111 GEICO, $30 Prudential), streaming (Netflix, Disney+, Peacock, Amazon Prime Video), SaaS (OpenAI, Plaid, Resend, Namecheap), childcare (Brightwheel $35)
+- **Files**: `app/api/regenerate-recurring-bills/route.ts` (new), DB migration `add_biweekly_frequency`
+
 ### February 12, 2026 - DAILY MORNING EMAIL INSIGHTS ✅ DEPLOYED
 - **12:30 PM EST**: New daily email insights feature deployed to production
 - **Git Commit**: `458fed9` - 2 files changed, 456 insertions
