@@ -252,7 +252,7 @@ async function gatherInsights(userId: string) {
 
     merchantPace.push({ name: m, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
   }
-  merchantPace.sort((a, b) => b.currentMonth - a.currentMonth);
+  merchantPace.sort((a, b) => b.pacePercent - a.pacePercent);
 
   // ── Category pace ──────────────────────────────────────────────
   const histCatTotals = new Map<string, number>();
@@ -289,7 +289,7 @@ async function gatherInsights(userId: string) {
 
     categoryPace.push({ name: c, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
   }
-  categoryPace.sort((a, b) => b.currentMonth - a.currentMonth);
+  categoryPace.sort((a, b) => b.pacePercent - a.pacePercent);
 
   return {
     now,
