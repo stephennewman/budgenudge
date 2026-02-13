@@ -144,11 +144,13 @@ async function gatherInsights(userId: string) {
 
   // Top categories (last 30 days)
   const categoryMap = new Map<string, CategorySpend>();
+  let last30dTotal = 0;
   last30d.forEach(t => {
     const cat = t.ai_category_tag || 'Uncategorized';
     const existing = categoryMap.get(cat) || { category: cat, total: 0, count: 0 };
     existing.total += t.amount;
     existing.count++;
+    last30dTotal += t.amount;
     categoryMap.set(cat, existing);
   });
   const topCategories = Array.from(categoryMap.values())
@@ -188,6 +190,7 @@ async function gatherInsights(userId: string) {
     daysLeft,
     dayOfMonth,
     monthTransactionCount: monthTransactions.length,
+    last30dTotal,
   };
 }
 
@@ -322,7 +325,7 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
 
   // Category rows
   const catRows = data.topCategories.map(c => {
-    const pct = data.monthSpend > 0 ? Math.round((c.total / data.monthSpend) * 100) : 0;
+    const pct = data.last30dTotal > 0 ? Math.round((c.total / data.last30dTotal) * 100) : 0;
     return `
       <tr>
         <td style="padding:6px 12px;font-size:14px;">${c.category}</td>
