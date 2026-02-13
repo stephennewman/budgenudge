@@ -23,6 +23,15 @@ interface Alert {
   merchant: string;
   detail: string;
 }
+interface PaceItem {
+  name: string;
+  currentMonth: number;
+  avgMonthly: number;
+  pacePercent: number;  // current vs expected-so-far (adjusted for day of month)
+  status: 'under' | 'on_track' | 'over';
+  currentWeek: number;
+  avgWeekly: number;
+}
 
 // ── Entry point ─────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -66,6 +75,10 @@ async function gatherInsights(userId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  // Week start (Monday)
+  const dayOfWeek = now.getDay(); // 0=Sun
+  const weekStart = new Date(today.getTime() - ((dayOfWeek === 0 ? 6 : dayOfWeek - 1)) * 24 * 60 * 60 * 1000);
 
   // Get user's plaid items
   const { data: userItems } = await supabase
@@ -83,6 +96,7 @@ async function gatherInsights(userId: string) {
     monthTransactionsResult,
     last7dTransactionsResult,
     last30dTransactionsResult,
+    historicalResult,
     upcomingBills,
     alertsData,
   ] = await Promise.all([
@@ -116,6 +130,15 @@ async function gatherInsights(userId: string) {
       .select('date, amount, ai_category_tag')
       .in('plaid_item_id', plaidItemIds)
       .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
+      .limit(1000),
+
+    // Historical transactions (last 90 days, excluding current month — for baseline averages)
+    supabase
+      .from('transactions')
+      .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
+      .in('plaid_item_id', plaidItemIds)
+      .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
+      .lt('date', monthStart.toISOString().split('T')[0])
       .limit(1000),
 
     // Upcoming bills
@@ -173,6 +196,100 @@ async function gatherInsights(userId: string) {
   // Days left in month
   const daysLeft = endOfMonth.getDate() - today.getDate();
   const dayOfMonth = today.getDate();
+  const daysInMonth = endOfMonth.getDate();
+  const monthProgressPct = dayOfMonth / daysInMonth;
+
+  // ── Pace tracking ──────────────────────────────────────────────
+  const historical = (historicalResult.data || []).filter(t => t.amount > 0);
+
+  // Figure out how many full months the historical window covers (excluding current month)
+  const histMonths = getDistinctMonths(historical.map(t => t.date));
+  const numHistMonths = Math.max(histMonths, 1);
+
+  // Current week transactions (Mon–today)
+  const weekStartStr = weekStart.toISOString().split('T')[0];
+  const currentWeekTx = monthTransactions.filter(t => t.date >= weekStartStr);
+
+  // Compute weeks in historical window
+  const histStartDate = ninetyDaysAgo;
+  const histEndDate = monthStart;
+  const histDays = Math.max(1, Math.round((histEndDate.getTime() - histStartDate.getTime()) / (1000 * 60 * 60 * 24)));
+  const numHistWeeks = Math.max(1, histDays / 7);
+
+  // ── Merchant pace ──────────────────────────────────────────────
+  const histMerchantTotals = new Map<string, number>();
+  for (const t of historical) {
+    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+    histMerchantTotals.set(m, (histMerchantTotals.get(m) || 0) + t.amount);
+  }
+
+  const currMerchantTotals = new Map<string, number>();
+  for (const t of monthTransactions) {
+    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+    currMerchantTotals.set(m, (currMerchantTotals.get(m) || 0) + t.amount);
+  }
+
+  const currWeekMerchantTotals = new Map<string, number>();
+  for (const t of currentWeekTx) {
+    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+    currWeekMerchantTotals.set(m, (currWeekMerchantTotals.get(m) || 0) + t.amount);
+  }
+
+  const merchantPace: PaceItem[] = [];
+  const allMerchants = new Set([...histMerchantTotals.keys(), ...currMerchantTotals.keys()]);
+  for (const m of allMerchants) {
+    const avgMonthly = (histMerchantTotals.get(m) || 0) / numHistMonths;
+    const avgWeekly = (histMerchantTotals.get(m) || 0) / numHistWeeks;
+    const currentMonth = currMerchantTotals.get(m) || 0;
+    const currentWeek = currWeekMerchantTotals.get(m) || 0;
+
+    // Only include merchants with meaningful history (avg > $5/mo) or current spending
+    if (avgMonthly < 5 && currentMonth < 5) continue;
+
+    const expectedSoFar = avgMonthly * monthProgressPct;
+    const pacePercent = expectedSoFar > 0 ? (currentMonth / expectedSoFar) * 100 : (currentMonth > 0 ? 999 : 0);
+    const status: PaceItem['status'] = pacePercent > 120 ? 'over' : pacePercent > 80 ? 'on_track' : 'under';
+
+    merchantPace.push({ name: m, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
+  }
+  merchantPace.sort((a, b) => b.currentMonth - a.currentMonth);
+
+  // ── Category pace ──────────────────────────────────────────────
+  const histCatTotals = new Map<string, number>();
+  for (const t of historical) {
+    const c = t.ai_category_tag || 'Uncategorized';
+    histCatTotals.set(c, (histCatTotals.get(c) || 0) + t.amount);
+  }
+
+  const currCatTotals = new Map<string, number>();
+  for (const t of monthTransactions) {
+    const c = t.ai_category_tag || 'Uncategorized';
+    currCatTotals.set(c, (currCatTotals.get(c) || 0) + t.amount);
+  }
+
+  const currWeekCatTotals = new Map<string, number>();
+  for (const t of currentWeekTx) {
+    const c = t.ai_category_tag || 'Uncategorized';
+    currWeekCatTotals.set(c, (currWeekCatTotals.get(c) || 0) + t.amount);
+  }
+
+  const categoryPace: PaceItem[] = [];
+  const allCats = new Set([...histCatTotals.keys(), ...currCatTotals.keys()]);
+  for (const c of allCats) {
+    const avgMonthly = (histCatTotals.get(c) || 0) / numHistMonths;
+    const avgWeekly = (histCatTotals.get(c) || 0) / numHistWeeks;
+    const currentMonth = currCatTotals.get(c) || 0;
+    const currentWeek = currWeekCatTotals.get(c) || 0;
+
+    if (avgMonthly < 10 && currentMonth < 10) continue;
+
+    const expectedSoFar = avgMonthly * monthProgressPct;
+    const pacePercent = expectedSoFar > 0 ? (currentMonth / expectedSoFar) * 100 : (currentMonth > 0 ? 999 : 0);
+    const status: PaceItem['status'] = pacePercent > 120 ? 'over' : pacePercent > 80 ? 'on_track' : 'under';
+
+    categoryPace.push({ name: c, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
+  }
+  categoryPace.sort((a, b) => b.currentMonth - a.currentMonth);
 
   return {
     now,
@@ -189,9 +306,19 @@ async function gatherInsights(userId: string) {
     alerts: alertsData,
     daysLeft,
     dayOfMonth,
+    daysInMonth,
+    monthProgressPct,
     monthTransactionCount: monthTransactions.length,
     last30dTotal,
+    merchantPace: merchantPace.slice(0, 12),
+    categoryPace: categoryPace.slice(0, 8),
+    numHistMonths,
   };
+}
+
+function getDistinctMonths(dates: string[]): number {
+  const months = new Set(dates.map(d => d.substring(0, 7))); // "YYYY-MM"
+  return months.size;
 }
 
 async function getUpcomingBills(userId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
@@ -323,26 +450,59 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
       <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(b.amount)}</td>
     </tr>`).join('');
 
-  // Category rows
-  const catRows = data.topCategories.map(c => {
-    const pct = data.last30dTotal > 0 ? Math.round((c.total / data.last30dTotal) * 100) : 0;
-    return `
-      <tr>
-        <td style="padding:6px 12px;font-size:14px;">${c.category}</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;">$${fmt(c.total)}</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;color:#666;">${c.count} txns</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;">
-          <span style="background:#e8f0fe;color:#1a73e8;padding:2px 8px;border-radius:10px;font-size:12px;">${pct}%</span>
-        </td>
-      </tr>`;
-  }).join('');
+  // Pace helper: status badge
+  const paceBadge = (p: PaceItem) => {
+    if (p.avgMonthly < 1) return `<span style="background:#e8f0fe;color:#1a73e8;padding:2px 8px;border-radius:10px;font-size:11px;">new</span>`;
+    const pct = Math.round(p.pacePercent);
+    if (p.status === 'over') return `<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
+    if (p.status === 'on_track') return `<span style="background:#fefce8;color:#a16207;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
+    return `<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
+  };
 
-  // Top merchants rows
-  const merchantRows = data.topMerchants.map(m => `
+  // Progress bar helper
+  const progressBar = (current: number, avg: number) => {
+    const pct = avg > 0 ? Math.min(Math.round((current / avg) * 100), 150) : 0;
+    const barColor = pct > 100 ? '#dc2626' : pct > 80 ? '#f59e0b' : '#16a34a';
+    const barWidth = Math.min(pct, 100);
+    return `<div style="background:#e5e7eb;border-radius:4px;height:6px;width:100%;margin-top:4px;">
+      <div style="background:${barColor};border-radius:4px;height:6px;width:${barWidth}%;"></div>
+    </div>`;
+  };
+
+  // Category pace rows
+  const catPaceRows = data.categoryPace.map(c => `
     <tr>
-      <td style="padding:6px 12px;font-size:14px;">${m.merchant}</td>
-      <td style="padding:6px 12px;font-size:14px;text-align:right;">$${fmt(m.total)}</td>
-      <td style="padding:6px 12px;font-size:14px;text-align:right;color:#666;">${m.count}x</td>
+      <td style="padding:8px 12px;font-size:14px;vertical-align:top;">
+        <strong>${c.name}</strong>
+        ${progressBar(c.currentMonth, c.avgMonthly)}
+      </td>
+      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">
+        <div>$${fmt(c.currentMonth)}</div>
+        <div style="font-size:11px;color:#999;">of $${fmt(c.avgMonthly)} avg</div>
+      </td>
+      <td style="padding:8px 12px;font-size:13px;text-align:right;vertical-align:top;">
+        <div>$${fmt(c.currentWeek)}/wk</div>
+        <div style="font-size:11px;color:#999;">avg $${fmt(c.avgWeekly)}/wk</div>
+      </td>
+      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">${paceBadge(c)}</td>
+    </tr>`).join('');
+
+  // Merchant pace rows
+  const merchantPaceRows = data.merchantPace.map(m => `
+    <tr>
+      <td style="padding:8px 12px;font-size:14px;vertical-align:top;">
+        <strong>${m.name}</strong>
+        ${progressBar(m.currentMonth, m.avgMonthly)}
+      </td>
+      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">
+        <div>$${fmt(m.currentMonth)}</div>
+        <div style="font-size:11px;color:#999;">of $${fmt(m.avgMonthly)} avg</div>
+      </td>
+      <td style="padding:8px 12px;font-size:13px;text-align:right;vertical-align:top;">
+        <div>$${fmt(m.currentWeek)}/wk</div>
+        <div style="font-size:11px;color:#999;">avg $${fmt(m.avgWeekly)}/wk</div>
+      </td>
+      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">${paceBadge(m)}</td>
     </tr>`).join('');
 
   // Yesterday breakdown
@@ -421,17 +581,36 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     ${data.upcomingBills.length > 8 ? `<div style="font-size:12px;color:#999;padding:6px 12px;">+${data.upcomingBills.length - 8} more</div>` : ''}
   </td></tr>` : ''}
 
-  <!-- Spending by category (30 days) -->
+  ${data.categoryPace.length > 0 ? `
+  <!-- Category pace -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Spending by Category (30 days)</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${catRows}</table>
-  </td></tr>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Category Pace — Month to Date</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">Day ${data.dayOfMonth} of ${data.daysInMonth} · Based on ${data.numHistMonths}-month averages</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
+      <tr style="border-bottom:1px solid #eee;">
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Category</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Week</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Pace</td>
+      </tr>
+      ${catPaceRows}
+    </table>
+  </td></tr>` : ''}
 
-  ${data.topMerchants.length > 0 ? `
-  <!-- Top merchants (7 days) -->
+  ${data.merchantPace.length > 0 ? `
+  <!-- Merchant pace -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Top Merchants (7 days) — $${fmt(data.last7dSpend)}</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${merchantRows}</table>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Merchant Pace — Month to Date</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">Current month vs. ${data.numHistMonths}-month average</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
+      <tr style="border-bottom:1px solid #eee;">
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Merchant</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Week</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Pace</td>
+      </tr>
+      ${merchantPaceRows}
+    </table>
   </td></tr>` : ''}
 
   <!-- Account breakdown -->
