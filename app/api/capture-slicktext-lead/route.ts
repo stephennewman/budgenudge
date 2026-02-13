@@ -6,40 +6,42 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+const ALLOWED_ORIGINS = [
+  'https://get.krezzo.com',
+  'https://krezzo.com',
+  process.env.NEXT_PUBLIC_SITE_URL,
+].filter(Boolean);
+
+function getCorsHeaders(request: NextRequest) {
+  const origin = request.headers.get('origin') || '';
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] || '';
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+}
+
 export async function POST(request: NextRequest) {
+  const corsHeaders = getCorsHeaders(request);
   try {
     const { phoneNumber, email, firstName, lastName } = await request.json();
-    
-    console.log('📱 SlickText Java Form capture:', { phoneNumber, email, firstName, lastName });
     
     // Clean phone number
     const cleanPhone = phoneNumber?.replace(/\D/g, '');
     
-    // Log the full contact data for now (until we add proper columns)
-    console.log('📊 Contact Data Details:', {
-      phone: cleanPhone,
-      email: email || 'not-provided',
-      firstName: firstName || 'not-provided', 
-      lastName: lastName || 'not-provided',
-      timestamp: new Date().toISOString()
-    });
-    
     // Generate tracking token
     const trackingToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
-    // Store additional contact data in a way that works with current schema
-    // Keep source field short due to VARCHAR(50) limit
-    const enhancedSource = `slicktext_form`;
-    
     // Store in database with all contact fields
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('sample_sms_leads')
       .insert({
         phone_number: cleanPhone,
         first_name: firstName,
         last_name: lastName,
         email: email,
-        source: enhancedSource,
+        source: 'slicktext_form',
         tracking_token: trackingToken,
         opted_in_at: new Date().toISOString(),
       })
@@ -47,40 +49,26 @@ export async function POST(request: NextRequest) {
       .single();
     
     if (error) {
-      console.error('❌ Database error details:', {
-        error,
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
+      console.error('Lead capture DB error:', error.message);
       return NextResponse.json({ 
         error: 'Database error', 
         details: error.message,
         code: error.code 
-      }, { status: 500 });
+      }, { status: 500, headers: corsHeaders });
     }
-    
-    console.log('✅ Successfully captured lead:', data);
     
     return NextResponse.json({ 
       success: true, 
       trackingToken,
       message: 'Lead captured successfully' 
-    });
+    }, { headers: corsHeaders });
     
   } catch (error) {
-    console.error('❌ API Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Lead capture error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: corsHeaders });
   }
 }
 
-export async function OPTIONS() {
-  return NextResponse.json({}, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
-  });
+export async function OPTIONS(request: NextRequest) {
+  return NextResponse.json({}, { headers: getCorsHeaders(request) });
 }

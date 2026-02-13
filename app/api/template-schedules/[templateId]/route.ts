@@ -24,8 +24,6 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📋 Fetching schedule for template ${templateId} for user: ${user.id}`);
-
     // Get the schedule for this specific template
     const { data: schedule, error } = await supabase
       .from('template_schedules')
@@ -41,8 +39,6 @@ export async function GET(
       }, { status: 500 });
     }
 
-    console.log(`✅ Schedule found:`, schedule ? 'Yes' : 'No');
-    
     return NextResponse.json({ 
       success: true, 
       schedule: schedule || null

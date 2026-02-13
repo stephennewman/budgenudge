@@ -9,8 +9,6 @@ const supabase = createClient(
 
 export async function POST() {
   try {
-    console.log('🔄 Starting SMS template cleanup - keeping only weekly, monthly, and 415pm-special');
-
     // Get all users with SMS preferences
     const { data: allUsers, error: usersError } = await supabase
       .from('user_sms_preferences')
@@ -26,16 +24,12 @@ export async function POST() {
     }
 
     const uniqueUsers = [...new Set(allUsers?.map(u => u.user_id) || [])];
-    console.log(`👥 Found ${uniqueUsers.length} unique users to update`);
-
     let usersUpdated = 0;
     let totalPreferencesUpdated = 0;
 
     // Process each user
     for (const userId of uniqueUsers) {
       try {
-        console.log(`🔄 Updating user: ${userId}`);
-
         // Get all SMS preferences for this user
         const { data: userPreferences, error: prefsError } = await supabase
           .from('user_sms_preferences')
@@ -48,7 +42,6 @@ export async function POST() {
         }
 
         if (!userPreferences || userPreferences.length === 0) {
-          console.log(`📭 No preferences found for user ${userId}, skipping`);
           continue;
         }
 
@@ -70,7 +63,6 @@ export async function POST() {
               return false;
             }
 
-            console.log(`✅ ${shouldEnable ? 'Enabled' : 'Disabled'} ${pref.sms_type} for user ${userId}`);
             return true;
           }
           
@@ -84,8 +76,6 @@ export async function POST() {
 
         // Create missing templates
         if (missingTypes.length > 0) {
-          console.log(`🔧 Creating missing templates for user ${userId}: ${missingTypes.join(', ')}`);
-          
           for (const smsType of missingTypes) {
             try {
               const { error: createError } = await supabase
@@ -102,7 +92,6 @@ export async function POST() {
               if (createError) {
                 console.error(`❌ Error creating ${smsType} for user ${userId}:`, createError);
               } else {
-                console.log(`✅ Created ${smsType} for user ${userId}`);
                 totalPreferencesUpdated++;
               }
             } catch (error) {
@@ -117,18 +106,13 @@ export async function POST() {
         if (updatedCount > 0) {
           usersUpdated++;
           totalPreferencesUpdated += updatedCount;
-          console.log(`✅ User ${userId}: Updated ${updatedCount} preferences`);
         } else {
-          console.log(`ℹ️ User ${userId}: No changes needed`);
         }
 
       } catch (error) {
         console.error(`❌ Error processing user ${userId}:`, error);
       }
     }
-
-    console.log(`🎉 SMS template cleanup completed!`);
-    console.log(`📊 Results: ${usersUpdated} users updated, ${totalPreferencesUpdated} preferences changed`);
 
     return NextResponse.json({ 
       success: true, 
@@ -153,8 +137,6 @@ export async function POST() {
 // GET method to show current status
 export async function GET() {
   try {
-    console.log('📊 Checking current SMS template status across all users');
-
     // Get all SMS preferences
     const { data: allPreferences, error: prefsError } = await supabase
       .from('user_sms_preferences')

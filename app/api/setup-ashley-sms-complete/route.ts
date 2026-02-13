@@ -16,12 +16,9 @@ export async function POST() {
     const slicktextContactId = '61330767';
     const sendTime = '08:00:00';
 
-    console.log('🚀 Setting up complete SMS configuration for Ashley Newman...');
-
     const setup_results = [];
 
     // 1. Ensure user_sms_settings exists
-    console.log('1. Setting up user_sms_settings...');
     const { data: existingSettings } = await supabase
       .from('user_sms_settings')
       .select('*')
@@ -60,7 +57,6 @@ export async function POST() {
     }
 
     // 2. Update profile with correct phone number  
-    console.log('2. Updating profile...');
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ 
@@ -76,7 +72,6 @@ export async function POST() {
     }
 
     // 3. Verify Plaid connection
-    console.log('3. Checking Plaid items...');
     const { data: items } = await supabase
       .from('items')
       .select('plaid_item_id, institution_name')
@@ -89,7 +84,6 @@ export async function POST() {
     }
 
     // 4. Verify tracking setup
-    console.log('4. Checking tracking setup...');
     const { data: merchantTracking } = await supabase
       .from('merchant_pacing_tracking')
       .select('ai_merchant_name')
@@ -106,7 +100,6 @@ export async function POST() {
     setup_results.push(`✅ Category tracking: ${categoryTracking?.length || 0} active categories`);
 
     // 5. Test all 4 message types
-    console.log('5. Testing message generation...');
     const messageTypes = ['recent', 'recurring', 'merchant-pacing', 'category-pacing'];
     const testResults: Record<string, string> = {};
 

@@ -83,33 +83,21 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log('🕐 Starting NEW SMS template processing...');
-    
     // Get all users with bank connections
-    console.log('DEBUG: About to query items table...');
-    
     // Test query: count all rows
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { count: totalItems, error: countError } = await supabase
       .from('items')
       .select('*', { count: 'exact', head: true });
-    console.log('DEBUG: Total items count:', totalItems, 'countError:', countError);
-    
     const { data: itemsWithUsers, error: itemsError } = await supabase
       .from('items')
       .select('id, user_id, plaid_item_id')
       .is('deleted_at', null);
 
     // DEBUG LOGGING START
-    console.log('DEBUG: itemsWithUsers:', itemsWithUsers);
-    console.log('DEBUG: itemsError:', itemsError);
-    console.log('DEBUG: Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-    console.log('DEBUG: Service Role Key present:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
-    console.log('DEBUG: itemsWithUsers length:', itemsWithUsers?.length || 0);
-    console.log('DEBUG: itemsWithUsers type:', typeof itemsWithUsers);
     // DEBUG LOGGING END
 
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
-      console.log('📭 No bank connections found');
       // Update cron_log as success (no users)
       if (cronLogId) {
         await supabase.from('cron_log').update({
@@ -128,8 +116,6 @@ export async function GET(request: NextRequest) {
         message: 'No bank connections found' 
       });
     }
-
-    console.log(`👥 Found ${itemsWithUsers.length} users with bank connections`);
 
     // Get current time in EST
     const nowEST = DateTime.now().setZone('America/New_York');
@@ -156,7 +142,6 @@ export async function GET(request: NextRequest) {
     
     // Morning Expenses: 7:00 AM EST
     if (isMorningExpensesTime) {
-      console.log('🌅 7am EST: Adding morning-expenses to template list');
       templatesToSend.push('morning-expenses');
     }
     
@@ -178,13 +163,9 @@ export async function GET(request: NextRequest) {
     //   templatesToSend.push('cash-flow-runway');
     // }
 
-    console.log(`📝 Templates to send: ${templatesToSend.join(', ')}`);
-
     // ==================================================
     // CUSTOM TEMPLATE SCHEDULING SYSTEM
     // ==================================================
-    console.log('🎯 Checking for custom scheduled templates...');
-    
     // Get all active custom template schedules that are due to be sent
     const { data: dueSchedules, error: schedulesError } = await supabase
       .from('template_schedules')
@@ -205,15 +186,11 @@ export async function GET(request: NextRequest) {
     if (schedulesError) {
       console.error('❌ Error fetching due schedules:', schedulesError);
     } else if (dueSchedules && dueSchedules.length > 0) {
-      console.log(`📅 Found ${dueSchedules.length} custom templates due to be sent`);
-      
       // Process each due schedule
       for (const schedule of dueSchedules) {
         try {
           const template = schedule.custom_sms_templates;
           const userId = template.user_id;
-          
-          console.log(`📱 Processing custom template "${template.template_name}" for user ${userId}`);
           
           // Get user's phone number
           const { data: settings } = await supabase
@@ -223,7 +200,6 @@ export async function GET(request: NextRequest) {
             .single();
           
           if (!settings?.phone_number) {
-            console.log(`📭 Skipping custom template for user ${userId} (no phone number)`);
             continue;
           }
           
@@ -291,7 +267,6 @@ export async function GET(request: NextRequest) {
                 break;
               // Add more variables as needed in the future
               default:
-                console.log(`⚠️ Unknown variable: ${variable}`);
             }
           }
           
@@ -317,7 +292,6 @@ export async function GET(request: NextRequest) {
               preview: formattedMessage.substring(0, 100),
               messageId: smsResult.messageId
             });
-            console.log(`✅ Custom template "${template.template_name}" sent to user ${userId}`);
           } else {
             smsFailed++;
             logDetails.push({
@@ -327,7 +301,6 @@ export async function GET(request: NextRequest) {
               sent: false,
               error: smsResult.error
             });
-            console.log(`❌ Failed to send custom template to user ${userId}:`, smsResult.error);
           }
           
           // Calculate and update next send time
@@ -341,8 +314,6 @@ export async function GET(request: NextRequest) {
               updated_at: new Date().toISOString()
             })
             .eq('id', schedule.id);
-          
-          console.log(`📅 Updated next send time for "${template.template_name}": ${nextSendTime}`);
           
           // Handle additional phone if present
           if (settings.additional_phone?.trim()) {
@@ -386,7 +357,6 @@ export async function GET(request: NextRequest) {
         }
       }
     } else {
-      console.log('📭 No custom templates due to be sent');
     }
 
     // Process each user (for traditional templates)
@@ -407,7 +377,6 @@ export async function GET(request: NextRequest) {
           .single();
         
         if (settingsError) {
-          console.log(`⚠️ Error fetching settings for user ${userId}:`, settingsError);
         }
         
         if (settings) {
@@ -415,18 +384,14 @@ export async function GET(request: NextRequest) {
           userPhoneNumber = settings.phone_number;
           
           if (userPhoneNumber) {
-            console.log(`📱 Found phone number for user ${userId}: ${userPhoneNumber}`);
           } else {
-            console.log(`📭 No phone number found for user ${userId}`);
           }
         } else {
-          console.log(`📭 No settings found for user ${userId}`);
         }
 
         // Skip users without phone numbers
         if (!userPhoneNumber || userPhoneNumber.trim() === '') {
           logDetails.push({ userId, skipped: true, reason: 'No phone number in user_sms_settings' });
-          console.log(`📭 Skipping user ${userId} (no phone number in user_sms_settings)`);
           continue;
         }
 
@@ -441,7 +406,6 @@ export async function GET(request: NextRequest) {
         
         // Check if we should send special templates (monthly/weekly summaries - sent at 7am EST regardless of user preference)
         if (hasSpecialTemplates) {
-          console.log(`📊 Processing special templates for user ${userId}`);
           shouldProcessUser = true;
         }
         
@@ -457,16 +421,13 @@ export async function GET(request: NextRequest) {
           const actualTimeDifference = Math.min(timeDifferenceMinutes, timeDifferenceMinutesAlt);
 
           if (actualTimeDifference <= 10) {
-            console.log(`⏰ ✅ Daily template time check passed for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
             shouldProcessUser = true;
           } else {
-            console.log(`⏰ Daily templates not at send time for user ${userId} (send time: ${sendTime} EST, current: ${nowEST.hour}:${nowEST.minute.toString().padStart(2, '0')} EST, difference: ${actualTimeDifference} minutes)`);
           }
         }
         
         if (!shouldProcessUser) {
           logDetails.push({ userId, skipped: true, reason: `No templates ready: daily templates not at send time (${sendTime} EST), no special templates scheduled` });
-          console.log(`⏰ Skipping user ${userId} - no templates ready to send`);
           continue;
         }
 
@@ -491,8 +452,6 @@ export async function GET(request: NextRequest) {
             userTemplatesToSend.push(...templatesToSend.filter(t => dailyTemplates.includes(t)));
           }
         }
-
-        console.log(`📱 Processing user ${userId} (${usersProcessed}/${itemsWithUsers.length}) - User Templates: ${userTemplatesToSend.join(', ')}`);
 
         // Send each template type for this user
         for (const templateType of userTemplatesToSend) {
@@ -539,7 +498,6 @@ export async function GET(request: NextRequest) {
             const isEnabledByDefault = preferenceType === 'cash-flow-runway';
             const enabled = templatePref ? !!templatePref.enabled : isEnabledByDefault;
             if (!enabled) {
-              console.log(`📭 Skipping ${templateType} for user ${userId} (disabled in preferences)`);
               continue;
             }
 
@@ -560,13 +518,8 @@ export async function GET(request: NextRequest) {
                 reason: `Deduplication prevented send: ${dedupeResult.reason}`,
                 logId: dedupeResult.logId 
               });
-              console.log(`🚫 Skipping ${templateType} for user ${userId} - ${dedupeResult.reason}`);
               continue;
             }
-            
-            console.log(`✅ Deduplication check passed for ${templateType} (log ID: ${dedupeResult.logId})`);
-
-            console.log(`📝 Generating ${templateType} SMS for user ${userId}`);
             
             // Generate message using new template system
             const smsMessage = await generateSMSMessage(userId, templateType);
@@ -574,14 +527,10 @@ export async function GET(request: NextRequest) {
             // Skip if message is too short or indicates an error
             if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
               logDetails.push({ userId, templateType, skipped: true, reason: 'Too short or error', preview: smsMessage });
-              console.log(`📭 ${templateType} SMS too short or error for user ${userId} - skipping`);
               smsFailed++;
               continue;
             }
             smsAttempted++;
-
-            console.log(`📱 Sending ${templateType} SMS to user ${userId}`);
-            console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
             // Send SMS using user's phone number
             const smsResult = await sendEnhancedSlickTextSMS({
@@ -600,7 +549,6 @@ export async function GET(request: NextRequest) {
                 logId: dedupeResult.logId,
                 messageId: smsResult.messageId
               });
-              console.log(`✅ ${templateType} SMS sent successfully to user ${userId} (log ID: ${dedupeResult.logId})`);
             } else {
               smsFailed++;
               logDetails.push({ 
@@ -610,7 +558,6 @@ export async function GET(request: NextRequest) {
                 error: smsResult.error,
                 logId: dedupeResult.logId
               });
-              console.log(`❌ Failed to send ${templateType} SMS to user ${userId}:`, smsResult.error);
             }
 
             // Fan-out to additional recipient if present (MVP)
@@ -698,7 +645,6 @@ export async function GET(request: NextRequest) {
       message: `Processed ${smsSent + smsFailed} SMS for ${usersProcessed} users`
     };
 
-    console.log('📊 SMS Processing Complete:', result);
     return NextResponse.json(result);
 
   } catch (error) {

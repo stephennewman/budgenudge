@@ -52,8 +52,6 @@ async function sendViaResend({ phoneNumber, message, userEmail }: SMSRequest): P
   const startTime = Date.now();
   
   try {
-    console.log('📱 Sending SMS via Resend...');
-    
     // Import Resend dynamically to avoid issues if not installed
     const { Resend } = await import('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
@@ -86,8 +84,6 @@ async function sendViaResend({ phoneNumber, message, userEmail }: SMSRequest): P
 
     const deliveryTime = Date.now() - startTime;
 
-    console.log(`✅ Resend SMS sent successfully in ${deliveryTime}ms:`, result.data?.id);
-
     return {
       success: true,
       provider: 'resend',
@@ -114,8 +110,6 @@ async function sendViaSlickText(request: SMSRequest): Promise<SMSResponse> {
   const startTime = Date.now();
   
   try {
-    console.log('📱 Sending SMS via SlickText...');
-    
     const result = await sendEnhancedSlickTextSMS({
       phoneNumber: request.phoneNumber,
       message: request.message,
@@ -126,7 +120,6 @@ async function sendViaSlickText(request: SMSRequest): Promise<SMSResponse> {
     const deliveryTime = Date.now() - startTime;
 
     if (result.success) {
-      console.log(`✅ SlickText SMS sent successfully in ${deliveryTime}ms:`, result.messageId);
       return {
         success: true,
         provider: 'slicktext',
@@ -162,27 +155,12 @@ export async function sendUnifiedSMS(request: SMSRequest): Promise<SMSResponse> 
   const config = getSMSConfig();
   const context = request.context || 'unknown';
   
-  console.log(`🚀 SMS Request [${context}]:`, {
-    provider: config.primaryProvider,
-    fallback: config.enableFallback,
-    testMode: config.testMode,
-    phoneNumber: request.phoneNumber.slice(-4) // Log last 4 digits only
-  });
-
   // Test mode - send via both providers for comparison
   if (config.testMode) {
-    console.log('🧪 Test mode: Sending via both providers...');
-    
     const [resendResult, slicktextResult] = await Promise.allSettled([
       config.resendEnabled ? sendViaResend(request) : Promise.resolve({ success: false, provider: 'resend' as const, error: 'Disabled' }),
       config.slicktextEnabled ? sendViaSlickText(request) : Promise.resolve({ success: false, provider: 'slicktext' as const, error: 'Disabled' })
     ]);
-
-    // Log comparison results
-    console.log('🧪 Test mode results:', {
-      resend: resendResult.status === 'fulfilled' ? resendResult.value : { error: resendResult.reason },
-      slicktext: slicktextResult.status === 'fulfilled' ? slicktextResult.value : { error: slicktextResult.reason }
-    });
 
     // Return primary provider result
     const primaryResult = config.primaryProvider === 'slicktext' ? slicktextResult : resendResult;
@@ -216,8 +194,6 @@ export async function sendUnifiedSMS(request: SMSRequest): Promise<SMSResponse> 
 
   // If primary failed and fallback is enabled, try fallback provider
   if (config.enableFallback) {
-    console.log(`⚠️ Primary provider (${config.primaryProvider}) failed, trying fallback...`);
-    
     let fallbackResult: SMSResponse;
     
     if (config.primaryProvider === 'slicktext' && config.resendEnabled) {
@@ -233,7 +209,6 @@ export async function sendUnifiedSMS(request: SMSRequest): Promise<SMSResponse> 
     }
 
     if (fallbackResult.success) {
-      console.log(`✅ Fallback provider succeeded: ${fallbackResult.provider}`);
       return {
         ...fallbackResult,
         fallbackUsed: true

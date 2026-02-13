@@ -46,7 +46,6 @@ export async function POST() {
         .limit(1);
 
       if (!recentTransactions || recentTransactions.length === 0) {
-        console.log(`No transactions found for ${merchant.merchant_name}, skipping`);
         continue;
       }
 

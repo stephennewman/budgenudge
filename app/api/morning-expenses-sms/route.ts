@@ -13,8 +13,6 @@ const TARGET_USER_ID = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 
 export async function POST() {
   try {
-    console.log('🌅 Starting morning expenses SMS for user:', TARGET_USER_ID);
-
     // Get user's phone number from SMS settings
     const { data: smsSettings } = await supabase
       .from('user_sms_settings')
@@ -63,8 +61,6 @@ async function buildMorningExpensesMessage(userId: string): Promise<string> {
   
   // Calculate rest of month date range
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  console.log(`📅 Fetching expenses from ${today.toISOString()} to ${endOfMonth.toISOString()}`);
   
   let message = `🌅 MORNING SNAPSHOT\n\n`;
   
@@ -286,7 +282,6 @@ async function getRecentlyPaidExpenses(userId: string): Promise<Array<{
     }
     
     if (!trackedMerchants || trackedMerchants.length === 0) {
-      console.log('No tracked merchants found for user');
       return expenses;
     }
     
@@ -298,7 +293,6 @@ async function getRecentlyPaidExpenses(userId: string): Promise<Array<{
       .is('deleted_at', null);
     
     if (!userItems || userItems.length === 0) {
-      console.log('No items found for user');
       return expenses;
     }
     

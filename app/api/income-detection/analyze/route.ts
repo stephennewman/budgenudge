@@ -32,8 +32,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🔍 Starting income detection analysis for user: ${user_id}`);
-    
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -43,8 +41,6 @@ export async function POST(request: NextRequest) {
     const endDate = new Date();
     const startDate = new Date();
     startDate.setMonth(endDate.getMonth() - lookback_months);
-    
-    console.log(`📅 Analyzing transactions from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
     
     // Get user's items to ensure proper access
     const { data: userItems, error: itemsError } = await supabase
@@ -78,8 +74,6 @@ export async function POST(request: NextRequest) {
         error: 'Failed to fetch transaction data' 
       }, { status: 500 });
     }
-    
-    console.log(`💰 Found ${transactions?.length || 0} negative transactions (potential income) to analyze`);
     
     if (!transactions || transactions.length === 0) {
       return NextResponse.json({
@@ -122,8 +116,6 @@ export async function POST(request: NextRequest) {
     
     // Log the analysis
     await logIncomeAnalysis(supabase, user_id, result);
-    
-    console.log(`✅ Income detection completed. Found ${detectedPatterns.length} patterns with ${Math.round(totalConfidence)}% confidence`);
     
     return NextResponse.json({
       success: true,

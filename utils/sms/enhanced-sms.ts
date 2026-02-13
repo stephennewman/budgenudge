@@ -26,8 +26,6 @@ export async function sendEnhancedSMS({
   preferBandwidth = true 
 }: EnhancedSMSOptions): Promise<SMSResult> {
   
-  console.log('📱 Using enhanced SMS via unified system...');
-  
   try {
     // Use the unified SMS system (SlickText + Resend fallback)
          const result = await sendUnifiedSMS({

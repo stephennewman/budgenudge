@@ -27,7 +27,6 @@ export default function SlickTextForm() {
         
         // Check if script already exists globally to avoid duplicates
         if (document.querySelector('script[src*="slicktext.com"]')) {
-          console.log('SlickText script already loaded');
           setFormLoading(false);
           return;
         }
@@ -38,7 +37,6 @@ export default function SlickTextForm() {
         script.async = true;
         
         script.onload = () => {
-          console.log('SlickText script loaded successfully');
           timeoutId = setTimeout(() => setFormLoading(false), 2000);
         };
         

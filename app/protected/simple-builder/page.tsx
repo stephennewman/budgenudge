@@ -60,17 +60,13 @@ export default function SimpleBuilderPage() {
 
   // Function to fetch variable data directly from Supabase
   const fetchVariableData = async (variableId: string): Promise<string> => {
-    console.log('🔍 fetchVariableData called with:', variableId);
-    
     try {
       // Get current user once at the beginning
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
-        console.error('❌ Auth error in fetchVariableData:', authError);
+        console.error('Auth error in fetchVariableData:', authError);
         return '[Authentication Error]';
       }
-      
-      console.log('✅ User authenticated:', user.id);
       
       switch (variableId) {
         case 'today-date':
@@ -91,7 +87,6 @@ export default function SimpleBuilderPage() {
           
           if (userItems && userItems.length > 0) {
             const itemIds = userItems.map(item => item.id);
-            console.log('🔍 Looking for accounts with item IDs:', itemIds);
             
             const { count: accountCount } = await supabase
               .from('accounts')
@@ -99,10 +94,8 @@ export default function SimpleBuilderPage() {
               .in('item_id', itemIds)
               .is('deleted_at', null);
               
-            console.log('🔍 Found account count:', accountCount);
             return `${accountCount || 0} account${(accountCount || 0) !== 1 ? 's' : ''} connected`;
           }
-          console.log('🔍 No user items found');
           return '0 accounts connected';
           
         case 'last-transaction-date':
@@ -321,8 +314,6 @@ export default function SimpleBuilderPage() {
       sendFirstSmsNow: sendFirstSmsNow
     };
     
-    console.log('🔍 Saving schedule with data:', JSON.stringify(requestBody, null, 2));
-    
     try {
       const response = await fetch('/api/template-schedules', {
         method: 'POST',
@@ -331,7 +322,6 @@ export default function SimpleBuilderPage() {
       });
 
       const result = await response.json();
-      console.log('🔍 Save response:', { status: response.status, result });
       
       if (response.ok) {
         setCurrentSchedule(result.schedule);
@@ -380,17 +370,12 @@ export default function SimpleBuilderPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { over, active } = event;
     
-    console.log('🔍 Drag event:', { over, active, variableId: active.id });
-    
     if (over?.id === 'canvas') {
       const variableId = active.id as string;
-      
-      console.log('✅ Variable dropped on canvas:', variableId);
       
       // Add the variable to canvas
       setCanvasItems(prev => {
         const newItems = [...prev, variableId];
-        console.log('📝 Updated canvas items:', newItems);
         return newItems;
       });
       
@@ -401,8 +386,6 @@ export default function SimpleBuilderPage() {
         'warning-icon', 'info-icon', 'money-icon', 'calendar-icon', 'bank-icon', 'sparkle',
         'fire', 'rocket', 'trophy', 'heart'
       ].includes(variableId);
-      
-      console.log('🔍 Is formatting variable:', isFormattingVariable);
       
       if (isFormattingVariable) {
         // For formatting variables, insert the predefined value directly
@@ -472,12 +455,7 @@ export default function SimpleBuilderPage() {
             formatValue = '';
         }
         
-        console.log('🎨 Formatting variable value:', formatValue);
-        setPreviewText(prev => {
-          const newText = prev + (prev ? '\n' : '') + formatValue;
-          console.log('📝 Updated preview text:', newText);
-          return newText;
-        });
+        setPreviewText(prev => prev + (prev ? '\n' : '') + formatValue);
       } else {
         // For data variables, fetch the variable value directly from Supabase
         try {
@@ -488,8 +466,6 @@ export default function SimpleBuilderPage() {
           setPreviewText(prev => prev + (prev ? '\n' : '') + `[${variableId} - Error]`);
         }
       }
-    } else {
-      console.log('❌ Variable not dropped on canvas:', over?.id);
     }
   };
 

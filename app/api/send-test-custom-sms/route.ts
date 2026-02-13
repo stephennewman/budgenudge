@@ -23,8 +23,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📱 Test SMS request from user: ${user.id}`);
-
     // Get user's phone number
     const phoneNumber = await getUserPhoneNumber(user.id);
     
@@ -33,8 +31,6 @@ export async function POST(request: NextRequest) {
         error: 'No phone number found. Please add a phone number to your profile to receive test SMS messages.' 
       }, { status: 400 });
     }
-
-    console.log(`📱 Sending test SMS to phone ending in: ${phoneNumber.slice(-4)}`);
 
     // Prepare the test message with template name and line break
     const displayName = templateName || 'Test Template';
@@ -50,8 +46,6 @@ export async function POST(request: NextRequest) {
     });
     
     if (smsResult.success) {
-      console.log(`✅ Test SMS sent successfully via ${smsResult.provider}:`, smsResult.messageId);
-      
       return NextResponse.json({ 
         success: true, 
         message: 'Test SMS sent successfully!',

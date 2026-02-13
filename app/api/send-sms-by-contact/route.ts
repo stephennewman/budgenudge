@@ -8,8 +8,6 @@ export async function POST(request: NextRequest) {
       throw new Error('Contact ID and message are required');
     }
     
-    console.log(`📱 Sending SMS to contact ID: ${contactId}`);
-    
     const apiKey = process.env.SLICKTEXT_API_KEY;
     const brandId = process.env.SLICKTEXT_BRAND_ID;
     const baseUrl = 'https://dev.slicktext.com/v1';
@@ -34,8 +32,6 @@ export async function POST(request: NextRequest) {
     });
     
     const responseText = await response.text();
-    console.log(`📝 SlickText Message Response (${response.status}):`, responseText);
-    
     if (!response.ok) {
       throw new Error(`SlickText API error: ${response.status} - ${responseText}`);
     }
@@ -46,8 +42,6 @@ export async function POST(request: NextRequest) {
     } catch {
       responseData = { message: responseText };
     }
-    
-    console.log('✅ SMS sent successfully via contact ID');
     
     return NextResponse.json({
       success: true,

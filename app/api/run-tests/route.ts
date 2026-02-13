@@ -44,8 +44,6 @@ export async function POST() {
   const results: TestResult[] = [];
   const startTime = Date.now();
 
-        console.log('🧪 Starting Krezzo Test Suite...');
-
   // Test 1: Database Connection
   results.push(await runTest('Database Connection', async () => {
     const { error } = await supabase.from('accounts').select('count').limit(1);
@@ -227,8 +225,6 @@ export async function POST() {
     duration: totalDuration,
     results
   };
-
-  console.log(`🧪 Test Suite Complete: ${passed}/${results.length} passed in ${totalDuration}ms`);
 
   return NextResponse.json({
     success: failed === 0,

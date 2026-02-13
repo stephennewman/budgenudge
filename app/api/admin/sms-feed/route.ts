@@ -28,8 +28,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Forbidden: Superadmin access required' }, { status: 403 });
     }
 
-    console.log(`📡 SMS Feed request from superadmin: ${user.id}`);
-
     // Query recent SMS sends from sms_send_log (ALL USERS - not filtered by user_id)
     const { data: smsLogs, error: fetchError } = await supabase
       .from('sms_send_log')
@@ -51,7 +49,6 @@ export async function GET() {
       
       if (formatLogs && formatLogs.length > 0) {
         debugLogs.push(...formatLogs);
-        console.log(`🎯 Found ${formatLogs.length} SMS logs for Ashley's phone in format: ${phoneFormat}`);
       }
     }
 
@@ -65,7 +62,6 @@ export async function GET() {
 
     if (wildcardLogs && wildcardLogs.length > 0) {
       debugLogs.push(...wildcardLogs);
-      console.log(`🔍 Wildcard search found ${wildcardLogs.length} SMS logs containing "5084934141"`);
     }
 
     // Remove duplicates and sort by most recent
@@ -79,9 +75,7 @@ export async function GET() {
       .from('sms_send_log')
       .select('*', { count: 'exact', head: true });
 
-    console.log(`🔍 Ashley phone debug: Found ${debugLogs?.length || 0} total logs across all formats, Total SMS logs: ${totalCount || 0}`);
     if (debugLogs && debugLogs.length > 0) {
-      console.log(`📱 Most recent SMS to Ashley (format: ${debugLogs[0].phone_number}):`, debugLogs[0]);
     }
 
     if (fetchError) {
@@ -112,8 +106,6 @@ export async function GET() {
     const todayEntries = feedEntries.filter(entry => 
       entry.timestamp.startsWith(today)
     );
-
-    console.log(`📊 SMS Feed stats: ${total} total, ${successful} successful, ${failed} failed, ${todayEntries.length} today`);
 
     return NextResponse.json({
       success: true,

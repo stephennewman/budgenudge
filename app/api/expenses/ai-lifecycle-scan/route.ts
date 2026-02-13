@@ -46,9 +46,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId required' }, { status: 400 });
     }
 
-    console.log(`🤖 Starting AI-powered expense lifecycle scan...`);
-    console.log(`📊 Mode: ${scanAllUsers ? 'ALL USERS' : `Single user ${userId}`}`);
-
     let userIds: string[] = [];
     
     if (scanAllUsers) {
@@ -60,7 +57,6 @@ export async function POST(request: NextRequest) {
       
       if (activeUsers) {
         userIds = [...new Set(activeUsers.map(item => item.user_id))];
-        console.log(`👥 Processing ${userIds.length} users`);
       }
     } else {
       userIds = [userId];
@@ -93,8 +89,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    console.log(`✅ Lifecycle scan complete:`, results);
-
     return NextResponse.json({
       success: true,
       results
@@ -116,8 +110,6 @@ async function processUserExpenses(userId: string): Promise<{
   amountChanges: number;
   multiPatternSplits: number;
 }> {
-  console.log(`\n🔍 Processing user: ${userId}`);
-
   // Get user's items
   const { data: userItems } = await supabase
     .from('items')
@@ -126,7 +118,6 @@ async function processUserExpenses(userId: string): Promise<{
     .is('deleted_at', null);
 
   if (!userItems || userItems.length === 0) {
-    console.log(`⏭️  No connected accounts for user ${userId}`);
     return { newBills: 0, paidBills: 0, dormantBills: 0, amountChanges: 0, multiPatternSplits: 0 };
   }
 
@@ -145,20 +136,13 @@ async function processUserExpenses(userId: string): Promise<{
     .order('date', { ascending: false });
 
   if (!transactions || transactions.length === 0) {
-    console.log(`⏭️  No transactions for user ${userId}`);
     return { newBills: 0, paidBills: 0, dormantBills: 0, amountChanges: 0, multiPatternSplits: 0 };
   }
 
-  console.log(`💳 Analyzing ${transactions.length} transactions`);
-
   // Step 1: Detect recurring patterns
   const recurringPatterns = await detectRecurringPatterns(transactions);
-  console.log(`📊 Found ${recurringPatterns.length} recurring patterns`);
-
   // Step 2: Detect multi-pattern merchants with AI
   const multiPatternMerchants = await detectMultiPatternMerchants(transactions, recurringPatterns);
-  console.log(`🔀 Found ${multiPatternMerchants.length} multi-pattern merchants`);
-
   // Step 3: Get existing tagged merchants
   const { data: existingBills } = await supabase
     .from('tagged_merchants')
@@ -169,7 +153,7 @@ async function processUserExpenses(userId: string): Promise<{
     (existingBills || []).map(bill => [bill.merchant_name.toLowerCase(), bill])
   );
 
-  let stats = {
+  const stats = {
     newBills: 0,
     paidBills: 0,
     dormantBills: 0,
@@ -215,12 +199,13 @@ async function processUserExpenses(userId: string): Promise<{
     }
   }
 
-  console.log(`✅ User ${userId} complete:`, stats);
   return stats;
 }
 
 // Detect recurring transaction patterns
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const merchantGroups = new Map<string, any[]>();
 
   // Group by merchant
@@ -298,7 +283,8 @@ function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
 
 // AI-powered multi-pattern detection
 async function detectMultiPatternMerchants(
-  transactions: any[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  _transactions: any[],
   patterns: RecurringPattern[]
 ): Promise<MultiPatternMerchant[]> {
   const merchantPatternMap = new Map<string, RecurringPattern[]>();
@@ -383,6 +369,7 @@ Respond in JSON format:
 
     return {
       merchant,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       patterns: aiResult.patterns.map((p: any, i: number) => ({
         averageAmount: p.averageAmount || patterns[i].averageAmount,
         frequency: p.frequency || patterns[i].frequency,
@@ -421,8 +408,6 @@ async function createSplitBills(
   multiMerchant: MultiPatternMerchant,
   accountIdentifier: string
 ) {
-  console.log(`🔀 Creating split bills for ${multiMerchant.merchant}`);
-
   const splitGroupId = `split_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
   for (const pattern of multiMerchant.patterns) {
@@ -449,7 +434,6 @@ async function createSplitBills(
         updated_at: new Date().toISOString()
       });
 
-    console.log(`  ✅ Created: ${merchantName} ($${pattern.averageAmount.toFixed(2)} ${pattern.frequency})`);
   }
 }
 
@@ -459,8 +443,6 @@ async function createNewBill(
   pattern: RecurringPattern,
   accountIdentifier: string
 ) {
-  console.log(`➕ New bill detected: ${pattern.merchant} ($${pattern.averageAmount.toFixed(2)} ${pattern.frequency})`);
-
   await supabase
     .from('tagged_merchants')
     .insert({
@@ -482,9 +464,11 @@ async function createNewBill(
 
 // Update existing bill with new transaction data
 async function updateExistingBill(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   existingBill: any,
   pattern: RecurringPattern,
-  transactions: any[]
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+  _transactions: any[]
 ): Promise<{ paid: boolean; amountChanged: boolean }> {
   let paid = false;
   let amountChanged = false;
@@ -514,7 +498,6 @@ async function updateExistingBill(
       .eq('id', existingBill.id);
 
     paid = true;
-    console.log(`  ✅ Marked paid: ${existingBill.merchant_name} ($${recentTx.amount})`);
   }
 
   // Check for amount change (>10% difference)
@@ -529,7 +512,6 @@ async function updateExistingBill(
       .eq('id', existingBill.id);
 
     amountChanged = true;
-    console.log(`  💰 Amount changed: ${existingBill.merchant_name} $${existingBill.expected_amount} → $${pattern.averageAmount}`);
   }
 
   return { paid, amountChanged };
@@ -546,7 +528,6 @@ async function markBillAsDormant(billId: number) {
     })
     .eq('id', billId);
 
-  console.log(`  💤 Marked dormant: Bill ID ${billId}`);
 }
 
 // Helper functions

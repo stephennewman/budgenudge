@@ -69,8 +69,6 @@ export class SlickTextClient {
     const url = `${this.baseUrl}/brands/${this.config.brandId}${endpoint}`;
     
     try {
-      console.log(`🌐 SlickText API Request: ${options.method || 'GET'} ${url}`);
-      
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -87,7 +85,6 @@ export class SlickTextClient {
       }
 
       const responseText = await response.text();
-      console.log(`📝 SlickText Response (${response.status}):`, responseText);
 
       let data: any = {};
       try {
@@ -116,8 +113,6 @@ export class SlickTextClient {
    */
   async createContact(contact: SlickTextContact): Promise<SlickTextResponse> {
     try {
-      console.log('👤 Creating SlickText contact:', contact.phone_number);
-      
       // First, check if contact already exists
       const cleanPhone = contact.phone_number.replace(/\D/g, '');
       try {
@@ -128,7 +123,6 @@ export class SlickTextClient {
         });
         
         if (existingContact) {
-          console.log('✅ Contact already exists:', existingContact.contact_id);
           return {
             success: true,
             data: existingContact,
@@ -136,7 +130,7 @@ export class SlickTextClient {
           };
         }
       } catch (lookupError) {
-        console.log('⚠️ Could not check for existing contact, proceeding with creation:', lookupError);
+        // Could not check for existing contact, proceeding with creation
       }
       
       const data = await this.makeRequest('/contacts', {
@@ -157,12 +151,9 @@ export class SlickTextClient {
         messageId: data.id
       };
     } catch (error) {
-      console.log('⚠️ Contact creation failed:', error);
-      
       // Handle duplicate contact error specifically
       if (error instanceof Error && error.message.includes('422') && 
           error.message.includes('mobile number already exists')) {
-        console.log('🔄 Contact already exists, trying to find it...');
         
         try {
           const cleanPhone = contact.phone_number.replace(/\D/g, '');
@@ -175,7 +166,6 @@ export class SlickTextClient {
           });
           
           if (existingContact) {
-            console.log('✅ Found existing contact after duplicate error:', existingContact.contact_id);
             return {
               success: true,
               data: existingContact,
@@ -183,7 +173,7 @@ export class SlickTextClient {
             };
           }
         } catch (findError) {
-          console.log('⚠️ Could not find existing contact after duplicate error:', findError);
+          // Could not find existing contact after duplicate error
         }
       }
       
@@ -199,11 +189,6 @@ export class SlickTextClient {
    */
   async sendSMS(message: SlickTextMessage): Promise<SlickTextResponse> {
     try {
-      console.log('📱 Sending SlickText SMS...', {
-        contentLength: message.content.length,
-        phoneNumbers: message.phone_numbers?.length || (message.contact ? 1 : 0)
-      });
-
       const phoneNumbers = message.phone_numbers || 
         (message.contact ? [message.contact.phone_number] : []);
 
@@ -220,7 +205,6 @@ export class SlickTextClient {
         } else if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
           phoneNumber = '+' + phoneNumber;
         }
-        console.log('📤 Step 1: Ensuring contact exists for', phoneNumber);
 
         // Check if contact exists
         let contactId: number | null = null;
@@ -234,12 +218,9 @@ export class SlickTextClient {
           
           if (existingContact) {
             contactId = existingContact.contact_id;
-            console.log('✅ Found existing contact:', contactId, 'for phone:', cleanPhoneNumber);
-          } else {
-            console.log('📭 No existing contact found for phone:', cleanPhoneNumber);
           }
         } catch (error) {
-          console.log('⚠️ Could not check existing contacts:', error);
+          // Could not check existing contacts
         }
 
         // Create contact if it doesn't exist
@@ -254,22 +235,17 @@ export class SlickTextClient {
               source: 'Krezzo Financial Alerts'
             };
 
-            console.log('📤 Creating new contact:', createContactPayload);
-
             const contactResponse = await this.makeRequest('/contacts', {
               method: 'POST',
               body: JSON.stringify(createContactPayload)
             });
 
             contactId = contactResponse.contact_id;
-            console.log('✅ Created new contact:', contactId);
           } catch (contactError) {
-            console.log('⚠️ Contact creation failed, will try without contact_id:', contactError);
             
             // Check if this is a duplicate contact error (422)
             if (contactError instanceof Error && contactError.message.includes('422') && 
                 contactError.message.includes('mobile number already exists')) {
-              console.log('🔄 Duplicate contact detected, trying to find existing contact...');
               
               // Try to find the existing contact again with different search methods
               try {
@@ -284,10 +260,9 @@ export class SlickTextClient {
                 
                 if (retryContact) {
                   contactId = retryContact.contact_id;
-                  console.log('✅ Found existing contact on retry:', contactId);
                 }
               } catch (retryError) {
-                console.log('⚠️ Retry contact search also failed:', retryError);
+                // Retry contact search also failed
               }
             }
           }
@@ -311,14 +286,10 @@ export class SlickTextClient {
             messagePayload.send_immediately = false;
           }
 
-          console.log('📤 Sending message via messages endpoint:', messagePayload);
-
           const messageResponse = await this.makeRequest('/messages', {
             method: 'POST',
             body: JSON.stringify(messagePayload)
           });
-
-          console.log('✅ SlickText SMS sent successfully via messages:', messageResponse);
 
           return {
             success: true,
@@ -327,7 +298,6 @@ export class SlickTextClient {
             deliveryStatus: 'sent'
           };
         } catch (messageError) {
-          console.log('⚠️ Messages endpoint failed, trying campaigns:', messageError);
 
           // Method 3: Try creating a campaign for the message
           try {
@@ -351,14 +321,10 @@ export class SlickTextClient {
               campaignPayload.send_immediately = false;
             }
 
-            console.log('📤 Creating campaign:', campaignPayload);
-
             const campaignResponse = await this.makeRequest('/campaigns', {
               method: 'POST',
               body: JSON.stringify(campaignPayload)
             });
-
-            console.log('✅ SlickText SMS sent successfully via campaign:', campaignResponse);
 
             return {
               success: true,
@@ -367,7 +333,6 @@ export class SlickTextClient {
               deliveryStatus: 'sent'
             };
           } catch (campaignError) {
-            console.log('❌ All methods failed:', { messageError, campaignError });
             throw messageError; // Return the messages error as it's more likely to be the right approach
           }
         }
@@ -448,11 +413,8 @@ export class SlickTextClient {
    */
   async testConnection(): Promise<SlickTextResponse> {
     try {
-      console.log('🧪 Testing SlickText connection...');
-      
       const brandInfo = await this.getBrandInfo();
       if (brandInfo.success) {
-        console.log('✅ SlickText connection successful:', brandInfo.data);
         return {
           success: true,
           data: brandInfo.data

@@ -99,8 +99,6 @@ export default function DataSamplePage() {
         throw new Error('Authentication error');
       }
 
-      console.log('🔍 Sampling data for user:', user.id);
-
       // Get user's Plaid items first
       const { data: userItems } = await supabase
         .from('items')
@@ -109,11 +107,7 @@ export default function DataSamplePage() {
         .is('deleted_at', null)
         .limit(10);
 
-      console.log('🔍 Found user items:', userItems?.length || 0);
-      console.log('🔍 User items details:', userItems);
-
       if (!userItems || userItems.length === 0) {
-        console.log('❌ No Plaid items found for user');
         setDataSample({
           user: { id: user.id, email: user.email || '' },
           accounts: { count: 0, total_balance: 0, types: [], sample: [] },
@@ -137,36 +131,6 @@ export default function DataSamplePage() {
       const itemDbIds = userItems.map(item => item.id); // Database IDs for accounts
       const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean); // Plaid IDs for transactions
 
-      console.log('🔍 Using database item IDs:', itemDbIds);
-      console.log('🔍 Using Plaid item IDs:', plaidItemIds);
-      console.log('🔍 User ID being used:', user.id);
-
-      // Debug: Check transaction structure and relationships
-      if (plaidItemIds.length > 0) {
-        const { data: sampleTransactions, error: txError } = await supabase
-          .from('transactions')
-          .select('id, plaid_item_id, account_id, name, amount, date')
-          .in('plaid_item_id', plaidItemIds)
-          .limit(5);
-        
-        console.log('🔍 Sample transactions structure:', sampleTransactions);
-        console.log('🔍 Transaction error:', txError);
-        
-        if (sampleTransactions && sampleTransactions.length > 0) {
-          const uniqueAccountIds = [...new Set(sampleTransactions.map(tx => tx.account_id).filter(Boolean))];
-          console.log('🔍 Unique account IDs from sample transactions:', uniqueAccountIds);
-        }
-      }
-
-      // Debug: Check if accounts exist at all for this user
-      const { data: allUserAccounts, error: accountsError } = await supabase
-        .from('accounts')
-        .select('*')
-        .limit(5);
-      
-      console.log('🔍 All accounts in database:', allUserAccounts);
-      console.log('🔍 Accounts error:', accountsError);
-
       // Sample 1: Account Information - Use the correct pattern from working SMS builder
       let accounts: Array<{
         id: string;
@@ -180,11 +144,8 @@ export default function DataSamplePage() {
       }> = [];
 
       // Get user's Plaid items first, then get accounts linked to those items (correct pattern)
-      console.log('🔍 Getting accounts using correct pattern for user:', user.id);
-      
       if (userItems && userItems.length > 0) {
         const itemIds = userItems.map(item => item.id);
-        console.log('🔍 Looking for accounts with item IDs:', itemIds);
         
         const { data: accountsData, error: accountsError } = await supabase
           .from('accounts')
@@ -208,23 +169,8 @@ export default function DataSamplePage() {
         
         if (accountsData && accountsData.length > 0) {
           accounts = accountsData;
-          console.log('🔍 Accounts found via item_id relationship:', accounts.length);
-          console.log('🔍 First account sample:', accounts[0]);
-        } else {
-          console.log('🔍 No accounts found via item_id relationship');
-          console.log('🔍 Item IDs used:', itemIds);
-          console.log('🔍 User ID:', user.id);
         }
-      } else {
-        console.log('🔍 No user items found for user:', user.id);
       }
-      
-      // Debug: Show what we found
-      console.log('🔍 Final accounts result:', {
-        count: accounts.length,
-        accounts: accounts,
-        user_id: user.id
-      });
 
       // Sample 2: Recent Transactions with AI categorization
       const { data: recentTransactions } = await supabase
@@ -354,15 +300,8 @@ export default function DataSamplePage() {
       // Calculate derived metrics
       const totalBalance = accounts?.reduce((sum, acc) => {
         const balance = acc.available_balance ?? acc.current_balance ?? 0;
-        console.log(`🔍 Account ${acc.name}: available_balance=${acc.available_balance}, current_balance=${acc.current_balance}, calculated=${balance}`);
         return sum + balance;
       }, 0) || 0;
-
-      console.log('🔍 Total balance calculation:', {
-        accountsCount: accounts?.length || 0,
-        accountsData: accounts,
-        totalBalance
-      });
 
       const monthlySpending = spendingCategories?.reduce((sum, tx) => {
         // Since we filtered for negative amounts (expenses), we need to make them positive for display

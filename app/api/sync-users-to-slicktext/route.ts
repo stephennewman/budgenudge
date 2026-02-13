@@ -10,8 +10,6 @@ export async function POST(request: NextRequest) {
   try {
     const { user_email_filter, limit = 10 } = await request.json();
     
-    console.log('🔄 Starting batch sync of users to SlickText...');
-
     // Get users who have phone numbers but haven't been synced to SlickText
     let query = supabase
       .from('user_sms_settings')
@@ -46,8 +44,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`📱 Found ${smsUsers.length} users to potentially sync to SlickText`);
-
     const results = [];
     let successCount = 0;
     let skipCount = 0;
@@ -59,7 +55,6 @@ export async function POST(request: NextRequest) {
         const { data: authUser } = await supabase.auth.admin.getUserById(smsUser.user_id);
         
         if (!authUser.user?.email) {
-          console.log(`⚠️ Skipping user ${smsUser.user_id} - no email`);
           skipCount++;
           continue;
         }
@@ -73,7 +68,6 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (existingSync) {
-          console.log(`⏭️ User ${authUser.user.email} already synced to SlickText`);
           skipCount++;
           continue;
         }
@@ -94,7 +88,6 @@ export async function POST(request: NextRequest) {
         const syncResult = await syncResponse.json();
         
         if (syncResponse.ok && syncResult.success) {
-          console.log(`✅ Synced ${authUser.user.email} to SlickText`);
           successCount++;
           results.push({
             user_id: smsUser.user_id,
@@ -104,7 +97,6 @@ export async function POST(request: NextRequest) {
             slicktext_contact_id: syncResult.slicktext_contact_id
           });
         } else {
-          console.log(`❌ Failed to sync ${authUser.user.email}:`, syncResult.error);
           errorCount++;
           results.push({
             user_id: smsUser.user_id,
@@ -128,8 +120,6 @@ export async function POST(request: NextRequest) {
         });
       }
     }
-
-    console.log(`🎉 Batch sync completed: ${successCount} success, ${skipCount} skipped, ${errorCount} errors`);
 
     return NextResponse.json({
       success: true,

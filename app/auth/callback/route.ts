@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const error = searchParams.get("error");
   const error_description = searchParams.get("error_description");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const next = searchParams.get("next") ?? "/protected";
 
   // Handle explicit errors from email provider
@@ -20,15 +21,12 @@ export async function GET(request: NextRequest) {
 
   // No code provided - redirect to verification error page
   if (!code) {
-    console.warn('Auth callback: No verification code provided');
     return NextResponse.redirect(
       `${origin}/auth/verification-error?error=missing_code&description=${encodeURIComponent('No verification code provided')}`
     );
   }
 
   try {
-    console.log('🔐 Processing email verification...');
-    
     const client = await createSupabaseClient();
     const { data: session, error: exchangeError } = await client.auth.exchangeCodeForSession(code);
     
@@ -61,16 +59,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('✅ Email verification successful for user:', session.user.id);
-
     // Set up user data after successful verification
     await setupNewUser(session.user);
 
     // Successful verification - redirect to protected area with success message
     const successUrl = `${origin}/protected?verified=true`;
-    console.log('🚀 Redirecting to:', successUrl);
-    console.log('🔍 Origin:', origin);
-    console.log('🔍 Next param:', next);
     
     return NextResponse.redirect(successUrl);
 
@@ -87,8 +80,6 @@ export async function GET(request: NextRequest) {
  */
 async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken?: string } }) {
   try {
-    console.log('🛠️ Setting up new user:', user.id);
-    
     // Create admin Supabase client for user setup
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -107,9 +98,7 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       .single();
 
     if (smsError && !smsError.message?.includes('duplicate')) {
-      console.warn('SMS settings setup error:', smsError);
-    } else {
-      console.log('✅ SMS settings created for user');
+      // Non-blocking: continue setup
     }
 
     // 2. Create default SMS preferences (only 3 types enabled)
@@ -128,9 +117,7 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       .insert(defaultPreferences);
 
     if (prefsError && !prefsError.message?.includes('duplicate')) {
-      console.warn('SMS preferences setup error:', prefsError);
-    } else {
-      console.log('✅ SMS preferences created for user');
+      // Non-blocking: continue setup
     }
 
     // 3. Check for sample SMS lead conversion (tracking token match)
@@ -153,13 +140,6 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
           })
           .eq('id', lead.id);
 
-        console.log('✅ Sample SMS lead converted via tracking token:', {
-          leadId: lead.id,
-          userId: user.id,
-          trackingToken: user.user_metadata.sampleSmsToken,
-          phoneNumber: lead.phone_number,
-          daysToConversion: Math.floor((Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60 * 24))
-        });
       }
     }
 
@@ -206,12 +186,10 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
               );
 
               if (phoneUpdateError) {
-                console.warn('Phone update error (non-blocking):', phoneUpdateError);
-              } else {
-                console.log('📞 User phone number updated in auth.users:', formattedPhone);
+                // Non-blocking: continue
               }
-            } catch (phoneError) {
-              console.warn('Phone update failed (non-blocking):', phoneError);
+            } catch {
+              // Non-blocking: continue
             }
 
             // Also update SMS settings table with phone number for SMS delivery
@@ -222,25 +200,14 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
                 .eq('user_id', user.id);
 
               if (smsPhoneError) {
-                console.warn('SMS settings phone update error (non-blocking):', smsPhoneError);
-              } else {
-                console.log('📱 User phone number updated in SMS settings:', mostRecentPhone);
+                // Non-blocking: continue
               }
-            } catch (smsPhoneError) {
-              console.warn('SMS settings phone update failed (non-blocking):', smsPhoneError);
+            } catch {
+              // Non-blocking: continue
             }
           }
         }
 
-        console.log('✅ SlickText leads linked via email:', {
-          email: authUser.user.email,
-          userId: user.id,
-          leadCount: emailLeads.length,
-          leadIds: leadIds,
-          sources: emailLeads.map(l => l.source),
-          phones: emailLeads.map(l => l.phone_number),
-          phoneUpdated: phoneNumbers.length > 0
-        });
       }
     }
 
@@ -251,8 +218,6 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
       const signupPhone = authUser.user?.user_metadata?.signupPhone;
       
       if (signupPhone && signupPhone.length >= 10) {
-        console.log('📞 Processing required phone from signup form:', signupPhone);
-        
         // Update auth.users with phone number
         const formattedPhone = `+1${signupPhone}`;
         await supabase.auth.admin.updateUserById(user.id, { phone: formattedPhone });
@@ -266,12 +231,9 @@ async function setupNewUser(user: { id: string; user_metadata?: { sampleSmsToken
             phone_number: signupPhone 
           });
         
-        console.log('✅ Required signup phone number stored:', formattedPhone);
-      } else {
-        console.log('⚠️ No phone number provided during signup (this should not happen with required field)');
       }
-    } catch (phoneError) {
-      console.log('⚠️ Signup phone processing error (non-blocking):', phoneError);
+    } catch {
+      // Non-blocking: continue
     }
 
     // 6. Send welcome text message to new user
@@ -302,13 +264,11 @@ Connect your bank account in the app to unlock these insights!`;
           context: 'welcome_new_user'
         });
 
-        if (smsResult.success) {
-          console.log('✅ Welcome text sent successfully:', smsResult.messageId);
-        } else {
-          console.warn('⚠️ Welcome text failed (non-blocking):', smsResult.error);
+        if (!smsResult.success) {
+          // Non-blocking: continue
         }
-      } catch (welcomeError) {
-        console.warn('⚠️ Welcome text error (non-blocking):', welcomeError);
+      } catch {
+        // Non-blocking: continue
       }
     }
 
@@ -317,13 +277,8 @@ Connect your bank account in the app to unlock these insights!`;
     try {
       const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
       if (authUser.user?.email) {
-        console.log('📱 Adding new user to SlickText as subscriber...');
-        
         // Use the updated phone number or fallback to what's in the database
         const phoneForSlickText = updatedPhone || authUser.user.phone;
-        
-        console.log('📞 Phone number for SlickText:', phoneForSlickText);
-        console.log('📋 User metadata:', authUser.user.user_metadata);
         
         const slickTextResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/add-user-to-slicktext`, {
           method: 'POST',
@@ -337,21 +292,15 @@ Connect your bank account in the app to unlock these insights!`;
           })
         });
 
-        const slickTextResult = await slickTextResponse.json();
-        console.log('📱 SlickText API response:', slickTextResult);
+        await slickTextResponse.json();
 
-        if (slickTextResponse.ok) {
-          console.log('✅ User added to SlickText:', slickTextResult.slicktext_contact_id || 'success');
-        } else {
-          console.log('⚠️ SlickText subscription failed (non-blocking):', slickTextResponse.status, slickTextResult);
+        if (!slickTextResponse.ok) {
+          // Non-blocking: continue
         }
       }
-    } catch (slickTextError) {
-      console.log('⚠️ SlickText subscription error (non-blocking):', slickTextError);
+    } catch {
       // Non-blocking: User setup continues even if SlickText subscription fails
     }
-
-    console.log('🎉 New user setup completed successfully');
 
     // 7. Send Slack notification for new signup (non-blocking)
     try {
@@ -367,8 +316,7 @@ Connect your bank account in the app to unlock these insights!`;
           conversionSource: authUser.user.user_metadata?.sampleSmsToken ? `Tracking Token: ${authUser.user.user_metadata.sampleSmsToken}` : undefined
         });
       }
-    } catch (slackError) {
-      console.log('⚠️ Slack notification error (non-blocking):', slackError);
+    } catch {
       // Non-blocking: User setup continues even if Slack notification fails
     }
 

@@ -43,7 +43,6 @@ export async function notifySlackNewUserSignup(user: SlackUser): Promise<boolean
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   
   if (!webhookUrl) {
-    console.log('⚠️ SLACK_WEBHOOK_URL not configured - skipping Slack notification');
     return false;
   }
 
@@ -133,8 +132,6 @@ export async function notifySlackNewUserSignup(user: SlackUser): Promise<boolean
       }
     });
 
-    console.log('📤 Sending Slack notification for new user:', user.id);
-
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
@@ -144,7 +141,6 @@ export async function notifySlackNewUserSignup(user: SlackUser): Promise<boolean
     });
 
     if (response.ok) {
-      console.log('✅ Slack notification sent successfully');
       return true;
     } else {
       const errorText = await response.text();
@@ -165,7 +161,6 @@ export async function notifySlackSimple(message: string): Promise<boolean> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL;
   
   if (!webhookUrl) {
-    console.log('⚠️ SLACK_WEBHOOK_URL not configured - skipping Slack notification');
     return false;
   }
 

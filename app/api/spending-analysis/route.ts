@@ -81,8 +81,6 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📊 Generating spending analysis for user ${user.id}`);
-
     // Get user's item IDs to filter transactions
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -121,8 +119,6 @@ export async function POST() {
         timeframe: 'last 90 days'
       });
     }
-
-    console.log(`📊 Analyzing ${transactions.length} tagged transactions`);
 
     // Calculate total spending
     const totalSpending = transactions.reduce((sum, tx) => sum + tx.amount, 0);
@@ -179,8 +175,6 @@ export async function POST() {
       totalSpending: Math.round(totalSpending * 100) / 100,
       timeframe: 'last 90 days'
     };
-
-    console.log(`✅ Analysis complete: ${categories.length} categories, ${merchants.length} merchants, $${totalSpending.toFixed(2)} total`);
 
     return NextResponse.json(result);
 

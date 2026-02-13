@@ -53,7 +53,6 @@ export async function GET(request: NextRequest) {
             });
         } catch {
           // Ignore unique constraint violations (record already exists)
-          console.log(`Preference for ${smsType} may already exist, skipping`);
         }
       }
 

@@ -113,7 +113,6 @@ export async function POST(request: NextRequest) {
       // 🆕 PHASE 1: Trigger AI tagging for all historical transactions
       // This ensures new users see clean merchant names from day 1
       try {
-        console.log('🤖 Triggering historical AI tagging for new account...');
         const tagResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tag-all-transactions`, {
           method: 'POST',
           headers: { 
@@ -126,20 +125,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (tagResponse.ok) {
-          const tagResult = await tagResponse.json();
-          console.log('✅ Historical AI tagging initiated:', tagResult.tagged || 0, 'transactions processed');
+          await tagResponse.json();
         } else {
-          console.log('⚠️ Historical AI tagging failed (non-blocking):', tagResponse.status);
         }
-      } catch (tagError) {
-        console.log('⚠️ Historical AI tagging error (non-blocking):', tagError);
+      } catch {
         // Non-blocking: Account setup continues even if AI tagging fails
       }
 
       // 🆕 PHASE 2: Trigger auto-selection for pacing tracking
       // This sets up merchant and category tracking for new users automatically
       try {
-        console.log('🎯 Triggering pacing auto-selection for new account...');
         const autoSelectResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auto-select-pacing`, {
           method: 'POST',
           headers: { 
@@ -149,24 +144,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (autoSelectResponse.ok) {
-          const autoSelectResult = await autoSelectResponse.json();
-          console.log('✅ Pacing auto-selection completed:', {
-            merchants: autoSelectResult.merchants_selected || 0,
-            categories: autoSelectResult.categories_selected || 0,
-            total: autoSelectResult.total_selected || 0
-          });
+          await autoSelectResponse.json();
         } else {
-          console.log('⚠️ Pacing auto-selection failed (non-blocking):', autoSelectResponse.status);
         }
-      } catch (autoSelectError) {
-        console.log('⚠️ Pacing auto-selection error (non-blocking):', autoSelectError);
+      } catch {
         // Non-blocking: Account setup continues even if auto-selection fails
       }
 
       // 🆕 PHASE 3: Trigger automatic recurring bill detection
       // This analyzes transaction patterns to auto-detect recurring bills
       try {
-        console.log('💳 Triggering automatic recurring bill detection for new account...');
         const billDetectionResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/auto-detect-recurring-bills`, {
           method: 'POST',
           headers: { 
@@ -180,24 +167,16 @@ export async function POST(request: NextRequest) {
         });
 
         if (billDetectionResponse.ok) {
-          const billResult = await billDetectionResponse.json();
-          console.log('✅ Automatic recurring bill detection completed:', {
-            bills_detected: billResult.bills_detected || 0,
-            total_monthly_amount: billResult.total_monthly_amount || 0
-          });
+          await billDetectionResponse.json();
         } else {
-          console.log('⚠️ Automatic recurring bill detection failed (non-blocking):', billDetectionResponse.status);
         }
-      } catch (billDetectionError) {
-        console.log('⚠️ Automatic recurring bill detection error (non-blocking):', billDetectionError);
+      } catch {
         // Non-blocking: Account setup continues even if bill detection fails
       }
 
       // 🆕 PHASE 4: Complete SMS workflow setup for new users
       // This ensures all future users get full SMS functionality automatically
       try {
-        console.log('📱 Setting up complete SMS workflow for new user...');
-        
         // 4A: Create SMS preferences for all 4 message types
         const smsPreferencesResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/sms-preferences`, {
           method: 'POST',
@@ -217,9 +196,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (smsPreferencesResponse.ok) {
-          console.log('✅ SMS preferences created for all 4 message types');
         } else {
-          console.log('⚠️ SMS preferences setup failed (non-blocking):', smsPreferencesResponse.status);
         }
 
         // 4B: Create user_sms_settings with default 8AM send time
@@ -242,21 +219,16 @@ export async function POST(request: NextRequest) {
           });
 
         if (!smsSettingsError) {
-          console.log('✅ SMS settings created with 8AM default send time');
         } else {
-          console.log('⚠️ SMS settings creation failed (non-blocking):', smsSettingsError.message);
         }
 
-      } catch (smsSetupError) {
-        console.log('⚠️ SMS workflow setup error (non-blocking):', smsSetupError);
+      } catch {
         // Non-blocking: Account setup continues even if SMS setup fails
       }
 
       // 🆕 PHASE 5: Trigger onboarding SMS sequence
       // This starts the 3-message onboarding flow for new bank connections
       try {
-        console.log('🎯 Starting onboarding SMS sequence...');
-        
         // Get user's phone number for SMS
         const { data: authUser } = await supabase.auth.admin.getUserById(user.id);
         let userPhone = authUser.user?.phone || authUser.user?.user_metadata?.signupPhone;
@@ -273,8 +245,6 @@ export async function POST(request: NextRequest) {
         }
 
         if (userPhone && userPhone.length >= 10) {
-          console.log('📱 User has phone number, starting onboarding sequence...');
-          
           const onboardingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/onboarding-sms-sequence`, {
             method: 'POST',
             headers: { 
@@ -288,22 +258,12 @@ export async function POST(request: NextRequest) {
           });
 
           if (onboardingResponse.ok) {
-            const onboardingResult = await onboardingResponse.json();
-            console.log('✅ Onboarding SMS sequence started:', {
-              sequenceId: onboardingResult.sequenceId,
-              immediate: onboardingResult.summary?.immediate,
-              total_scheduled: onboardingResult.summary ? 
-                (onboardingResult.summary.analysisComplete === 'scheduled' ? 1 : 0) +
-                (onboardingResult.summary.dayBefore === 'scheduled' ? 1 : 0) : 0
-            });
+            await onboardingResponse.json();
           } else {
-            console.log('⚠️ Onboarding SMS sequence failed to start:', onboardingResponse.status);
           }
         } else {
-          console.log('ℹ️ No phone number available, skipping onboarding SMS sequence');
         }
-      } catch (onboardingError) {
-        console.log('⚠️ Onboarding SMS sequence error (non-blocking):', onboardingError);
+      } catch {
         // Non-blocking: Account setup continues even if onboarding SMS fails
       }
     }

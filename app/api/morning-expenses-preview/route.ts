@@ -12,8 +12,6 @@ const TARGET_USER_ID = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 
 export async function GET() {
   try {
-    console.log('👁️ Previewing morning expenses message for user:', TARGET_USER_ID);
-
     // Build the morning expenses message (same logic as the SMS route but don't send)
     const morningMessage = await buildMorningExpensesMessage(TARGET_USER_ID);
     
@@ -40,8 +38,6 @@ async function buildMorningExpensesMessage(userId: string): Promise<string> {
   
   // Calculate rest of month date range
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  
-  console.log(`📅 Fetching expenses from ${today.toISOString()} to ${endOfMonth.toISOString()}`);
   
   let message = `🌅 MORNING SNAPSHOT\n\n`;
   
@@ -161,7 +157,6 @@ async function getRecentlyPaidExpenses(userId: string): Promise<Array<{
     }
     
     if (!trackedMerchants || trackedMerchants.length === 0) {
-      console.log('No tracked merchants found for user');
       return expenses;
     }
     
@@ -173,7 +168,6 @@ async function getRecentlyPaidExpenses(userId: string): Promise<Array<{
       .is('deleted_at', null);
     
     if (!userItems || userItems.length === 0) {
-      console.log('No items found for user');
       return expenses;
     }
     

@@ -25,8 +25,6 @@ interface Account {
 
 export async function POST() {
   try {
-    console.log('📊 Generating real data SMS for Stephen Newman...');
-    
     // Get Stephen Newman's user ID by email (assuming he's the main user)
     const { data: userData } = await supabase.auth.admin.listUsers();
     
@@ -41,7 +39,6 @@ export async function POST() {
       
       if (stephenUser) {
         stephenUserId = stephenUser.id;
-        console.log('✅ Found Stephen Newman user:', stephenUser.email);
       }
     }
     
@@ -54,7 +51,6 @@ export async function POST() {
       
       if (items && items.length > 0) {
         stephenUserId = items[0].user_id;
-        console.log('📝 Using fallback user ID:', stephenUserId);
       } else {
         throw new Error('No users found in the database');
       }
@@ -96,8 +92,6 @@ export async function POST() {
     if (!accounts || accounts.length === 0) {
       throw new Error('No accounts found for user');
     }
-    
-    console.log(`📊 Found ${transactions.length} transactions and ${accounts.length} accounts`);
     
     if (!stephenUserId) {
       throw new Error('User ID not found');
@@ -310,7 +304,6 @@ async function findRealUpcomingBills(transactions: Transaction[], userId: string
   
   // If no tagged merchants found, show a helpful message
   if (bills.length === 0) {
-    console.log('No active recurring bills found in tagged_merchants table');
   }
   
   return bills.sort((a, b) => a.predictedDate.getTime() - b.predictedDate.getTime());

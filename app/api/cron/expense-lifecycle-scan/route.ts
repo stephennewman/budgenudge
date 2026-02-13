@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('🤖 Starting nightly expense lifecycle scan...');
     const startTime = Date.now();
 
     // Call the AI lifecycle scan API for all users
@@ -49,8 +48,6 @@ export async function GET(request: NextRequest) {
     if (!scanResult.success) {
       throw new Error(`Scan failed: ${scanResult.error}`);
     }
-
-    console.log(`✅ Expense lifecycle scan complete in ${duration}ms:`, scanResult.results);
 
     return NextResponse.json({
       success: true,

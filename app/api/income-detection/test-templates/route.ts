@@ -12,23 +12,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🧪 Testing paycheck-period SMS templates for user: ${user_id}`);
-    
     const templatesToTest = template_types || [];
 // TEMPORARILY DISABLED - Paycheck templates
 // ['paycheck-efficiency', 'cash-flow-runway']
     const results = [];
     
     for (const templateType of templatesToTest) {
-      console.log(`📝 Generating ${templateType} SMS for user: ${user_id}`);
-      
       const message = await generateSMSMessage(user_id, templateType);
-      
-      console.log(`📊 ${templateType} Message Generated:`);
-      console.log('---');
-      console.log(message);
-      console.log('---');
-      console.log(`📏 Message length: ${message.length} characters`);
       
       results.push({
         template: templateType,

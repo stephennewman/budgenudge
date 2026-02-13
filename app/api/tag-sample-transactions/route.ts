@@ -12,8 +12,6 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`🏷️ Tagging sample transactions for user ${user.id}`);
-
     // Get user's item IDs
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -48,8 +46,6 @@ export async function POST() {
       });
     }
 
-    console.log(`🔍 Found ${transactions.length} untagged transactions to test`);
-
     const results = [];
     let taggedCount = 0;
 
@@ -64,7 +60,6 @@ export async function POST() {
           subcategory: transaction.subcategory
         };
 
-        console.log(`🧠 Tagging: "${transaction.name}"`);
         const aiResult = await tagMerchantWithAI(input);
 
         // Update the transaction with AI tags
@@ -90,7 +85,6 @@ export async function POST() {
             ai_merchant_name: aiResult.merchant_name,
             ai_category_tag: aiResult.category_tag
           });
-          console.log(`✅ Tagged: "${transaction.name}" → "${aiResult.merchant_name}" (${aiResult.category_tag})`);
         }
 
         // Small delay to avoid overwhelming OpenAI

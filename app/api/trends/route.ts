@@ -34,8 +34,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📈 Generating historical trends data for user ${user.id}`);
-
     // Get user's item IDs to filter transactions
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -73,50 +71,9 @@ export async function GET() {
       });
     }
 
-    console.log(`📊 Processing ${allTransactions.length} historical transactions`);
-    
-    // Log recent transactions to verify latest data is included
-    const recentTransactions = allTransactions.slice(-10);
-    console.log(`📅 Most recent transactions:`, recentTransactions.map(t => ({
-      date: t.date,
-      merchant: t.ai_merchant_name || t.merchant_name || t.name,
-      amount: t.amount
-    })));
-    
-    // Check for September 2025 data specifically
-    const sept2025Transactions = allTransactions.filter(t => 
-      t.date >= '2025-09-01' && t.date <= '2025-09-30'
-    );
-    console.log(`📅 September 2025 transactions: ${sept2025Transactions.length}`);
-    if (sept2025Transactions.length > 0) {
-      console.log(`📅 September 2025 sample:`, sept2025Transactions.slice(0, 5).map(t => ({
-        date: t.date,
-        merchant: t.ai_merchant_name || t.merchant_name || t.name,
-        amount: t.amount
-      })));
-      
-      // Check if September data is being processed in merchant grouping
-      const septMerchants = new Map();
-      sept2025Transactions.forEach(tx => {
-        const merchant = tx.ai_merchant_name || tx.merchant_name || tx.name || 'Unknown';
-        if (!septMerchants.has(merchant)) {
-          septMerchants.set(merchant, { total: 0, count: 0 });
-        }
-        const data = septMerchants.get(merchant);
-        data.total += tx.amount;
-        data.count += 1;
-      });
-      console.log(`📊 September merchants (top 5):`, Array.from(septMerchants.entries())
-        .sort(([,a], [,b]) => b.total - a.total)
-        .slice(0, 5)
-        .map(([name, data]) => ({ name, total: data.total, count: data.count })));
-    }
-
     // Get date range
     const firstTransactionDate = allTransactions[0].date;
     const lastTransactionDate = allTransactions[allTransactions.length - 1].date;
-
-    console.log(`📅 Date range: ${firstTransactionDate} to ${lastTransactionDate}`);
 
     // Generate weekly and monthly time series data
     // Generate individual merchant and category time series
@@ -130,27 +87,13 @@ export async function GET() {
       lastTransactionDate
     };
 
-    console.log(`✅ Generated historical trends: ${merchants.length} merchants, ${categories.length} categories`);
-    console.log(`📊 Data structure validation:`, {
-      hasMerchants: Array.isArray(merchants),
-      hasCategories: Array.isArray(categories),
-      merchantsLength: merchants.length,
-      categoriesLength: categories.length,
-      firstDate: firstTransactionDate,
-      lastDate: lastTransactionDate
-    });
-
     return NextResponse.json(trendsData);
 
   } catch (error) {
     console.error('Error generating historical trends:', error);
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to generate historical trends data', details: error.message },
+      { error: 'Failed to generate historical trends data', details: message },
       { status: 500 }
     );
   }
@@ -245,15 +188,12 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
   startOfWeek.setDate(start.getDate() - start.getDay()); // Sunday
   startOfWeek.setHours(0, 0, 0, 0);
   
-  console.log(`📅 Weekly data range: ${startOfWeek.toISOString().split('T')[0]} to ${endOfCurrentMonth.toISOString().split('T')[0]} (last transaction: ${lastTxDate.toISOString().split('T')[0]})`);
-  
   const currentWeek = new Date(startOfWeek);
   let weekCount = 0;
   while (currentWeek <= endOfCurrentMonth) {
     weekCount++;
     
     if (weekCount > 100) { // Safety break to prevent infinite loop
-      console.error('⚠️ Breaking out of week loop - too many weeks');
       break;
     }
     const weekEnd = new Date(currentWeek);
@@ -265,14 +205,6 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
       return txDate >= currentWeek && txDate <= weekEnd;
     });
     
-    // Special debug for September weeks
-    if (currentWeek.getMonth() === 8 && currentWeek.getFullYear() === 2025) { // September 2025
-      console.log(`🔍 September week ${formatWeekPeriod(currentWeek)}: Found ${weekTransactions.length} transactions`);
-      if (weekTransactions.length > 0) {
-        console.log(`🔍 Sample Sept transactions:`, weekTransactions.slice(0, 3).map(tx => ({ date: tx.date, amount: tx.amount })));
-      }
-    }
-    
     const amount = weekTransactions.reduce((sum, tx) => sum + tx.amount, 0);
     
     weeklyData.push({
@@ -281,20 +213,12 @@ function generateMerchantWeeklyData(transactions: Array<{amount: number; date: s
       count: weekTransactions.length
     });
     
-    // Log each week being processed for debugging
-    if (weekTransactions.length > 0) {
-      console.log(`📊 Week ${formatWeekPeriod(currentWeek)}: $${amount.toFixed(2)} (${weekTransactions.length} transactions)`);
-    } else {
-      console.log(`📊 Week ${formatWeekPeriod(currentWeek)}: $0.00 (0 transactions)`);
-    }
-
     currentWeek.setDate(currentWeek.getDate() + 7);
   }
   
   // Sort by period to ensure chronological order
   weeklyData.sort((a, b) => a.period.localeCompare(b.period));
   
-  console.log(`📈 Generated ${weeklyData.length} weekly periods`);
   return weeklyData;
 }
 
@@ -313,8 +237,6 @@ function generateMerchantMonthlyData(transactions: Array<{amount: number; date: 
   
   const startOfMonth = new Date(start.getFullYear(), start.getMonth(), 1);
   const currentMonth = new Date(startOfMonth);
-  
-  console.log(`📅 Monthly data range: ${startOfMonth.toISOString().split('T')[0]} to ${currentMonthEnd.toISOString().split('T')[0]} (through current month)`);
   
   while (currentMonth <= currentMonthEnd) {
     const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);

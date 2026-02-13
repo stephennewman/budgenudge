@@ -5,10 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const { item_id } = await request.json();
 
-    console.log('🔌 Disconnect API called with:', { item_id });
-
     if (!item_id) {
-      console.log('❌ Missing item_id');
       return NextResponse.json(
         { error: 'item_id is required' },
         { status: 400 }
@@ -35,8 +32,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('✅ User authenticated:', user.id);
-
     // Verify user owns this item
     const { data: itemData, error: itemError } = await supabase
       .from('items')
@@ -45,8 +40,6 @@ export async function POST(request: NextRequest) {
       .eq('user_id', user.id)
       .single();
 
-    console.log('🔍 Item lookup result:', { itemData: itemData?.id, error: itemError });
-
     if (itemError || !itemData) {
       console.error('❌ Item not found or not owned by user:', itemError);
       return NextResponse.json(
@@ -54,8 +47,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    console.log('🔌 Disconnecting item:', itemData.id);
 
     // Mark item as disconnected
     const now = new Date();
@@ -74,8 +65,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log('✅ Account disconnected successfully');
 
     // Return success response
     return NextResponse.json({

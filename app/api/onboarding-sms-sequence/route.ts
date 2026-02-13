@@ -42,8 +42,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`🎯 Starting onboarding SMS sequence for user: ${userId}`);
-
     // Clean phone number for SMS
     const cleanPhone = phoneNumber.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
@@ -63,13 +61,10 @@ export async function POST(request: NextRequest) {
     // ===================================
     // MESSAGE 1: IMMEDIATE WELCOME
     // ===================================
-    console.log('📱 Sending immediate onboarding message...');
-    
     try {
       // Check deduplication
       const immediateCheck = await canSendSMS(cleanPhone, 'onboarding-immediate');
       if (!immediateCheck.canSend) {
-        console.log('⚠️ Immediate message already sent today, skipping');
         results.immediate = { skipped: true, reason: immediateCheck.reason };
       } else {
         // Generate and send immediate message
@@ -94,7 +89,6 @@ export async function POST(request: NextRequest) {
         });
 
         results.immediate = immediateResult;
-        console.log('✅ Immediate message sent:', immediateResult.success ? 'success' : 'failed');
       }
     } catch (error) {
       console.error('❌ Error sending immediate message:', error);
@@ -104,8 +98,6 @@ export async function POST(request: NextRequest) {
     // ===================================
     // MESSAGE 2: ANALYSIS COMPLETE (Scheduled)
     // ===================================
-    console.log('⏰ Scheduling analysis complete message...');
-    
     try {
       // Schedule message for 8 minutes from now (gives AI time to complete)
       const analysisCompleteTime = new Date(Date.now() + 8 * 60 * 1000); // 8 minutes
@@ -122,7 +114,6 @@ export async function POST(request: NextRequest) {
         scheduled: true, 
         scheduledAt: analysisCompleteTime.toISOString() 
       };
-      console.log('✅ Analysis complete message scheduled for:', analysisCompleteTime);
     } catch (error) {
       console.error('❌ Error scheduling analysis complete message:', error);
       results.analysisComplete = { error: error instanceof Error ? error.message : 'Unknown error' };
@@ -131,8 +122,6 @@ export async function POST(request: NextRequest) {
     // ===================================
     // MESSAGE 3: DAY BEFORE (Scheduled)
     // ===================================
-    console.log('⏰ Scheduling day-before message...');
-    
     try {
       // Schedule for 6 PM the same day (if after 6 PM) or next day at 6 PM
       const now = new Date();
@@ -157,7 +146,6 @@ export async function POST(request: NextRequest) {
         scheduled: true, 
         scheduledAt: dayBeforeTime.toISOString() 
       };
-      console.log('✅ Day-before message scheduled for:', dayBeforeTime);
     } catch (error) {
       console.error('❌ Error scheduling day-before message:', error);
       results.dayBefore = { error: error instanceof Error ? error.message : 'Unknown error' };
@@ -228,8 +216,6 @@ async function scheduleOnboardingMessage({
  */
 export async function GET() {
   try {
-    console.log('🔄 Processing scheduled onboarding messages...');
-
     // Get pending messages that are due
     const now = new Date();
     const { data: pendingMessages, error } = await supabase
@@ -245,7 +231,6 @@ export async function GET() {
     }
 
     if (!pendingMessages || pendingMessages.length === 0) {
-      console.log('✅ No pending onboarding messages to process');
       return NextResponse.json({ 
         success: true, 
         processed: 0,
@@ -253,18 +238,12 @@ export async function GET() {
       });
     }
 
-    console.log(`📬 Found ${pendingMessages.length} pending messages to process`);
-
     const results = [];
     for (const message of pendingMessages) {
       try {
-        console.log(`📱 Processing ${message.template_type} for user ${message.user_id}`);
-
         // Check deduplication
         const canSend = await canSendSMS(message.phone_number, message.template_type);
         if (!canSend.canSend) {
-          console.log(`⚠️ Message ${message.template_type} already sent, marking as completed`);
-          
           // Mark as completed (already sent)
           await supabase
             .from('scheduled_onboarding_sms')
@@ -319,8 +298,6 @@ export async function GET() {
           messageId: smsResult.messageId
         });
 
-        console.log(`✅ ${message.template_type} message processed:`, smsResult.success ? 'sent' : 'failed');
-
       } catch (error) {
         console.error(`❌ Error processing message ${message.id}:`, error);
         
@@ -342,8 +319,6 @@ export async function GET() {
         });
       }
     }
-
-    console.log(`🎯 Processed ${results.length} onboarding messages`);
 
     return NextResponse.json({
       success: true,

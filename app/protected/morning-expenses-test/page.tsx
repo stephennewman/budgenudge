@@ -21,9 +21,7 @@ export default function MorningExpensesTestPage() {
       const data = await response.json();
       setResult(data);
       
-      if (data.success) {
-        console.log('✅ Morning SMS test successful:', data);
-      } else {
+      if (!data.success) {
         console.error('❌ Morning SMS test failed:', data.error);
       }
     } catch (error) {

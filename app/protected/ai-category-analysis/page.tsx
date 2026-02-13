@@ -112,7 +112,6 @@ export default function AICategoryAnalysisPage() {
   // Auto-select top categories for new users
   const runAutoSelection = async () => {
     try {
-      console.log('🤖 Running auto-selection for top categories...');
       const response = await fetch('/api/category-pacing-tracking/auto-select', {
         method: 'POST',
       });
@@ -120,11 +119,8 @@ export default function AICategoryAnalysisPage() {
       const data = await response.json();
       
       if (data.success && data.auto_selected?.length > 0) {
-        console.log(`✅ Auto-selected ${data.auto_selected.length} categories:`, data.category_analysis);
         // Refresh tracked categories to show the newly selected ones
         await fetchTrackedCategories();
-      } else {
-        console.log('ℹ️ Auto-selection result:', data.message);
       }
     } catch (error) {
       console.error('Error in auto-selection:', error);
@@ -307,9 +303,6 @@ export default function AICategoryAnalysisPage() {
             spendingTrend = change > 0 ? 'increasing' : 'decreasing';
           }
         }
-
-        // Debug logging for transaction count comparison
-        console.log(`${aiCategory}: All-time: ${data.transactionCount}, Current month: ${data.currentMonthTransactionCount}`);
 
         return {
           ai_category: aiCategory,

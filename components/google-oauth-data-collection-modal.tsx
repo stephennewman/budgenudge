@@ -123,7 +123,6 @@ export default function GoogleOAuthDataCollectionModal({
         });
 
         if (slickTextResponse.ok) {
-          console.log('✅ User successfully added to SlickText with complete data');
         } else {
           console.warn('⚠️ SlickText integration failed, but user data was saved');
         }

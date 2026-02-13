@@ -239,7 +239,7 @@ export class BrandExtractor {
     } catch (error) {
       // Log the error for debugging (but don't fail)
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`Failed to fetch logo from ${src}: ${errorMessage}`);
+      // Failed to fetch logo - non-critical, continue
     }
     return null;
   }

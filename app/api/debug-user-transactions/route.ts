@@ -66,11 +66,13 @@ export async function GET(request: Request) {
     }
 
     // Get transaction counts
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { count: totalTxCount, error: totalCountError } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })
       .eq('items.user_id', userId);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { count: activeTxCount, error: activeCountError } = await supabase
       .from('transactions')
       .select('*', { count: 'exact', head: true })

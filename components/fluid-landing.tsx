@@ -49,8 +49,6 @@ class FluidSimulation {
     }
     this.gl = gl;
     
-    console.log('WebGL2 context created successfully', 'Canvas size:', canvas.width, 'x', canvas.height);
-    console.log('Starting fluid simulation with enhanced smoke effects...');
     this.resizeCanvas();
     this.init();
   }
@@ -322,7 +320,6 @@ export default function FluidLanding() {
 
     try {
       simulationRef.current = new FluidSimulation(canvasRef.current);
-      console.log('Fluid simulation initialized successfully');
     } catch (error) {
       console.error('Failed to initialize fluid simulation:', error);
       // Fallback: Create a simple CSS animation background

@@ -8,8 +8,6 @@ const supabase = createClient(
 
 export async function GET() {
   try {
-    console.log('🧪 Testing conversational AI system components...');
-    
     const testResults = {
       database: { status: 'unknown', message: '' },
       tables: { status: 'unknown', message: '' },

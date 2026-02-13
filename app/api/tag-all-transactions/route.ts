@@ -28,8 +28,6 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { max_transactions = 1000 } = body; // Increased default limit
 
-    console.log(`🏷️ Starting bulk AI tagging for user ${user.id}`);
-
     // Get user's item IDs
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -65,8 +63,6 @@ export async function POST(request: Request) {
       });
     }
 
-    console.log(`🔍 Found ${transactions.length} untagged transactions to process`);
-
     // Group transactions by merchant for efficient caching
     const merchantGroups = new Map<string, typeof transactions>();
     transactions.forEach(tx => {
@@ -76,8 +72,6 @@ export async function POST(request: Request) {
       }
       merchantGroups.get(merchantKey)!.push(tx);
     });
-
-    console.log(`📊 Processing ${merchantGroups.size} unique merchants`);
 
     let processedCount = 0;
     let apiCallCount = 0;
@@ -93,7 +87,6 @@ export async function POST(request: Request) {
       .in('merchant_pattern', merchantPatterns);
 
     const cacheMap = new Map(cachedTags?.map(tag => [tag.merchant_pattern, tag]) || []);
-    console.log(`💾 Found ${cachedTags?.length || 0} cached merchant patterns (${cachedTags?.filter(t => t.is_manual_override).length || 0} manual overrides)`);
 
     // Process merchants in smaller batches
     const merchantEntries = Array.from(merchantGroups.entries());
@@ -102,8 +95,6 @@ export async function POST(request: Request) {
       const [merchantPattern, merchantTransactions] = merchantEntries[i];
       const cached = cacheMap.get(merchantPattern);
       
-      console.log(`🔄 Processing merchant ${i + 1}/${merchantEntries.length}: ${merchantPattern}`);
-
       let aiMerchantName: string;
       let aiCategoryTag: string;
 
@@ -112,8 +103,6 @@ export async function POST(request: Request) {
         aiMerchantName = cached.ai_merchant_name;
         aiCategoryTag = cached.ai_category_tag;
         cachedCount += merchantTransactions.length;
-        const overrideLabel = cached.is_manual_override ? ' [MANUAL OVERRIDE]' : '';
-        console.log(`💾 Using cached: ${merchantPattern} → ${aiMerchantName} (${aiCategoryTag})${overrideLabel}`);
       } else {
         // Call AI for new merchant
         try {
@@ -144,11 +133,8 @@ export async function POST(request: Request) {
             console.warn(`Failed to cache merchant pattern: ${cacheError.message}`);
           }
 
-          console.log(`🧠 AI Tagged: ${merchantPattern} → ${aiMerchantName} (${aiCategoryTag})`);
-          
           // Rate limiting: Wait between API calls
           if (apiCallCount % 5 === 0) {
-            console.log('⏳ Rate limiting: Waiting 2 seconds...');
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
 
@@ -185,7 +171,6 @@ export async function POST(request: Request) {
           });
         } else {
           updatedCount += batch.length;
-          console.log(`✅ Updated batch ${i + 1}-${i + batch.length} for ${merchantPattern}`);
         }
       }
 
@@ -200,8 +185,6 @@ export async function POST(request: Request) {
         });
       }
     }
-
-    console.log(`✅ Bulk tagging completed: ${processedCount} transactions processed`);
 
     return NextResponse.json({
       success: true,

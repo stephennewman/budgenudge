@@ -16,8 +16,6 @@ async function executeAITagging(request?: Request) {
       }
     }
 
-    console.log(`🤖 Auto AI Tagging: Starting AI tagging process`);
-
     const supabaseService = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -42,7 +40,6 @@ async function executeAITagging(request?: Request) {
     }
 
     if (!untaggedTransactions || untaggedTransactions.length === 0) {
-      console.log('🤖✅ No untagged transactions found in the last 90 days');
       return NextResponse.json({ 
         success: true, 
         message: 'No untagged transactions found',
@@ -50,8 +47,6 @@ async function executeAITagging(request?: Request) {
         timestamp: new Date().toISOString()
       });
     }
-
-    console.log(`🤖 Found ${untaggedTransactions.length} untagged transactions in last 90 days to process`);
 
     // Group transactions by merchant for efficient processing
     const merchantGroups = new Map<string, typeof untaggedTransactions>();
@@ -86,8 +81,6 @@ async function executeAITagging(request?: Request) {
       }
     }
 
-    console.log(`🤖💾 Loaded ${cacheMap.size} cached merchant patterns from ${Math.ceil(merchantPatterns.length / batchSize)} batches`);
-
     const updates: Array<{id: string, ai_merchant_name: string, ai_category_tag: string}> = [];
     const newMerchantTags: Array<{merchant_pattern: string, ai_merchant_name: string, ai_category_tag: string}> = [];
     let apiCallCount = 0;
@@ -98,7 +91,6 @@ async function executeAITagging(request?: Request) {
       
       if (cached) {
         // Use cached tags
-        console.log(`🤖💾 Using cached tags for ${merchantPattern}: ${cached.ai_merchant_name} (${cached.ai_category_tag})`);
         merchantTransactions.forEach(tx => {
           updates.push({
             id: tx.id,
@@ -138,8 +130,6 @@ async function executeAITagging(request?: Request) {
           });
 
           apiCallCount++;
-          console.log(`🤖🧠 AI Tagged: ${merchantPattern} → ${aiResult.merchant_name} (${aiResult.category_tag})`);
-
           // Rate limiting to prevent API overload
           if (apiCallCount % 5 === 0) {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -161,14 +151,12 @@ async function executeAITagging(request?: Request) {
       if (cacheError) {
         console.error('🤖⚠️ Warning: Failed to cache merchant tags:', cacheError);
       } else {
-        console.log(`🤖💾 Cached ${newMerchantTags.length} new merchant patterns`);
       }
     }
 
     // Update transactions with AI tags in batches
     if (updates.length > 0) {
       const batchSize = 50;
-      let updatedCount = 0;
       
       for (let i = 0; i < updates.length; i += batchSize) {
         const batch = updates.slice(i, i + batchSize);
@@ -184,8 +172,6 @@ async function executeAITagging(request?: Request) {
 
           if (updateError) {
             console.error(`🤖❌ Failed to update transaction ${update.id}:`, updateError);
-          } else {
-            updatedCount++;
           }
         }
 
@@ -195,7 +181,6 @@ async function executeAITagging(request?: Request) {
         }
       }
 
-      console.log(`🤖✅ Updated ${updatedCount} transactions with AI tags`);
     }
 
     const summary = {
@@ -211,7 +196,6 @@ async function executeAITagging(request?: Request) {
       timestamp: new Date().toISOString()
     };
 
-    console.log(`🤖✅ Auto AI tagging summary:`, summary.stats);
     return NextResponse.json(summary);
 
   } catch (error) {
@@ -227,12 +211,10 @@ async function executeAITagging(request?: Request) {
 
 // ✅ GET method for Vercel cron jobs (calls every 15 minutes)
 export async function GET() {
-  console.log('🤖⏰ CRON: Auto AI tagging triggered by Vercel cron');
   return await executeAITagging();
 }
 
 // POST method for manual testing and API calls
 export async function POST(request: Request) {
-  console.log('🤖🔧 MANUAL: Auto AI tagging triggered manually');
   return await executeAITagging(request);
 } 

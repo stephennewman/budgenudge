@@ -76,8 +76,6 @@ Return only valid JSON:`;
     result.merchant_name = toTitleCase(result.merchant_name.trim());
     result.category_tag = toTitleCase(result.category_tag.trim());
 
-    console.log(`✅ AI Tagged: "${rawMerchant}" → "${result.merchant_name}" (${result.category_tag})`);
-    
     return result;
 
   } catch (error) {
@@ -86,8 +84,6 @@ Return only valid JSON:`;
     // Fallback: Return reasonable defaults
     const fallbackMerchant = cleanMerchantName(rawMerchant);
     const fallbackCategory = getFallbackCategory(input);
-    
-    console.log(`🔄 Fallback: "${rawMerchant}" → "${fallbackMerchant}" (${fallbackCategory})`);
     
     return {
       merchant_name: fallbackMerchant,

@@ -55,11 +55,6 @@ export async function generateRecurringTransactionsMessage(userId: string): Prom
       (acc.subtype === 'checking' || acc.subtype === 'savings')
     ) || [];
     
-    // Debug logging to see what accounts are being included
-    console.log('🔍 Recurring bills - Available balance calculation:');
-    console.log('All accounts:', accounts?.map(acc => ({ name: acc.name, type: acc.type, subtype: acc.subtype, balance: acc.available_balance })));
-    console.log('Filtered accounts:', checkingSavingsAccounts?.map(acc => ({ name: acc.name, type: acc.type, subtype: acc.subtype, balance: acc.available_balance })));
-    
     const totalAvailableBalance = checkingSavingsAccounts.reduce(
       (sum, acc) => sum + (acc.available_balance || 0), 
       0
@@ -2004,7 +1999,6 @@ async function getMorningRecentlyPaidExpenses(userId: string): Promise<Array<{
     }
     
     if (!trackedMerchants || trackedMerchants.length === 0) {
-      console.log('No tracked merchants found for user');
       return expenses;
     }
     
@@ -2016,7 +2010,6 @@ async function getMorningRecentlyPaidExpenses(userId: string): Promise<Array<{
       .is('deleted_at', null);
     
     if (!userItems || userItems.length === 0) {
-      console.log('No items found for user');
       return expenses;
     }
     
@@ -2087,8 +2080,6 @@ async function getMorningRecentlyPaidExpenses(userId: string): Promise<Array<{
 // 5:30 PM KREZZO REPORT - Enhanced format with better emojis and readability
 export async function generate415pmSpecialMessage(userId: string): Promise<string> {
   try {
-    console.log('🔍 generate415pmSpecialMessage called for user:', userId);
-    
     // Get user's first name for personalization
     const { data: authUser } = await supabase.auth.admin.getUserById(userId);
     const firstName = authUser?.user?.user_metadata?.firstName || authUser?.user?.user_metadata?.first_name || 'there';
@@ -2158,13 +2149,10 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       .eq('user_id', userId)
       .single();
 
-    console.log('🔍 Income Profile Data:', JSON.stringify(incomeProfile, null, 2));
-
     let incomeCandidates: any[] = [];
     if (incomeProfile?.profile_data?.income_sources) {
       // Use the structured income data from the income page
       const incomeSources = incomeProfile.profile_data.income_sources;
-      console.log('🔍 Income Sources Found:', JSON.stringify(incomeSources, null, 2));
       
       incomeCandidates = incomeSources
         .filter((source: any) => source.frequency !== 'irregular' && source.expected_amount > 0)
@@ -2177,9 +2165,7 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
           confidence_score: source.confidence_score
         }));
       
-      console.log('🔍 Filtered Income Candidates:', JSON.stringify(incomeCandidates, null, 2));
     } else {
-      console.log('🔍 No income profile found, using fallback detection');
       // Fallback to transaction-based detection if no income profile exists
       const lookbackStart = new Date();
       lookbackStart.setDate(lookbackStart.getDate() - 120);
@@ -2478,13 +2464,6 @@ export async function generate415pmSpecialMessage(userId: string): Promise<strin
       message += actionItems[0]; // Show first action item
     } else {
       message += `Keep up the great financial management!`;
-    }
-
-    console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
-    console.log(`📱 SMS Length: ${message.length} characters`);
-    
-    if (message.length > 1600) {
-      console.log(`⚠️ Warning: SMS is ${message.length} characters (recommended: <1600)`);
     }
 
     return message;
@@ -2884,27 +2863,21 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
 function findNextIncome(incomeCandidates: any[]): any {
   if (!incomeCandidates || incomeCandidates.length === 0) return null;
 
-  console.log('🔍 findNextIncome called with:', JSON.stringify(incomeCandidates, null, 2));
-
   // Check if we have structured income data from user_income_profiles
   if (incomeCandidates[0]?.source_name && incomeCandidates[0]?.frequency) {
-    console.log('🔍 Using structured income data');
     // Use structured income data
     const now = new Date();
     const upcomingIncomes: Array<{ source_name: string; expected_amount: number; next_predicted_date: string }>= [];
 
     for (const source of incomeCandidates) {
-      console.log('🔍 Processing income source:', source.source_name);
       let nextDate: Date;
       
       if (source.next_predicted_date && new Date(source.next_predicted_date) >= now) {
         // Use manual override if it's in the future
         nextDate = new Date(source.next_predicted_date);
-        console.log('🔍 Using manual override date:', source.next_predicted_date);
       } else if (source.last_pay_date) {
         // Calculate from last payment date
         nextDate = new Date(source.last_pay_date);
-        console.log('🔍 Calculating from last pay date:', source.last_pay_date);
         
         // Add frequency-based days
         switch (source.frequency) {
@@ -2930,15 +2903,11 @@ function findNextIncome(incomeCandidates: any[]): any {
             }
             break;
           default:
-            console.log('🔍 Skipping irregular frequency:', source.frequency);
             continue; // Skip irregular sources
         }
       } else {
-        console.log('🔍 No date information for source:', source.source_name);
         continue; // Skip if no date information
       }
-
-      console.log('🔍 Calculated next date for', source.source_name, ':', nextDate.toISOString());
 
       upcomingIncomes.push({
         source_name: source.source_name,
@@ -2947,16 +2916,12 @@ function findNextIncome(incomeCandidates: any[]): any {
       });
     }
 
-    console.log('🔍 All upcoming incomes:', JSON.stringify(upcomingIncomes, null, 2));
-
     // Return the soonest income
     const result = upcomingIncomes.sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime())[0] || null;
-    console.log('🔍 Selected income result:', JSON.stringify(result, null, 2));
     return result;
   }
 
-  // NEW: Simple transaction-based income prediction for multiple sources
-  console.log('🔍 Using simple transaction-based income prediction');
+  // Simple transaction-based income prediction for multiple sources
   const now = new Date();
   
   // Group transactions by likely income source
@@ -2972,8 +2937,6 @@ function findNextIncome(incomeCandidates: any[]): any {
     }
     incomeGroups.get(key)!.push(transaction);
   }
-
-  console.log('🔍 Grouped income sources:', Array.from(incomeGroups.keys()));
 
   const incomePredictions: Array<{ source_name: string; expected_amount: number; next_predicted_date: string; confidence: number }> = [];
 
@@ -3037,12 +3000,8 @@ function findNextIncome(incomeCandidates: any[]): any {
   // Sort by next date (soonest first)
   incomePredictions.sort((a, b) => new Date(a.next_predicted_date).getTime() - new Date(b.next_predicted_date).getTime());
 
-  console.log('🔍 Income predictions:', JSON.stringify(incomePredictions, null, 2));
-
   // Return the soonest income prediction
-  const result = incomePredictions[0] || null;
-  console.log('🔍 Selected income result:', JSON.stringify(result, null, 2));
-  return result;
+  return incomePredictions[0] || null;
 }
 
 // Helper function to normalize income source names

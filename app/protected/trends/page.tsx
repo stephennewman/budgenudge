@@ -41,18 +41,15 @@ export default function TrendsPage() {
       setIsLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log('No session found');
         return;
       }
 
-      console.log('Fetching trends data...');
       const response = await fetch('/api/trends', {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Trends data received:', data);
         setTrendsData(data);
       } else {
         const errorData = await response.json();

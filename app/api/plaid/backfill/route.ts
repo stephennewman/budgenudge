@@ -16,8 +16,6 @@ export async function POST() {
   try {
     const supabase = createSupabaseServerClient();
     
-    console.log('🔄 STARTING HISTORICAL BACKFILL...');
-
     // Get all items for backfill
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -35,8 +33,6 @@ export async function POST() {
 
     for (const item of items) {
       try {
-        console.log(`📊 Backfilling item: ${item.plaid_item_id}`);
-        
         // Calculate date range for missing data (30-90 days ago)
         const endDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // 90 days ago
@@ -61,15 +57,12 @@ export async function POST() {
 
           allTransactions = allTransactions.concat(response.data.transactions);
           
-          console.log(`📄 Fetched ${response.data.transactions.length} transactions (offset: ${offset}) for item ${item.plaid_item_id}`);
-          
           // Check if we have more transactions to fetch
           hasMore = response.data.transactions.length === count;
           offset += count;
           
           // Safety check to prevent infinite loops
           if (offset > 10000) {
-            console.log(`⚠️ Safety limit reached for item ${item.plaid_item_id}`);
             break;
           }
         }
@@ -79,9 +72,7 @@ export async function POST() {
           await storeTransactions(allTransactions, item.plaid_item_id);
           totalBackfilled += allTransactions.length;
           
-          console.log(`✅ Backfilled ${allTransactions.length} total transactions for item ${item.plaid_item_id}`);
         } else {
-          console.log(`ℹ️ No historical transactions found for item ${item.plaid_item_id}`);
         }
 
       } catch (error) {
@@ -89,8 +80,6 @@ export async function POST() {
         // Continue with other items even if one fails
       }
     }
-
-    console.log(`🎉 BACKFILL COMPLETE: ${totalBackfilled} total transactions added`);
 
     return NextResponse.json({
       success: true,

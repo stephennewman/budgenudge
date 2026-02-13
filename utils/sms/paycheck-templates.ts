@@ -26,8 +26,6 @@ interface PaycheckPeriodData {
  * Generate paycheck efficiency analysis SMS for any user
  */
 export async function generatePaycheckEfficiencyMessage(userId: string): Promise<string> {
-  console.log('📊 Generating paycheck efficiency analysis for user:', userId);
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -141,8 +139,6 @@ ${statusEmoji} ${sourceNote}
  * Generate cash flow runway analysis for any user
  */
 export async function generateCashFlowRunwayMessage(userId: string): Promise<string> {
-  console.log('🛤️ Generating cash flow runway for user:', userId);
-
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -344,14 +340,11 @@ async function getUserIncomeProfile(userId: string, supabase: any) {
       .single();
     
     if (error || !profile?.setup_completed) {
-      console.log('📝 No conversational profile found, using auto-detection');
       return null;
     }
     
-    console.log('🤖 Using conversational AI income profile:', profile.profile_data);
     return profile.profile_data;
   } catch (error) {
-    console.log('📝 Error fetching conversational profile, using auto-detection');
     return null;
   }
 }

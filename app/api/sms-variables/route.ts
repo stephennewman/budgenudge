@@ -11,17 +11,14 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('🔍 Sampling data for user:', user.id);
-
     // Test query to see if we can get any data for this user
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { data: testUserData, error: testError } = await supabase
       .from('items')
       .select('*')
       .eq('user_id', user.id)
       .limit(1);
     
-    console.log('🔍 Test query result:', { testUserData, testError, userEmail: user.email });
-
     // Get user's Plaid items first (this is the correct data flow)
     const { data: userItems } = await supabase
       .from('items')
@@ -30,11 +27,7 @@ export async function GET() {
       .is('deleted_at', null)
       .limit(10);
 
-    console.log('🔍 Found user items:', userItems?.length || 0);
-    console.log('🔍 User items details:', userItems);
-
     if (!userItems || userItems.length === 0) {
-      console.log('❌ No Plaid items found for user');
       return NextResponse.json({
         user: { id: user.id, email: user.email },
         accounts: { count: 0, total_balance: 0, types: [], sample: [] },
@@ -56,10 +49,6 @@ export async function GET() {
     const itemDbIds = userItems.map(item => item.id); // Database IDs for accounts
     const plaidItemIds = userItems.map(item => item.plaid_item_id).filter(Boolean); // Plaid IDs for transactions
 
-    console.log('🔍 Using database item IDs:', itemDbIds);
-    console.log('🔍 Using Plaid item IDs:', plaidItemIds);
-    console.log('🔍 User ID being used:', user.id);
-
     // Sample 1: Account Information (using itemDbIds like the working transactions API)
     const { data: accounts } = await supabase
       .from('accounts')
@@ -78,12 +67,8 @@ export async function GET() {
       .is('deleted_at', null)
       .limit(10);
 
-    console.log('🔍 Accounts query result:', accounts?.length || 0, 'accounts found');
-    console.log('🔍 Accounts query parameters:', { itemDbIds, user_id: user.id });
     if (accounts && accounts.length > 0) {
-      console.log('🔍 First account sample:', accounts[0]);
     } else {
-      console.log('🔍 No accounts found for item IDs:', itemDbIds);
     }
 
     // Sample 2: Recent Transactions with AI categorization
@@ -198,15 +183,8 @@ export async function GET() {
     // Calculate derived metrics
     const totalBalance = accounts?.reduce((sum, acc) => {
       const balance = acc.available_balance ?? acc.current_balance ?? 0;
-      console.log(`🔍 Account ${acc.name}: available_balance=${acc.available_balance}, current_balance=${acc.current_balance}, calculated=${balance}`);
       return sum + balance;
     }, 0) || 0;
-
-    console.log('🔍 Total balance calculation:', {
-      accountsCount: accounts?.length || 0,
-      accountsData: accounts,
-      totalBalance
-    });
 
     const monthlySpending = spendingCategories?.reduce((sum, tx) => {
       return sum + Math.abs(tx.amount || 0);

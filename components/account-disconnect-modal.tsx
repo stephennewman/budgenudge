@@ -45,9 +45,6 @@ export default function AccountDisconnectModal({
   if (!item) return null;
 
   const handleDisconnect = async () => {
-    console.log('🔍 Modal handleDisconnect - item data:', item);
-    console.log('🔍 plaid_item_id value:', item.plaid_item_id);
-    
     if (!item.plaid_item_id) {
       console.error('❌ Missing plaid_item_id in item:', item);
       alert('Error: Bank connection missing required plaid_item_id. Please refresh the page and try again.');

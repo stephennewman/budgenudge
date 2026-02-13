@@ -9,57 +9,40 @@ export default function JavaFormSlickText() {
   // Backup form capture (in addition to SlickText JavaScript injection)
   // This provides double coverage in case SlickText timing fails
   const setupBackupCapture = () => {
-    console.log('🔧 Setting up backup form capture...');
-    
     let attempts = 0;
     const maxAttempts = 15;
     
     const findAndCaptureForm = () => {
       attempts++;
-      console.log(`🔍 Backup capture attempt ${attempts}/${maxAttempts}`);
-      
       // Look for forms in multiple ways
       const containerForms = document.querySelectorAll('#java-form-container form');
       const allForms = document.querySelectorAll('form');
-      const anyInputs = document.querySelectorAll('input[type="email"], input[type="tel"]');
-      
-      console.log(`📊 Backup found: ${containerForms.length} container forms, ${allForms.length} total forms, ${anyInputs.length} email/phone inputs`);
-      
       const targetForm = containerForms[0] || allForms[0];
       
       if (!targetForm && attempts < maxAttempts) {
-        console.log('⏳ Backup: No form found, retrying...');
         setTimeout(findAndCaptureForm, 1000);
         return;
       }
       
       if (!targetForm) {
-        console.log('❌ Backup: No forms found after all attempts');
         return;
       }
       
-      console.log('📋 Backup: Form found!', targetForm);
-      
       // Check if listener already attached
       if ((targetForm as HTMLFormElement).dataset.krezzoBackupAttached) {
-        console.log('⚠️ Backup: Already attached to this form');
         return;
       }
       
       (targetForm as HTMLFormElement).dataset.krezzoBackupAttached = 'true';
       
       targetForm.addEventListener('submit', function() {
-        console.log('📤 BACKUP CAPTURE: Form submitted!');
-        
         try {
           // Get form data with multiple strategies
           const formData = new FormData(targetForm as HTMLFormElement);
           
-          console.log('📊 Backup: All form fields:');
           const allData: Record<string, string> = {};
           for (const [key, value] of formData.entries()) {
             allData[key] = value.toString();
-            console.log(`  ${key}: ${value}`);
           }
           
           // Find fields by multiple methods
@@ -72,8 +55,6 @@ export default function JavaFormSlickText() {
             const type = (element as HTMLInputElement).type || '';
             const name = element.name || '';
             const placeholder = (element as HTMLInputElement).placeholder || '';
-            
-            console.log(`🔍 Backup checking input: type="${type}" name="${name}" placeholder="${placeholder}" value="${value}"`);
             
             if (type === 'tel' || name.toLowerCase().includes('phone') || placeholder.toLowerCase().includes('phone')) {
               phoneValue = value;
@@ -93,8 +74,6 @@ export default function JavaFormSlickText() {
             phoneNumber: phoneValue
           };
           
-          console.log('📊 Backup captured data:', captureData);
-          
           // Send to our API
           fetch('/api/capture-slicktext-lead', {
             method: 'POST',
@@ -104,8 +83,7 @@ export default function JavaFormSlickText() {
             body: JSON.stringify(captureData)
           })
           .then(response => response.json())
-          .then(data => {
-            console.log('✅ Backup: Successfully sent to Krezzo:', data);
+          .then(() => {
           })
           .catch(error => {
             console.error('❌ Backup: Error sending to Krezzo:', error);
@@ -116,7 +94,6 @@ export default function JavaFormSlickText() {
         }
       });
       
-      console.log('✅ Backup: Submit listener attached successfully');
     };
     
     // Start looking immediately and keep trying
@@ -148,7 +125,6 @@ export default function JavaFormSlickText() {
         
         // Check if script already exists globally to avoid duplicates
         if (document.querySelector('script[src*="030378ec5d0a9dbc2502ad4f47c9afb24"]')) {
-          console.log('Java Form script already loaded');
           setFormLoading(false);
           return;
         }
@@ -159,7 +135,6 @@ export default function JavaFormSlickText() {
         script.async = true;
         
         script.onload = () => {
-          console.log('Java Form script loaded successfully');
           timeoutId = setTimeout(() => setFormLoading(false), 2000);
           
           // Set up backup capture after SlickText script loads

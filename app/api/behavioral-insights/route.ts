@@ -93,14 +93,10 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📊 Generating behavioral insights for user ${user.id}`);
-
     // Get user's signup date from auth metadata
     const userSignupDate = new Date(user.created_at);
     const daysSinceSignup = Math.floor((Date.now() - userSignupDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    console.log(`👤 User signed up ${daysSinceSignup} days ago on ${userSignupDate.toISOString().split('T')[0]}`);
-
     // Get user's item IDs to filter transactions
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -181,8 +177,6 @@ export async function GET() {
       baselineStartDate = new Date(baselineEndDate.getTime() - minimumBaselinePeriod);
     }
 
-    console.log(`📅 Baseline period: ${baselineStartDate.toISOString().split('T')[0]} to ${baselineEndDate.toISOString().split('T')[0]}`);
-
     // Filter transactions by periods
     const baselineTransactions = transactions.filter(tx => {
       const txDate = new Date(tx.date + 'T12:00:00');
@@ -198,8 +192,6 @@ export async function GET() {
       const txDate = new Date(tx.date + 'T12:00:00');
       return txDate >= fourteenDaysAgo;
     });
-
-    console.log(`📊 Transaction counts: Baseline: ${baselineTransactions.length}, 30-day: ${thirtyDayTransactions.length}, 14-day: ${fourteenDayTransactions.length}`);
 
     const baselineDays = Math.max(1, Math.ceil((baselineEndDate.getTime() - baselineStartDate.getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -432,9 +424,6 @@ export async function GET() {
         overall_trend: overallTrend
       }
     };
-
-    console.log(`✅ Generated behavioral insights: ${categories.length} categories, ${merchants.length} merchants analyzed`);
-    console.log(`📈 Overall trend: ${overallTrend} (${totalImprovements} improving, ${totalWorsening} worsening out of ${totalAnalyzed} total)`);
 
     return NextResponse.json(response);
 

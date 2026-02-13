@@ -83,8 +83,7 @@ export default function PlaidSuccessPage() {
         throw new Error('Failed to process transactions');
       }
 
-      const tagResult = await tagResponse.json();
-      console.log('AI Tagging complete:', tagResult);
+      await tagResponse.json();
 
       // Step 2: Generate spending analysis
       setProgressMessage('📊 Generating your spending breakdown...');

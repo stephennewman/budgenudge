@@ -132,8 +132,6 @@ Return JSON with: expense_type, confidence (0-100), reasoning`;
       reasoning: aiResult.reasoning || 'AI classification'
     };
 
-    console.log(`💰 ADF Classified: "${merchantName}" → ${result.expense_type} (${result.confidence}% confidence)`);
-    
     return result;
 
   } catch (error) {
@@ -141,8 +139,6 @@ Return JSON with: expense_type, confidence (0-100), reasoning`;
     
     // Fallback: Rule-based classification
     const fallbackResult = classifyWithRules(merchantName, categoryTag, input.amount);
-    console.log(`🔄 ADF Fallback: "${merchantName}" → ${fallbackResult.expense_type}`);
-    
     return fallbackResult;
   }
 }

@@ -77,6 +77,5 @@ export async function getSmsGatewayWithFallback(
   }
   
   // Fallback to hardcoded number (maintains current functionality)
-  console.log('📱 Falling back to default phone number - user phone not found');
   return '6173472721@tmomail.net';
 } 

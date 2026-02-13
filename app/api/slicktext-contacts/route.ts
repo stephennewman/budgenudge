@@ -3,8 +3,6 @@ import { createSlickTextClient } from '../../../utils/sms/slicktext-client';
 
 export async function GET() {
   try {
-    console.log('🔍 Fetching SlickText contacts...');
-    
     // Use a direct API call since we need to access the contacts endpoint
     const apiKey = process.env.SLICKTEXT_API_KEY;
     const brandId = process.env.SLICKTEXT_BRAND_ID;
@@ -20,8 +18,6 @@ export async function GET() {
     });
     
     const responseText = await response.text();
-    console.log(`📝 SlickText Contacts Response (${response.status}):`, responseText);
-    
     if (!response.ok) {
       throw new Error(`SlickText API error: ${response.status} - ${responseText}`);
     }
@@ -35,8 +31,6 @@ export async function GET() {
     
     const contacts = Array.isArray(contactsData.data) ? contactsData.data : 
                     Array.isArray(contactsData) ? contactsData : [];
-    
-    console.log(`✅ Found ${contacts.length} contacts in SlickText`);
     
     // Format contact information for easier reading
     const formattedContacts = contacts.map((contact: Record<string, unknown>) => ({
@@ -72,8 +66,6 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const { phoneNumber } = await request.json();
-    
-    console.log(`🔍 Searching for contact: ${phoneNumber}`);
     
     const client = createSlickTextClient();
     const result = await client.getContact(phoneNumber);

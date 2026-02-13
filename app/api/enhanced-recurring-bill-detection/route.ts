@@ -16,8 +16,6 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
     
-    console.log(`🔍 Running enhanced recurring bill detection for user: ${userId}`);
-    
     // Get user's transaction data
     const { data: userItems } = await supabase
       .from('items')
@@ -47,8 +45,6 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    console.log(`💳 Analyzing ${allTransactions.length} expense transactions`);
-    
     // Run enhanced detection algorithm
     const detectedBills = runEnhancedBillDetection(allTransactions);
     
@@ -73,8 +69,6 @@ export async function POST(request: NextRequest) {
     
     if (!preview && newBills.length > 0) {
       // Insert new bills into database
-      console.log(`📝 Inserting ${newBills.length} new bills`);
-      
       const billsToInsert = newBills.map(bill => ({
         user_id: userId,
         merchant_name: bill.merchant,

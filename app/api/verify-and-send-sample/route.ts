@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (verifyError || !verificationData) {
-      console.log('Invalid or expired verification code for:', cleanPhone);
       return NextResponse.json({ error: 'Invalid or expired verification code' }, { status: 400 });
     }
 
@@ -94,8 +93,6 @@ export async function POST(request: NextRequest) {
       .delete()
       .eq('phone_number', cleanPhone);
 
-    console.log('✅ Sample SMS sent successfully to:', cleanPhone);
-    
     return NextResponse.json({ 
       success: true, 
       message: 'Sample SMS sent successfully',

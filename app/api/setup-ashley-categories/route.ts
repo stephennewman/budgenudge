@@ -12,8 +12,6 @@ export async function POST() {
   try {
     const ashleyUserId = 'd5671ac4-cd39-4c1b-a897-7298dd15938a';
     
-    console.log('🎯 Setting up category pacing tracking for Ashley...');
-    
     // Get Ashley's Plaid items
     const { data: items } = await supabase
       .from('items')

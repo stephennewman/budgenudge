@@ -95,7 +95,6 @@ export default function RecurringBillsManager() {
         
         // If no bills exist, run first-time initialization
         if (data.taggedMerchants.length === 0) {
-          console.log('🚀 First-time user detected. Initializing expense tracking...');
           setInitializing(true);
           
           try {
@@ -108,8 +107,6 @@ export default function RecurringBillsManager() {
             const initResult = await initResponse.json();
             
             if (initResult.success) {
-              console.log('✅ Expense tracking initialized:', initResult);
-              
               // Re-fetch to get newly detected bills
               const refreshResponse = await fetch('/api/tagged-merchants');
               const refreshData = await refreshResponse.json();
@@ -180,7 +177,6 @@ export default function RecurringBillsManager() {
       
       if (data.success) {
         setEditingId(null);
-        console.log('✅ Merchant updated successfully, refreshing list...');
         fetchTaggedMerchants(); // Refresh the list
       } else {
         console.error('❌ Failed to update merchant:', data.error);

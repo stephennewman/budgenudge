@@ -277,6 +277,7 @@ export async function GET(request: Request) {
 
     // Calculate spending velocity
     const avgTransactionSize = totalCurrent / currentMonthTx.length;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const spendingVelocity = totalChangePercent > 50 ? "High spending velocity" :
                             totalChangePercent < -30 ? "Great spending control" :
                             "Moderate spending pace";

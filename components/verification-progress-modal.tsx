@@ -11,15 +11,10 @@ export default function VerificationProgressModal({
   onClose, 
   userEmail 
 }: VerificationProgressModalProps) {
-  console.log('🎭 MODAL COMPONENT CALLED:', { isOpen, userEmail });
-  
   if (!isOpen) {
-    console.log('🎭 Modal not showing - isOpen is false');
     return null;
   }
 
-  console.log('🎭 MODAL ABOUT TO RENDER');
-  
   return (
     <div 
       style={{

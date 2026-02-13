@@ -5,10 +5,7 @@ export async function POST(request: NextRequest) {
   try {
     const { account_id } = await request.json();
 
-    console.log('🗑️ Disconnect Account API called with:', { account_id });
-
     if (!account_id) {
-      console.log('❌ Missing account_id');
       return NextResponse.json(
         { error: 'account_id is required' },
         { status: 400 }
@@ -34,8 +31,6 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('✅ User authenticated:', user.id);
 
     // Verify user owns this account via the item relationship
     const { data: accountData, error: accountError } = await supabase
@@ -66,8 +61,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🗑️ Disconnecting account:', accountData.id);
-
     // Mark account as disconnected (soft delete)
     const now = new Date();
     const { error: updateError } = await supabase
@@ -84,8 +77,6 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
-
-    console.log('✅ Account disconnected successfully');
 
     // Return success response
     return NextResponse.json({

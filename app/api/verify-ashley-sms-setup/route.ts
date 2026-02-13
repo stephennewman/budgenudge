@@ -16,13 +16,10 @@ export async function POST() {
     const slicktextContactId = '61330767';
     const sendTime = '08:00:00';
 
-    console.log('🔍 Verifying Ashley Newman SMS setup...');
-    
     const issues = [];
     const fixes = [];
 
     // 1. Verify Ashley has an active Plaid-connected item
-    console.log('1. Checking Plaid connection...');
     const { data: items, error: itemsError } = await supabase
       .from('items')
       .select('plaid_item_id, user_id, created_at')
@@ -30,12 +27,9 @@ export async function POST() {
 
     if (itemsError || !items || items.length === 0) {
       issues.push('❌ No Plaid-connected items found for Ashley');
-    } else {
-      console.log(`✅ Found ${items.length} Plaid item(s) for Ashley`);
     }
 
     // 2. Check user_sms_settings
-    console.log('2. Checking SMS settings...');
     const { data: smsSettings, error: smsError } = await supabase
       .from('user_sms_settings')
       .select('*')
@@ -89,13 +83,10 @@ export async function POST() {
         } else {
           fixes.push('✅ Updated SMS settings (phone number and send time)');
         }
-      } else {
-        console.log('✅ SMS settings are correct');
       }
     }
 
     // 3. Check user profile
-    console.log('3. Checking user profile...');
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('email, phone_number')
@@ -126,7 +117,6 @@ export async function POST() {
     }
 
     // 4. Check merchant and category tracking
-    console.log('4. Checking tracking setup...');
     const { data: merchantTracking } = await supabase
       .from('merchant_pacing_tracking')
       .select('count')
@@ -150,7 +140,6 @@ export async function POST() {
     }
 
     // 5. Test SMS generation
-    console.log('5. Testing SMS message generation...');
     const testResults: Record<string, string> = {};
     const messageTypes = ['recurring', 'recent', 'merchant-pacing', 'category-pacing'];
     

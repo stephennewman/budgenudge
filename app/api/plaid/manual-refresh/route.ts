@@ -26,8 +26,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`🔄 Manual transaction refresh requested by user: ${user.id}`);
-
     // Get all items for this user
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -55,17 +53,10 @@ export async function POST(request: Request) {
     // Process each item
     for (const item of items) {
       try {
-        console.log(`🏦 Processing item: ${item.plaid_item_id}`);
-
         // Calculate date range
         const startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const endDate = new Date().toISOString().split('T')[0];
-        console.log(`📅 Fetching transactions from ${startDate} to ${endDate}`);
-
         // Fetch transactions for the last 90 days (same as webhook)
-        console.log(`🔑 Access token check: ${item.plaid_access_token ? 'Present' : 'Missing'}`);
-        console.log(`📋 Request params: start_date=${startDate}, end_date=${endDate}`);
-        
         let transactionsResponse;
         try {
           transactionsResponse = await plaidClient.transactionsGet({
@@ -94,15 +85,10 @@ export async function POST(request: Request) {
           throw plaidError;
         }
 
-        console.log(`📊 Plaid returned ${transactionsResponse.data.transactions.length} total transactions`);
-        
         // Log recent transactions (last 10 days)
         const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
         const recentTransactions = transactionsResponse.data.transactions.filter(t => t.date >= tenDaysAgo);
-        console.log(`📊 ${recentTransactions.length} transactions from last 10 days (since ${tenDaysAgo})`);
-        
         if (recentTransactions.length > 0) {
-          console.log(`📊 Recent transaction dates: ${recentTransactions.map(t => t.date).slice(0, 5).join(', ')}${recentTransactions.length > 5 ? '...' : ''}`);
         }
 
         // Store transactions in database (using verified database plaid_item_id)
@@ -111,7 +97,6 @@ export async function POST(request: Request) {
           item.plaid_item_id
         );
 
-        console.log(`💾 Stored ${storedTransactions?.length || 0} new/updated transactions in database`);
         totalNewTransactions += storedTransactions?.length || 0;
 
         // 🤖 Auto-tag new transactions with AI (non-blocking)
@@ -120,7 +105,6 @@ export async function POST(request: Request) {
           triggerBackgroundAITagging().catch((error: unknown) => {
             console.warn('⚠️ Background AI tagging failed (non-critical):', error);
           });
-          console.log(`🤖 Started background AI tagging for ${storedTransactions.length} new transactions`);
         }
 
         // Update account balances (same as webhook)
@@ -162,8 +146,6 @@ export async function POST(request: Request) {
           status: 'success'
         });
 
-        console.log(`✅ Processed ${transactionsResponse.data.transactions.length} transactions for item ${item.plaid_item_id}`);
-
       } catch (itemError) {
         console.error(`❌ Error processing item ${item.plaid_item_id}:`, itemError);
         results.push({
@@ -178,8 +160,6 @@ export async function POST(request: Request) {
     const message = totalNewTransactions > 0 
       ? `Successfully refreshed! Found ${totalNewTransactions} new/updated transactions across ${items.length} connected account(s).`
       : `Refresh complete! No new transactions found. Your data is up to date.`;
-
-    console.log(`🎉 Manual refresh complete for user ${user.id}: ${totalNewTransactions} new transactions, ${accountsUpdated} accounts updated`);
 
     return NextResponse.json({
       success: true,
@@ -206,8 +186,6 @@ export async function POST(request: Request) {
 // 🤖 Simple background AI tagging using existing API
 async function triggerBackgroundAITagging() {
   try {
-    console.log('🤖 Triggering background AI tagging...');
-    
     // Call the existing tag-all-transactions API (internal call)
     const response = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/tag-all-transactions`, {
       method: 'POST',
@@ -218,8 +196,7 @@ async function triggerBackgroundAITagging() {
     });
 
     if (response.ok) {
-      const result = await response.json();
-      console.log(`🤖 Background AI tagging completed: ${result.tagged || 0} transactions tagged`);
+      await response.json();
     } else {
       console.warn('🤖 Background AI tagging failed with status:', response.status);
     }

@@ -20,7 +20,6 @@ export async function POST(request: Request) {
 
     // PERFORMANCE FIX: Limit to 500 transactions max to prevent timeouts
     const limitedTransactionIds = transaction_ids.slice(0, 500);
-    console.log(`Processing ${limitedTransactionIds.length} of ${transaction_ids.length} transactions for starred status`);
 
     // Get all active tagged merchants for this user
     const { data: taggedMerchants, error: merchantError } = await supabase
@@ -106,8 +105,6 @@ export async function POST(request: Request) {
         .map(m => m.merchant_name.toLowerCase())
     );
 
-    console.log(`Found ${userTransactions.length} user transactions, ${userMerchants.size} starred merchants, ${transactionLinks.size} split links`);
-
     // Determine starred status for each transaction
     const starredStatus = new Map<string, boolean>();
     
@@ -135,8 +132,6 @@ export async function POST(request: Request) {
         starredStatus.set(txId, false);
       }
     });
-
-    console.log(`Returning starred status for ${starredStatus.size} transactions`);
 
     return NextResponse.json({
       success: true,

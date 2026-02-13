@@ -3,34 +3,78 @@ import { plaidClient } from '@/utils/plaid/client';
 import { createSupabaseServerClient } from '@/utils/plaid/server';
 import { storeTransactions } from '@/utils/plaid/server-enhanced';
 import { createClient } from '@supabase/supabase-js';
+import { importJWK, jwtVerify, decodeProtectedHeader } from 'jose';
+import { createHash } from 'crypto';
 
 // Set timeout to 60 seconds for Hobby plan (prevents 503 errors)
 export const maxDuration = 60;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-};
+// Cache verification keys for 24 hours to avoid repeated API calls
+const keyCache = new Map<string, { key: Awaited<ReturnType<typeof importJWK>>; expiresAt: number }>();
 
+async function verifyPlaidWebhook(request: NextRequest, rawBody: string): Promise<boolean> {
+  const signedJwt = request.headers.get('plaid-verification');
+  if (!signedJwt) {
+    return false;
+  }
 
+  try {
+    // 1. Decode the JWT header to get the key ID
+    const header = decodeProtectedHeader(signedJwt);
 
-export async function OPTIONS() {
-  return NextResponse.json({}, { headers: corsHeaders });
+    if (header.alg !== 'ES256') {
+      return false;
+    }
+
+    const kid = header.kid;
+    if (!kid) {
+      return false;
+    }
+
+    // 2. Get the verification key (from cache or Plaid API)
+    let verifyKey: Awaited<ReturnType<typeof importJWK>>;
+    const cached = keyCache.get(kid);
+    if (cached && cached.expiresAt > Date.now()) {
+      verifyKey = cached.key;
+    } else {
+      const keyResponse = await plaidClient.webhookVerificationKeyGet({ key_id: kid });
+      const jwk = keyResponse.data.key;
+      verifyKey = await importJWK(jwk, 'ES256');
+      keyCache.set(kid, { key: verifyKey, expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
+    }
+
+    // 3. Verify the JWT signature
+    const { payload } = await jwtVerify(signedJwt, verifyKey, {
+      algorithms: ['ES256'],
+      clockTolerance: 300, // 5 minute tolerance
+    });
+
+    // 4. Verify the request body hash matches the JWT claim
+    const bodyHash = createHash('sha256').update(rawBody).digest('hex');
+    if (payload.request_body_sha256 !== bodyHash) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Webhook verification failed:', error);
+    return false;
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    // Use CORS headers
-    
-    const body = await request.json();
-    
-    console.log('🎯 WEBHOOK RECEIVED:', body);
-    console.log(`🕐 WEBHOOK TIMESTAMP: ${new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })} EST`);
+    const rawBody = await request.text();
+    const body = JSON.parse(rawBody);
 
-    // Verify webhook (you should implement proper verification in production)
-    // const signature = request.headers.get('plaid-signature');
-    // TODO: Verify webhook signature
+    // Verify webhook signature in production
+    if (process.env.PLAID_ENV === 'production') {
+      const isValid = await verifyPlaidWebhook(request, rawBody);
+      if (!isValid) {
+        console.error('❌ WEBHOOK REJECTED: Invalid signature');
+        return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 401 });
+      }
+    }
 
     const { webhook_type, webhook_code, item_id } = body;
 
@@ -45,15 +89,14 @@ export async function POST(request: NextRequest) {
         break;
       
       default:
-        console.log(`Unhandled webhook type: ${webhook_type}`);
     }
 
-    return NextResponse.json({ success: true }, { headers: corsHeaders });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('❌ WEBHOOK ERROR:', error);
+    console.error('Webhook processing error:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500, headers: corsHeaders }
+      { status: 500 }
     );
   }
 }
@@ -65,8 +108,6 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
     case 'INITIAL_UPDATE':
     case 'HISTORICAL_UPDATE':
     case 'DEFAULT_UPDATE':
-      console.log(`🔄 Processing ${webhook_code} for item ${item_id}`);
-      
       // Get access token for this item and verify it exists
       const { data: item } = await supabase
         .from('items')
@@ -75,7 +116,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         .single();
 
       if (!item) {
-        console.error(`❌ Item not found: ${item_id}`);
+        console.error(`Item not found: ${item_id}`);
         return;
       }
 
@@ -83,16 +124,14 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
       try {
         const response = await plaidClient.transactionsGet({
           access_token: item.plaid_access_token,
-          start_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 90 days
+          start_date: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           end_date: new Date().toISOString().split('T')[0],
         });
 
         // Store transactions in database using the verified database plaid_item_id
         const storedTransactions = await storeTransactions(response.data.transactions, item.plaid_item_id);
         
-        // Transaction storage completed - AI tagging handled by separate scheduled process
         if (storedTransactions && storedTransactions.length > 0) {
-          console.log(`💾✅ Successfully stored ${storedTransactions.length} new transactions - AI tagging will be handled by scheduled process every 15 minutes`);
         }
         
         // Update account balances
@@ -109,8 +148,6 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
           for (const account of accountsResponse.data.accounts) {
             const balance = account.balances;
             
-            console.log(`💰 Updating balance for ${account.name}: Current=$${balance.current}, Available=$${balance.available}`);
-            
             await supabaseService
               .from('accounts')
               .update({
@@ -122,21 +159,11 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
               })
               .eq('plaid_account_id', account.account_id);
           }
-          console.log(`💰 ✅ Successfully updated balances for ${accountsResponse.data.accounts.length} accounts`);
         } catch (error) {
-          console.error('❌ Error updating balances:', error);
-        }
-        
-        console.log(`✅ WEBHOOK SUCCESS: Stored ${response.data.transactions.length} transactions for item ${item_id}`);
-        
-        // 📱 Simple transaction logging (SMS handled by scheduled jobs)
-        if (response.data.transactions.length > 0) {
-          console.log(`📱 NEW TRANSACTIONS DETECTED: ${response.data.transactions.length} transactions - SMS will be handled by 30min cron job`);
-        } else {
-          console.log(`📱 NO NEW TRANSACTIONS: Webhook fired but found ${response.data.transactions.length} new transactions`);
+          console.error('Error updating balances:', error);
         }
       } catch (error) {
-        console.error('❌ Error fetching transactions:', error);
+        console.error('Error fetching transactions:', error);
       }
       break;
 
@@ -148,13 +175,10 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
           .from('transactions')
           .delete()
           .in('plaid_transaction_id', removed_transactions);
-        
-        console.log(`🗑️ Removed ${removed_transactions.length} transactions`);
       }
       break;
 
     default:
-      console.log(`Unhandled transaction webhook code: ${webhook_code}`);
   }
 }
 
@@ -165,9 +189,8 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
 
   switch (webhook_code) {
     case 'ERROR':
-      console.error(`❌ Item error for ${item_id}:`, body.error);
+      console.error(`Item error for ${item_id}:`, body.error);
       
-      // Update item status
       await supabase
         .from('items')
         .update({ status: 'error' })
@@ -175,9 +198,6 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
       break;
 
     case 'PENDING_EXPIRATION':
-      console.log(`⚠️ Item ${item_id} has pending expiration`);
-      
-      // Update item status
       await supabase
         .from('items')
         .update({ status: 'pending_expiration' })
@@ -185,8 +205,6 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
       break;
 
     case 'ITEM_REMOVED':
-      console.log(`🔌 Item ${item_id} was removed from Plaid`);
-      
       // Check if this was an intentional disconnection or external removal
       const { data: itemData } = await supabase
         .from('items')
@@ -195,25 +213,18 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
         .single();
 
       if (itemData) {
-        if (itemData.deleted_at) {
-          // This was an intentional disconnect - item is already marked for deletion
-          console.log(`✅ Confirmed disconnection for item ${item_id} (${itemData.institution_name})`);
-        } else {
+        if (!itemData.deleted_at) {
           // External removal - user likely disconnected from bank's side
-          console.log(`⚠️ External removal detected for item ${item_id} - marking as disconnected`);
-          
-          // Mark as externally disconnected but don't delete data immediately
           await supabase
             .from('items')
             .update({ 
               status: 'disconnected_external',
               deleted_at: new Date().toISOString(),
-              retention_choice: 'soft_30_days', // Default to 30-day retention for external disconnects
+              retention_choice: 'soft_30_days',
               permanent_delete_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
             })
             .eq('plaid_item_id', item_id);
 
-          // Log the external disconnection for audit
           await supabase
             .from('audit_log')
             .insert({
@@ -225,14 +236,10 @@ async function handleItemWebhook(webhook_code: string, item_id: string, body: Re
                 reason: 'External removal detected via webhook'
               }
             });
-          console.log('📝 External disconnect audit log created');
         }
-      } else {
-        console.warn(`❓ ITEM_REMOVED webhook for unknown item: ${item_id}`);
       }
       break;
 
     default:
-      console.log(`Unhandled item webhook code: ${webhook_code}`);
   }
 } 

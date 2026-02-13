@@ -9,6 +9,7 @@ import { createSupabaseClient } from '@/utils/supabase/server';
  * 2. If not, triggers AI lifecycle scan
  * 3. Returns initialization status
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createSupabaseClient();
@@ -21,8 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = user.id;
-    console.log(`🚀 Checking expense initialization for user: ${userId}`);
-
     // Check if user already has expense data
     const { data: existingBills, error: checkError } = await supabase
       .from('tagged_merchants')
@@ -43,8 +42,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    console.log(`🔍 First-time user detected. Running AI expense analysis...`);
-
     // User is new - run AI lifecycle scan
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
                     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
@@ -63,8 +60,6 @@ export async function POST(request: NextRequest) {
     if (!scanResult.success) {
       throw new Error(`Expense scan failed: ${scanResult.error}`);
     }
-
-    console.log(`✅ First-time expense setup complete for user ${userId}:`, scanResult.results);
 
     // Check if any bills were detected
     const billsDetected = scanResult.results.newBillsDetected > 0;

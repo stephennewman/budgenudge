@@ -29,8 +29,6 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  console.log('🌅 Starting 5:30 PM Special SMS processing...');
-  
   let usersProcessed = 0;
   let smsSent = 0;
   let smsFailed = 0;
@@ -44,15 +42,12 @@ export async function GET(request: NextRequest) {
       .is('deleted_at', null);
 
     if (itemsError || !itemsWithUsers || itemsWithUsers.length === 0) {
-      console.log('📭 No bank connections found for 5:30 PM SMS');
       return NextResponse.json({ 
         success: true, 
         processed: 0,
         message: 'No bank connections found' 
       });
     }
-
-          console.log(`👥 Found ${itemsWithUsers.length} users for 5:30 PM SMS`);
 
     // Deduplicate by user_id (users can have multiple items)
     const uniqueUserIds = Array.from(new Set((itemsWithUsers || []).map(u => u.user_id)));
@@ -75,7 +70,6 @@ export async function GET(request: NextRequest) {
         // Default to enabled for new users
         const enabled = templatePref ? !!templatePref.enabled : true;
         if (!enabled) {
-          console.log(`📭 Skipping 5:30 PM SMS for user ${userId} (disabled in preferences)`);
           continue;
         }
 
@@ -88,7 +82,6 @@ export async function GET(request: NextRequest) {
 
         const userPhoneNumber = settings?.phone_number;
         if (!userPhoneNumber || userPhoneNumber.trim() === '') {
-          console.log(`📭 Skipping user ${userId} (no phone number)`);
           continue;
         }
 
@@ -102,24 +95,17 @@ export async function GET(request: NextRequest) {
         });
         
         if (!dedupeResult.canSend) {
-          console.log(`🚫 Skipping 5:30 PM SMS for user ${userId} - ${dedupeResult.reason}`);
           continue;
         }
-
-        console.log(`📝 Generating 5:30 PM special SMS for user ${userId}`);
 
         // Generate message using v2 for all users
         const smsMessage = await generateDailyReportV2(userId);
 
         // Skip if message is too short or indicates an error
         if (!smsMessage || smsMessage.trim().length < 15 || smsMessage.includes('Error')) {
-          console.log(`📭 5:30 PM SMS too short or error for user ${userId} - skipping`);
           smsFailed++;
           continue;
         }
-
-        console.log(`📱 Sending 5:30 PM special SMS to user ${userId}`);
-        console.log(`📄 Message preview: ${smsMessage.substring(0, 100)}...`);
 
         // Send SMS via unified sender
         const smsResult = await sendUnifiedSMS({
@@ -139,7 +125,6 @@ export async function GET(request: NextRequest) {
             logId: dedupeResult.logId,
             messageId: smsResult.messageId
           });
-          console.log(`✅ 5:30 PM special SMS sent successfully to user ${userId}`);
         } else {
           smsFailed++;
           logDetails.push({ 
@@ -149,7 +134,6 @@ export async function GET(request: NextRequest) {
             error: smsResult.error,
             logId: dedupeResult.logId
           });
-          console.log(`❌ Failed to send 5:30 PM special SMS to user ${userId}:`, smsResult.error);
         }
 
         // MVP: also send to additional recipient if present
@@ -202,7 +186,6 @@ export async function GET(request: NextRequest) {
       message: `5:30 PM Special SMS: Processed ${smsSent + smsFailed} SMS for ${usersProcessed} users`
     };
 
-    console.log('📊 5:30 PM Special SMS Processing Complete:', result);
     return NextResponse.json(result);
 
   } catch (error) {

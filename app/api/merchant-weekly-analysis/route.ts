@@ -8,12 +8,6 @@ interface WeeklyData {
   avg_transaction: number;
 }
 
-interface MerchantSummary {
-  merchant: string;
-  totalTransactions: number;
-  totalSpent: number;
-}
-
 // Calculate week start (Sunday) for a given date
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
@@ -26,7 +20,7 @@ function getWeekStart(date: Date): Date {
 // Generate all weeks between start and end dates
 function generateWeeks(startDate: Date, endDate: Date): string[] {
   const weeks: string[] = [];
-  let current = getWeekStart(startDate);
+  const current = getWeekStart(startDate);
   const end = getWeekStart(endDate);
   
   while (current <= end) {
@@ -98,6 +92,7 @@ export async function GET() {
 
     // Step 3: Get all transactions (merchants + categories)
     // Note: Supabase has 1000 row default limit, so we need to paginate
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allTransactions: any[] = [];
     let from = 0;
     const pageSize = 1000;
@@ -178,6 +173,7 @@ export async function GET() {
       .slice(0, 10);
 
     // Step 4: Get weekly data (with pagination)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let weeklyTransactions: any[] = [];
     from = 0;
     hasMore = true;

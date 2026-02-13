@@ -15,8 +15,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'user_id and email are required' }, { status: 400 });
     }
 
-    console.log(`📱 Adding user to SlickText: ${email}`);
-
     // Get phone number if not provided - check from user's SMS settings or auth.users
     let phoneNumber = phone;
     if (!phoneNumber) {
@@ -39,7 +37,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!phoneNumber) {
-      console.log('⚠️ No phone number available for user, skipping SlickText subscription');
       return NextResponse.json({
         success: true,
         message: 'User has no phone number - SlickText subscription skipped',
@@ -57,7 +54,6 @@ export async function POST(request: NextRequest) {
     }
     
     if (cleanPhone.length !== 10) {
-      console.log('⚠️ Invalid phone number format:', cleanPhone, 'from original:', phoneNumber);
       return NextResponse.json({
         success: false,
         error: 'Invalid phone number format',
@@ -83,13 +79,9 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    console.log('📤 Creating SlickText contact:', contactData);
-    
     const result = await slickTextClient.createContact(contactData);
     
     if (result.success) {
-      console.log('✅ User successfully added to SlickText:', result.data);
-      
       // Log this activity in our database for tracking
       await supabase
         .from('sample_sms_leads')
@@ -117,8 +109,6 @@ export async function POST(request: NextRequest) {
         email
       });
     } else {
-      console.log('⚠️ SlickText contact creation failed:', result.error);
-      
       return NextResponse.json({
         success: false,
         error: result.error || 'Failed to add user to SlickText',

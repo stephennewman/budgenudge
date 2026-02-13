@@ -39,11 +39,8 @@ export async function storeTransactions(transactions: any[], itemId: string) {
   const BATCH_DELAY_MS = 100; // Small delay between batches
   const allResults = [];
   
-  console.log(`💾 Storing ${formattedTransactions.length} transactions (enhanced) in micro-batches of ${BATCH_SIZE} with ${BATCH_DELAY_MS}ms delays`);
-  
   for (let i = 0; i < formattedTransactions.length; i += BATCH_SIZE) {
     const batch = formattedTransactions.slice(i, i + BATCH_SIZE);
-    console.log(`💾 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(formattedTransactions.length/BATCH_SIZE)}: ${batch.length} transactions`);
     
     try {
       const { data, error } = await supabase
@@ -64,11 +61,6 @@ export async function storeTransactions(transactions: any[], itemId: string) {
       if (data) {
         allResults.push(...data);
         
-        // 🆕 LOG NEW DATA CAPTURE
-        const enhancedCount = data.filter(t => t.logo_url || t.location_city || t.is_subscription || t.pfc_primary).length;
-        if (enhancedCount > 0) {
-          console.log(`🎯 Enhanced data captured for ${enhancedCount}/${data.length} transactions in this batch`);
-        }
       }
     } catch (batchError) {
       console.error(`❌ Unexpected error in batch ${Math.floor(i/BATCH_SIZE) + 1}:`, batchError);
@@ -82,6 +74,5 @@ export async function storeTransactions(transactions: any[], itemId: string) {
     }
   }
   
-  console.log(`💾 ✅ Successfully stored ${allResults.length} transactions with enhanced data capture`);
   return allResults;
 } 

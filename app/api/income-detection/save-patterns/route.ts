@@ -24,8 +24,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`💾 Saving ${patterns.length} income patterns for user: ${user_id}`);
-    
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -88,8 +86,6 @@ export async function POST(request: NextRequest) {
         }
         
         savedPatterns.push(updatedPattern);
-        console.log(`✅ Updated existing pattern: ${pattern.source_name}`);
-        
       } else {
         // Create new pattern
         const { data: newPattern, error: insertError } = await supabase
@@ -118,11 +114,8 @@ export async function POST(request: NextRequest) {
         }
         
         savedPatterns.push(newPattern);
-        console.log(`✅ Created new pattern: ${pattern.source_name}`);
       }
     }
-    
-    console.log(`💾 Successfully saved ${savedPatterns.length} income patterns`);
     
     return NextResponse.json({
       success: true,

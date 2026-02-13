@@ -31,8 +31,6 @@ export async function POST(request: NextRequest) {
     // Get user's SMS gateway (with fallback to default)
     const targetPhoneNumber = phoneNumber || await getSmsGatewayWithFallback(userId);
     
-    console.log('🔄 Fetching recurring transactions for user:', userId);
-    
     // Fetch recurring merchants from the database
     const { data: recurringMerchants, error: dbError } = await supabase
       .from('merchant_analytics')
@@ -154,12 +152,6 @@ Generated: ${new Date().toLocaleString('en-US', {
       hour12: true 
     })} EST`;
     
-    console.log('📱 Sending recurring transactions SMS:', {
-      merchantCount: recurringMerchants.length,
-      totalMonthly: totalMonthlyRecurring.toFixed(2),
-      messageLength: smsMessage.length
-    });
-    
     // Send SMS via Resend API
     const smsResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -186,8 +178,6 @@ Generated: ${new Date().toLocaleString('en-US', {
     }
 
     const smsResult = await smsResponse.json();
-    console.log('✅ SMS sent successfully:', smsResult);
-
     return NextResponse.json({ 
       success: true, 
       message: 'Recurring transactions SMS sent successfully',

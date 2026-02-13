@@ -4,7 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('Update income source request:', body);
 
     const { sourceId, updatedSource } = body;
 
@@ -32,8 +31,6 @@ export async function POST(request: NextRequest) {
       console.error('Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    console.log('User authenticated:', user.id);
 
     // Create service role client for database operations
     const serviceSupabase = createClient(
@@ -64,21 +61,13 @@ export async function POST(request: NextRequest) {
 
     // Update the specific income source
     const currentSources = existingProfile.profile_data.income_sources;
-    console.log('Current sources in database:', currentSources.map((s: { id?: string; source_name?: string; expected_amount?: number; amount?: number }, i: number) => ({
-      id: s.id || `source_${i}`,
-      source_name: s.source_name,
-      expected_amount: s.expected_amount || s.amount
-    })));
-    console.log('Looking for sourceId:', sourceId);
     
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const updatedSources = currentSources.map((source: { id?: string; source_name?: string; expected_amount?: number; frequency?: string; next_predicted_date?: string }, index: number) => {
       // Use the same ID generation logic as the frontend
       const currentSourceId = source.id || `source_${source.source_name?.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-      console.log(`Checking source ${index}: currentSourceId="${currentSourceId}" vs targetId="${sourceId}"`);
-      console.log(`Source name: "${source.source_name}"`);
       
       if (currentSourceId === sourceId) {
-        console.log('MATCH FOUND! Updating source:', source.source_name);
         // Update the source with new values
         return {
           ...source,
@@ -99,8 +88,6 @@ export async function POST(request: NextRequest) {
       last_updated: new Date().toISOString()
     };
 
-    console.log('Updating income source:', sourceId, 'with data:', updatedSource);
-
     // Save to database
     const { error: updateError } = await serviceSupabase
       .from('user_income_profiles')
@@ -117,8 +104,6 @@ export async function POST(request: NextRequest) {
         details: updateError.message 
       }, { status: 500 });
     }
-
-    console.log('Income source updated successfully');
 
     return NextResponse.json({
       success: true,

@@ -9,8 +9,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('🔄 Running enhanced fields migration...');
-
     const supabaseService = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -29,8 +27,6 @@ export async function POST(request: Request) {
       }, { status: 500 });
     }
 
-    console.log('✅ Transactions table accessible');
-
     // Check if columns already exist
     const sampleTransaction = currentStructure?.[0];
     const hasNewColumns = sampleTransaction && (
@@ -41,7 +37,6 @@ export async function POST(request: Request) {
     );
 
     if (hasNewColumns) {
-      console.log('✅ Enhanced columns already exist');
       return NextResponse.json({ 
         success: true,
         message: 'Enhanced columns already exist',

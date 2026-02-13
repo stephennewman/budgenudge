@@ -63,11 +63,8 @@ export async function storeTransactions(transactions: any[], itemId: string) {
   const BATCH_DELAY_MS = 100; // Small delay between batches
   const allResults = [];
   
-  console.log(`💾 Storing ${formattedTransactions.length} transactions in micro-batches of ${BATCH_SIZE} with ${BATCH_DELAY_MS}ms delays`);
-  
   for (let i = 0; i < formattedTransactions.length; i += BATCH_SIZE) {
     const batch = formattedTransactions.slice(i, i + BATCH_SIZE);
-    console.log(`💾 Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(formattedTransactions.length/BATCH_SIZE)}: ${batch.length} transactions`);
     
     try {
       const { data, error } = await supabase
@@ -100,6 +97,5 @@ export async function storeTransactions(transactions: any[], itemId: string) {
     }
   }
   
-  console.log(`💾 ✅ Successfully stored ${allResults.length} transactions in ${Math.ceil(formattedTransactions.length/BATCH_SIZE)} batches`);
   return allResults;
 } 

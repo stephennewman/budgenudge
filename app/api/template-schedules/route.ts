@@ -23,12 +23,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📅 Saving schedule for template ${templateId} for user: ${user.id}`);
-    console.log(`📅 Schedule data:`, JSON.stringify(schedule, null, 2));
-
     // Calculate next send time based on schedule
     const nextSendAt = calculateNextSendTime(schedule);
-    console.log(`📅 Calculated next send time:`, nextSendAt);
 
     // Prepare the data to be upserted
     const upsertData = {
@@ -43,8 +39,6 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString()
     };
     
-    console.log(`📅 Upsert data:`, JSON.stringify(upsertData, null, 2));
-
     // Upsert the schedule (create or update)
     const { data, error } = await supabase
       .from('template_schedules')
@@ -70,8 +64,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`✅ Schedule saved successfully:`, data);
-    
     // Send first SMS immediately if requested
     if (sendFirstSmsNow && schedule.is_active) {
       try {
@@ -157,7 +149,7 @@ export async function POST(request: NextRequest) {
                   }
                   break;
                 default:
-                  console.log(`⚠️ Unknown variable: ${variable}`);
+                  break;
               }
             }
             
@@ -171,13 +163,9 @@ export async function POST(request: NextRequest) {
               userId: user.id
             });
             
-            if (smsResult.success) {
-              console.log(`✅ First SMS sent immediately for template "${template.template_name}"`);
-            } else {
+            if (!smsResult.success) {
               console.error(`❌ Failed to send first SMS:`, smsResult.error);
             }
-          } else {
-            console.log(`📭 No phone number found for user ${user.id}, skipping immediate SMS`);
           }
         }
       } catch (smsError) {
@@ -212,8 +200,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📋 Fetching schedules for user: ${user.id}`);
-
     // Get user's template schedules
     const { data: schedules, error } = await supabase
       .from('template_schedules')
@@ -231,8 +217,6 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    console.log(`✅ Found ${schedules?.length || 0} schedules`);
-    
     return NextResponse.json({ 
       success: true, 
       schedules: schedules || []

@@ -4,8 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('Merge request body:', body);
-    
     const { mergedSource, removedSourceIds } = body;
     
     if (!mergedSource || !removedSourceIds) {
@@ -32,8 +30,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    console.log('User authenticated:', user.id);
-
     // Create service role client for database operations
     const serviceSupabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -52,8 +48,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch income profile', details: profileError.message }, { status: 500 });
     }
     
-    console.log('Existing profile:', existingProfile ? 'found' : 'not found');
-
     let updatedProfileData;
     
     if (existingProfile?.profile_data?.income_sources) {
@@ -83,12 +77,9 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    console.log('Updated profile data:', JSON.stringify(updatedProfileData, null, 2));
-
     // Save to database
     if (existingProfile) {
       // Update existing profile
-      console.log('Updating existing profile...');
       const { error: updateError } = await serviceSupabase
         .from('user_income_profiles')
         .update({
@@ -101,10 +92,8 @@ export async function POST(request: NextRequest) {
         console.error('Error updating income profile:', updateError);
         return NextResponse.json({ error: 'Failed to update income profile', details: updateError.message }, { status: 500 });
       }
-      console.log('Profile updated successfully');
     } else {
       // Create new profile
-      console.log('Creating new profile...');
       const { error: insertError } = await serviceSupabase
         .from('user_income_profiles')
         .insert({
@@ -118,7 +107,6 @@ export async function POST(request: NextRequest) {
         console.error('Error creating income profile:', insertError);
         return NextResponse.json({ error: 'Failed to create income profile', details: insertError.message }, { status: 500 });
       }
-      console.log('Profile created successfully');
     }
 
     return NextResponse.json({

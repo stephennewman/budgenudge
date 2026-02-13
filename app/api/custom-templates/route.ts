@@ -21,8 +21,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📝 Saving template "${templateName}" for user: ${user.id}`);
-
     // Save the template
     const { data, error } = await supabase
       .from('custom_sms_templates')
@@ -54,8 +52,6 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
-    console.log(`✅ Template saved successfully:`, data);
-    
     return NextResponse.json({ 
       success: true, 
       message: 'Template saved successfully!',
@@ -82,8 +78,6 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`📋 Fetching templates for user: ${user.id}`);
-
     // Get user's templates
     const { data: templates, error } = await supabase
       .from('custom_sms_templates')
@@ -98,8 +92,6 @@ export async function GET() {
       }, { status: 500 });
     }
 
-    console.log(`✅ Found ${templates?.length || 0} templates`);
-    
     return NextResponse.json({ 
       success: true, 
       templates: templates || []

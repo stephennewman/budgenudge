@@ -22,15 +22,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       next_predicted_date
     } = body;
 
-    console.log(`🔄 Updating merchant ${merchantId} for user ${user.id}:`, {
-      expected_amount,
-      prediction_frequency,
-      confidence_score,
-      is_active,
-      account_identifier,
-      next_predicted_date
-    });
-
     // Calculate next predicted date if frequency changed
     const updateData: Record<string, string | number | boolean> = {
       updated_at: new Date().toISOString()
@@ -110,12 +101,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         error: 'Tagged merchant not found or access denied' 
       }, { status: 404 });
     }
-
-    console.log(`✅ Successfully updated merchant ${merchantId}: ${data.merchant_name}`, {
-      account_identifier: data.account_identifier,
-      expected_amount: data.expected_amount,
-      is_active: data.is_active
-    });
 
     return NextResponse.json({ 
       success: true, 

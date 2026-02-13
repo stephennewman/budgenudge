@@ -24,16 +24,12 @@ interface WebhookData {
  */
 export async function POST(request: NextRequest) {
   try {
-    console.log('📨 SlickText webhook received...');
-    
     const webhookData = await request.json();
     
     // Check if this is a contact creation event (form submission)
     if (webhookData.name === 'contact_created' || webhookData.event === 'contact_created') {
       return await handleContactCreated(webhookData);
     }
-    console.log('�� Webhook payload:', JSON.stringify(webhookData, null, 2));
-    
     // Extract from SlickText's actual payload format
     const data = webhookData.data || webhookData;
     const {
@@ -44,7 +40,6 @@ export async function POST(request: NextRequest) {
     
     // Only process incoming messages
     if (direction !== 'incoming') {
-      console.log('⏭️ Skipping non-incoming message');
       return NextResponse.json({ success: true, message: 'Non-incoming message ignored' });
     }
     
@@ -53,8 +48,6 @@ export async function POST(request: NextRequest) {
     }
     
     const userMessage = message.trim().toUpperCase();
-    
-    console.log(`📱 Processing message from contact ${contactId}: "${message}"`);
     
     let responseMessage = '';
     
@@ -87,8 +80,6 @@ export async function POST(request: NextRequest) {
     // Send response back via SlickText
     if (responseMessage && contactId) {
       try {
-        console.log(`📤 Sending response to contact ${contactId}:`, responseMessage);
-        
         const apiKey = process.env.SLICKTEXT_API_KEY;
         const slickTextBrandId = process.env.SLICKTEXT_BRAND_ID;
         
@@ -107,7 +98,6 @@ export async function POST(request: NextRequest) {
         });
         
         if (response.ok) {
-          console.log('✅ Response sent successfully');
         } else {
           const errorText = await response.text();
           console.error('❌ Failed to send response:', errorText);
@@ -216,8 +206,6 @@ function getKeywordResponse(message: string): string {
  */
 async function handleContactCreated(webhookData: WebhookData): Promise<NextResponse> {
   try {
-    console.log('📝 Processing SlickText contact creation...');
-    
     const contactData = webhookData.data || webhookData.contact || (webhookData as ContactData);
     
     // Extract contact information
@@ -226,10 +214,7 @@ async function handleContactCreated(webhookData: WebhookData): Promise<NextRespo
     const lastName = contactData?.last_name || contactData?.lastName || '';
     const email = contactData?.email || '';
     
-    console.log('📊 Contact data extracted:', { phoneNumber, firstName, lastName, email });
-    
     if (!phoneNumber) {
-      console.log('⚠️ No phone number found in contact data');
       return NextResponse.json({ success: true, message: 'No phone number to process' });
     }
     
@@ -269,8 +254,6 @@ async function handleContactCreated(webhookData: WebhookData): Promise<NextRespo
         details: error.message 
       }, { status: 500 });
     }
-    
-    console.log('✅ Contact stored successfully:', data);
     
     return NextResponse.json({
       success: true,

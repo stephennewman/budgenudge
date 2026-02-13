@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    console.log('🔍 Attempting to discover SlickText Brand ID...');
-    
     const apiKey = process.env.SLICKTEXT_API_KEY;
     
     if (!apiKey) {
@@ -14,12 +12,8 @@ export async function GET() {
       }, { status: 400 });
     }
 
-    console.log('✅ API key found, testing different discovery methods...');
-
     // Method 1: Try to get user/account info (might show brand ID)
     try {
-      console.log('🧪 Method 1: Trying base API call...');
-      
       const response = await fetch('https://dev.slicktext.com/v1/user', {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -29,8 +23,6 @@ export async function GET() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ User endpoint successful:', data);
-        
         return NextResponse.json({
           success: true,
           method: 'user_endpoint',
@@ -43,14 +35,11 @@ export async function GET() {
           ]
         });
       }
-    } catch (error) {
-      console.log('⚠️ Method 1 failed:', error);
+    } catch {
     }
 
     // Method 2: Try account endpoint
     try {
-      console.log('🧪 Method 2: Trying account endpoint...');
-      
       const response = await fetch('https://dev.slicktext.com/v1/account', {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -60,8 +49,6 @@ export async function GET() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Account endpoint successful:', data);
-        
         return NextResponse.json({
           success: true,
           method: 'account_endpoint',
@@ -69,14 +56,11 @@ export async function GET() {
           message: 'Found account data - check for brand_id or similar field'
         });
       }
-    } catch (error) {
-      console.log('⚠️ Method 2 failed:', error);
+    } catch {
     }
 
     // Method 3: Try brands list endpoint (if it exists)
     try {
-      console.log('🧪 Method 3: Trying brands list...');
-      
       const response = await fetch('https://dev.slicktext.com/v1/brands', {
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -86,8 +70,6 @@ export async function GET() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Brands endpoint successful:', data);
-        
         return NextResponse.json({
           success: true,
           method: 'brands_list',
@@ -95,8 +77,7 @@ export async function GET() {
           message: 'Found brands list - your brand ID should be in this response!'
         });
       }
-    } catch (error) {
-      console.log('⚠️ Method 3 failed:', error);
+    } catch {
     }
 
     // If all methods failed, provide manual instructions

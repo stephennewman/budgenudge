@@ -183,10 +183,7 @@ export default function TransactionsPage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Tag override applied:', result.message);
-        console.log(`📊 Updated ${result.updated_transactions} transactions`);
-        
+        await response.json();
         // Update local state instead of full reload
         setTransactions(prevTransactions => {
           const updatedTransactions = prevTransactions.map(tx => {
@@ -234,8 +231,6 @@ export default function TransactionsPage() {
   async function fetchTransactionStarredStatus(transactionIds: string[]) {
     if (transactionIds.length === 0) return;
     
-    console.log('🌟 Fetching starred status for transactions:', transactionIds.length);
-    
     try {
       const response = await fetch('/api/transaction-starred-status', {
         method: 'POST',
@@ -244,14 +239,12 @@ export default function TransactionsPage() {
       });
       
       const data = await response.json();
-      console.log('🌟 Starred status API response:', data);
       
       if (data.success && data.starred_status) {
         const statusMap = new Map<string, boolean>();
         Object.entries(data.starred_status).forEach(([txId, isStarred]) => {
           statusMap.set(txId, isStarred as boolean);
         });
-        console.log('🌟 Setting starred status map:', statusMap);
         setTransactionStarredStatus(statusMap);
       } else {
         console.error('🌟 Failed to get starred status:', data);
@@ -385,9 +378,6 @@ export default function TransactionsPage() {
       const transactionsData = await transactionsResponse.json();
       
       if (transactionsResponse.ok && transactionsData.transactions) {
-        console.log('Transactions fetched:', transactionsData.transactions.length);
-        console.log('Accounts fetched:', transactionsData.accounts?.length || 0);
-        
         // Store accounts data for account column mapping
         if (transactionsData.accounts) {
           setAccounts(transactionsData.accounts);

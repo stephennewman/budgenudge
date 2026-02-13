@@ -380,7 +380,6 @@ export default function AIMerchantAnalysisPage() {
   // Auto-select top merchants for new users
   const runAutoSelection = async () => {
     try {
-      console.log('🤖 Running auto-selection for top merchants...');
       const response = await fetch('/api/merchant-pacing-tracking/auto-select', {
         method: 'POST',
       });
@@ -388,11 +387,8 @@ export default function AIMerchantAnalysisPage() {
       const data = await response.json();
       
       if (data.success && data.auto_selected?.length > 0) {
-        console.log(`✅ Auto-selected ${data.auto_selected.length} merchants:`, data.merchant_analysis);
         // Refresh tracked merchants to show the newly selected ones
         await fetchTrackedMerchants();
-      } else {
-        console.log('ℹ️ Auto-selection result:', data.message);
       }
     } catch (error) {
       console.error('Error during auto-selection:', error);

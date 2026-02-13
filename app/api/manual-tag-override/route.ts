@@ -60,8 +60,6 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    console.log(`🏷️ Manual override: ${merchant_pattern} → ${ai_merchant_name} (${ai_category_tag})`);
-
     // Get user's item IDs for transaction queries
     const { data: items, error: itemsError } = await supabase
       .from('items')
@@ -90,8 +88,6 @@ export async function POST(request: Request) {
     }
 
     const matchedCount = matchingTransactions?.length || 0;
-    console.log(`🔍 Found ${matchedCount} matching transactions for pattern: ${merchant_pattern}`);
-
     // If preview_only, return the matches without updating
     if (preview_only) {
       return NextResponse.json({
@@ -152,7 +148,6 @@ export async function POST(request: Request) {
           console.error(`Failed to update transaction batch ${i + 1}-${i + batch.length}:`, updateError);
         } else {
           updatedTransactionCount += batch.length;
-          console.log(`✅ Updated ${batch.length} transactions (batch ${i + 1}-${i + batch.length})`);
         }
       }
 
@@ -183,7 +178,6 @@ export async function POST(request: Request) {
           if (cacheError) {
             console.warn('Warning: Failed to update some merchant cache entries:', cacheError);
           } else {
-            console.log(`💾 Updated cache for ${merchantCacheUpdates.length} similar merchant patterns`);
           }
         }
       }

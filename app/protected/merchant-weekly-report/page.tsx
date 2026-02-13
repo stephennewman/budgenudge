@@ -114,7 +114,6 @@ export default function MerchantWeeklyReportPage() {
   }
 
   const selectedMerchantData = selectedMerchant ? data.weeklyData[selectedMerchant] : [];
-  const merchantSummary = data.topMerchants.find(m => m.merchant === selectedMerchant);
 
   // Calculate summary stats for selected merchant
   const activeWeeks = selectedMerchantData.filter(w => w.transaction_count > 0).length;
@@ -131,7 +130,7 @@ export default function MerchantWeeklyReportPage() {
   }));
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: any[] }) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: { value: number; payload: Record<string, number> }[] }) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-white p-4 border border-gray-200 rounded shadow-lg">
@@ -309,7 +308,6 @@ export default function MerchantWeeklyReportPage() {
           {/* Category Summary Stats */}
           {selectedCategory && (() => {
             const categoryData = data.categoryWeeklyData[selectedCategory] || [];
-            const categorySummary = data.topCategories.find(c => c.category === selectedCategory);
             const activeWeeks = categoryData.filter(w => w.transaction_count > 0).length;
             const totalSpent = categoryData.reduce((sum, w) => sum + w.total_spent, 0);
             const totalTransactions = categoryData.reduce((sum, w) => sum + w.transaction_count, 0);

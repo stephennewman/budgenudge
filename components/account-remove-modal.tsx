@@ -39,9 +39,6 @@ export default function AccountRemoveModal({
   if (!account) return null;
 
   const handleRemove = async () => {
-    console.log('🗑️ Modal handleRemove - account data:', account);
-    console.log('🗑️ account.id value:', account.id);
-    
     if (!account.id) {
       console.error('❌ Missing account.id in account:', account);
       alert('Error: Account missing required ID. Please refresh the page and try again.');

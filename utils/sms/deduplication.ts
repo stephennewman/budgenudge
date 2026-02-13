@@ -41,8 +41,6 @@ export async function canSendSMS(
     const targetDate = checkDate || new Date();
     const dateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD format
     
-    console.log(`🔍 Checking SMS deduplication: ${phoneNumber.slice(-4)} + ${templateType} on ${dateStr}`);
-    
     const { data, error } = await supabase.rpc('can_send_sms', {
       p_phone_number: phoneNumber,
       p_template_type: templateType,
@@ -58,8 +56,6 @@ export async function canSendSMS(
     const canSend = data === true;
     const reason = canSend ? undefined : `Already sent ${templateType} to ${phoneNumber.slice(-4)} today`;
     
-    console.log(`${canSend ? '✅' : '🚫'} SMS deduplication result: ${canSend ? 'CAN SEND' : 'ALREADY SENT'}`);
-    
     return { canSend, reason };
     
   } catch (error) {
@@ -74,8 +70,6 @@ export async function canSendSMS(
  */
 export async function logSMSSend(record: SMSSendRecord): Promise<{ success: boolean; logId?: number; error?: string }> {
   try {
-    console.log(`📝 Logging SMS send: ${record.phoneNumber.slice(-4)} + ${record.templateType} via ${record.sourceEndpoint}`);
-    
     const { data: logId, error } = await supabase.rpc('log_sms_send', {
       p_phone_number: record.phoneNumber,
       // Use override if provided to isolate dedupe keys across different subject users
@@ -91,7 +85,6 @@ export async function logSMSSend(record: SMSSendRecord): Promise<{ success: bool
       return { success: false, error: error.message };
     }
     
-    console.log(`✅ SMS send logged with ID: ${logId}`);
     return { success: true, logId };
     
   } catch (error) {

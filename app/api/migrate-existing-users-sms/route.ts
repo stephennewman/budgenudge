@@ -10,8 +10,6 @@ const supabase = createClient(
 // POST - Migrate existing users to complete SMS workflow
 export async function POST() {
   try {
-    console.log('🔄 Starting migration of existing users to complete SMS workflow...');
-
     // Get all users who have Plaid connections but incomplete SMS setup
     const { data: users, error: usersError } = await supabase
       .from('items')
@@ -34,8 +32,6 @@ export async function POST() {
 
     for (const user of uniqueUsers) {
       try {
-        console.log(`🔄 Migrating user: ${user.user_id}`);
-        
         // Get user profile
         const { data: profile } = await supabase
           .from('profiles')

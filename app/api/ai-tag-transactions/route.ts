@@ -19,8 +19,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'transaction_ids array is required' }, { status: 400 });
     }
 
-    console.log(`🏷️ AI Tagging ${transaction_ids.length} transactions for user ${user.id}`);
-
     // Fetch transactions that need tagging
     const { data: transactions, error: fetchError } = await supabase
       .from('transactions')
@@ -57,8 +55,6 @@ export async function POST(request: Request) {
       merchantGroups.get(merchantKey)!.push(tx);
     });
 
-    console.log(`📊 Processing ${merchantGroups.size} unique merchants`);
-
     // Check cache for existing merchant patterns
     const merchantPatterns = Array.from(merchantGroups.keys());
     const { data: cachedTags } = await supabase
@@ -77,7 +73,6 @@ export async function POST(request: Request) {
       
       if (cached) {
         // Use cached tags
-        console.log(`💾 Using cached tags for ${merchantPattern}: ${cached.ai_merchant_name} (${cached.ai_category_tag})`);
         merchantTransactions.forEach(tx => {
           updates.push({
             id: tx.id,
@@ -141,7 +136,6 @@ export async function POST(request: Request) {
         console.error('Warning: Failed to cache merchant tags:', cacheError);
         // Don't fail the entire operation
       } else {
-        console.log(`💾 Cached ${newMerchantTags.length} new merchant patterns`);
       }
     }
 
@@ -166,7 +160,6 @@ export async function POST(request: Request) {
         await Promise.all(updatePromises);
       }
 
-      console.log(`✅ Updated ${updates.length} transactions with AI tags`);
     }
 
     return NextResponse.json({

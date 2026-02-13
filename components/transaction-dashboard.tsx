@@ -90,9 +90,6 @@ export default function TransactionDashboard() {
           return true;
         });
         
-        console.log('🏦 Fetched accounts:', validAccounts.length);
-        console.log('🔍 First account sample:', validAccounts[0]);
-        console.log('🔍 Account keys:', validAccounts[0] ? Object.keys(validAccounts[0]) : 'No accounts');
         setAccounts(validAccounts);
       } else {
         console.error('Failed to fetch accounts:', response.status, response.statusText);
@@ -118,8 +115,6 @@ export default function TransactionDashboard() {
 
   const handleAccountDisconnect = async (accountId: number) => {
     try {
-      console.log('🗑️ handleAccountDisconnect called with:', { accountId });
-      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         console.error('No session found');
@@ -130,8 +125,6 @@ export default function TransactionDashboard() {
         account_id: accountId
       };
       
-      console.log('📤 Sending account disconnect request:', requestBody);
-
       const response = await fetch('/api/plaid/disconnect-account', {
         method: 'POST',
         headers: {
@@ -141,12 +134,8 @@ export default function TransactionDashboard() {
         body: JSON.stringify(requestBody),
       });
 
-      console.log('📡 Account disconnect response status:', response.status);
-
       if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Account disconnected successfully:', result);
-        
+        await response.json();
         // Refresh accounts list
         await fetchAccounts();
         

@@ -82,7 +82,6 @@ export default function IncomePage() {
         .single();
 
       if (existingAnalysis?.profile_data?.income_sources) {
-        console.log('Loading existing income data:', existingAnalysis.profile_data.income_sources);
         // Map existing data to ensure consistent format
         const mappedExisting = existingAnalysis.profile_data.income_sources.map((source: { id?: string; source_name?: string; frequency?: string; pattern_type?: string; expected_amount?: number; amount?: number; confidence_score?: number; next_predicted_date?: string; last_pay_date?: string; account_id?: string; pattern?: string; dates?: string[]; amounts?: number[]; intervals?: number[] }) => {
           const mapped = {
@@ -100,14 +99,6 @@ export default function IncomePage() {
             intervals: source.intervals || [],
             transaction_count: source.amounts?.length || source.dates?.length || 0
           };
-          console.log(`📋 Loading source "${mapped.source_name}":`, {
-            id: mapped.id,
-            next_predicted_date: mapped.next_predicted_date,
-            last_pay_date: mapped.last_pay_date,
-            expected_amount: mapped.expected_amount,
-            frequency: mapped.frequency,
-            amounts: mapped.amounts
-          });
           return mapped;
         });
         
@@ -120,7 +111,6 @@ export default function IncomePage() {
           setIncomeData(mappedExisting);
           // generateSubscriptionOptions and preloadTransactionCounts will be called separately
         } else {
-          console.log('Existing data is invalid, running fresh analysis...');
           // runIncomeAnalysis will be called separately
         }
       } else {
@@ -176,9 +166,7 @@ export default function IncomePage() {
   //     });
 
   //     const result = await response.json();
-  //     console.log(`🔢 Count fetch result for ${sourceId}:`, result);
   //     if (result.success && result.transactions) {
-  //       console.log(`✅ Setting count for ${sourceId}: ${result.transactions.length}`);
   //       setTransactionCounts(prev => ({
   //         ...prev,
   //         [sourceId]: result.transactions.length
@@ -193,21 +181,12 @@ export default function IncomePage() {
 
   // Function to pre-load transaction counts - temporarily disabled
   // const preloadTransactionCounts = useCallback((sources: IncomeSource[]) => {
-  //   console.log('🔄 Preloading transaction counts for sources:', sources.length);
   //   sources.forEach((source, index) => {
   //     const sourceId = source.id || `source_${index}`;
   //     const hasInlineData = source.dates && source.amounts && source.dates.length > 0;
   //     
-  //     console.log(`🔍 Checking source "${source.source_name}":`, {
-  //       sourceId,
-  //       hasInlineData,
-  //       transaction_count: source.transaction_count,
-  //       will_fetch: !hasInlineData && source.transaction_count === 0
-  //     });
-  //     
   //     // Only fetch count for sources without inline transaction data
   //     if (!hasInlineData && source.transaction_count === 0) {
-  //       console.log(`📡 Fetching count for: ${source.source_name}`);
   //       fetchTransactionCount(sourceId, source);
   //     }
   //   });
@@ -271,8 +250,6 @@ export default function IncomePage() {
       });
 
       const result = await response.json();
-      console.log('Income detection result:', result); // Debug logging
-      
       if (result.success && result.result?.patterns_detected?.length > 0) {
         // Map the API response to our UI format
         const mappedPatterns = result.result.patterns_detected.map((pattern: { source_name?: string; pattern?: string; frequency?: string; expected_amount?: number; confidence_score?: number; next_predicted_date?: string; account_id?: string; dates?: string[]; amounts?: number[]; intervals?: number[] }) => ({
@@ -294,8 +271,6 @@ export default function IncomePage() {
         const preservedData = mappedPatterns; // Simplified for now
         setIncomeData(preservedData);
         // generateSubscriptionOptions and preloadTransactionCounts will be called separately
-      } else {
-        console.log('No income patterns detected or API error:', result);
       }
     } catch (error) {
       console.error('Error analyzing income:', error);
@@ -306,9 +281,9 @@ export default function IncomePage() {
 
   const generateSubscriptionOptions = useCallback((sources: IncomeSource[]) => {
     // Subscription generation temporarily disabled - Stripe not configured yet
-    console.log('Subscription options would be generated for:', sources.length, 'sources');
     // This will be re-enabled when Stripe is configured
     // For now, this is a no-op function
+    void sources; // Prevent unused parameter warning
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -478,13 +453,6 @@ export default function IncomePage() {
         }
       }
       
-      console.log(`🔍 Calendar check for "${source.source_name}":`, {
-        frequency: source.frequency,
-        last_pay_date: source.last_pay_date,
-        calculated_last_date: lastDate,
-        will_include: !!lastDate
-      });
-
       if (!lastDate) return; // Skip if we can't determine a start date
 
       // Prioritize manual override first, then fall back to calculated date
@@ -494,7 +462,6 @@ export default function IncomePage() {
         // Use manual override if it's in the future
         nextDate = parseDateSafe(source.next_predicted_date);
         isManualOverride = true;
-        console.log(`📅 Using manual override for "${source.source_name}": ${source.next_predicted_date}`);
       } else {
         // Calculate from last payment if no valid override
         nextDate = parseDateSafe(lastDate);
@@ -528,7 +495,6 @@ export default function IncomePage() {
             }
           }
         }
-        console.log(`🔄 Calculated next date for "${source.source_name}": ${nextDate.toISOString().split('T')[0]}`);
       }
 
       // Calculate next payment dates based on frequency
@@ -650,9 +616,7 @@ export default function IncomePage() {
         body: JSON.stringify({ userId: user.id })
       });
       
-      const result = await response.json();
-      console.log('🔍 Income Analysis Debug:', result);
-      alert('Debug results logged to console. Check developer tools.');
+      await response.json();
     } catch (error) {
       console.error('Debug error:', error);
     }
@@ -681,10 +645,6 @@ export default function IncomePage() {
     setLoadingTransactions(prev => ({ ...prev, [sourceId]: true }));
     
     try {
-      // Create a query to find transactions matching this income source pattern
-      console.log(`🔄 Fetching transactions for source: ${source.source_name} (ID: ${sourceId})`);
-      console.log(`📡 Calling API for pattern: "${source.pattern || source.source_name}"`);
-      
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('No authentication token available');
@@ -705,11 +665,9 @@ export default function IncomePage() {
       });
 
       const result = await response.json();
-      console.log(`✅ API response for ${source.source_name}:`, result);
       
       if (result.success) {
         setSourceTransactions(prev => ({ ...prev, [sourceId]: result.transactions || [] }));
-        console.log(`💾 Stored ${result.transactions?.length || 0} transactions for ${sourceId}`);
         
         // Update the transaction count in the income data
         if (result.transactions?.length > 0) {
@@ -750,8 +708,6 @@ export default function IncomePage() {
 
 
 
-      console.log('💾 Saving edit for source:', editingSource, 'with data:', editForm);
-      
       const response = await fetch('/api/update-income-source', {
         method: 'POST',
         headers: {
@@ -765,10 +721,8 @@ export default function IncomePage() {
       });
 
       const result = await response.json();
-      console.log('💾 API response:', result);
 
       if (result.success) {
-        console.log('✅ Update successful, updating local state...');
         // Update local state with the new data
         setIncomeData(prev => prev.map(source => {
           const sourceId = source.id || `source_${prev.indexOf(source)}`;
@@ -780,7 +734,6 @@ export default function IncomePage() {
               frequency: editForm.frequency as 'weekly' | 'bi-weekly' | 'bi-monthly' | 'monthly' | 'irregular',
               next_predicted_date: editForm.next_predicted_date || undefined
             };
-            console.log('🔄 Updated source locally:', updatedSource);
             return updatedSource;
           }
           return source;
@@ -789,7 +742,6 @@ export default function IncomePage() {
         setEditingSource(null);
         
         // Force a reload to make sure we have the latest data
-        console.log('🔄 Reloading data to confirm changes...');
         setTimeout(() => {
           loadIncomeData();
         }, 1000);
@@ -851,15 +803,6 @@ export default function IncomePage() {
       const sourceId = source.id || `source_${index}`;
       return selectedForMerge.has(sourceId);
     });
-
-    console.log('Selected sources for merge:', selectedSources.map(s => ({
-      name: s.source_name,
-      amounts: s.amounts?.length || 0,
-      dates: s.dates?.length || 0,
-      intervals: s.intervals?.length || 0,
-      frequency: s.frequency,
-      confidence: s.confidence_score
-    })));
 
     // Create merged source by combining data
     const mergedSource: IncomeSource = {
@@ -1013,8 +956,7 @@ export default function IncomePage() {
         throw new Error(`Failed to save merge: ${errorData.error || response.statusText}${errorData.details ? ` - ${errorData.details}` : ''}`);
       }
 
-      const result = await response.json();
-      console.log('Merge saved successfully:', result);
+      await response.json();
 
       // Update UI
       const newIncomeData = incomeData.filter((source, index) => {

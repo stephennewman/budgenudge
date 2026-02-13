@@ -34,8 +34,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`💳 Starting automatic recurring bill detection for user: ${user_id}`);
-    
     // Get user's items to filter transactions
     const { data: items } = await supabase
       .from('items')
@@ -96,14 +94,10 @@ export async function POST(request: NextRequest) {
         if (!insertError) {
           billsDetected++;
           totalMonthlyAmount += bill.avg_amount;
-          console.log(`✅ Auto-detected recurring bill: ${bill.merchant_name} - $${bill.avg_amount}`);
         }
       } catch {
-        console.log(`⚠️ Skipped duplicate or invalid bill: ${bill.merchant_name}`);
       }
     }
-
-    console.log(`🎯 Auto-detection complete: ${billsDetected} bills detected, $${totalMonthlyAmount.toFixed(2)} monthly total`);
 
     return NextResponse.json({
       success: true,
@@ -127,8 +121,6 @@ export async function POST(request: NextRequest) {
 // Fallback analysis using direct SQL queries
 async function fallbackRecurringAnalysis(userId: string, itemIds: string[], confidenceThreshold: number) {
   try {
-    console.log('🔄 Using fallback recurring bill analysis...');
-
     // Manual analysis query for recurring patterns
     const { data: patterns } = await supabase
       .from('transactions')
@@ -200,10 +192,8 @@ async function fallbackRecurringAnalysis(userId: string, itemIds: string[], conf
             if (!insertError) {
               billsDetected++;
               totalMonthlyAmount += avgAmount;
-              console.log(`✅ Fallback auto-detected: ${merchant} - $${avgAmount.toFixed(2)} (${confidence.toFixed(0)}% confidence)`);
             }
           } catch {
-            console.log(`⚠️ Skipped duplicate bill: ${merchant}`);
           }
         }
       }

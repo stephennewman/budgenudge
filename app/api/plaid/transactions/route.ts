@@ -55,19 +55,14 @@ export async function GET(request: Request) {
     try {
       // TEMPORARY FIX: Force chunking fallback to resolve missing recent transactions
       // The stored function has complex joins that can miss transactions
-      console.log(`🔧 TEMPORARY: Forcing chunking fallback to fix missing transactions`);
       throw new Error("Forcing chunking approach for reliability");
 
-    } catch (storedFuncError) {
-      console.log(`⚠️ Stored function failed, falling back to chunking approach:`, storedFuncError);
-      
+    } catch {
       // Phase 1 Fallback: Chunk item IDs to avoid 414 Request-URI Too Large errors
       const CHUNK_SIZE = 5;
 
       // Process transactions in chunks
       if (itemIds.length > CHUNK_SIZE) {
-        console.log(`📊 Processing ${itemIds.length} items in chunks of ${CHUNK_SIZE} to avoid 414 errors`);
-        
         const itemIdChunks = chunkArray(itemIds, CHUNK_SIZE);
         const transactionPromises = itemIdChunks.map(chunk => 
           supabase
@@ -152,10 +147,7 @@ export async function GET(request: Request) {
         }));
       }
 
-      console.log(`✅ Chunking fallback successful: ${allTransactions.length} transactions, ${allAccounts.length} accounts`);
     }
-
-    console.log(`✅ Successfully fetched ${allTransactions.length} transactions and ${allAccounts.length} accounts`);
 
     return NextResponse.json({ 
       transactions: allTransactions, 

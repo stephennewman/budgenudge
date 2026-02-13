@@ -12,8 +12,6 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log(`🤖 Starting pacing auto-selection for user: ${user.id}`);
-
     // Check if user has any Plaid items (accounts connected)
     const { data: items } = await supabase
       .from('items')
@@ -41,7 +39,6 @@ export async function POST() {
       
       if (merchantResponse.ok) {
         merchantResult = await merchantResponse.json();
-        console.log('✅ Merchant auto-selection completed:', merchantResult.message);
       }
     } catch (error) {
       console.error('❌ Merchant auto-selection failed:', error);
@@ -59,7 +56,6 @@ export async function POST() {
       
       if (categoryResponse.ok) {
         categoryResult = await categoryResponse.json();
-        console.log('✅ Category auto-selection completed:', categoryResult.message);
       }
     } catch (error) {
       console.error('❌ Category auto-selection failed:', error);

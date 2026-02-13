@@ -61,7 +61,6 @@ export default function AdminFeedPage() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user || !isSuperAdmin(user.id)) {
-        console.log('❌ Not superadmin, redirecting...');
         router.push('/protected');
         return;
       }

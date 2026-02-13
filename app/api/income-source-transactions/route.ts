@@ -16,8 +16,6 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    console.log(`🔍 Fetching transactions for income source: ${pattern}`);
-    
     // Get user's connected accounts
     const { data: userItems } = await supabase
       .from('items')
@@ -69,8 +67,6 @@ export async function POST(request: NextRequest) {
              normalizedName.includes(normalizedPattern) ||
              normalizedPattern.includes(normalizedName);
     });
-
-    console.log(`Found ${matchingTransactions.length} transactions for pattern: ${pattern}`);
 
     return NextResponse.json({
       success: true,

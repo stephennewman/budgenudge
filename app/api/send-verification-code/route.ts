@@ -63,8 +63,6 @@ Msg&data rates apply. Reply STOP to opt-out.`,
       }, { status: 400 });
     }
 
-    console.log('✅ Verification code sent successfully to:', cleanPhone);
-    
     return NextResponse.json({ 
       success: true, 
       message: 'Verification code sent successfully' 
