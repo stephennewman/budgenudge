@@ -75,7 +75,6 @@ async function gatherInsights(userId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   // Week start (Monday)
   const dayOfWeek = now.getDay(); // 0=Sun
   const weekStart = new Date(today.getTime() - ((dayOfWeek === 0 ? 6 : dayOfWeek - 1)) * 24 * 60 * 60 * 1000);
@@ -132,14 +131,8 @@ async function gatherInsights(userId: string) {
       .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
       .limit(1000),
 
-    // Historical transactions (last 90 days, excluding current month — for baseline averages)
-    supabase
-      .from('transactions')
-      .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
-      .in('plaid_item_id', plaidItemIds)
-      .gte('date', ninetyDaysAgo.toISOString().split('T')[0])
-      .lt('date', monthStart.toISOString().split('T')[0])
-      .limit(1000),
+    // Historical transactions (ALL prior months — for baseline averages)
+    fetchAllHistorical(plaidItemIds, monthStart),
 
     // Upcoming bills
     getUpcomingBills(userId, today, endOfMonth),
@@ -200,25 +193,27 @@ async function gatherInsights(userId: string) {
   const monthProgressPct = dayOfMonth / daysInMonth;
 
   // ── Pace tracking ──────────────────────────────────────────────
-  const historical = (historicalResult.data || []).filter(t => t.amount > 0);
+  const historical = (historicalResult || []).filter((t: { amount: number }) => t.amount > 0);
 
-  // Figure out how many full months the historical window covers (excluding current month)
-  const histMonths = getDistinctMonths(historical.map(t => t.date));
+  // Figure out how many distinct months the historical data covers
+  const histMonths = getDistinctMonths(historical.map((t: { date: string }) => t.date));
   const numHistMonths = Math.max(histMonths, 1);
 
   // Current week transactions (Mon–today)
   const weekStartStr = weekStart.toISOString().split('T')[0];
   const currentWeekTx = monthTransactions.filter(t => t.date >= weekStartStr);
 
-  // Compute weeks in historical window
-  const histStartDate = ninetyDaysAgo;
+  // Compute weeks from actual data span
+  const histDates = historical.map((t: { date: string }) => t.date).sort();
+  const histStartDate = histDates.length > 0 ? new Date(histDates[0] + 'T12:00:00') : monthStart;
   const histEndDate = monthStart;
   const histDays = Math.max(1, Math.round((histEndDate.getTime() - histStartDate.getTime()) / (1000 * 60 * 60 * 24)));
   const numHistWeeks = Math.max(1, histDays / 7);
 
   // ── Merchant pace ──────────────────────────────────────────────
+  type HistTx = { date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null };
   const histMerchantTotals = new Map<string, number>();
-  for (const t of historical) {
+  for (const t of historical as HistTx[]) {
     const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
     histMerchantTotals.set(m, (histMerchantTotals.get(m) || 0) + t.amount);
   }
@@ -256,7 +251,7 @@ async function gatherInsights(userId: string) {
 
   // ── Category pace ──────────────────────────────────────────────
   const histCatTotals = new Map<string, number>();
-  for (const t of historical) {
+  for (const t of historical as HistTx[]) {
     const c = t.ai_category_tag || 'Uncategorized';
     histCatTotals.set(c, (histCatTotals.get(c) || 0) + t.amount);
   }
@@ -314,6 +309,34 @@ async function gatherInsights(userId: string) {
     categoryPace: categoryPace.slice(0, 8),
     numHistMonths,
   };
+}
+
+async function fetchAllHistorical(plaidItemIds: string[], beforeDate: Date) {
+  const beforeStr = beforeDate.toISOString().split('T')[0];
+  const PAGE_SIZE = 1000;
+  const all: Array<{ date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null }> = [];
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data: page, error } = await supabase
+      .from('transactions')
+      .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
+      .in('plaid_item_id', plaidItemIds)
+      .lt('date', beforeStr)
+      .gt('amount', 0)
+      .order('date', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (error || !page || page.length === 0) {
+      hasMore = false;
+    } else {
+      all.push(...page);
+      offset += page.length;
+      hasMore = page.length === PAGE_SIZE;
+    }
+  }
+  return all;
 }
 
 function getDistinctMonths(dates: string[]): number {
