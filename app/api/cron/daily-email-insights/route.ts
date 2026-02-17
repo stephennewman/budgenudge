@@ -23,15 +23,29 @@ interface Alert {
   merchant: string;
   detail: string;
 }
-interface PaceItem {
-  name: string;
-  currentMonth: number;
-  avgMonthly: number;
-  pacePercent: number;  // current vs expected-so-far (adjusted for day of month)
-  status: 'under' | 'on_track' | 'over';
-  currentWeek: number;
-  avgWeekly: number;
+interface WeekBucket {
+  label: string;
+  current: number;
+  avgHist: number;
 }
+interface WeeklyBreakdown {
+  label: string;
+  buckets: WeekBucket[];
+  currentTotal: number;
+  avgHistTotal: number;
+}
+
+// Week-of-month buckets
+const WEEK_BUCKETS = [
+  { label: 'Days 1–7',   start: 1,  end: 7 },
+  { label: 'Days 8–14',  start: 8,  end: 14 },
+  { label: 'Days 15–21', start: 15, end: 21 },
+  { label: 'Days 22–31', start: 22, end: 31 },
+];
+
+// Key merchants & categories to track
+const KEY_MERCHANTS = ['Publix', 'Amazon'];
+const KEY_CATEGORIES = ['Groceries', 'Restaurants'];
 
 // ── Entry point ─────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -75,9 +89,6 @@ async function gatherInsights(userId: string) {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  // Week start (Monday)
-  const dayOfWeek = now.getDay(); // 0=Sun
-  const weekStart = new Date(today.getTime() - ((dayOfWeek === 0 ? 6 : dayOfWeek - 1)) * 24 * 60 * 60 * 1000);
 
   // Get user's plaid items
   const { data: userItems } = await supabase
@@ -192,99 +203,84 @@ async function gatherInsights(userId: string) {
   const daysInMonth = endOfMonth.getDate();
   const monthProgressPct = dayOfMonth / daysInMonth;
 
-  // ── Pace tracking ──────────────────────────────────────────────
-  const historical = (historicalResult || []).filter((t: { amount: number }) => t.amount > 0);
-
-  // Figure out how many distinct months the historical data covers
-  const histMonths = getDistinctMonths(historical.map((t: { date: string }) => t.date));
-  const numHistMonths = Math.max(histMonths, 1);
-
-  // Current week transactions (Mon–today)
-  const weekStartStr = weekStart.toISOString().split('T')[0];
-  const currentWeekTx = monthTransactions.filter(t => t.date >= weekStartStr);
-
-  // Compute weeks from actual data span
-  const histDates = historical.map((t: { date: string }) => t.date).sort();
-  const histStartDate = histDates.length > 0 ? new Date(histDates[0] + 'T12:00:00') : monthStart;
-  const histEndDate = monthStart;
-  const histDays = Math.max(1, Math.round((histEndDate.getTime() - histStartDate.getTime()) / (1000 * 60 * 60 * 24)));
-  const numHistWeeks = Math.max(1, histDays / 7);
-
-  // ── Merchant pace ──────────────────────────────────────────────
+  // ── Weekly bucket breakdowns ────────────────────────────────────
   type HistTx = { date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null };
-  const histMerchantTotals = new Map<string, number>();
-  for (const t of historical as HistTx[]) {
-    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
-    histMerchantTotals.set(m, (histMerchantTotals.get(m) || 0) + t.amount);
-  }
+  const historical = (historicalResult || []).filter((t: HistTx) => t.amount > 0) as HistTx[];
+  const numHistMonths = Math.max(getDistinctMonths(historical.map(t => t.date)), 1);
 
-  const currMerchantTotals = new Map<string, number>();
-  for (const t of monthTransactions) {
-    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
-    currMerchantTotals.set(m, (currMerchantTotals.get(m) || 0) + t.amount);
-  }
+  // Helper: get day-of-month from date string "YYYY-MM-DD"
+  const dayOf = (d: string) => parseInt(d.split('-')[2], 10);
 
-  const currWeekMerchantTotals = new Map<string, number>();
-  for (const t of currentWeekTx) {
-    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
-    currWeekMerchantTotals.set(m, (currWeekMerchantTotals.get(m) || 0) + t.amount);
-  }
+  // Helper: bucket index for a day-of-month
+  const bucketIdx = (day: number) => {
+    if (day <= 7) return 0;
+    if (day <= 14) return 1;
+    if (day <= 21) return 2;
+    return 3;
+  };
 
-  const merchantPace: PaceItem[] = [];
-  const allMerchants = new Set([...histMerchantTotals.keys(), ...currMerchantTotals.keys()]);
-  for (const m of allMerchants) {
-    const avgMonthly = (histMerchantTotals.get(m) || 0) / numHistMonths;
-    const avgWeekly = (histMerchantTotals.get(m) || 0) / numHistWeeks;
-    const currentMonth = currMerchantTotals.get(m) || 0;
-    const currentWeek = currWeekMerchantTotals.get(m) || 0;
+  // Helper: build a WeeklyBreakdown for a filter fn over current-month & historical txns
+  const buildBreakdown = (
+    label: string,
+    filterCurrent: (t: typeof monthTransactions[0]) => boolean,
+    filterHist: (t: HistTx) => boolean,
+  ): WeeklyBreakdown => {
+    const currBuckets = [0, 0, 0, 0];
+    const histBuckets = [0, 0, 0, 0];
 
-    // Only include merchants with meaningful history (avg > $5/mo) or current spending
-    if (avgMonthly < 5 && currentMonth < 5) continue;
+    for (const t of monthTransactions) {
+      if (!filterCurrent(t)) continue;
+      currBuckets[bucketIdx(dayOf(t.date))] += t.amount;
+    }
+    for (const t of historical) {
+      if (!filterHist(t)) continue;
+      histBuckets[bucketIdx(dayOf(t.date))] += t.amount;
+    }
 
-    const expectedSoFar = avgMonthly * monthProgressPct;
-    const pacePercent = expectedSoFar > 0 ? (currentMonth / expectedSoFar) * 100 : (currentMonth > 0 ? 999 : 0);
-    const status: PaceItem['status'] = pacePercent > 120 ? 'over' : pacePercent > 80 ? 'on_track' : 'under';
+    const buckets: WeekBucket[] = WEEK_BUCKETS.map((wb, i) => ({
+      label: wb.label,
+      current: currBuckets[i],
+      avgHist: histBuckets[i] / numHistMonths,
+    }));
 
-    merchantPace.push({ name: m, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
-  }
-  merchantPace.sort((a, b) => b.pacePercent - a.pacePercent);
+    return {
+      label,
+      buckets,
+      currentTotal: currBuckets.reduce((a, b) => a + b, 0),
+      avgHistTotal: histBuckets.reduce((a, b) => a + b, 0) / numHistMonths,
+    };
+  };
 
-  // ── Category pace ──────────────────────────────────────────────
-  const histCatTotals = new Map<string, number>();
-  for (const t of historical as HistTx[]) {
-    const c = t.ai_category_tag || 'Uncategorized';
-    histCatTotals.set(c, (histCatTotals.get(c) || 0) + t.amount);
-  }
+  // Match helper: case-insensitive merchant name check
+  const merchantMatch = (t: { ai_merchant_name: string | null; merchant_name: string; name: string }, keyword: string) => {
+    const m = (t.ai_merchant_name || t.merchant_name || t.name || '').toLowerCase();
+    return m.includes(keyword.toLowerCase());
+  };
 
-  const currCatTotals = new Map<string, number>();
-  for (const t of monthTransactions) {
-    const c = t.ai_category_tag || 'Uncategorized';
-    currCatTotals.set(c, (currCatTotals.get(c) || 0) + t.amount);
-  }
+  // Overall breakdown
+  const overallBreakdown = buildBreakdown(
+    'All Spending',
+    () => true,
+    () => true,
+  );
 
-  const currWeekCatTotals = new Map<string, number>();
-  for (const t of currentWeekTx) {
-    const c = t.ai_category_tag || 'Uncategorized';
-    currWeekCatTotals.set(c, (currWeekCatTotals.get(c) || 0) + t.amount);
-  }
+  // Key category breakdowns
+  const categoryBreakdowns: WeeklyBreakdown[] = KEY_CATEGORIES.map(cat =>
+    buildBreakdown(
+      cat,
+      t => (t.ai_category_tag || '').toLowerCase() === cat.toLowerCase(),
+      t => (t.ai_category_tag || '').toLowerCase() === cat.toLowerCase(),
+    )
+  );
 
-  const categoryPace: PaceItem[] = [];
-  const allCats = new Set([...histCatTotals.keys(), ...currCatTotals.keys()]);
-  for (const c of allCats) {
-    const avgMonthly = (histCatTotals.get(c) || 0) / numHistMonths;
-    const avgWeekly = (histCatTotals.get(c) || 0) / numHistWeeks;
-    const currentMonth = currCatTotals.get(c) || 0;
-    const currentWeek = currWeekCatTotals.get(c) || 0;
-
-    if (avgMonthly < 10 && currentMonth < 10) continue;
-
-    const expectedSoFar = avgMonthly * monthProgressPct;
-    const pacePercent = expectedSoFar > 0 ? (currentMonth / expectedSoFar) * 100 : (currentMonth > 0 ? 999 : 0);
-    const status: PaceItem['status'] = pacePercent > 120 ? 'over' : pacePercent > 80 ? 'on_track' : 'under';
-
-    categoryPace.push({ name: c, currentMonth, avgMonthly, pacePercent, status, currentWeek, avgWeekly });
-  }
-  categoryPace.sort((a, b) => b.pacePercent - a.pacePercent);
+  // Key merchant breakdowns
+  const merchantBreakdowns: WeeklyBreakdown[] = KEY_MERCHANTS.map(name =>
+    buildBreakdown(
+      name,
+      t => merchantMatch(t, name),
+      t => merchantMatch(t, name),
+    )
+  );
 
   return {
     now,
@@ -305,38 +301,26 @@ async function gatherInsights(userId: string) {
     monthProgressPct,
     monthTransactionCount: monthTransactions.length,
     last30dTotal,
-    merchantPace: merchantPace.slice(0, 12),
-    categoryPace: categoryPace.slice(0, 8),
     numHistMonths,
+    overallBreakdown,
+    categoryBreakdowns,
+    merchantBreakdowns,
   };
 }
 
 async function fetchAllHistorical(plaidItemIds: string[], beforeDate: Date) {
   const beforeStr = beforeDate.toISOString().split('T')[0];
-  const PAGE_SIZE = 1000;
-  const all: Array<{ date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null }> = [];
-  let offset = 0;
-  let hasMore = true;
+  // Single large query — avoids slow pagination round-trips
+  const { data } = await supabase
+    .from('transactions')
+    .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
+    .in('plaid_item_id', plaidItemIds)
+    .lt('date', beforeStr)
+    .gt('amount', 0)
+    .order('date', { ascending: true })
+    .limit(5000);
 
-  while (hasMore) {
-    const { data: page, error } = await supabase
-      .from('transactions')
-      .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
-      .in('plaid_item_id', plaidItemIds)
-      .lt('date', beforeStr)
-      .gt('amount', 0)
-      .order('date', { ascending: true })
-      .range(offset, offset + PAGE_SIZE - 1);
-
-    if (error || !page || page.length === 0) {
-      hasMore = false;
-    } else {
-      all.push(...page);
-      offset += page.length;
-      hasMore = page.length === PAGE_SIZE;
-    }
-  }
-  return all;
+  return data || [];
 }
 
 function getDistinctMonths(dates: string[]): number {
@@ -370,57 +354,52 @@ async function getUpcomingBills(userId: string, startDate: Date, endDate: Date):
     }));
 }
 
-async function getAlerts(userId: string, since: Date): Promise<Alert[]> {
+async function getAlerts(userId: string, _since: Date): Promise<Alert[]> {
   const alerts: Alert[] = [];
+  const now = new Date();
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+  const sixtyDaysAgoStr = sixtyDaysAgo.toISOString().split('T')[0];
 
-  const [newBillsRes, dormantRes, changedRes] = await Promise.all([
-    supabase
-      .from('tagged_merchants')
-      .select('merchant_name, expected_amount, prediction_frequency')
-      .eq('user_id', userId)
-      .eq('auto_detected', true)
-      .gte('created_at', since.toISOString())
-      .limit(3),
-    supabase
-      .from('tagged_merchants')
-      .select('merchant_name')
-      .eq('user_id', userId)
-      .eq('lifecycle_state', 'dormant')
-      .gte('updated_at', since.toISOString())
-      .limit(2),
-    supabase
-      .from('tagged_merchants')
-      .select('merchant_name, expected_amount, amount_drift')
-      .eq('user_id', userId)
-      .not('amount_drift', 'is', null)
-      .neq('amount_drift', 0)
-      .gte('updated_at', since.toISOString())
-      .limit(2),
-  ]);
+  // "New bill" = first transaction within last 60 days (truly new recurring charge)
+  // "Dormant" = was active but last charge > 60 days ago
+  // "Amount change" = amount_drift is set (non-zero)
+  const { data: bills } = await supabase
+    .from('tagged_merchants')
+    .select('merchant_name, expected_amount, prediction_frequency, last_transaction_date, lifecycle_state, amount_drift, is_active')
+    .eq('user_id', userId);
 
-  newBillsRes.data?.forEach(b => alerts.push({
-    type: 'new_bill',
-    merchant: b.merchant_name,
-    detail: `$${Number(b.expected_amount).toFixed(2)}/${b.prediction_frequency}`,
-  }));
+  if (!bills) return alerts;
 
-  dormantRes.data?.forEach(b => alerts.push({
-    type: 'dormant',
-    merchant: b.merchant_name,
-    detail: 'Possibly cancelled — no recent charges',
-  }));
+  for (const b of bills) {
+    const lastTx = b.last_transaction_date;
 
-  changedRes.data?.forEach(b => {
-    const newAmt = Number(b.expected_amount);
-    const oldAmt = newAmt - Number(b.amount_drift);
-    alerts.push({
-      type: 'amount_change',
-      merchant: b.merchant_name,
-      detail: `$${oldAmt.toFixed(2)} → $${newAmt.toFixed(2)}`,
-    });
-  });
+    // New bill: first appeared recently (last_transaction_date exists, bill is active,
+    // and the merchant hasn't been around long — proxy: only 1-2 months of history)
+    // Skip this for now — it's unreliable without tracking first-ever transaction date.
 
-  return alerts;
+    // Dormant: active bill that hasn't been charged in 60+ days
+    if (b.is_active && lastTx && lastTx < sixtyDaysAgoStr) {
+      alerts.push({
+        type: 'dormant',
+        merchant: b.merchant_name,
+        detail: `Last charge ${lastTx} — may have stopped`,
+      });
+    }
+
+    // Amount change
+    const drift = Number(b.amount_drift || 0);
+    if (drift !== 0) {
+      const newAmt = Number(b.expected_amount);
+      const oldAmt = newAmt - drift;
+      alerts.push({
+        type: 'amount_change',
+        merchant: b.merchant_name,
+        detail: `$${oldAmt.toFixed(2)} → $${newAmt.toFixed(2)}`,
+      });
+    }
+  }
+
+  return alerts.slice(0, 5);
 }
 
 // ── Subject line ────────────────────────────────────────────────────
@@ -473,60 +452,51 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
       <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(b.amount)}</td>
     </tr>`).join('');
 
-  // Pace helper: status badge
-  const paceBadge = (p: PaceItem) => {
-    if (p.avgMonthly < 1) return `<span style="background:#e8f0fe;color:#1a73e8;padding:2px 8px;border-radius:10px;font-size:11px;">new</span>`;
-    const pct = Math.round(p.pacePercent);
-    if (p.status === 'over') return `<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
-    if (p.status === 'on_track') return `<span style="background:#fefce8;color:#a16207;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
-    return `<span style="background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:10px;font-size:11px;">${pct}% of pace</span>`;
+  // ── Weekly breakdown table builder ──────────────────────────────
+  const weeklyTable = (bd: WeeklyBreakdown, highlight: boolean) => {
+    const diffTotal = bd.currentTotal - bd.avgHistTotal;
+    const diffColor = diffTotal > 0 ? '#dc2626' : '#16a34a';
+    const diffSign = diffTotal > 0 ? '+' : '';
+
+    const rows = bd.buckets.map((b, i) => {
+      const isFuture = data.dayOfMonth <= WEEK_BUCKETS[i].start - 1;
+      const isCurrent = data.dayOfMonth >= WEEK_BUCKETS[i].start && data.dayOfMonth <= WEEK_BUCKETS[i].end;
+      const diff = b.current - b.avgHist;
+      const dColor = diff > 0 ? '#dc2626' : '#16a34a';
+      const dSign = diff > 0 ? '+' : '';
+      const rowBg = isCurrent ? '#f0f9ff' : 'transparent';
+      const indicator = isCurrent ? ' ◀' : '';
+
+      return `<tr style="background:${rowBg};">
+        <td style="padding:6px 12px;font-size:14px;white-space:nowrap;"><strong>${b.label}</strong>${indicator}</td>
+        <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">
+          ${isFuture ? '<span style="color:#ccc;">—</span>' : '$' + fmt(b.current)}
+        </td>
+        <td style="padding:6px 12px;font-size:14px;text-align:right;color:#666;">$${fmt(b.avgHist)}</td>
+        <td style="padding:6px 12px;font-size:14px;text-align:right;color:${isFuture ? '#ccc' : dColor};font-weight:600;">
+          ${isFuture ? '—' : dSign + '$' + fmt(Math.abs(diff))}
+        </td>
+      </tr>`;
+    }).join('');
+
+    const bgColor = highlight ? '#fafafa' : '#ffffff';
+
+    return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bgColor};border-radius:8px;border:1px solid #eee;margin-bottom:4px;">
+      <tr style="border-bottom:2px solid #eee;">
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Period</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Avg Month</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">+/−</td>
+      </tr>
+      ${rows}
+      <tr style="border-top:2px solid #ddd;">
+        <td style="padding:8px 12px;font-size:14px;font-weight:700;">Total</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;">$${fmt(bd.currentTotal)}</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;color:#666;font-weight:700;">$${fmt(bd.avgHistTotal)}</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;color:${diffColor};font-weight:700;">${diffSign}$${fmt(Math.abs(diffTotal))}</td>
+      </tr>
+    </table>`;
   };
-
-  // Progress bar helper
-  const progressBar = (current: number, avg: number) => {
-    const pct = avg > 0 ? Math.min(Math.round((current / avg) * 100), 150) : 0;
-    const barColor = pct > 100 ? '#dc2626' : pct > 80 ? '#f59e0b' : '#16a34a';
-    const barWidth = Math.min(pct, 100);
-    return `<div style="background:#e5e7eb;border-radius:4px;height:6px;width:100%;margin-top:4px;">
-      <div style="background:${barColor};border-radius:4px;height:6px;width:${barWidth}%;"></div>
-    </div>`;
-  };
-
-  // Category pace rows
-  const catPaceRows = data.categoryPace.map(c => `
-    <tr>
-      <td style="padding:8px 12px;font-size:14px;vertical-align:top;">
-        <strong>${c.name}</strong>
-        ${progressBar(c.currentMonth, c.avgMonthly)}
-      </td>
-      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">
-        <div>$${fmt(c.currentMonth)}</div>
-        <div style="font-size:11px;color:#999;">of $${fmt(c.avgMonthly)} avg</div>
-      </td>
-      <td style="padding:8px 12px;font-size:13px;text-align:right;vertical-align:top;">
-        <div>$${fmt(c.currentWeek)}/wk</div>
-        <div style="font-size:11px;color:#999;">avg $${fmt(c.avgWeekly)}/wk</div>
-      </td>
-      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">${paceBadge(c)}</td>
-    </tr>`).join('');
-
-  // Merchant pace rows
-  const merchantPaceRows = data.merchantPace.map(m => `
-    <tr>
-      <td style="padding:8px 12px;font-size:14px;vertical-align:top;">
-        <strong>${m.name}</strong>
-        ${progressBar(m.currentMonth, m.avgMonthly)}
-      </td>
-      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">
-        <div>$${fmt(m.currentMonth)}</div>
-        <div style="font-size:11px;color:#999;">of $${fmt(m.avgMonthly)} avg</div>
-      </td>
-      <td style="padding:8px 12px;font-size:13px;text-align:right;vertical-align:top;">
-        <div>$${fmt(m.currentWeek)}/wk</div>
-        <div style="font-size:11px;color:#999;">avg $${fmt(m.avgWeekly)}/wk</div>
-      </td>
-      <td style="padding:8px 12px;font-size:14px;text-align:right;vertical-align:top;">${paceBadge(m)}</td>
-    </tr>`).join('');
 
   // Yesterday breakdown
   const yesterdayRows = data.yesterdayTx.slice(0, 6).map(t => `
@@ -604,36 +574,31 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     ${data.upcomingBills.length > 8 ? `<div style="font-size:12px;color:#999;padding:6px 12px;">+${data.upcomingBills.length - 8} more</div>` : ''}
   </td></tr>` : ''}
 
-  ${data.categoryPace.length > 0 ? `
-  <!-- Category pace -->
+  <!-- Overall weekly breakdown -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Category Pace — Month to Date</div>
-    <div style="font-size:12px;color:#999;margin-bottom:8px;">Day ${data.dayOfMonth} of ${data.daysInMonth} · Based on ${data.numHistMonths}-month averages</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
-      <tr style="border-bottom:1px solid #eee;">
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Category</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Week</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Pace</td>
-      </tr>
-      ${catPaceRows}
-    </table>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Spending by Week — ${data.overallBreakdown.label}</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">Day ${data.dayOfMonth} of ${data.daysInMonth} · Avg based on ${data.numHistMonths} months of history</div>
+    ${weeklyTable(data.overallBreakdown, false)}
+  </td></tr>
+
+  <!-- Category breakdowns -->
+  ${data.categoryBreakdowns.length > 0 ? `
+  <tr><td style="padding:0 32px 20px;">
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Key Categories — Week by Week</div>
+    ${data.categoryBreakdowns.map(cb => `
+      <div style="font-weight:600;font-size:14px;color:#374151;margin:8px 0 4px;">${cb.label}</div>
+      ${weeklyTable(cb, true)}
+    `).join('')}
   </td></tr>` : ''}
 
-  ${data.merchantPace.length > 0 ? `
-  <!-- Merchant pace -->
+  <!-- Merchant breakdowns -->
+  ${data.merchantBreakdowns.length > 0 ? `
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Merchant Pace — Month to Date</div>
-    <div style="font-size:12px;color:#999;margin-bottom:8px;">Current month vs. ${data.numHistMonths}-month average</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
-      <tr style="border-bottom:1px solid #eee;">
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Merchant</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Week</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Pace</td>
-      </tr>
-      ${merchantPaceRows}
-    </table>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Key Merchants — Week by Week</div>
+    ${data.merchantBreakdowns.map(mb => `
+      <div style="font-weight:600;font-size:14px;color:#374151;margin:8px 0 4px;">${mb.label}</div>
+      ${weeklyTable(mb, true)}
+    `).join('')}
   </td></tr>` : ''}
 
   <!-- Account breakdown -->
