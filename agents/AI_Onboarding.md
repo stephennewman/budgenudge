@@ -81,6 +81,22 @@ Complete PostgreSQL schema with 15+ core tables:
 
 ## 📋 CONTINUOUS ACTIVITY LOG
 
+### February 17, 2026 - WEEKLY SPENDING BREAKDOWNS EMAIL ✅ DEPLOYED
+- **Time**: Late evening EST
+- **Git Commit**: `da342be` - 1 file changed, 214 insertions, 249 deletions
+- **What**: Replaced abstract pace-percentage sections with concrete weekly spending breakdowns
+- **Changes**:
+  - New weekly bucket view: Days 1–7, 8–14, 15–21, 22–31 for each month
+  - Each bucket shows: this month's actual spend, historical average, and +/− difference
+  - Current week row highlighted with indicator arrow
+  - Overall spending breakdown (all transactions)
+  - Key categories breakdown: Groceries, Restaurants
+  - Key merchants breakdown: Publix, Amazon
+  - Historical averages computed from ALL past transaction data (not just 90 days)
+  - Fixed false alert detection after recurring bills regeneration (removed created_at-based "new bill" alerts, now uses last_transaction_date for dormant detection)
+  - Optimized historical data fetch: single 5000-limit query instead of paginated round-trips
+- **Files**: `app/api/cron/daily-email-insights/route.ts`
+
 ### February 12, 2026 - RECURRING BILLS 2.0: Full Regeneration ✅ DEPLOYED
 - **Time**: Evening EST
 - **What**: Complete rebuild of the recurring bills detection system

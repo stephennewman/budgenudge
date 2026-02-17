@@ -16,6 +16,7 @@ export const maxDuration = 30;
 
 // ── Types ───────────────────────────────────────────────────────────
 interface Expense { merchant: string; amount: number; date: string }
+interface PredictedExpense { merchant: string; predictedDate: string; amount: number; monthsMatched: number }
 interface CategorySpend { category: string; total: number; count: number }
 interface MerchantSpend { merchant: string; total: number; count: number }
 interface Alert {
@@ -203,11 +204,83 @@ async function gatherInsights(userId: string) {
   const daysInMonth = endOfMonth.getDate();
   const monthProgressPct = dayOfMonth / daysInMonth;
 
-  // ── Weekly bucket breakdowns ────────────────────────────────────
+  // ── Historical data + derived views ────────────────────────────────
   type HistTx = { date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null };
   const historical = (historicalResult || []).filter((t: HistTx) => t.amount > 0) as HistTx[];
   const numHistMonths = Math.max(getDistinctMonths(historical.map(t => t.date)), 1);
 
+  // ── Day before yesterday ──────────────────────────────────────
+  const dayBeforeYesterday = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
+  const dayBeforeYesterdayStr = dayBeforeYesterday.toISOString().split('T')[0];
+  let dayBeforeTx = monthTransactions.filter(t => t.date === dayBeforeYesterdayStr);
+  if (dayBeforeTx.length === 0 && dayBeforeYesterday.getMonth() !== today.getMonth()) {
+    dayBeforeTx = historical.filter(t => t.date === dayBeforeYesterdayStr);
+  }
+  const dayBeforeSpend = dayBeforeTx.reduce((s, t) => s + t.amount, 0);
+
+  // ── Predicted expenses (next 7 days) ──────────────────────────
+  const allTxForPrediction: HistTx[] = [...historical, ...(monthTransactions as HistTx[])];
+  const merchantDayGroups = new Map<string, { month: string; day: number; amount: number }[]>();
+
+  for (const t of allTxForPrediction) {
+    const m = (t.ai_merchant_name || t.merchant_name || t.name || 'Unknown').toLowerCase().trim();
+    const day = parseInt(t.date.split('-')[2], 10);
+    const month = t.date.substring(0, 7);
+    const entries = merchantDayGroups.get(m) || [];
+    entries.push({ month, day, amount: t.amount });
+    merchantDayGroups.set(m, entries);
+  }
+
+  // Build the next 7 calendar dates (tomorrow through +7)
+  const next7dates: { str: string; day: number }[] = [];
+  for (let i = 1; i <= 7; i++) {
+    const dt = new Date(today.getTime() + i * 24 * 60 * 60 * 1000);
+    next7dates.push({ str: dt.toISOString().split('T')[0], day: dt.getDate() });
+  }
+
+  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const predictedExpenses: PredictedExpense[] = [];
+  const predictedMerchants = new Set<string>();
+
+  for (const [merchant, entries] of merchantDayGroups) {
+    for (const target of next7dates) {
+      if (predictedMerchants.has(merchant)) break; // one prediction per merchant
+
+      // Find entries within ±2 days of the target day-of-month
+      const matching = entries.filter(e => Math.abs(e.day - target.day) <= 2);
+      const distinctMonths = new Set(matching.map(e => e.month));
+
+      if (distinctMonths.size < 2) continue; // need at least 2 months of pattern
+
+      // Skip if already charged this month near this day
+      const chargedThisMonth = matching.some(e => e.month === currentMonthStr);
+      if (chargedThisMonth) continue;
+
+      // Use most recent amount
+      const sorted = [...matching].sort((a, b) => b.month.localeCompare(a.month));
+      const displayName = entries.length > 0
+        ? (allTxForPrediction.find(t =>
+            (t.ai_merchant_name || t.merchant_name || t.name || '').toLowerCase().trim() === merchant
+          )?.ai_merchant_name || allTxForPrediction.find(t =>
+            (t.ai_merchant_name || t.merchant_name || t.name || '').toLowerCase().trim() === merchant
+          )?.merchant_name || merchant)
+        : merchant;
+
+      predictedExpenses.push({
+        merchant: displayName,
+        predictedDate: target.str,
+        amount: sorted[0].amount,
+        monthsMatched: distinctMonths.size,
+      });
+      predictedMerchants.add(merchant);
+    }
+  }
+
+  // Sort by date, then amount descending
+  predictedExpenses.sort((a, b) => a.predictedDate.localeCompare(b.predictedDate) || b.amount - a.amount);
+  const predictedTotal = predictedExpenses.reduce((s, p) => s + p.amount, 0);
+
+  // ── Weekly bucket breakdowns ────────────────────────────────────
   // Helper: get day-of-month from date string "YYYY-MM-DD"
   const dayOf = (d: string) => parseInt(d.split('-')[2], 10);
 
@@ -290,8 +363,13 @@ async function gatherInsights(userId: string) {
     last7dSpend,
     yesterdaySpend,
     yesterdayTx,
+    dayBeforeSpend,
+    dayBeforeTx,
+    dayBeforeYesterdayStr,
     upcomingBills,
     upcomingTotal,
+    predictedExpenses,
+    predictedTotal,
     topCategories,
     topMerchants,
     alerts: alertsData,
@@ -499,10 +577,25 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
   };
 
   // Yesterday breakdown
-  const yesterdayRows = data.yesterdayTx.slice(0, 6).map(t => `
+  const yesterdayRows = data.yesterdayTx.slice(0, 8).map(t => `
     <tr>
       <td style="padding:4px 12px;font-size:14px;">${t.ai_merchant_name || t.merchant_name || t.name}</td>
       <td style="padding:4px 12px;font-size:14px;text-align:right;">$${fmt(t.amount)}</td>
+    </tr>`).join('');
+
+  // Day before yesterday breakdown
+  const dayBeforeRows = data.dayBeforeTx.slice(0, 8).map(t => `
+    <tr>
+      <td style="padding:4px 12px;font-size:14px;">${t.ai_merchant_name || t.merchant_name || t.name}</td>
+      <td style="padding:4px 12px;font-size:14px;text-align:right;">$${fmt(t.amount)}</td>
+    </tr>`).join('');
+
+  // Predicted expenses rows
+  const predictedRows = data.predictedExpenses.slice(0, 10).map(p => `
+    <tr>
+      <td style="padding:6px 12px;font-size:14px;color:#666;">${fmtDate(p.predictedDate)}</td>
+      <td style="padding:6px 12px;font-size:14px;">${p.merchant}</td>
+      <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(p.amount)}</td>
     </tr>`).join('');
 
   // Account rows
@@ -566,12 +659,30 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${yesterdayRows}</table>
   </td></tr>` : ''}
 
-  ${data.upcomingBills.length > 0 ? `
-  <!-- Upcoming bills -->
+  ${data.dayBeforeTx.length > 0 ? `
+  <!-- Day Before Yesterday -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Upcoming Bills — $${fmt(data.upcomingTotal)}</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${billRows}</table>
-    ${data.upcomingBills.length > 8 ? `<div style="font-size:12px;color:#999;padding:6px 12px;">+${data.upcomingBills.length - 8} more</div>` : ''}
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Day Before (${data.dayBeforeYesterdayStr}) — $${fmt(data.dayBeforeSpend)}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${dayBeforeRows}</table>
+  </td></tr>` : ''}
+
+  ${data.predictedExpenses.length > 0 ? `
+  <!-- Predicted Expenses -->
+  <tr><td style="padding:0 32px 20px;">
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Predicted Expenses — Next 7 Days</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">Based on recurring patterns · $${fmt(data.predictedTotal)} expected</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;">
+      <tr style="border-bottom:1px solid #fde68a;">
+        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-transform:uppercase;">Date</td>
+        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-transform:uppercase;">Merchant</td>
+        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-align:right;text-transform:uppercase;">Est. Amount</td>
+      </tr>
+      ${predictedRows}
+      <tr style="border-top:1px solid #fde68a;">
+        <td colspan="2" style="padding:8px 12px;font-size:14px;font-weight:700;color:#92400e;">Total Predicted</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;color:#92400e;">$${fmt(data.predictedTotal)}</td>
+      </tr>
+    </table>
   </td></tr>` : ''}
 
   <!-- Overall weekly breakdown -->
