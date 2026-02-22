@@ -24,29 +24,6 @@ interface Alert {
   merchant: string;
   detail: string;
 }
-interface WeekBucket {
-  label: string;
-  current: number;
-  avgHist: number;
-}
-interface WeeklyBreakdown {
-  label: string;
-  buckets: WeekBucket[];
-  currentTotal: number;
-  avgHistTotal: number;
-}
-
-// Week-of-month buckets
-const WEEK_BUCKETS = [
-  { label: 'Days 1–7',   start: 1,  end: 7 },
-  { label: 'Days 8–14',  start: 8,  end: 14 },
-  { label: 'Days 15–21', start: 15, end: 21 },
-  { label: 'Days 22–31', start: 22, end: 31 },
-];
-
-// Key merchants & categories to track
-const KEY_MERCHANTS = ['Publix', 'Amazon'];
-const KEY_CATEGORIES = ['Groceries', 'Restaurants'];
 
 // ── Entry point ─────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -88,7 +65,8 @@ async function gatherInsights(userId: string) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0); // last day of prev month
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Get user's plaid items
@@ -105,8 +83,7 @@ async function gatherInsights(userId: string) {
   const [
     accountsResult,
     monthTransactionsResult,
-    last7dTransactionsResult,
-    last30dTransactionsResult,
+    lastMonthTransactionsResult,
     historicalResult,
     upcomingBills,
     alertsData,
@@ -126,24 +103,17 @@ async function gatherInsights(userId: string) {
       .order('date', { ascending: false })
       .limit(500),
 
-    // Last 7 days transactions
+    // Last month's transactions
     supabase
       .from('transactions')
       .select('date, amount, merchant_name, name, ai_merchant_name, ai_category_tag')
       .in('plaid_item_id', plaidItemIds)
-      .gte('date', sevenDaysAgo.toISOString().split('T')[0])
+      .gte('date', lastMonthStart.toISOString().split('T')[0])
+      .lte('date', lastMonthEnd.toISOString().split('T')[0])
       .order('date', { ascending: false })
-      .limit(200),
-
-    // Last 30 days transactions
-    supabase
-      .from('transactions')
-      .select('date, amount, ai_category_tag')
-      .in('plaid_item_id', plaidItemIds)
-      .gte('date', thirtyDaysAgo.toISOString().split('T')[0])
       .limit(1000),
 
-    // Historical transactions (ALL prior months — for baseline averages)
+    // Historical transactions (ALL prior months — for predictions)
     fetchAllHistorical(plaidItemIds, monthStart),
 
     // Upcoming bills
@@ -155,13 +125,12 @@ async function gatherInsights(userId: string) {
 
   const accounts = accountsResult.data || [];
   const monthTransactions = (monthTransactionsResult.data || []).filter(t => t.amount > 0);
-  const last7d = (last7dTransactionsResult.data || []).filter(t => t.amount > 0);
-  const last30d = (last30dTransactionsResult.data || []).filter(t => t.amount > 0);
+  const lastMonthTransactions = (lastMonthTransactionsResult.data || []).filter(t => t.amount > 0);
 
   // Compute summaries
   const totalBalance = accounts.reduce((s, a) => s + (a.available_balance || a.current_balance || 0), 0);
   const monthSpend = monthTransactions.reduce((s, t) => s + t.amount, 0);
-  const last7dSpend = last7d.reduce((s, t) => s + t.amount, 0);
+  const lastMonthSpend = lastMonthTransactions.reduce((s, t) => s + t.amount, 0);
   const upcomingTotal = upcomingBills.reduce((s, b) => s + b.amount, 0);
 
   // Yesterday's transactions
@@ -170,44 +139,64 @@ async function gatherInsights(userId: string) {
   const yesterdayTx = monthTransactions.filter(t => t.date === yesterdayStr);
   const yesterdaySpend = yesterdayTx.reduce((s, t) => s + t.amount, 0);
 
-  // Top categories (last 30 days)
-  const categoryMap = new Map<string, CategorySpend>();
-  let last30dTotal = 0;
-  last30d.forEach(t => {
+  // This month by category
+  const thisMonthCatMap = new Map<string, CategorySpend>();
+  monthTransactions.forEach(t => {
     const cat = t.ai_category_tag || 'Uncategorized';
-    const existing = categoryMap.get(cat) || { category: cat, total: 0, count: 0 };
+    const existing = thisMonthCatMap.get(cat) || { category: cat, total: 0, count: 0 };
     existing.total += t.amount;
     existing.count++;
-    last30dTotal += t.amount;
-    categoryMap.set(cat, existing);
+    thisMonthCatMap.set(cat, existing);
   });
-  const topCategories = Array.from(categoryMap.values())
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6);
+  const thisMonthCategories = Array.from(thisMonthCatMap.values())
+    .sort((a, b) => b.total - a.total);
 
-  // Top merchants (last 7 days)
-  const merchantMap = new Map<string, MerchantSpend>();
-  last7d.forEach(t => {
+  // This month by merchant
+  const thisMonthMerchMap = new Map<string, MerchantSpend>();
+  monthTransactions.forEach(t => {
     const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
-    const existing = merchantMap.get(m) || { merchant: m, total: 0, count: 0 };
+    const existing = thisMonthMerchMap.get(m) || { merchant: m, total: 0, count: 0 };
     existing.total += t.amount;
     existing.count++;
-    merchantMap.set(m, existing);
+    thisMonthMerchMap.set(m, existing);
   });
-  const topMerchants = Array.from(merchantMap.values())
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
+  const thisMonthMerchants = Array.from(thisMonthMerchMap.values())
+    .sort((a, b) => b.total - a.total);
+
+  // Last month by category
+  const lastMonthCatMap = new Map<string, CategorySpend>();
+  lastMonthTransactions.forEach(t => {
+    const cat = t.ai_category_tag || 'Uncategorized';
+    const existing = lastMonthCatMap.get(cat) || { category: cat, total: 0, count: 0 };
+    existing.total += t.amount;
+    existing.count++;
+    lastMonthCatMap.set(cat, existing);
+  });
+  const lastMonthCategories = Array.from(lastMonthCatMap.values())
+    .sort((a, b) => b.total - a.total);
+
+  // Last month by merchant
+  const lastMonthMerchMap = new Map<string, MerchantSpend>();
+  lastMonthTransactions.forEach(t => {
+    const m = t.ai_merchant_name || t.merchant_name || t.name || 'Unknown';
+    const existing = lastMonthMerchMap.get(m) || { merchant: m, total: 0, count: 0 };
+    existing.total += t.amount;
+    existing.count++;
+    lastMonthMerchMap.set(m, existing);
+  });
+  const lastMonthMerchants = Array.from(lastMonthMerchMap.values())
+    .sort((a, b) => b.total - a.total);
+
+  const lastMonthLabel = lastMonthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   // Days left in month
   const daysLeft = endOfMonth.getDate() - today.getDate();
   const dayOfMonth = today.getDate();
   const daysInMonth = endOfMonth.getDate();
-  const monthProgressPct = dayOfMonth / daysInMonth;
 
-  // ── Historical data + derived views ────────────────────────────────
+  // ── Historical data (for predictions) ──────────────────────────────
   type HistTx = { date: string; amount: number; merchant_name: string; name: string; ai_merchant_name: string | null; ai_category_tag: string | null };
   const historical = (historicalResult || []).filter((t: HistTx) => t.amount > 0) as HistTx[];
-  const numHistMonths = Math.max(getDistinctMonths(historical.map(t => t.date)), 1);
 
   // ── Day before yesterday ──────────────────────────────────────
   const dayBeforeYesterday = new Date(today.getTime() - 2 * 24 * 60 * 60 * 1000);
@@ -280,87 +269,13 @@ async function gatherInsights(userId: string) {
   predictedExpenses.sort((a, b) => a.predictedDate.localeCompare(b.predictedDate) || b.amount - a.amount);
   const predictedTotal = predictedExpenses.reduce((s, p) => s + p.amount, 0);
 
-  // ── Weekly bucket breakdowns ────────────────────────────────────
-  // Helper: get day-of-month from date string "YYYY-MM-DD"
-  const dayOf = (d: string) => parseInt(d.split('-')[2], 10);
-
-  // Helper: bucket index for a day-of-month
-  const bucketIdx = (day: number) => {
-    if (day <= 7) return 0;
-    if (day <= 14) return 1;
-    if (day <= 21) return 2;
-    return 3;
-  };
-
-  // Helper: build a WeeklyBreakdown for a filter fn over current-month & historical txns
-  const buildBreakdown = (
-    label: string,
-    filterCurrent: (t: typeof monthTransactions[0]) => boolean,
-    filterHist: (t: HistTx) => boolean,
-  ): WeeklyBreakdown => {
-    const currBuckets = [0, 0, 0, 0];
-    const histBuckets = [0, 0, 0, 0];
-
-    for (const t of monthTransactions) {
-      if (!filterCurrent(t)) continue;
-      currBuckets[bucketIdx(dayOf(t.date))] += t.amount;
-    }
-    for (const t of historical) {
-      if (!filterHist(t)) continue;
-      histBuckets[bucketIdx(dayOf(t.date))] += t.amount;
-    }
-
-    const buckets: WeekBucket[] = WEEK_BUCKETS.map((wb, i) => ({
-      label: wb.label,
-      current: currBuckets[i],
-      avgHist: histBuckets[i] / numHistMonths,
-    }));
-
-    return {
-      label,
-      buckets,
-      currentTotal: currBuckets.reduce((a, b) => a + b, 0),
-      avgHistTotal: histBuckets.reduce((a, b) => a + b, 0) / numHistMonths,
-    };
-  };
-
-  // Match helper: case-insensitive merchant name check
-  const merchantMatch = (t: { ai_merchant_name: string | null; merchant_name: string; name: string }, keyword: string) => {
-    const m = (t.ai_merchant_name || t.merchant_name || t.name || '').toLowerCase();
-    return m.includes(keyword.toLowerCase());
-  };
-
-  // Overall breakdown
-  const overallBreakdown = buildBreakdown(
-    'All Spending',
-    () => true,
-    () => true,
-  );
-
-  // Key category breakdowns
-  const categoryBreakdowns: WeeklyBreakdown[] = KEY_CATEGORIES.map(cat =>
-    buildBreakdown(
-      cat,
-      t => (t.ai_category_tag || '').toLowerCase() === cat.toLowerCase(),
-      t => (t.ai_category_tag || '').toLowerCase() === cat.toLowerCase(),
-    )
-  );
-
-  // Key merchant breakdowns
-  const merchantBreakdowns: WeeklyBreakdown[] = KEY_MERCHANTS.map(name =>
-    buildBreakdown(
-      name,
-      t => merchantMatch(t, name),
-      t => merchantMatch(t, name),
-    )
-  );
-
   return {
     now,
     totalBalance,
     accounts,
     monthSpend,
-    last7dSpend,
+    lastMonthSpend,
+    lastMonthLabel,
     yesterdaySpend,
     yesterdayTx,
     dayBeforeSpend,
@@ -370,19 +285,15 @@ async function gatherInsights(userId: string) {
     upcomingTotal,
     predictedExpenses,
     predictedTotal,
-    topCategories,
-    topMerchants,
+    thisMonthCategories,
+    thisMonthMerchants,
+    lastMonthCategories,
+    lastMonthMerchants,
     alerts: alertsData,
     daysLeft,
     dayOfMonth,
     daysInMonth,
-    monthProgressPct,
     monthTransactionCount: monthTransactions.length,
-    last30dTotal,
-    numHistMonths,
-    overallBreakdown,
-    categoryBreakdowns,
-    merchantBreakdowns,
   };
 }
 
@@ -399,11 +310,6 @@ async function fetchAllHistorical(plaidItemIds: string[], beforeDate: Date) {
     .limit(5000);
 
   return data || [];
-}
-
-function getDistinctMonths(dates: string[]): number {
-  const months = new Set(dates.map(d => d.substring(0, 7))); // "YYYY-MM"
-  return months.size;
 }
 
 async function getUpcomingBills(userId: string, startDate: Date, endDate: Date): Promise<Expense[]> {
@@ -510,68 +416,56 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     year: 'numeric',
   });
 
-  // Alert rows
-  const alertRows = data.alerts.map(a => {
-    const icon = a.type === 'new_bill' ? '🆕' : a.type === 'amount_change' ? '📊' : '⏸️';
-    const label = a.type === 'new_bill' ? 'New bill detected' : a.type === 'amount_change' ? 'Amount changed' : 'Possibly cancelled';
-    return `
+  // ── Combined spend table (this month + last month side by side) ──
+  const combinedSpendTable = (
+    thisMonth: { name: string; total: number; count: number }[],
+    lastMonth: { name: string; total: number; count: number }[],
+    thisMonthTotal: number,
+    lastMonthTotal: number,
+    lastMonthLabel: string,
+  ) => {
+    const lastMonthMap = new Map(lastMonth.map(i => [i.name, i]));
+    const seen = new Set<string>();
+
+    // Start with this month's items (sorted by this month total desc)
+    const combined: { name: string; thisTotal: number; thisCount: number; lastTotal: number }[] = [];
+    for (const item of thisMonth) {
+      seen.add(item.name);
+      const last = lastMonthMap.get(item.name);
+      combined.push({ name: item.name, thisTotal: item.total, thisCount: item.count, lastTotal: last?.total || 0 });
+    }
+    // Add items only in last month
+    for (const item of lastMonth) {
+      if (!seen.has(item.name)) {
+        combined.push({ name: item.name, thisTotal: 0, thisCount: 0, lastTotal: item.total });
+      }
+    }
+
+    const rows = combined.map(item => {
+      const hasLastMonth = item.lastTotal > 0;
+      const overLastMonth = item.thisTotal > item.lastTotal && hasLastMonth;
+      const underLastMonth = item.thisTotal < item.lastTotal && hasLastMonth;
+      const thisColor = !hasLastMonth ? '#ca8a04' : overLastMonth ? '#dc2626' : '#16a34a';
+      const nameColor = thisColor;
+      return `
       <tr>
-        <td style="padding:6px 12px;font-size:14px;">${icon} <strong>${a.merchant}</strong></td>
-        <td style="padding:6px 12px;font-size:14px;color:#666;">${label}</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;">${a.detail}</td>
-      </tr>`;
-  }).join('');
-
-  // Upcoming bills rows
-  const billRows = data.upcomingBills.slice(0, 8).map(b => `
-    <tr>
-      <td style="padding:6px 12px;font-size:14px;color:#666;">${fmtDate(b.date)}</td>
-      <td style="padding:6px 12px;font-size:14px;">${b.merchant}</td>
-      <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(b.amount)}</td>
-    </tr>`).join('');
-
-  // ── Weekly breakdown table builder ──────────────────────────────
-  const weeklyTable = (bd: WeeklyBreakdown, highlight: boolean) => {
-    const diffTotal = bd.currentTotal - bd.avgHistTotal;
-    const diffColor = diffTotal > 0 ? '#dc2626' : '#16a34a';
-    const diffSign = diffTotal > 0 ? '+' : '';
-
-    const rows = bd.buckets.map((b, i) => {
-      const isFuture = data.dayOfMonth <= WEEK_BUCKETS[i].start - 1;
-      const isCurrent = data.dayOfMonth >= WEEK_BUCKETS[i].start && data.dayOfMonth <= WEEK_BUCKETS[i].end;
-      const diff = b.current - b.avgHist;
-      const dColor = diff > 0 ? '#dc2626' : '#16a34a';
-      const dSign = diff > 0 ? '+' : '';
-      const rowBg = isCurrent ? '#f0f9ff' : 'transparent';
-      const indicator = isCurrent ? ' ◀' : '';
-
-      return `<tr style="background:${rowBg};">
-        <td style="padding:6px 12px;font-size:14px;white-space:nowrap;"><strong>${b.label}</strong>${indicator}</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">
-          ${isFuture ? '<span style="color:#ccc;">—</span>' : '$' + fmt(b.current)}
-        </td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;color:#666;">$${fmt(b.avgHist)}</td>
-        <td style="padding:6px 12px;font-size:14px;text-align:right;color:${isFuture ? '#ccc' : dColor};font-weight:600;">
-          ${isFuture ? '—' : dSign + '$' + fmt(Math.abs(diff))}
-        </td>
+        <td style="padding:6px 12px;font-size:14px;color:${nameColor};">${item.name}</td>
+        <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;color:${thisColor};">$${fmt(item.thisTotal)}</td>
+        <td style="padding:6px 12px;font-size:14px;text-align:right;color:${hasLastMonth ? '#666' : '#ca8a04'};">$${fmt(item.lastTotal)}</td>
       </tr>`;
     }).join('');
 
-    const bgColor = highlight ? '#fafafa' : '#ffffff';
-
-    return `<table width="100%" cellpadding="0" cellspacing="0" style="background:${bgColor};border-radius:8px;border:1px solid #eee;margin-bottom:4px;">
+    return `<table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;border:1px solid #eee;">
       <tr style="border-bottom:2px solid #eee;">
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Period</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-transform:uppercase;">Name</td>
         <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">This Month</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">Avg Month</td>
-        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">+/−</td>
+        <td style="padding:6px 12px;font-size:11px;color:#999;text-align:right;text-transform:uppercase;">${lastMonthLabel}</td>
       </tr>
       ${rows}
       <tr style="border-top:2px solid #ddd;">
         <td style="padding:8px 12px;font-size:14px;font-weight:700;">Total</td>
-        <td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;">$${fmt(bd.currentTotal)}</td>
-        <td style="padding:8px 12px;font-size:14px;text-align:right;color:#666;font-weight:700;">$${fmt(bd.avgHistTotal)}</td>
-        <td style="padding:8px 12px;font-size:14px;text-align:right;color:${diffColor};font-weight:700;">${diffSign}$${fmt(Math.abs(diffTotal))}</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;color:${thisMonthTotal > lastMonthTotal && lastMonthTotal > 0 ? '#dc2626' : '#1a1a2e'};">$${fmt(thisMonthTotal)}</td>
+        <td style="padding:8px 12px;font-size:14px;text-align:right;color:#666;font-weight:700;">$${fmt(lastMonthTotal)}</td>
       </tr>
     </table>`;
   };
@@ -588,14 +482,6 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     <tr>
       <td style="padding:4px 12px;font-size:14px;">${t.ai_merchant_name || t.merchant_name || t.name}</td>
       <td style="padding:4px 12px;font-size:14px;text-align:right;">$${fmt(t.amount)}</td>
-    </tr>`).join('');
-
-  // Predicted expenses rows
-  const predictedRows = data.predictedExpenses.slice(0, 10).map(p => `
-    <tr>
-      <td style="padding:6px 12px;font-size:14px;color:#666;">${fmtDate(p.predictedDate)}</td>
-      <td style="padding:6px 12px;font-size:14px;">${p.merchant}</td>
-      <td style="padding:6px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(p.amount)}</td>
     </tr>`).join('');
 
   // Account rows
@@ -643,73 +529,41 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     </table>
   </td></tr>
 
-  ${data.alerts.length > 0 ? `
-  <!-- Alerts -->
-  <tr><td style="padding:0 32px 16px;">
-    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 0;">
-      <div style="padding:4px 12px 8px;font-weight:700;font-size:14px;color:#9a3412;">⚠️ Alerts</div>
-      <table width="100%" cellpadding="0" cellspacing="0">${alertRows}</table>
-    </div>
-  </td></tr>` : ''}
-
   ${data.yesterdayTx.length > 0 ? `
   <!-- Yesterday -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Yesterday — $${fmt(data.yesterdaySpend)}</div>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Posted Yesterday — $${fmt(data.yesterdaySpend)}</div>
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${yesterdayRows}</table>
   </td></tr>` : ''}
 
   ${data.dayBeforeTx.length > 0 ? `
   <!-- Day Before Yesterday -->
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Day Before (${data.dayBeforeYesterdayStr}) — $${fmt(data.dayBeforeSpend)}</div>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Posted Lasterday (${data.dayBeforeYesterdayStr}) — $${fmt(data.dayBeforeSpend)}</div>
     <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">${dayBeforeRows}</table>
   </td></tr>` : ''}
 
-  ${data.predictedExpenses.length > 0 ? `
-  <!-- Predicted Expenses -->
+  <!-- Spending by Category -->
+  ${data.thisMonthCategories.length > 0 ? `
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Predicted Expenses — Next 7 Days</div>
-    <div style="font-size:12px;color:#999;margin-bottom:8px;">Based on recurring patterns · $${fmt(data.predictedTotal)} expected</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;">
-      <tr style="border-bottom:1px solid #fde68a;">
-        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-transform:uppercase;">Date</td>
-        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-transform:uppercase;">Merchant</td>
-        <td style="padding:6px 12px;font-size:11px;color:#92400e;text-align:right;text-transform:uppercase;">Est. Amount</td>
-      </tr>
-      ${predictedRows}
-      <tr style="border-top:1px solid #fde68a;">
-        <td colspan="2" style="padding:8px 12px;font-size:14px;font-weight:700;color:#92400e;">Total Predicted</td>
-        <td style="padding:8px 12px;font-size:14px;text-align:right;font-weight:700;color:#92400e;">$${fmt(data.predictedTotal)}</td>
-      </tr>
-    </table>
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Spending by Category</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">Day ${data.dayOfMonth} of ${data.daysInMonth} · ${data.monthTransactionCount} transactions</div>
+    ${combinedSpendTable(
+      data.thisMonthCategories.map(c => ({ name: c.category, total: c.total, count: c.count })),
+      data.lastMonthCategories.map(c => ({ name: c.category, total: c.total, count: c.count })),
+      data.monthSpend, data.lastMonthSpend, data.lastMonthLabel,
+    )}
   </td></tr>` : ''}
 
-  <!-- Overall weekly breakdown -->
+  <!-- Spending by Merchant -->
+  ${data.thisMonthMerchants.length > 0 ? `
   <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Spending by Week — ${data.overallBreakdown.label}</div>
-    <div style="font-size:12px;color:#999;margin-bottom:8px;">Day ${data.dayOfMonth} of ${data.daysInMonth} · Avg based on ${data.numHistMonths} months of history</div>
-    ${weeklyTable(data.overallBreakdown, false)}
-  </td></tr>
-
-  <!-- Category breakdowns -->
-  ${data.categoryBreakdowns.length > 0 ? `
-  <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Key Categories — Week by Week</div>
-    ${data.categoryBreakdowns.map(cb => `
-      <div style="font-weight:600;font-size:14px;color:#374151;margin:8px 0 4px;">${cb.label}</div>
-      ${weeklyTable(cb, true)}
-    `).join('')}
-  </td></tr>` : ''}
-
-  <!-- Merchant breakdowns -->
-  ${data.merchantBreakdowns.length > 0 ? `
-  <tr><td style="padding:0 32px 20px;">
-    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Key Merchants — Week by Week</div>
-    ${data.merchantBreakdowns.map(mb => `
-      <div style="font-weight:600;font-size:14px;color:#374151;margin:8px 0 4px;">${mb.label}</div>
-      ${weeklyTable(mb, true)}
-    `).join('')}
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:8px;">Spending by Merchant</div>
+    ${combinedSpendTable(
+      data.thisMonthMerchants.map(m => ({ name: m.merchant, total: m.total, count: m.count })),
+      data.lastMonthMerchants.map(m => ({ name: m.merchant, total: m.total, count: m.count })),
+      data.monthSpend, data.lastMonthSpend, data.lastMonthLabel,
+    )}
   </td></tr>` : ''}
 
   <!-- Account breakdown -->
