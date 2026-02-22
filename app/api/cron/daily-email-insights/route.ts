@@ -120,7 +120,7 @@ async function gatherInsights(userId: string) {
     getUpcomingBills(userId, today, endOfMonth),
 
     // Alerts
-    getAlerts(userId, sevenDaysAgo),
+    getAlerts(userId),
   ]);
 
   const accounts = accountsResult.data || [];
@@ -338,7 +338,7 @@ async function getUpcomingBills(userId: string, startDate: Date, endDate: Date):
     }));
 }
 
-async function getAlerts(userId: string, _since: Date): Promise<Alert[]> {
+async function getAlerts(userId: string): Promise<Alert[]> {
   const alerts: Alert[] = [];
   const now = new Date();
   const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -403,10 +403,6 @@ function buildSubject(data: Awaited<ReturnType<typeof gatherInsights>>): string 
 // ── HTML email ──────────────────────────────────────────────────────
 function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): string {
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const fmtDate = (d: string) => {
-    const dt = new Date(d + 'T12:00:00');
-    return `${dt.getMonth() + 1}/${dt.getDate()}`;
-  };
 
   const dateStr = data.now.toLocaleDateString('en-US', {
     timeZone: 'America/New_York',
@@ -444,7 +440,6 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     const rows = combined.map(item => {
       const hasLastMonth = item.lastTotal > 0;
       const overLastMonth = item.thisTotal > item.lastTotal && hasLastMonth;
-      const underLastMonth = item.thisTotal < item.lastTotal && hasLastMonth;
       const thisColor = !hasLastMonth ? '#ca8a04' : overLastMonth ? '#dc2626' : '#16a34a';
       const nameColor = thisColor;
       return `
