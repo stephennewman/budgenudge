@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
-import { Check, Clock, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Check, Clock, AlertTriangle, ChevronRight, MoreHorizontal, Pencil, GitBranch, Trash2 } from 'lucide-react';
 
 interface BillTimelineEntry {
   id: number;
@@ -261,12 +261,13 @@ export default function RecurringBillsManager() {
   };
 
   const isLikelyTechnicalString = (str: string): boolean => {
-    return /^[A-Z0-9]{10,}$/i.test(str) ||
-           /^[a-z0-9_-]{15,}$/i.test(str) ||
-           str.includes('plaid') ||
-           str.includes('item_') ||
-           str.length > 30 ||
-           /^[A-Z0-9]{3,}\d{5,}/.test(str);
+    if (str.includes('plaid') || str.includes('item_')) return true;
+    if (str.length > 50) return true;
+    // Must contain digits mixed with letters to look like an ID (e.g., "ACC12345XYZ")
+    if (/^[A-Z0-9]{12,}$/.test(str) && /\d/.test(str)) return true;
+    // Underscore/dash-heavy strings like "plaid_item_abc-123"
+    if (/^[a-z0-9_-]{20,}$/.test(str) && /[_-]/.test(str)) return true;
+    return false;
   };
 
   const formatDate = (dateStr: string) => {
@@ -316,6 +317,161 @@ export default function RecurringBillsManager() {
     }
   };
 
+  const renderBillRow = (entry: BillTimelineEntry, isPaid: boolean) => {
+    const displayName = getDisplayName(entry.id, entry.merchant_name);
+    const displayDate = entry.actual_date || entry.predicted_date;
+    const confidenceBadge = getConfidenceBadge(entry.confidence_score);
+    const merchant = allMerchants.find(m => m.id === entry.id);
+    const isMenuOpen = openMenuId === entry.id;
+
+    return (
+      <div key={`${entry.id}-${entry.status}`}>
+        <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+          {editingId === entry.id ? (
+            <div className="flex-1 space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                  <Input type="text" value={editForm.merchant_name} onChange={(e) => setEditForm({...editForm, merchant_name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                    <Input type="number" step="0.01" value={editForm.expected_amount} onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})} className="pl-6" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Next Date</label>
+                  <Input type="date" value={editForm.next_predicted_date} onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+                  <select value={editForm.prediction_frequency} onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm">
+                    <option value="weekly">Weekly</option>
+                    <option value="bi-weekly">Bi-weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="bi-monthly">Bi-monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="semi-annual">Semi-annual</option>
+                    <option value="annual">Annual</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Subgroup (optional)</label>
+                  <Input type="text" placeholder="API, Credit Card, etc." value={editForm.account_identifier} onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})} />
+                </div>
+                <div className="flex gap-2 pt-5">
+                  <Button size="sm" onClick={() => handleSaveEdit(entry.id)}>Save</Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Date */}
+              <div className="w-12 flex-shrink-0 text-sm font-medium text-gray-500 text-center">
+                {getDayOrdinal(displayDate)}
+              </div>
+
+              {/* Merchant + details */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm truncate">{displayName}</span>
+                  {merchant?.ai_category_tag && (
+                    <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{merchant.ai_category_tag}</span>
+                  )}
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  {isPaid ? (
+                    <>
+                      {formatDate(entry.actual_date!)}
+                      {entry.days_off === 0 ? ' · on time' : ` · ${entry.days_off}d off`}
+                    </>
+                  ) : (
+                    <>
+                      {entry.prediction_frequency}
+                      {entry.interval_days && !['weekly','bi-weekly','monthly','bi-monthly','quarterly'].includes(entry.prediction_frequency)
+                        ? ` (${entry.interval_days}d)` : ''}
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Amount + confidence */}
+              <div className="text-right flex-shrink-0 mr-1">
+                <div className={`font-semibold text-sm ${isPaid ? 'text-gray-900' : 'text-gray-900'}`}>
+                  ${(entry.actual_amount || entry.expected_amount).toFixed(2)}
+                </div>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${confidenceBadge.color}`}>
+                  {confidenceBadge.label}
+                </span>
+              </div>
+
+              {/* Overflow menu */}
+              <div className="relative flex-shrink-0" ref={isMenuOpen ? menuRef : undefined}>
+                <button
+                  type="button"
+                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : entry.id); }}
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-36">
+                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { if (merchant) handleEdit(merchant); setOpenMenuId(null); }}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit
+                    </button>
+                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { handleSplitAccounts(entry.id); setOpenMenuId(null); }}>
+                      <GitBranch className="w-3.5 h-3.5" /> Split
+                    </button>
+                    <button
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"
+                      onClick={() => {
+                        setExpandedRecentByMerchant(prev => ({ ...prev, [entry.id]: !prev[entry.id] }));
+                        if (!merchantTransactions[entry.id] && !loadingTransactions[entry.id]) {
+                          fetchMerchantTransactions(entry.id, entry.merchant_name);
+                        }
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" /> History
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" onClick={() => { handleDelete(entry.id, entry.merchant_name); setOpenMenuId(null); }}>
+                      <Trash2 className="w-3.5 h-3.5" /> Remove
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Expanded transaction history */}
+        {expandedRecentByMerchant[entry.id] && !editingId && (
+          <div className="px-5 pb-3 ml-12">
+            {loadingTransactions[entry.id] ? (
+              <div className="text-xs text-gray-400">Loading...</div>
+            ) : merchantTransactions[entry.id] && merchantTransactions[entry.id].length > 0 ? (
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                {merchantTransactions[entry.id].map((tx) => (
+                  <span key={tx.id} className="text-xs text-gray-400">
+                    {tx.date} <span className="text-gray-600 font-medium">${Math.abs(tx.amount).toFixed(2)}</span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-gray-400">No transactions found</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   if (loading || initializing) {
     return (
       <div className="relative min-h-[400px]">
@@ -337,16 +493,20 @@ export default function RecurringBillsManager() {
     );
   }
 
-  const allTimelineEntries = [
-    ...timeline.paid,
-    ...timeline.upcoming,
-  ].sort((a, b) => {
-    const dateA = a.actual_date || a.predicted_date;
-    const dateB = b.actual_date || b.predicted_date;
-    return dateA.localeCompare(dateB);
-  });
-
   const totalMonth = timeline.totalPaid + timeline.totalUpcoming;
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
 
   return (
     <div className="space-y-6">
@@ -381,7 +541,7 @@ export default function RecurringBillsManager() {
         <Card className="p-4 text-center">
           <div className="text-sm text-muted-foreground">Month Total</div>
           <div className="text-2xl font-bold">${totalMonth.toFixed(2)}</div>
-          <div className="text-xs text-muted-foreground">{allTimelineEntries.length} bills</div>
+          <div className="text-xs text-muted-foreground">{timeline.paid.length + timeline.upcoming.length} bills</div>
         </Card>
       </div>
 
@@ -428,203 +588,53 @@ export default function RecurringBillsManager() {
       )}
 
       {/* Monthly Timeline */}
-      <Card className="p-6">
-        {allTimelineEntries.length === 0 ? (
+      {timeline.paid.length === 0 && timeline.upcoming.length === 0 ? (
+        <Card className="p-6">
           <p className="text-gray-500 text-center py-8">
             No recurring bills found. Add some above or connect a bank account to start tracking.
           </p>
-        ) : (
-          <div className="space-y-1">
-            {allTimelineEntries.map((entry) => {
-              const displayName = getDisplayName(entry.id, entry.merchant_name);
-              const isPaid = entry.status === 'paid';
-              const displayDate = entry.actual_date || entry.predicted_date;
-              const confidenceBadge = getConfidenceBadge(entry.confidence_score);
-              const merchant = allMerchants.find(m => m.id === entry.id);
-
-              return (
-                <div key={`${entry.id}-${entry.status}`} className="bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between p-3">
-                    {editingId === entry.id ? (
-                      <div className="flex-1 space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                            <Input
-                              type="text"
-                              value={editForm.merchant_name}
-                              onChange={(e) => setEditForm({...editForm, merchant_name: e.target.value})}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={editForm.expected_amount}
-                                onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
-                                className="pl-6"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Next Date</label>
-                            <Input
-                              type="date"
-                              value={editForm.next_predicted_date}
-                              onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
-                            <select
-                              value={editForm.prediction_frequency}
-                              onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
-                              className="w-full px-3 py-2 border rounded-md text-sm"
-                            >
-                              <option value="weekly">Weekly</option>
-                              <option value="bi-weekly">Bi-weekly</option>
-                              <option value="monthly">Monthly</option>
-                              <option value="bi-monthly">Bi-monthly</option>
-                              <option value="quarterly">Quarterly</option>
-                              <option value="semi-annual">Semi-annual</option>
-                              <option value="annual">Annual</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Subgroup Name (optional)</label>
-                            <Input
-                              type="text"
-                              placeholder="API, Credit Card, etc."
-                              value={editForm.account_identifier}
-                              onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
-                            />
-                          </div>
-                          <div className="flex gap-2 pt-5">
-                            <Button size="sm" onClick={() => handleSaveEdit(entry.id)}>Save</Button>
-                            <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                          {/* Status icon */}
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                            isPaid ? 'bg-green-100' : 'bg-amber-100'
-                          }`}>
-                            {isPaid ? (
-                              <Check className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <Clock className="w-4 h-4 text-amber-600" />
-                            )}
-                          </div>
-
-                          {/* Date column */}
-                          <div className="w-16 flex-shrink-0 text-sm font-medium text-gray-600">
-                            {getDayOrdinal(displayDate)}
-                          </div>
-
-                          {/* Merchant + details */}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">{displayName}</span>
-                              {merchant?.ai_category_tag && (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{merchant.ai_category_tag}</span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {isPaid ? (
-                                <>
-                                  Paid {formatDate(entry.actual_date!)}
-                                  {entry.days_off === 0 ? ' · on time' : ` · ${entry.days_off}d off`}
-                                </>
-                              ) : (
-                                <>
-                                  Expected {formatDate(entry.predicted_date)} · {entry.prediction_frequency}
-                                  {entry.interval_days && !['weekly','bi-weekly','monthly','bi-monthly','quarterly'].includes(entry.prediction_frequency)
-                                    ? ` (${entry.interval_days}d cycle)` : ''}
-                                </>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Amount */}
-                          <div className="text-right flex-shrink-0">
-                            <div className={`font-semibold ${isPaid ? 'text-green-700' : 'text-gray-900'}`}>
-                              ${(entry.actual_amount || entry.expected_amount).toFixed(2)}
-                            </div>
-                            {!isPaid && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${confidenceBadge.color}`}>
-                                {confidenceBadge.label}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-1 ml-3 flex-shrink-0">
-                          <Button variant="ghost" size="sm" onClick={() => {
-                            if (merchant) handleEdit(merchant);
-                          }}>Edit</Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleSplitAccounts(entry.id)}>Split</Button>
-                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(entry.id, entry.merchant_name)}>
-                            Remove
-                          </Button>
-                        </div>
-                      </>
-                    )}
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {/* Paid section */}
+          {timeline.paid.length > 0 && (
+            <Card className="overflow-hidden">
+              <div className="px-5 py-3 bg-green-50 border-b border-green-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Check className="w-4 h-4 text-green-600" />
+                    <span className="text-sm font-semibold text-green-800">Paid</span>
+                    <span className="text-xs text-green-600">{timeline.paid.length} bills</span>
                   </div>
-
-                  {/* Expandable recent transactions */}
-                  {!editingId && (() => {
-                    // Load transactions on first expand
-                    if (!merchantTransactions[entry.id] && !loadingTransactions[entry.id] && expandedRecentByMerchant[entry.id]) {
-                      fetchMerchantTransactions(entry.id, entry.merchant_name);
-                    }
-
-                    return loadingTransactions[entry.id] ? (
-                      <div className="px-3 pb-3">
-                        <div className="bg-white border rounded-md p-3 text-sm text-gray-500">Loading transactions...</div>
-                      </div>
-                    ) : (
-                      <div className="px-3 pb-2">
-                        <button
-                          type="button"
-                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                          onClick={() => {
-                            setExpandedRecentByMerchant(prev => ({ ...prev, [entry.id]: !prev[entry.id] }));
-                            if (!merchantTransactions[entry.id] && !loadingTransactions[entry.id]) {
-                              fetchMerchantTransactions(entry.id, entry.merchant_name);
-                            }
-                          }}
-                        >
-                          <ChevronRight className={`h-3 w-3 transition-transform ${expandedRecentByMerchant[entry.id] ? 'rotate-90' : ''}`} />
-                          Recent Transactions
-                        </button>
-                        {expandedRecentByMerchant[entry.id] && merchantTransactions[entry.id] && (
-                          <ul className="mt-1 space-y-0.5">
-                            {merchantTransactions[entry.id].map((tx) => (
-                              <li key={tx.id} className="text-xs py-1 px-2 rounded bg-white">
-                                <span className="text-gray-500">{tx.date}</span>
-                                <span className="ml-2 font-medium">${Math.abs(tx.amount).toFixed(2)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    );
-                  })()}
+                  <span className="text-sm font-semibold text-green-700">${timeline.totalPaid.toFixed(2)}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </Card>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {timeline.paid.map((entry) => renderBillRow(entry, true))}
+              </div>
+            </Card>
+          )}
+
+          {/* Upcoming section */}
+          {timeline.upcoming.length > 0 && (
+            <Card className="overflow-hidden">
+              <div className="px-5 py-3 bg-amber-50 border-b border-amber-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm font-semibold text-amber-800">Upcoming</span>
+                    <span className="text-xs text-amber-600">{timeline.upcoming.length} bills</span>
+                  </div>
+                  <span className="text-sm font-semibold text-amber-700">${timeline.totalUpcoming.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {timeline.upcoming.map((entry) => renderBillRow(entry, false))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Inactive Merchants */}
       {inactiveMerchants.length > 0 && (
