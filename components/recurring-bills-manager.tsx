@@ -19,6 +19,7 @@ interface BillTimelineEntry {
   confidence_score: number;
   prediction_frequency: string;
   days_off?: number;
+  interval_days?: number;
 }
 
 interface TaggedMerchant {
@@ -411,9 +412,12 @@ export default function RecurringBillsManager() {
               onChange={(e) => setNewMerchant({...newMerchant, prediction_frequency: e.target.value})}
             >
               <option value="weekly">Weekly</option>
+              <option value="bi-weekly">Bi-weekly</option>
               <option value="monthly">Monthly</option>
               <option value="bi-monthly">Bi-monthly</option>
               <option value="quarterly">Quarterly</option>
+              <option value="semi-annual">Semi-annual</option>
+              <option value="annual">Annual</option>
             </select>
             <div className="flex gap-2">
               <Button onClick={handleAddMerchant} size="sm">Add</Button>
@@ -481,9 +485,12 @@ export default function RecurringBillsManager() {
                               className="w-full px-3 py-2 border rounded-md text-sm"
                             >
                               <option value="weekly">Weekly</option>
+                              <option value="bi-weekly">Bi-weekly</option>
                               <option value="monthly">Monthly</option>
                               <option value="bi-monthly">Bi-monthly</option>
                               <option value="quarterly">Quarterly</option>
+                              <option value="semi-annual">Semi-annual</option>
+                              <option value="annual">Annual</option>
                             </select>
                           </div>
                         </div>
@@ -539,6 +546,8 @@ export default function RecurringBillsManager() {
                               ) : (
                                 <>
                                   Expected {formatDate(entry.predicted_date)} · {entry.prediction_frequency}
+                                  {entry.interval_days && !['weekly','bi-weekly','monthly','bi-monthly','quarterly'].includes(entry.prediction_frequency)
+                                    ? ` (${entry.interval_days}d cycle)` : ''}
                                 </>
                               )}
                             </div>

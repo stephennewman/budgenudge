@@ -19,9 +19,13 @@ interface RecurringPattern {
     date: string;
   }>;
   averageAmount: number;
-  frequency: 'weekly' | 'monthly' | 'quarterly';
+  amountStdDev: number;
+  frequency: string;
   intervalDays: number;
+  intervalStdDev: number;
   confidence: number;
+  occurrenceCount: number;
+  streakCount: number;
   lastDate: string;
   nextPredictedDate: string;
 }
@@ -202,13 +206,12 @@ async function processUserExpenses(userId: string): Promise<{
   return stats;
 }
 
-// Detect recurring transaction patterns
+// Detect recurring transaction patterns using interval-based analysis
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const merchantGroups = new Map<string, any[]>();
 
-  // Group by merchant
   transactions.forEach(tx => {
     const merchant = (tx.ai_merchant_name || tx.merchant_name || tx.name || '').trim();
     if (!merchant) return;
@@ -226,14 +229,11 @@ function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
 
   const patterns: RecurringPattern[] = [];
 
-  // Analyze each merchant for recurring patterns
   for (const [merchant, txs] of merchantGroups) {
-    if (txs.length < 3) continue; // Need at least 3 transactions
+    if (txs.length < 3) continue;
 
-    // Sort by date
-    txs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    txs.sort((a: { date: string }, b: { date: string }) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculate intervals between transactions
     const intervals: number[] = [];
     for (let i = 1; i < txs.length; i++) {
       const days = Math.abs(
@@ -244,24 +244,45 @@ function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
     }
 
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
-    const intervalVariance = calculateVariance(intervals);
-    
-    // Determine frequency
-    let frequency: 'weekly' | 'monthly' | 'quarterly' = 'monthly';
-    if (avgInterval >= 5 && avgInterval <= 9) frequency = 'weekly';
-    else if (avgInterval >= 25 && avgInterval <= 35) frequency = 'monthly';
-    else if (avgInterval >= 80 && avgInterval <= 100) frequency = 'quarterly';
-    else continue; // Not a clear pattern
+    const intervalStdDev = Math.sqrt(calculateVariance(intervals));
+    const intervalCV = avgInterval > 0 ? intervalStdDev / avgInterval : 999;
 
-    // Calculate confidence based on interval consistency
-    const confidence = Math.max(0, 100 - (intervalVariance / avgInterval) * 100);
-    if (confidence < 60) continue; // Too inconsistent
+    // Filter: interval must have reasonable consistency (CV < 0.5)
+    // and average interval must be >= 5 days (skip daily purchases like coffee)
+    if (intervalCV > 0.5 || avgInterval < 5) continue;
 
-    // Calculate average amount
-    const amounts = txs.map(tx => tx.amount);
-    const averageAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+    const amounts = txs.map((tx: { amount: number }) => tx.amount);
+    const averageAmount = amounts.reduce((a: number, b: number) => a + b, 0) / amounts.length;
+    const amountStdDev = Math.sqrt(calculateVariance(amounts));
+    const amountCV = averageAmount > 0 ? amountStdDev / averageAmount : 999;
 
-    // Predict next date
+    // Filter out high-frequency variable spending (grocery stores, gas, etc.)
+    // A true bill has either: consistent amounts (amountCV < 0.3) OR a clear interval pattern (intervalCV < 0.2)
+    if (amountCV > 0.3 && intervalCV > 0.2) continue;
+
+    // Calculate streak: consecutive intervals within 20% of mean
+    let streak = 0;
+    for (let i = intervals.length - 1; i >= 0; i--) {
+      if (Math.abs(intervals[i] - avgInterval) / avgInterval <= 0.2) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    // Confidence formula based on historical profile
+    // Base: start at 50, build up from consistency metrics
+    const intervalScore = Math.max(0, (1 - intervalCV) * 40); // 0-40 pts
+    const amountScore = Math.max(0, (1 - amountCV) * 30);     // 0-30 pts
+    const countScore = Math.min(20, txs.length * 3);            // 0-20 pts (capped)
+    const streakBonus = Math.min(10, streak * 2);               // 0-10 pts
+    const confidence = Math.round(Math.min(99, intervalScore + amountScore + countScore + streakBonus));
+
+    if (confidence < 40) continue;
+
+    // Derive human-readable frequency label from interval_days
+    const frequency = deriveFrequencyLabel(avgInterval);
+
     const lastDate = new Date(txs[txs.length - 1].date);
     const nextDate = new Date(lastDate);
     nextDate.setDate(nextDate.getDate() + Math.round(avgInterval));
@@ -270,15 +291,30 @@ function detectRecurringPatterns(transactions: any[]): RecurringPattern[] {
       merchant,
       transactions: txs,
       averageAmount,
+      amountStdDev,
       frequency,
       intervalDays: Math.round(avgInterval),
-      confidence: Math.round(confidence),
+      intervalStdDev: Math.round(intervalStdDev * 10) / 10,
+      confidence,
+      occurrenceCount: txs.length,
+      streakCount: streak,
       lastDate: txs[txs.length - 1].date,
       nextPredictedDate: nextDate.toISOString().split('T')[0]
     });
   }
 
   return patterns;
+}
+
+function deriveFrequencyLabel(intervalDays: number): string {
+  if (intervalDays <= 9) return 'weekly';
+  if (intervalDays <= 16) return 'bi-weekly';
+  if (intervalDays >= 25 && intervalDays <= 35) return 'monthly';
+  if (intervalDays >= 55 && intervalDays <= 65) return 'bi-monthly';
+  if (intervalDays >= 85 && intervalDays <= 95) return 'quarterly';
+  if (intervalDays >= 170 && intervalDays <= 200) return 'semi-annual';
+  if (intervalDays >= 350 && intervalDays <= 380) return 'annual';
+  return `every ${intervalDays} days`;
 }
 
 // AI-powered multi-pattern detection
@@ -437,7 +473,6 @@ async function createSplitBills(
   }
 }
 
-// Create new bill from pattern
 async function createNewBill(
   userId: string,
   pattern: RecurringPattern,
@@ -457,12 +492,16 @@ async function createNewBill(
       account_identifier: accountIdentifier,
       next_predicted_date: pattern.nextPredictedDate,
       last_transaction_date: pattern.lastDate,
+      interval_days: pattern.intervalDays,
+      interval_std_dev: pattern.intervalStdDev,
+      amount_std_dev: pattern.amountStdDev,
+      occurrence_count: pattern.occurrenceCount,
+      streak_count: pattern.streakCount,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     });
 }
 
-// Update existing bill with new transaction data
 async function updateExistingBill(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   existingBill: any,
@@ -473,7 +512,6 @@ async function updateExistingBill(
   let paid = false;
   let amountChanged = false;
 
-  // Check if there's a recent transaction matching this bill
   const recentTx = pattern.transactions.find(tx => {
     const txDate = new Date(tx.date);
     const predictedDate = new Date(existingBill.next_predicted_date);
@@ -482,7 +520,6 @@ async function updateExistingBill(
   });
 
   if (recentTx) {
-    // Mark as paid and roll forward
     const nextDate = new Date(recentTx.date);
     nextDate.setDate(nextDate.getDate() + pattern.intervalDays);
 
@@ -500,19 +537,28 @@ async function updateExistingBill(
     paid = true;
   }
 
-  // Check for amount change (>10% difference)
-  if (Math.abs(pattern.averageAmount - existingBill.expected_amount) / existingBill.expected_amount > 0.1) {
-    await supabase
-      .from('tagged_merchants')
-      .update({
-        expected_amount: pattern.averageAmount,
-        amount_drift: pattern.averageAmount - existingBill.expected_amount,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', existingBill.id);
+  // Always update the interval-based stats from the latest pattern analysis
+  const updatePayload: Record<string, unknown> = {
+    interval_days: pattern.intervalDays,
+    interval_std_dev: pattern.intervalStdDev,
+    amount_std_dev: pattern.amountStdDev,
+    occurrence_count: pattern.occurrenceCount,
+    streak_count: pattern.streakCount,
+    prediction_frequency: pattern.frequency,
+    confidence_score: pattern.confidence,
+    updated_at: new Date().toISOString()
+  };
 
+  if (Math.abs(pattern.averageAmount - existingBill.expected_amount) / existingBill.expected_amount > 0.1) {
+    updatePayload.expected_amount = pattern.averageAmount;
+    updatePayload.amount_drift = pattern.averageAmount - existingBill.expected_amount;
     amountChanged = true;
   }
+
+  await supabase
+    .from('tagged_merchants')
+    .update(updatePayload)
+    .eq('id', existingBill.id);
 
   return { paid, amountChanged };
 }
@@ -540,9 +586,16 @@ function calculateVariance(numbers: number[]): number {
 function getIntervalDays(frequency: string): number {
   switch (frequency) {
     case 'weekly': return 7;
+    case 'bi-weekly': return 14;
     case 'monthly': return 30;
+    case 'bi-monthly': return 60;
     case 'quarterly': return 90;
-    default: return 30;
+    case 'semi-annual': return 182;
+    case 'annual': return 365;
+    default: {
+      const match = frequency.match(/every (\d+) days/);
+      return match ? parseInt(match[1], 10) : 30;
+    }
   }
 }
 

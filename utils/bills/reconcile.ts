@@ -19,6 +19,11 @@ interface TaggedMerchant {
   last_transaction_date: string | null;
   status: string | null;
   account_identifier: string | null;
+  interval_days: number | null;
+  interval_std_dev: number | null;
+  amount_std_dev: number | null;
+  occurrence_count: number | null;
+  streak_count: number | null;
 }
 
 interface Transaction {
@@ -41,6 +46,7 @@ export interface BillTimelineEntry {
   confidence_score: number;
   prediction_frequency: string;
   days_off?: number;
+  interval_days?: number;
 }
 
 export interface ReconciliationResult {
@@ -76,7 +82,6 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
 
   const itemIds = userItems.map(i => i.plaid_item_id);
 
-  // Fetch 90 days of transactions to cover multiple billing cycles
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
@@ -100,7 +105,6 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
     const predictedDate = merchant.next_predicted_date;
     if (!predictedDate) continue;
 
-    // Find matching transactions after last_paid_date (or from 90 days ago)
     const sinceDate = merchant.last_paid_date || ninetyDaysAgo.toISOString().split('T')[0];
 
     const matchingTx = findMatchingTransaction(
@@ -110,9 +114,8 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
     );
 
     if (!matchingTx) {
-      // No new matching transaction — just ensure next_predicted_date rolls forward if stale
       if (predictedDate < todayStr) {
-        const rolledDate = rollDateForward(predictedDate, merchant.prediction_frequency, todayStr);
+        const rolledDate = rollDateForward(predictedDate, merchant, todayStr);
         if (rolledDate !== predictedDate) {
           await supabase
             .from('tagged_merchants')
@@ -129,28 +132,14 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
       continue;
     }
 
-    // We found a matching transaction — reconcile
     const txDate = matchingTx.date;
     const txAmount = matchingTx.amount;
 
-    // Calculate confidence adjustments
-    const daysDiff = Math.abs(daysBetween(predictedDate, txDate));
-    const amountDiffPct = merchant.expected_amount > 0
-      ? Math.abs(txAmount - merchant.expected_amount) / merchant.expected_amount * 100
-      : 0;
+    const newConfidence = computeConfidence(merchant, predictedDate, txDate, txAmount);
+    const newStreak = computeStreak(merchant, predictedDate, txDate, txAmount);
 
-    let newConfidence = merchant.confidence_score;
-    if (daysDiff === 0) {
-      newConfidence = Math.min(99, newConfidence + 2);
-    } else {
-      newConfidence -= daysDiff * 3;
-    }
-    newConfidence -= Math.round(amountDiffPct);
-    newConfidence = Math.max(20, Math.min(99, newConfidence));
-
-    // Roll next_predicted_date forward from the actual transaction date
-    const nextDate = advanceByFrequency(txDate, merchant.prediction_frequency);
-    const rolledNext = rollDateForward(nextDate, merchant.prediction_frequency, todayStr);
+    const nextDate = advanceByInterval(txDate, merchant);
+    const rolledNext = rollDateForward(nextDate, merchant, todayStr);
 
     const drift = txAmount - merchant.expected_amount;
 
@@ -165,17 +154,18 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
         expected_amount: txAmount,
         confidence_score: newConfidence,
         amount_drift: drift !== 0 ? drift : 0,
+        streak_count: newStreak,
         last_status_check: new Date().toISOString(),
         merchant_pattern: merchant.merchant_pattern || merchant.merchant_name.toLowerCase(),
         updated_at: new Date().toISOString()
       })
       .eq('id', merchant.id);
 
-    // Update local object for timeline building
     merchant.last_paid_date = txDate;
     merchant.next_predicted_date = rolledNext;
     merchant.expected_amount = txAmount;
     merchant.confidence_score = newConfidence;
+    merchant.streak_count = newStreak;
     merchant.status = 'paid';
     reconciledCount++;
   }
@@ -185,14 +175,83 @@ export async function reconcileUserBills(userId: string): Promise<Reconciliation
   return result;
 }
 
+function computeConfidence(
+  merchant: TaggedMerchant,
+  predictedDate: string,
+  actualDate: string,
+  actualAmount: number
+): number {
+  const intervalDays = merchant.interval_days || 30;
+  const intervalStdDev = merchant.interval_std_dev || 5;
+  const amountStdDev = merchant.amount_std_dev || 0;
+  const occurrences = merchant.occurrence_count || 3;
+  const currentStreak = merchant.streak_count || 0;
+
+  // Interval consistency: CV = std_dev / mean (lower = more predictable)
+  const intervalCV = intervalDays > 0 ? intervalStdDev / intervalDays : 0.5;
+  // Amount consistency: CV = std_dev / mean
+  const amountCV = merchant.expected_amount > 0 ? amountStdDev / merchant.expected_amount : 0;
+
+  // Base score from historical consistency (0-40)
+  const intervalScore = Math.max(0, (1 - intervalCV) * 40);
+  // Amount consistency (0-30)
+  const amountScore = Math.max(0, (1 - amountCV) * 30);
+  // Occurrence depth (0-15, grows slowly)
+  const countScore = Math.min(15, occurrences * 2);
+  // Streak bonus (0-15)
+  const streakScore = Math.min(15, currentStreak * 3);
+
+  let baseConfidence = intervalScore + amountScore + countScore + streakScore;
+
+  // Penalize this specific reconciliation if it deviated from prediction
+  const daysDiff = Math.abs(daysBetween(predictedDate, actualDate));
+  // 3% per day off for date variance (as user requested)
+  const datePenalty = daysDiff * 3;
+
+  const amountDiffPct = merchant.expected_amount > 0
+    ? Math.abs(actualAmount - merchant.expected_amount) / merchant.expected_amount * 100
+    : 0;
+
+  baseConfidence -= datePenalty;
+  baseConfidence -= amountDiffPct;
+
+  // Boost if exact match on date
+  if (daysDiff === 0) baseConfidence += 3;
+  // Boost if exact match on amount (within $0.50)
+  if (Math.abs(actualAmount - merchant.expected_amount) < 0.5) baseConfidence += 2;
+
+  return Math.round(Math.max(20, Math.min(99, baseConfidence)));
+}
+
+function computeStreak(
+  merchant: TaggedMerchant,
+  predictedDate: string,
+  actualDate: string,
+  actualAmount: number
+): number {
+  const currentStreak = merchant.streak_count || 0;
+  const intervalDays = merchant.interval_days || 30;
+  const daysDiff = Math.abs(daysBetween(predictedDate, actualDate));
+  const amountDiffPct = merchant.expected_amount > 0
+    ? Math.abs(actualAmount - merchant.expected_amount) / merchant.expected_amount
+    : 0;
+
+  // "On target" = within 20% of interval for date, and within 10% for amount
+  const dateOnTarget = daysDiff <= Math.max(2, intervalDays * 0.2);
+  const amountOnTarget = amountDiffPct <= 0.1;
+
+  if (dateOnTarget && amountOnTarget) {
+    return currentStreak + 1;
+  }
+  return 0;
+}
+
 function findMatchingTransaction(
   merchantName: string,
   transactions: Transaction[],
   sinceDate: string
 ): Transaction | null {
   const needle = merchantName.toLowerCase().trim();
-
-  // Build search variants: split on common separators for partial matching
   const needleWords = needle.split(/[\s\-_]+/).filter(w => w.length > 2);
 
   for (const tx of transactions) {
@@ -205,11 +264,9 @@ function findMatchingTransaction(
     ].filter(Boolean) as string[];
 
     for (const candidate of candidates) {
-      // Direct substring match (either direction)
       if (candidate.includes(needle) || needle.includes(candidate)) {
         return tx;
       }
-      // Word-level match: if most words in the needle appear in the candidate
       if (needleWords.length >= 2) {
         const matchedWords = needleWords.filter(w => candidate.includes(w));
         if (matchedWords.length >= Math.ceil(needleWords.length * 0.6)) {
@@ -227,8 +284,26 @@ function daysBetween(dateA: string, dateB: string): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function advanceByInterval(dateStr: string, merchant: TaggedMerchant): string {
+  const d = new Date(dateStr + 'T12:00:00');
+
+  if (merchant.interval_days && merchant.interval_days > 0) {
+    d.setDate(d.getDate() + Math.round(merchant.interval_days));
+    return d.toISOString().split('T')[0];
+  }
+
+  return advanceByFrequency(dateStr, merchant.prediction_frequency);
+}
+
 function advanceByFrequency(dateStr: string, frequency: string): string {
   const d = new Date(dateStr + 'T12:00:00');
+
+  const daysMatch = frequency.match(/every (\d+) days/);
+  if (daysMatch) {
+    d.setDate(d.getDate() + parseInt(daysMatch[1], 10));
+    return d.toISOString().split('T')[0];
+  }
+
   switch (frequency) {
     case 'weekly':
       d.setDate(d.getDate() + 7);
@@ -245,17 +320,24 @@ function advanceByFrequency(dateStr: string, frequency: string): string {
     case 'quarterly':
       d.setMonth(d.getMonth() + 3);
       break;
+    case 'semi-annual':
+      d.setMonth(d.getMonth() + 6);
+      break;
+    case 'annual':
+      d.setMonth(d.getMonth() + 12);
+      break;
     default:
       d.setMonth(d.getMonth() + 1);
   }
   return d.toISOString().split('T')[0];
 }
 
-function rollDateForward(dateStr: string, frequency: string, todayStr: string): string {
+function rollDateForward(dateStr: string, merchant: TaggedMerchant, todayStr: string): string {
   let current = dateStr;
-  // Keep advancing until the date is in the future (or today)
-  while (current < todayStr) {
-    current = advanceByFrequency(current, frequency);
+  let safety = 0;
+  while (current < todayStr && safety < 50) {
+    current = advanceByInterval(current, merchant);
+    safety++;
   }
   return current;
 }
@@ -266,7 +348,6 @@ function buildTimeline(merchants: TaggedMerchant[], transactions: Transaction[])
   const monthStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthStart = monthStartDate.toISOString().split('T')[0];
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-  // Day before monthStart so findMatchingTransaction includes the 1st
   const dayBeforeMonthStart = new Date(monthStartDate.getTime() - 86400000).toISOString().split('T')[0];
 
   const paid: BillTimelineEntry[] = [];
@@ -274,15 +355,12 @@ function buildTimeline(merchants: TaggedMerchant[], transactions: Transaction[])
   const overdue: BillTimelineEntry[] = [];
 
   for (const m of merchants) {
-    // Check if paid this month
     if (m.last_paid_date && m.last_paid_date >= monthStart && m.last_paid_date <= monthEnd) {
-      // Find the actual transaction to get the real amount
       const matchTx = findMatchingTransaction(m.merchant_name, transactions, dayBeforeMonthStart);
       const actualAmount = matchTx ? matchTx.amount : m.expected_amount;
 
-      // Calculate predicted date for this billing cycle (the one before the current next_predicted_date)
       const predictedForThisCycle = m.next_predicted_date
-        ? rewindByFrequency(m.next_predicted_date, m.prediction_frequency)
+        ? rewindByInterval(m.next_predicted_date, m)
         : m.last_paid_date;
 
       const daysOff = predictedForThisCycle
@@ -299,11 +377,11 @@ function buildTimeline(merchants: TaggedMerchant[], transactions: Transaction[])
         status: 'paid',
         confidence_score: m.confidence_score,
         prediction_frequency: m.prediction_frequency,
-        days_off: daysOff
+        days_off: daysOff,
+        interval_days: m.interval_days || undefined
       });
     }
 
-    // Upcoming: next_predicted_date is this month and in the future
     if (m.next_predicted_date && m.next_predicted_date >= todayStr && m.next_predicted_date <= monthEnd) {
       upcoming.push({
         id: m.id,
@@ -312,12 +390,12 @@ function buildTimeline(merchants: TaggedMerchant[], transactions: Transaction[])
         predicted_date: m.next_predicted_date,
         status: 'upcoming',
         confidence_score: m.confidence_score,
-        prediction_frequency: m.prediction_frequency
+        prediction_frequency: m.prediction_frequency,
+        interval_days: m.interval_days || undefined
       });
     }
   }
 
-  // Sort by date
   paid.sort((a, b) => (a.actual_date || a.predicted_date).localeCompare(b.actual_date || b.predicted_date));
   upcoming.sort((a, b) => a.predicted_date.localeCompare(b.predicted_date));
 
@@ -332,8 +410,26 @@ function buildTimeline(merchants: TaggedMerchant[], transactions: Transaction[])
   };
 }
 
+function rewindByInterval(dateStr: string, merchant: TaggedMerchant): string {
+  const d = new Date(dateStr + 'T12:00:00');
+
+  if (merchant.interval_days && merchant.interval_days > 0) {
+    d.setDate(d.getDate() - Math.round(merchant.interval_days));
+    return d.toISOString().split('T')[0];
+  }
+
+  return rewindByFrequency(dateStr, merchant.prediction_frequency);
+}
+
 function rewindByFrequency(dateStr: string, frequency: string): string {
   const d = new Date(dateStr + 'T12:00:00');
+
+  const daysMatch = frequency.match(/every (\d+) days/);
+  if (daysMatch) {
+    d.setDate(d.getDate() - parseInt(daysMatch[1], 10));
+    return d.toISOString().split('T')[0];
+  }
+
   switch (frequency) {
     case 'weekly':
       d.setDate(d.getDate() - 7);
@@ -349,6 +445,12 @@ function rewindByFrequency(dateStr: string, frequency: string): string {
       break;
     case 'quarterly':
       d.setMonth(d.getMonth() - 3);
+      break;
+    case 'semi-annual':
+      d.setMonth(d.getMonth() - 6);
+      break;
+    case 'annual':
+      d.setMonth(d.getMonth() - 12);
       break;
     default:
       d.setMonth(d.getMonth() - 1);

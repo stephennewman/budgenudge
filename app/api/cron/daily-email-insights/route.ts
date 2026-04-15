@@ -619,9 +619,10 @@ function buildBillTimelineHtml(
     const ordinal = day + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
     const amount = entry.actual_amount || entry.expected_amount;
     const amountColor = isPaid ? '#16a34a' : '#1a1a2e';
+    const freqLabel = entry.prediction_frequency || '';
     const statusText = isPaid
       ? (entry.days_off === 0 ? 'on time' : `${entry.days_off}d off`)
-      : `${entry.confidence_score}% conf`;
+      : `${entry.confidence_score}% · ${freqLabel}`;
 
     return `<tr>
       <td style="padding:4px 12px;font-size:14px;">${icon}</td>

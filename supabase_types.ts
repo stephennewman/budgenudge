@@ -496,6 +496,11 @@ export type Database = {
           split_group_id: string | null
           lifecycle_state: string | null
           amount_drift: number | null
+          interval_days: number | null
+          interval_std_dev: number | null
+          amount_std_dev: number | null
+          occurrence_count: number | null
+          streak_count: number | null
         }
         Insert: {
           id?: number
@@ -521,6 +526,11 @@ export type Database = {
           split_group_id?: string | null
           lifecycle_state?: string | null
           amount_drift?: number | null
+          interval_days?: number | null
+          interval_std_dev?: number | null
+          amount_std_dev?: number | null
+          occurrence_count?: number | null
+          streak_count?: number | null
         }
         Update: {
           id?: number
@@ -546,6 +556,11 @@ export type Database = {
           split_group_id?: string | null
           lifecycle_state?: string | null
           amount_drift?: number | null
+          interval_days?: number | null
+          interval_std_dev?: number | null
+          amount_std_dev?: number | null
+          occurrence_count?: number | null
+          streak_count?: number | null
         }
         Relationships: []
       }

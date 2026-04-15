@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Step 1: Backfill NULL merchant_pattern on all tagged_merchants
+    // Step 1: Backfill NULL merchant_pattern
     const { data: nullPatterns } = await supabase
       .from('tagged_merchants')
       .select('id, merchant_name')
@@ -34,7 +34,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 2: Get all users with active items
+    // Step 2: Trigger AI lifecycle scan to recompute interval stats
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    let scanResult = null;
+    try {
+      const scanResponse = await fetch(
+        `${baseUrl}/api/expenses/ai-lifecycle-scan`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.CRON_SECRET}`
+          },
+          body: JSON.stringify({ scanAllUsers: true })
+        }
+      );
+      scanResult = await scanResponse.json();
+    } catch (err) {
+      console.error('AI lifecycle scan failed during backfill:', err);
+    }
+
+    // Step 3: Get all users with active items
     const { data: activeUsers } = await supabase
       .from('items')
       .select('user_id')
@@ -42,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const userIds = [...new Set((activeUsers || []).map(item => item.user_id))];
 
-    // Step 3: Reconcile each user
+    // Step 4: Reconcile each user
     const results: { userId: string; reconciled: number; paid: number; upcoming: number }[] = [];
     const errors: string[] = [];
 
@@ -63,6 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       patternsFixed,
+      scanResult,
       usersProcessed: results.length,
       results,
       errors,
