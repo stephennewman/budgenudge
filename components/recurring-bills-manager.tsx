@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
-import { Check, Clock, AlertTriangle, ChevronRight, MoreHorizontal, Pencil, GitBranch, Trash2 } from 'lucide-react';
+import { Check, Clock, AlertTriangle, ChevronRight, MoreHorizontal, Pencil, GitBranch, Trash2, Merge, X } from 'lucide-react';
 
 interface BillTimelineEntry {
   id: number;
@@ -94,6 +94,9 @@ export default function RecurringBillsManager() {
   // Split modal state
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
+
+  // Merge state
+  const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchMonthlySummary();
@@ -317,6 +320,25 @@ export default function RecurringBillsManager() {
     }
   };
 
+  const handleMerge = async (keepId: number, removeId: number) => {
+    try {
+      const response = await fetch('/api/tagged-merchants/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keep_id: keepId, remove_id: removeId })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setMergeSourceId(null);
+        fetchMonthlySummary();
+      } else {
+        alert('Failed to merge: ' + data.error);
+      }
+    } catch (error) {
+      console.error('Error merging:', error);
+    }
+  };
+
   const renderBillRow = (entry: BillTimelineEntry, isPaid: boolean) => {
     const displayName = getDisplayName(entry.id, entry.merchant_name);
     const displayDate = entry.actual_date || entry.predicted_date;
@@ -324,8 +346,21 @@ export default function RecurringBillsManager() {
     const merchant = allMerchants.find(m => m.id === entry.id);
     const isMenuOpen = openMenuId === entry.id;
 
+    const isMergeSource = mergeSourceId === entry.id;
+    const isMergeTarget = mergeSourceId !== null && mergeSourceId !== entry.id;
+
     return (
-      <div key={`${entry.id}-${entry.status}`}>
+      <div key={`${entry.id}-${entry.status}`} className={isMergeSource ? 'bg-blue-50 ring-1 ring-blue-200' : ''}>
+        {isMergeTarget && (
+          <button
+            type="button"
+            className="w-full flex items-center gap-2 px-5 py-2 text-xs text-blue-600 hover:bg-blue-50 transition-colors border-b border-blue-100"
+            onClick={() => handleMerge(entry.id, mergeSourceId!)}
+          >
+            <Merge className="w-3 h-3" />
+            Merge "{allMerchants.find(m => m.id === mergeSourceId)?.merchant_name}" into this bill
+          </button>
+        )}
         <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
           {editingId === entry.id ? (
             <div className="flex-1 space-y-3">
@@ -438,6 +473,9 @@ export default function RecurringBillsManager() {
                       }}
                     >
                       <ChevronRight className="w-3.5 h-3.5" /> History
+                    </button>
+                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { setMergeSourceId(entry.id); setOpenMenuId(null); }}>
+                      <Merge className="w-3.5 h-3.5" /> Merge
                     </button>
                     <div className="border-t border-gray-100 my-1" />
                     <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" onClick={() => { handleDelete(entry.id, entry.merchant_name); setOpenMenuId(null); }}>
@@ -596,6 +634,22 @@ export default function RecurringBillsManager() {
         </Card>
       ) : (
         <div className="space-y-4">
+          {mergeSourceId && (
+            <div className="flex items-center justify-between bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <Merge className="w-4 h-4" />
+                <span>Select the bill to merge <strong>{allMerchants.find(m => m.id === mergeSourceId)?.merchant_name}</strong> into</span>
+              </div>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-blue-100 text-blue-600"
+                onClick={() => setMergeSourceId(null)}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Paid section */}
           {timeline.paid.length > 0 && (
             <Card className="overflow-hidden">
