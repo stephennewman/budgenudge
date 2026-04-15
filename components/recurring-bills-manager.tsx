@@ -61,8 +61,24 @@ interface TimelineData {
   totalOverdue: number;
 }
 
+function generateMonthTabs(count: number): { key: string; label: string; shortLabel: string }[] {
+  const tabs = [];
+  const now = new Date();
+  for (let i = 0; i < count; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const shortLabel = i === 0 ? 'Current' : d.toLocaleDateString('en-US', { month: 'short' });
+    tabs.push({ key, label, shortLabel });
+  }
+  return tabs;
+}
+
 export default function RecurringBillsManager() {
+  const monthTabs = generateMonthTabs(6);
+  const [activeMonthKey, setActiveMonthKey] = useState(monthTabs[0].key);
   const [loading, setLoading] = useState(true);
+  const [loadingMonth, setLoadingMonth] = useState(false);
   const [initializing, setInitializing] = useState(false);
   const [monthLabel, setMonthLabel] = useState('');
   const [timeline, setTimeline] = useState<TimelineData>({ paid: [], upcoming: [], overdue: [], totalPaid: 0, totalUpcoming: 0, totalOverdue: 0 });
@@ -98,13 +114,40 @@ export default function RecurringBillsManager() {
   // Merge state
   const [mergeSourceId, setMergeSourceId] = useState<number | null>(null);
 
+  // Overflow menu state
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    fetchMonthlySummary();
+    if (!openMenuId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openMenuId]);
+
+  useEffect(() => {
+    fetchMonthlySummary(activeMonthKey);
   }, []);
 
-  const fetchMonthlySummary = async () => {
+  const switchMonth = async (monthKey: string) => {
+    setActiveMonthKey(monthKey);
+    setLoadingMonth(true);
+    setMergeSourceId(null);
+    setEditingId(null);
+    setOpenMenuId(null);
+    await fetchMonthlySummary(monthKey);
+    setLoadingMonth(false);
+  };
+
+  const fetchMonthlySummary = async (monthKey?: string) => {
     try {
-      const response = await fetch('/api/expenses/monthly-summary');
+      const key = monthKey || activeMonthKey;
+      const params = key ? `?month=${key}` : '';
+      const response = await fetch(`/api/expenses/monthly-summary${params}`);
       const data = await response.json();
 
       if (data.success) {
@@ -113,7 +156,6 @@ export default function RecurringBillsManager() {
         setAllMerchants(data.allMerchants || []);
         setInactiveMerchants(data.inactiveMerchants || []);
 
-        // If no merchants at all, try initialization
         if ((!data.allMerchants || data.allMerchants.length === 0)) {
           await runInitialization();
         }
@@ -456,12 +498,16 @@ export default function RecurringBillsManager() {
                 </button>
                 {isMenuOpen && (
                   <div className="absolute right-0 top-8 z-20 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-36">
-                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { if (merchant) handleEdit(merchant); setOpenMenuId(null); }}>
-                      <Pencil className="w-3.5 h-3.5" /> Edit
-                    </button>
-                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { handleSplitAccounts(entry.id); setOpenMenuId(null); }}>
-                      <GitBranch className="w-3.5 h-3.5" /> Split
-                    </button>
+                    {isCurrentMonth && (
+                      <>
+                        <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { if (merchant) handleEdit(merchant); setOpenMenuId(null); }}>
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { handleSplitAccounts(entry.id); setOpenMenuId(null); }}>
+                          <GitBranch className="w-3.5 h-3.5" /> Split
+                        </button>
+                      </>
+                    )}
                     <button
                       className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2"
                       onClick={() => {
@@ -474,13 +520,17 @@ export default function RecurringBillsManager() {
                     >
                       <ChevronRight className="w-3.5 h-3.5" /> History
                     </button>
-                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { setMergeSourceId(entry.id); setOpenMenuId(null); }}>
-                      <Merge className="w-3.5 h-3.5" /> Merge
-                    </button>
-                    <div className="border-t border-gray-100 my-1" />
-                    <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" onClick={() => { handleDelete(entry.id, entry.merchant_name); setOpenMenuId(null); }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Remove
-                    </button>
+                    {isCurrentMonth && (
+                      <>
+                        <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 flex items-center gap-2" onClick={() => { setMergeSourceId(entry.id); setOpenMenuId(null); }}>
+                          <Merge className="w-3.5 h-3.5" /> Merge
+                        </button>
+                        <div className="border-t border-gray-100 my-1" />
+                        <button className="w-full text-left px-3 py-1.5 text-sm hover:bg-red-50 text-red-600 flex items-center gap-2" onClick={() => { handleDelete(entry.id, entry.merchant_name); setOpenMenuId(null); }}>
+                          <Trash2 className="w-3.5 h-3.5" /> Remove
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -532,19 +582,7 @@ export default function RecurringBillsManager() {
   }
 
   const totalMonth = timeline.totalPaid + timeline.totalUpcoming;
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!openMenuId) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [openMenuId]);
+  const isCurrentMonth = activeMonthKey === monthTabs[0].key;
 
   return (
     <div className="space-y-6">
@@ -556,26 +594,55 @@ export default function RecurringBillsManager() {
             {monthLabel} &middot; {timeline.paid.length} paid &middot; {timeline.upcoming.length} upcoming
           </p>
         </div>
-        <Button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="bg-green-600 hover:bg-green-700"
-        >
-          + Expense
-        </Button>
+        {isCurrentMonth && (
+          <Button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            + Expense
+          </Button>
+        )}
       </div>
 
+      {/* Month Tabs */}
+      <div className="flex gap-1 border-b overflow-x-auto">
+        {monthTabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => switchMonth(tab.key)}
+            disabled={loadingMonth}
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeMonthKey === tab.key
+                ? 'border-green-600 text-green-600'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+            } disabled:opacity-50`}
+          >
+            {tab.shortLabel}
+          </button>
+        ))}
+      </div>
+
+      {loadingMonth ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600" />
+          <span className="ml-3 text-muted-foreground text-sm">Loading {monthLabel || '...'}...</span>
+        </div>
+      ) : (
+      <>
       {/* Month Total Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className={`grid gap-4 ${isCurrentMonth ? 'grid-cols-3' : 'grid-cols-2'}`}>
         <Card className="p-4 text-center">
-          <div className="text-sm text-muted-foreground">Paid</div>
+          <div className="text-sm text-muted-foreground">{isCurrentMonth ? 'Paid' : 'Total Paid'}</div>
           <div className="text-2xl font-bold text-green-600">${timeline.totalPaid.toFixed(2)}</div>
           <div className="text-xs text-muted-foreground">{timeline.paid.length} bills</div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-sm text-muted-foreground">Upcoming</div>
-          <div className="text-2xl font-bold text-amber-600">${timeline.totalUpcoming.toFixed(2)}</div>
-          <div className="text-xs text-muted-foreground">{timeline.upcoming.length} bills</div>
-        </Card>
+        {isCurrentMonth && (
+          <Card className="p-4 text-center">
+            <div className="text-sm text-muted-foreground">Upcoming</div>
+            <div className="text-2xl font-bold text-amber-600">${timeline.totalUpcoming.toFixed(2)}</div>
+            <div className="text-xs text-muted-foreground">{timeline.upcoming.length} bills</div>
+          </Card>
+        )}
         <Card className="p-4 text-center">
           <div className="text-sm text-muted-foreground">Month Total</div>
           <div className="text-2xl font-bold">${totalMonth.toFixed(2)}</div>
@@ -584,7 +651,7 @@ export default function RecurringBillsManager() {
       </div>
 
       {/* Add New Merchant Form */}
-      {showAddForm && (
+      {isCurrentMonth && showAddForm && (
         <Card className="p-4 border-green-200 bg-green-50">
           <h3 className="font-semibold mb-3">Add Recurring Expense</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -629,7 +696,9 @@ export default function RecurringBillsManager() {
       {timeline.paid.length === 0 && timeline.upcoming.length === 0 ? (
         <Card className="p-6">
           <p className="text-gray-500 text-center py-8">
-            No recurring bills found. Add some above or connect a bank account to start tracking.
+            {isCurrentMonth
+              ? 'No recurring bills found. Add some above or connect a bank account to start tracking.'
+              : `No matched bills for ${monthLabel}.`}
           </p>
         </Card>
       ) : (
@@ -669,8 +738,8 @@ export default function RecurringBillsManager() {
             </Card>
           )}
 
-          {/* Upcoming section */}
-          {timeline.upcoming.length > 0 && (
+          {/* Upcoming section — only for current month */}
+          {isCurrentMonth && timeline.upcoming.length > 0 && (
             <Card className="overflow-hidden">
               <div className="px-5 py-3 bg-amber-50 border-b border-amber-100">
                 <div className="flex items-center justify-between">
@@ -690,8 +759,8 @@ export default function RecurringBillsManager() {
         </div>
       )}
 
-      {/* Inactive Merchants */}
-      {inactiveMerchants.length > 0 && (
+      {/* Inactive Merchants — current month only */}
+      {isCurrentMonth && inactiveMerchants.length > 0 && (
         <Card className="p-6">
           <h3 className="text-sm font-semibold text-gray-500 mb-3">Inactive ({inactiveMerchants.length})</h3>
           <div className="space-y-2">
@@ -727,6 +796,8 @@ export default function RecurringBillsManager() {
           }}
           onConfirm={handleConfirmSplit}
         />
+      )}
+      </>
       )}
     </div>
   );
