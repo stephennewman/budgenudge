@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { reconcileUserBills } from '@/utils/bills/reconcile';
+import type { ReconciliationResult } from '@/utils/bills/reconcile';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,7 +38,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await gatherInsights(TARGET_USER_ID);
-    const html = buildEmailHtml(data);
+
+    // Reconcile bills to get fresh paid/upcoming timeline
+    let billTimeline: ReconciliationResult | null = null;
+    try {
+      billTimeline = await reconcileUserBills(TARGET_USER_ID);
+    } catch (err) {
+      console.error('Bill reconciliation failed for email:', err);
+    }
+
+    const html = buildEmailHtml(data, billTimeline);
     const subject = buildSubject(data);
 
     const { error } = await resend.emails.send({
@@ -400,7 +411,7 @@ function buildSubject(data: Awaited<ReturnType<typeof gatherInsights>>): string 
 }
 
 // ── HTML email ──────────────────────────────────────────────────────
-function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): string {
+function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>, billTimeline?: ReconciliationResult | null): string {
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const dateStr = data.now.toLocaleDateString('en-US', {
@@ -523,6 +534,10 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
     </table>
   </td></tr>
 
+  ${buildBillTimelineHtml(billTimeline, data.alerts, fmt)}
+
+  ${buildPredictedExpensesHtml(data.predictedExpenses, fmt)}
+
   ${data.yesterdayTx.length > 0 ? `
   <!-- Yesterday -->
   <tr><td style="padding:0 32px 20px;">
@@ -578,4 +593,93 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>): strin
 </table>
 </body>
 </html>`;
+}
+
+function buildBillTimelineHtml(
+  timeline: ReconciliationResult | null | undefined,
+  alerts: Alert[],
+  fmt: (n: number) => string
+): string {
+  if (!timeline || (timeline.paid.length === 0 && timeline.upcoming.length === 0)) {
+    return '';
+  }
+
+  const allEntries = [
+    ...timeline.paid.map(e => ({ ...e, sortDate: e.actual_date || e.predicted_date })),
+    ...timeline.upcoming.map(e => ({ ...e, sortDate: e.predicted_date })),
+  ].sort((a, b) => a.sortDate.localeCompare(b.sortDate));
+
+  const rows = allEntries.map(entry => {
+    const isPaid = entry.status === 'paid';
+    const icon = isPaid ? '&#9989;' : '&#9203;';
+    const displayDate = new Date((entry.actual_date || entry.predicted_date) + 'T12:00:00');
+    const day = displayDate.getDate();
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = day % 100;
+    const ordinal = day + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+    const amount = entry.actual_amount || entry.expected_amount;
+    const amountColor = isPaid ? '#16a34a' : '#1a1a2e';
+    const statusText = isPaid
+      ? (entry.days_off === 0 ? 'on time' : `${entry.days_off}d off`)
+      : `${entry.confidence_score}% conf`;
+
+    return `<tr>
+      <td style="padding:4px 12px;font-size:14px;">${icon}</td>
+      <td style="padding:4px 12px;font-size:14px;font-weight:600;">${ordinal}</td>
+      <td style="padding:4px 12px;font-size:14px;">${entry.merchant_name}</td>
+      <td style="padding:4px 12px;font-size:14px;text-align:right;font-weight:600;color:${amountColor};">$${fmt(amount)}</td>
+      <td style="padding:4px 12px;font-size:12px;color:#999;">${statusText}</td>
+    </tr>`;
+  }).join('');
+
+  const totalPaid = timeline.totalPaid;
+  const totalUpcoming = timeline.totalUpcoming;
+
+  let alertsHtml = '';
+  if (alerts.length > 0) {
+    alertsHtml = `<div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border-radius:6px;font-size:12px;color:#92400e;">
+      ${alerts.map(a => `<div>&#9888; ${a.merchant}: ${a.detail}</div>`).join('')}
+    </div>`;
+  }
+
+  return `
+  <!-- Bill Timeline -->
+  <tr><td style="padding:0 32px 20px;">
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Monthly Bills</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">${timeline.paid.length} paid ($${fmt(totalPaid)}) · ${timeline.upcoming.length} upcoming ($${fmt(totalUpcoming)})</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
+      ${rows}
+    </table>
+    ${alertsHtml}
+  </td></tr>`;
+}
+
+function buildPredictedExpensesHtml(
+  predictions: PredictedExpense[],
+  fmt: (n: number) => string
+): string {
+  if (!predictions || predictions.length === 0) return '';
+
+  const rows = predictions.map(p => {
+    const d = new Date(p.predictedDate + 'T12:00:00');
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `<tr>
+      <td style="padding:4px 12px;font-size:14px;">${dateStr}</td>
+      <td style="padding:4px 12px;font-size:14px;">${p.merchant}</td>
+      <td style="padding:4px 12px;font-size:14px;text-align:right;font-weight:600;">$${fmt(p.amount)}</td>
+      <td style="padding:4px 12px;font-size:12px;color:#999;">${p.monthsMatched}mo pattern</td>
+    </tr>`;
+  }).join('');
+
+  const total = predictions.reduce((s, p) => s + p.amount, 0);
+
+  return `
+  <!-- Predicted Expenses -->
+  <tr><td style="padding:0 32px 20px;">
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:4px;">Predicted This Week</div>
+    <div style="font-size:12px;color:#999;margin-bottom:8px;">${predictions.length} charges · ~$${fmt(total)}</div>
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#fafafa;border-radius:8px;">
+      ${rows}
+    </table>
+  </td></tr>`;
 }

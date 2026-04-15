@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { storeTransactions } from '@/utils/plaid/server';
 import { createClient } from '@supabase/supabase-js';
 import { plaidClient } from '@/utils/plaid/client';
+import { reconcileUserBills } from '@/utils/bills/reconcile';
 
 // Manual refresh endpoint - replicates webhook functionality
 export async function POST(request: Request) {
@@ -155,6 +156,13 @@ export async function POST(request: Request) {
           error: itemError instanceof Error ? itemError.message : 'Unknown error'
         });
       }
+    }
+
+    // Reconcile bills against new/updated transactions (non-blocking)
+    if (totalNewTransactions > 0) {
+      reconcileUserBills(user.id).catch(err =>
+        console.error('Background bill reconciliation failed:', err)
+      );
     }
 
     const message = totalNewTransactions > 0 

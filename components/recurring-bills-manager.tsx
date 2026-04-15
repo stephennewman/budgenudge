@@ -6,8 +6,20 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
-import { ChevronRight } from 'lucide-react';
+import { Check, Clock, AlertTriangle, ChevronRight } from 'lucide-react';
 
+interface BillTimelineEntry {
+  id: number;
+  merchant_name: string;
+  expected_amount: number;
+  actual_amount?: number;
+  predicted_date: string;
+  actual_date?: string;
+  status: 'paid' | 'upcoming' | 'overdue';
+  confidence_score: number;
+  prediction_frequency: string;
+  days_off?: number;
+}
 
 interface TaggedMerchant {
   id: number;
@@ -22,6 +34,8 @@ interface TaggedMerchant {
   next_predicted_date: string;
   account_identifier?: string;
   created_at: string;
+  status?: string;
+  last_paid_date?: string;
 }
 
 interface Transaction {
@@ -37,10 +51,23 @@ interface Transaction {
   is_tracked_for_this_split?: boolean;
 }
 
+interface TimelineData {
+  paid: BillTimelineEntry[];
+  upcoming: BillTimelineEntry[];
+  overdue: BillTimelineEntry[];
+  totalPaid: number;
+  totalUpcoming: number;
+  totalOverdue: number;
+}
+
 export default function RecurringBillsManager() {
-  const [taggedMerchants, setTaggedMerchants] = useState<TaggedMerchant[]>([]);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(false);
+  const [monthLabel, setMonthLabel] = useState('');
+  const [timeline, setTimeline] = useState<TimelineData>({ paid: [], upcoming: [], overdue: [], totalPaid: 0, totalUpcoming: 0, totalOverdue: 0 });
+  const [allMerchants, setAllMerchants] = useState<TaggedMerchant[]>([]);
+  const [inactiveMerchants, setInactiveMerchants] = useState<TaggedMerchant[]>([]);
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({
     merchant_name: '',
@@ -51,7 +78,6 @@ export default function RecurringBillsManager() {
     is_active: true
   });
 
-  // New merchant form
   const [newMerchant, setNewMerchant] = useState({
     merchant_name: '',
     expected_amount: '',
@@ -62,89 +88,75 @@ export default function RecurringBillsManager() {
   // Historical transactions state
   const [merchantTransactions, setMerchantTransactions] = useState<{[key: number]: Transaction[]}>({});
   const [loadingTransactions, setLoadingTransactions] = useState<{[key: number]: boolean}>({});
+  const [expandedRecentByMerchant, setExpandedRecentByMerchant] = useState<Record<number, boolean>>({});
 
   // Split modal state
   const [splitModalOpen, setSplitModalOpen] = useState(false);
   const [splitMerchant, setSplitMerchant] = useState<TaggedMerchant | null>(null);
-  const [expandedRecentByMerchant, setExpandedRecentByMerchant] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    fetchTaggedMerchants();
+    fetchMonthlySummary();
   }, []);
 
-  useEffect(() => {
-    // When active merchants are loaded, fetch transactions for each
-    if (taggedMerchants.length > 0) {
-      const activeMerchants = taggedMerchants.filter(m => m.is_active);
-      activeMerchants.forEach((merchant) => {
-        if (!merchantTransactions[merchant.id] && !loadingTransactions[merchant.id]) {
-          fetchMerchantTransactions(merchant.id, merchant.merchant_name);
-        }
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taggedMerchants]);
-
-  const fetchTaggedMerchants = async () => {
+  const fetchMonthlySummary = async () => {
     try {
-      const response = await fetch('/api/tagged-merchants');
+      const response = await fetch('/api/expenses/monthly-summary');
       const data = await response.json();
-      
+
       if (data.success) {
-        setTaggedMerchants(data.taggedMerchants);
-        
-        // If no bills exist, run first-time initialization
-        if (data.taggedMerchants.length === 0) {
-          setInitializing(true);
-          
-          try {
-            const initResponse = await fetch('/api/expenses/initialize', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({})
-            });
-            
-            const initResult = await initResponse.json();
-            
-            if (initResult.success) {
-              // Re-fetch to get newly detected bills
-              const refreshResponse = await fetch('/api/tagged-merchants');
-              const refreshData = await refreshResponse.json();
-              
-              if (refreshData.success) {
-                setTaggedMerchants(refreshData.taggedMerchants);
-              }
-            }
-          } catch (initError) {
-            console.error('❌ Initialization error:', initError);
-          } finally {
-            setInitializing(false);
-          }
+        setMonthLabel(data.monthLabel);
+        setTimeline(data.timeline);
+        setAllMerchants(data.allMerchants || []);
+        setInactiveMerchants(data.inactiveMerchants || []);
+
+        // If no merchants at all, try initialization
+        if ((!data.allMerchants || data.allMerchants.length === 0)) {
+          await runInitialization();
         }
       }
     } catch (error) {
-      console.error('Error fetching tagged merchants:', error);
+      console.error('Error fetching monthly summary:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchMerchantTransactions = async (merchantId: number, merchantName: string) => {
-    if (merchantTransactions[merchantId]) {
-      return;
+  const runInitialization = async () => {
+    setInitializing(true);
+    try {
+      const initResponse = await fetch('/api/expenses/initialize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const initResult = await initResponse.json();
+      if (initResult.success) {
+        // Re-fetch to get newly detected bills
+        const refreshResponse = await fetch('/api/expenses/monthly-summary');
+        const refreshData = await refreshResponse.json();
+        if (refreshData.success) {
+          setMonthLabel(refreshData.monthLabel);
+          setTimeline(refreshData.timeline);
+          setAllMerchants(refreshData.allMerchants || []);
+          setInactiveMerchants(refreshData.inactiveMerchants || []);
+        }
+      }
+    } catch (initError) {
+      console.error('Initialization error:', initError);
+    } finally {
+      setInitializing(false);
     }
+  };
+
+  const fetchMerchantTransactions = async (merchantId: number, merchantName: string) => {
+    if (merchantTransactions[merchantId]) return;
     setLoadingTransactions(prev => ({ ...prev, [merchantId]: true }));
     try {
-      // Use server-side API endpoint to fetch transactions
-      // Include merchantId for split accounts to get specific grouped transactions
       const response = await fetch(`/api/merchant-transactions?merchant=${encodeURIComponent(merchantName)}&merchantId=${merchantId}`);
       const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch transactions');
+      if (response.ok) {
+        setMerchantTransactions(prev => ({ ...prev, [merchantId]: data.transactions || [] }));
       }
-      
-      setMerchantTransactions(prev => ({ ...prev, [merchantId]: data.transactions || [] }));
     } catch (error) {
       console.error('Error fetching merchant transactions:', error);
       setMerchantTransactions(prev => ({ ...prev, [merchantId]: [] }));
@@ -172,15 +184,12 @@ export default function RecurringBillsManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editForm)
       });
-
       const data = await response.json();
-      
       if (data.success) {
         setEditingId(null);
-        fetchTaggedMerchants(); // Refresh the list
+        fetchMonthlySummary();
       } else {
-        console.error('❌ Failed to update merchant:', data.error);
-        alert('Failed to update merchant: ' + data.error);
+        alert('Failed to update: ' + data.error);
       }
     } catch (error) {
       console.error('Error updating merchant:', error);
@@ -190,22 +199,16 @@ export default function RecurringBillsManager() {
 
   const handleDelete = async (merchantId: number, merchantName: string) => {
     if (!confirm(`Remove ${merchantName} from recurring bills?`)) return;
-
     try {
-      const response = await fetch(`/api/tagged-merchants/${merchantId}`, {
-        method: 'DELETE'
-      });
-
+      const response = await fetch(`/api/tagged-merchants/${merchantId}`, { method: 'DELETE' });
       const data = await response.json();
-      
       if (data.success) {
-        fetchTaggedMerchants(); // Refresh the list
+        fetchMonthlySummary();
       } else {
-        alert('Failed to delete merchant: ' + data.error);
+        alert('Failed to delete: ' + data.error);
       }
     } catch (error) {
       console.error('Error deleting merchant:', error);
-      alert('Error deleting merchant');
     }
   };
 
@@ -216,17 +219,10 @@ export default function RecurringBillsManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !currentActive })
       });
-
       const data = await response.json();
-      
-      if (data.success) {
-        fetchTaggedMerchants(); // Refresh the list
-      } else {
-        alert('Failed to toggle merchant: ' + data.error);
-      }
+      if (data.success) fetchMonthlySummary();
     } catch (error) {
       console.error('Error toggling merchant:', error);
-      alert('Error toggling merchant');
     }
   };
 
@@ -235,113 +231,89 @@ export default function RecurringBillsManager() {
       alert('Please fill in merchant name and amount');
       return;
     }
-
     try {
       const response = await fetch('/api/tagged-merchants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMerchant)
       });
-
       const data = await response.json();
-      
       if (data.success) {
         setNewMerchant({ merchant_name: '', expected_amount: '', prediction_frequency: 'monthly' });
         setShowAddForm(false);
-        fetchTaggedMerchants(); // Refresh the list
+        fetchMonthlySummary();
       } else {
-        alert('Failed to add merchant: ' + data.error);
+        alert('Failed to add: ' + data.error);
       }
     } catch (error) {
       console.error('Error adding merchant:', error);
-      alert('Error adding merchant');
     }
   };
 
-  const formatNextDate = (dateString: string) => {
-    // Parse as local noon to avoid timezone issues (same as SMS)
-    const date = new Date(dateString + 'T12:00:00');
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-    });
-  };
-
-  // const getConfidenceColor = (score: number): string => {
-  //   if (score >= 80) return 'text-green-600';
-  //   if (score >= 60) return 'text-yellow-600';
-  //   return 'text-red-600';
-  // };
-
-  const getDisplayName = (merchant: TaggedMerchant): string => {
-    const baseName = merchant.ai_merchant_name || merchant.merchant_name;
-    
-    // Hide technical strings that look like internal identifiers
-    const cleanBaseName = isLikelyTechnicalString(baseName) ? "Unnamed Bill" : baseName;
-    
-    if (!merchant.account_identifier) {
-      return cleanBaseName; // "Prudential" (original, unsplit)
+  const getDisplayName = (entryId: number, merchantName: string): string => {
+    const match = allMerchants.find(m => m.id === entryId);
+    if (match?.ai_merchant_name && !isLikelyTechnicalString(match.ai_merchant_name)) {
+      return match.ai_merchant_name;
     }
-    
-    // If account_identifier is a technical string (like plaid_item_id), don't show it
-    if (isLikelyTechnicalString(merchant.account_identifier)) {
-      return cleanBaseName; // Just show the clean base name
-    }
-    
-    // Check if numeric identifier
-    if (/^\d+$/.test(merchant.account_identifier)) {
-      return `${cleanBaseName} ${merchant.account_identifier}`; // "OpenAI 1"
-    } else {
-      // For custom names, use clean format without parentheses
-      return `${cleanBaseName} ${merchant.account_identifier}`; // "OpenAI API", "Chase Credit Card"
-    }
+    if (isLikelyTechnicalString(merchantName)) return 'Unnamed Bill';
+    return merchantName;
   };
 
   const isLikelyTechnicalString = (str: string): boolean => {
-    // Check for patterns like "10XB...", plaid IDs, or other technical identifiers
-    return /^[A-Z0-9]{10,}$/i.test(str) || // Long alphanumeric strings (10+ chars)
-           /^[a-z0-9_-]{15,}$/i.test(str) || // Very long lowercase with underscores/dashes
+    return /^[A-Z0-9]{10,}$/i.test(str) ||
+           /^[a-z0-9_-]{15,}$/i.test(str) ||
            str.includes('plaid') ||
            str.includes('item_') ||
-           str.length > 30 || // Very long strings are likely technical
-           /^[A-Z0-9]{3,}\d{5,}/.test(str); // Pattern like "10xbBNDxYJURRZdqE1DQC3YDmpaZ1nTmq533d"
+           str.length > 30 ||
+           /^[A-Z0-9]{3,}\d{5,}/.test(str);
   };
 
-  const handleSplitAccounts = (merchant: TaggedMerchant) => {
-    setSplitMerchant(merchant);
-    setSplitModalOpen(true);
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const getDayOrdinal = (dateStr: string) => {
+    const day = new Date(dateStr + 'T12:00:00').getDate();
+    const suffixes = ['th', 'st', 'nd', 'rd'];
+    const v = day % 100;
+    return day + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+  };
+
+  const getConfidenceBadge = (score: number) => {
+    if (score >= 85) return { color: 'bg-green-100 text-green-700', label: `${score}%` };
+    if (score >= 60) return { color: 'bg-yellow-100 text-yellow-700', label: `${score}%` };
+    return { color: 'bg-red-100 text-red-700', label: `${score}%` };
+  };
+
+  const handleSplitAccounts = (merchantId: number) => {
+    const merchant = allMerchants.find(m => m.id === merchantId);
+    if (merchant) {
+      setSplitMerchant(merchant);
+      setSplitModalOpen(true);
+    }
   };
 
   const handleConfirmSplit = async (groups: { id: string; transactions: Transaction[]; averageAmount: number; frequency: string; confidence: number; }[]) => {
     if (!splitMerchant) return;
-
     try {
       const response = await fetch('/api/tagged-merchants/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          merchant_id: splitMerchant.id,
-          groups: groups
-        })
+        body: JSON.stringify({ merchant_id: splitMerchant.id, groups })
       });
-
       const data = await response.json();
-      
       if (data.success) {
         setSplitModalOpen(false);
         setSplitMerchant(null);
-        fetchTaggedMerchants(); // Refresh the list
+        fetchMonthlySummary();
       } else {
-        alert('Failed to split merchant: ' + data.error);
+        alert('Failed to split: ' + data.error);
       }
     } catch (error) {
       console.error('Error splitting merchant:', error);
-      alert('Error splitting merchant');
     }
   };
-
-
 
   if (loading || initializing) {
     return (
@@ -352,7 +324,7 @@ export default function RecurringBillsManager() {
             <div className="text-center max-w-md p-6">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                🤖 AI is analyzing your expenses...
+                AI is analyzing your expenses...
               </h3>
               <p className="text-sm text-gray-600">
                 Detecting recurring bills from your transaction history. This usually takes 10-20 seconds.
@@ -364,26 +336,28 @@ export default function RecurringBillsManager() {
     );
   }
 
-  // Filter and sort active merchants by upcoming date (soonest first, future dates only)
-  const now = new Date();
-  now.setHours(0, 0, 0, 0); // Set to start of today
-  const activeMerchants = taggedMerchants
-    .filter(m => m.is_active && new Date(m.next_predicted_date + 'T12:00:00').setHours(0,0,0,0) >= now.getTime())
-    .sort((a, b) => new Date(a.next_predicted_date + 'T12:00:00').getTime() - new Date(b.next_predicted_date + 'T12:00:00').getTime());
-  
-  const inactiveMerchants = taggedMerchants.filter(m => !m.is_active);
+  const allTimelineEntries = [
+    ...timeline.paid,
+    ...timeline.upcoming,
+  ].sort((a, b) => {
+    const dateA = a.actual_date || a.predicted_date;
+    const dateB = b.actual_date || b.predicted_date;
+    return dateA.localeCompare(dateB);
+  });
+
+  const totalMonth = timeline.totalPaid + timeline.totalUpcoming;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div className="flex flex-col">
-          <h1 className="text-2xl font-medium">💸 Expenses</h1>
-          <p className="text-muted-foreground mt-2">
-            {activeMerchants.length} active predictions
+          <h1 className="text-2xl font-medium">Expenses</h1>
+          <p className="text-muted-foreground mt-1">
+            {monthLabel} &middot; {timeline.paid.length} paid &middot; {timeline.upcoming.length} upcoming
           </p>
         </div>
-        <Button 
+        <Button
           onClick={() => setShowAddForm(!showAddForm)}
           className="bg-green-600 hover:bg-green-700"
         >
@@ -391,10 +365,29 @@ export default function RecurringBillsManager() {
         </Button>
       </div>
 
+      {/* Month Total Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="p-4 text-center">
+          <div className="text-sm text-muted-foreground">Paid</div>
+          <div className="text-2xl font-bold text-green-600">${timeline.totalPaid.toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground">{timeline.paid.length} bills</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-sm text-muted-foreground">Upcoming</div>
+          <div className="text-2xl font-bold text-amber-600">${timeline.totalUpcoming.toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground">{timeline.upcoming.length} bills</div>
+        </Card>
+        <Card className="p-4 text-center">
+          <div className="text-sm text-muted-foreground">Month Total</div>
+          <div className="text-2xl font-bold">${totalMonth.toFixed(2)}</div>
+          <div className="text-xs text-muted-foreground">{allTimelineEntries.length} bills</div>
+        </Card>
+      </div>
+
       {/* Add New Merchant Form */}
       {showAddForm && (
         <Card className="p-4 border-green-200 bg-green-50">
-          <h3 className="font-semibold mb-3">➕ Add Custom Recurring Transaction</h3>
+          <h3 className="font-semibold mb-3">Add Recurring Expense</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Input
               placeholder="Merchant name"
@@ -412,7 +405,7 @@ export default function RecurringBillsManager() {
                 className="pl-6"
               />
             </div>
-            <select 
+            <select
               className="px-3 py-2 border rounded-md"
               value={newMerchant.prediction_frequency}
               onChange={(e) => setNewMerchant({...newMerchant, prediction_frequency: e.target.value})}
@@ -430,186 +423,196 @@ export default function RecurringBillsManager() {
         </Card>
       )}
 
-      {/* Active Merchants */}
+      {/* Monthly Timeline */}
       <Card className="p-6">
-        {activeMerchants.length === 0 ? (
+        {allTimelineEntries.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
-            No active recurring bills found. Add some above to start tracking predictions!
+            No recurring bills found. Add some above or connect a bank account to start tracking.
           </p>
         ) : (
-          <div className="space-y-3">
-            {activeMerchants.map((merchant) => (
-              <div key={merchant.id} className="bg-gray-50 rounded-lg">
-                <div className="flex items-center justify-between p-3">
-                  {editingId === merchant.id ? (
-                    // Edit mode - improved layout with Name first
-                    <div className="flex-1 space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                          <Input
-                            type="text"
-                            value={editForm.merchant_name}
-                            onChange={(e) => setEditForm({...editForm, merchant_name: e.target.value})}
-                            placeholder="Bill name"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+          <div className="space-y-1">
+            {allTimelineEntries.map((entry) => {
+              const displayName = getDisplayName(entry.id, entry.merchant_name);
+              const isPaid = entry.status === 'paid';
+              const displayDate = entry.actual_date || entry.predicted_date;
+              const confidenceBadge = getConfidenceBadge(entry.confidence_score);
+              const merchant = allMerchants.find(m => m.id === entry.id);
+
+              return (
+                <div key={`${entry.id}-${entry.status}`} className="bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between p-3">
+                    {editingId === entry.id ? (
+                      <div className="flex-1 space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
                             <Input
-                              type="number"
-                              step="0.01"
-                              value={editForm.expected_amount}
-                              onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
-                              className="pl-6"
-                              placeholder="0.00"
+                              type="text"
+                              value={editForm.merchant_name}
+                              onChange={(e) => setEditForm({...editForm, merchant_name: e.target.value})}
                             />
                           </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Next Date</label>
-                          <Input
-                            type="date"
-                            value={editForm.next_predicted_date}
-                            onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
-                          <select 
-                            value={editForm.prediction_frequency}
-                            onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
-                            className="w-full px-3 py-2 border rounded-md text-sm"
-                          >
-                            <option value="weekly">Weekly</option>
-                            <option value="monthly">Monthly</option>
-                            <option value="bi-monthly">Bi-monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                          </select>
-                        </div>
-                      </div>
-                      {/* Second row for subgroup name and actions */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Subgroup Name (optional)</label>
-                          <Input
-                            type="text"
-                            placeholder="API, Credit Card, etc."
-                            value={editForm.account_identifier}
-                            onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
-                            title="Custom name for this account (e.g., 'API', 'Credit Card', 'Personal')"
-                          />
-                        </div>
-                        <div className="flex gap-2 pt-5">
-                          <Button size="sm" onClick={() => handleSaveEdit(merchant.id)}>Save</Button>
-                          <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode
-                    <>
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium truncate">{getDisplayName(merchant)}</span>
-                            {merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) && (
-                              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">Subgroup</span>
-                            )}
-                            {merchant.ai_category_tag && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">{merchant.ai_category_tag}</span>
-                            )}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={editForm.expected_amount}
+                                onChange={(e) => setEditForm({...editForm, expected_amount: e.target.value})}
+                                className="pl-6"
+                              />
+                            </div>
                           </div>
-                          <div className="text-sm text-gray-600">
-                            <span className="text-red-600">Next: {formatNextDate(merchant.next_predicted_date)}</span> • 
-                            ${merchant.expected_amount.toFixed(2)} • {merchant.prediction_frequency}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Next Date</label>
+                            <Input
+                              type="date"
+                              value={editForm.next_predicted_date}
+                              onChange={(e) => setEditForm({...editForm, next_predicted_date: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+                            <select
+                              value={editForm.prediction_frequency}
+                              onChange={(e) => setEditForm({...editForm, prediction_frequency: e.target.value})}
+                              className="w-full px-3 py-2 border rounded-md text-sm"
+                            >
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="bi-monthly">Bi-monthly</option>
+                              <option value="quarterly">Quarterly</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Subgroup Name (optional)</label>
+                            <Input
+                              type="text"
+                              placeholder="API, Credit Card, etc."
+                              value={editForm.account_identifier}
+                              onChange={(e) => setEditForm({...editForm, account_identifier: e.target.value})}
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-5">
+                            <Button size="sm" onClick={() => handleSaveEdit(entry.id)}>Save</Button>
+                            <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(merchant)}>Edit Item</Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleSplitAccounts(merchant)}
-                          className={merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) ? "text-green-600 hover:text-green-700" : "text-blue-600 hover:text-blue-700"}
-                        >
-                          {merchant.account_identifier && !isLikelyTechnicalString(merchant.account_identifier) ? "✏️ Edit Subgroup" : "🔀 Split"}
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleDelete(merchant.id, merchant.merchant_name)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Remove
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </div>
-                
-                {/* Historical Transactions */}
-                {loadingTransactions[merchant.id] ? (
-                  <div className="px-3 pb-3">
-                    <div className="bg-white border rounded-md p-3">
-                      <div className="text-sm text-gray-500">Loading transactions...</div>
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Status icon */}
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                            isPaid ? 'bg-green-100' : 'bg-amber-100'
+                          }`}>
+                            {isPaid ? (
+                              <Check className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <Clock className="w-4 h-4 text-amber-600" />
+                            )}
+                          </div>
+
+                          {/* Date column */}
+                          <div className="w-16 flex-shrink-0 text-sm font-medium text-gray-600">
+                            {getDayOrdinal(displayDate)}
+                          </div>
+
+                          {/* Merchant + details */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium truncate">{displayName}</span>
+                              {merchant?.ai_category_tag && (
+                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{merchant.ai_category_tag}</span>
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {isPaid ? (
+                                <>
+                                  Paid {formatDate(entry.actual_date!)}
+                                  {entry.days_off === 0 ? ' · on time' : ` · ${entry.days_off}d off`}
+                                </>
+                              ) : (
+                                <>
+                                  Expected {formatDate(entry.predicted_date)} · {entry.prediction_frequency}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Amount */}
+                          <div className="text-right flex-shrink-0">
+                            <div className={`font-semibold ${isPaid ? 'text-green-700' : 'text-gray-900'}`}>
+                              ${(entry.actual_amount || entry.expected_amount).toFixed(2)}
+                            </div>
+                            {!isPaid && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${confidenceBadge.color}`}>
+                                {confidenceBadge.label}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 ml-3 flex-shrink-0">
+                          <Button variant="ghost" size="sm" onClick={() => {
+                            if (merchant) handleEdit(merchant);
+                          }}>Edit</Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleSplitAccounts(entry.id)}>Split</Button>
+                          <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDelete(entry.id, entry.merchant_name)}>
+                            Remove
+                          </Button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                ) : merchantTransactions[merchant.id] && merchantTransactions[merchant.id].length > 0 ? (
-                  <div className="px-3 pb-3">
-                    <div className="bg-white border rounded-md p-3">
-                      <div className="flex items-center mb-2">
+
+                  {/* Expandable recent transactions */}
+                  {!editingId && (() => {
+                    // Load transactions on first expand
+                    if (!merchantTransactions[entry.id] && !loadingTransactions[entry.id] && expandedRecentByMerchant[entry.id]) {
+                      fetchMerchantTransactions(entry.id, entry.merchant_name);
+                    }
+
+                    return loadingTransactions[entry.id] ? (
+                      <div className="px-3 pb-3">
+                        <div className="bg-white border rounded-md p-3 text-sm text-gray-500">Loading transactions...</div>
+                      </div>
+                    ) : (
+                      <div className="px-3 pb-2">
                         <button
                           type="button"
-                          className="flex items-center gap-2 text-sm font-medium text-gray-700 group"
-                          aria-expanded={Boolean(expandedRecentByMerchant[merchant.id])}
-                          aria-controls={`recent-${merchant.id}`}
-                          onClick={() =>
-                            setExpandedRecentByMerchant(prev => ({
-                              ...prev,
-                              [merchant.id]: !prev[merchant.id]
-                            }))
-                          }
+                          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                          onClick={() => {
+                            setExpandedRecentByMerchant(prev => ({ ...prev, [entry.id]: !prev[entry.id] }));
+                            if (!merchantTransactions[entry.id] && !loadingTransactions[entry.id]) {
+                              fetchMerchantTransactions(entry.id, entry.merchant_name);
+                            }
+                          }}
                         >
-                          <ChevronRight
-                            className={`h-4 w-4 transition-transform duration-200 ${expandedRecentByMerchant[merchant.id] ? 'rotate-90' : ''}`}
-                            aria-hidden="true"
-                          />
-                          <span>📋 Recent Transactions</span>
+                          <ChevronRight className={`h-3 w-3 transition-transform ${expandedRecentByMerchant[entry.id] ? 'rotate-90' : ''}`} />
+                          Recent Transactions
                         </button>
+                        {expandedRecentByMerchant[entry.id] && merchantTransactions[entry.id] && (
+                          <ul className="mt-1 space-y-0.5">
+                            {merchantTransactions[entry.id].map((tx) => (
+                              <li key={tx.id} className="text-xs py-1 px-2 rounded bg-white">
+                                <span className="text-gray-500">{tx.date}</span>
+                                <span className="ml-2 font-medium">${Math.abs(tx.amount).toFixed(2)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
-                      {expandedRecentByMerchant[merchant.id] && (
-                        <ul id={`recent-${merchant.id}`} className="space-y-0.5">
-                          {merchantTransactions[merchant.id].map((transaction) => (
-                            <li key={transaction.id} className={`text-xs py-1 px-2 rounded ${
-                              merchant.account_identifier && transaction.is_tracked_for_this_split 
-                                ? 'bg-blue-50 border-l-2 border-l-blue-400' 
-                                : merchant.account_identifier
-                                ? 'bg-gray-50 opacity-75'
-                                : ''
-                            }`}>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-600">{transaction.date}</span>
-                                <span className="font-medium">${Math.abs(transaction.amount).toFixed(2)}</span>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      </div>
-                  </div>
-                ) : (
-                  <div className="px-3 pb-3">
-                    <div className="bg-white border rounded-md p-3">
-                      <div className="text-sm text-gray-500">No recent transactions found for this merchant.</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                    );
+                  })()}
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>
@@ -617,27 +620,20 @@ export default function RecurringBillsManager() {
       {/* Inactive Merchants */}
       {inactiveMerchants.length > 0 && (
         <Card className="p-6">
+          <h3 className="text-sm font-semibold text-gray-500 mb-3">Inactive ({inactiveMerchants.length})</h3>
           <div className="space-y-2">
             {inactiveMerchants.map((merchant) => (
               <div key={merchant.id} className="flex items-center justify-between p-3 bg-gray-100 rounded-lg opacity-60">
                 <div className="flex items-center gap-4 flex-1">
+                  <AlertTriangle className="w-4 h-4 text-gray-400" />
                   <span className="font-medium">{merchant.merchant_name}</span>
                   <span className="text-gray-600">${merchant.expected_amount.toFixed(2)} {merchant.prediction_frequency}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleToggleActive(merchant.id, merchant.is_active)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleToggleActive(merchant.id, merchant.is_active)}>
                     Enable
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDelete(merchant.id, merchant.merchant_name)}
-                    className="text-red-600 hover:text-red-700"
-                  >
+                  <Button variant="outline" size="sm" onClick={() => handleDelete(merchant.id, merchant.merchant_name)} className="text-red-600 hover:text-red-700">
                     Remove
                   </Button>
                 </div>
@@ -659,8 +655,6 @@ export default function RecurringBillsManager() {
           onConfirm={handleConfirmSplit}
         />
       )}
-
-
     </div>
   );
-} 
+}

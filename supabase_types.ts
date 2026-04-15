@@ -473,55 +473,79 @@ export type Database = {
       }
       tagged_merchants: {
         Row: {
-          auto_detected: boolean | null
-          confidence_score: number
-          created_at: string | null
-          expected_amount: number
           id: number
-          is_active: boolean
-          last_transaction_date: string | null
+          user_id: string | null
           merchant_name: string
           merchant_pattern: string | null
-          next_predicted_date: string | null
+          expected_amount: number
           prediction_frequency: string
-          type: string | null
+          confidence_score: number
+          is_active: boolean
+          auto_detected: boolean | null
+          last_transaction_date: string | null
+          next_predicted_date: string | null
+          created_at: string | null
           updated_at: string | null
-          user_id: string | null
+          type: string | null
           account_identifier: string | null
+          status: string | null
+          last_status_check: string | null
+          paid_date: string | null
+          last_prediction_date: string | null
+          last_paid_date: string | null
+          split_group_id: string | null
+          lifecycle_state: string | null
+          amount_drift: number | null
         }
         Insert: {
-          auto_detected?: boolean | null
-          confidence_score: number
-          created_at?: string | null
-          expected_amount: number
           id?: number
-          is_active?: boolean
-          last_transaction_date?: string | null
+          user_id?: string | null
           merchant_name: string
           merchant_pattern?: string | null
-          next_predicted_date?: string | null
+          expected_amount: number
           prediction_frequency: string
-          type?: string | null
+          confidence_score: number
+          is_active?: boolean
+          auto_detected?: boolean | null
+          last_transaction_date?: string | null
+          next_predicted_date?: string | null
+          created_at?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          type?: string | null
           account_identifier?: string | null
+          status?: string | null
+          last_status_check?: string | null
+          paid_date?: string | null
+          last_prediction_date?: string | null
+          last_paid_date?: string | null
+          split_group_id?: string | null
+          lifecycle_state?: string | null
+          amount_drift?: number | null
         }
         Update: {
-          auto_detected?: boolean | null
-          confidence_score?: number
-          created_at?: string | null
-          expected_amount?: number
           id?: number
-          is_active?: boolean
-          last_transaction_date?: string | null
+          user_id?: string | null
           merchant_name?: string
           merchant_pattern?: string | null
-          next_predicted_date?: string | null
+          expected_amount?: number
           prediction_frequency?: string
-          type?: string | null
+          confidence_score?: number
+          is_active?: boolean
+          auto_detected?: boolean | null
+          last_transaction_date?: string | null
+          next_predicted_date?: string | null
+          created_at?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          type?: string | null
           account_identifier?: string | null
+          status?: string | null
+          last_status_check?: string | null
+          paid_date?: string | null
+          last_prediction_date?: string | null
+          last_paid_date?: string | null
+          split_group_id?: string | null
+          lifecycle_state?: string | null
+          amount_drift?: number | null
         }
         Relationships: []
       }

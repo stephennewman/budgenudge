@@ -1,23 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { reconcileUserBills } from '@/utils/bills/reconcile';
 
-/**
- * Nightly Expense Lifecycle Scan Cron Job
- * 
- * Schedule: Daily at 2:00 AM EST
- * Purpose: Run AI-powered expense detection, bill matching, dormant detection
- * 
- * Vercel Cron Config (add to vercel.json):
- * {
- *   "crons": [{
- *     "path": "/api/cron/expense-lifecycle-scan",
- *     "schedule": "0 7 * * *"  // 2am EST = 7am UTC
- *   }]
- * }
- */
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authorization: allow Vercel cron or correct secret
     const isVercelCron = request.headers.get('x-vercel-cron');
     const authHeader = request.headers.get('authorization');
     const CRON_SECRET = process.env.CRON_SECRET;
@@ -27,37 +15,70 @@ export async function GET(request: NextRequest) {
     }
 
     const startTime = Date.now();
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
 
-    // Call the AI lifecycle scan API for all users
-    const scanResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('supabase.co', 'vercel.app') || 'http://localhost:3000'}/api/expenses/ai-lifecycle-scan`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          scanAllUsers: true
-        })
+    // Step 1: Run AI lifecycle scan for new bill detection + dormant marking
+    let scanResults = null;
+    try {
+      const scanResponse = await fetch(
+        `${baseUrl}/api/expenses/ai-lifecycle-scan`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scanAllUsers: true })
+        }
+      );
+      const scanResult = await scanResponse.json();
+      if (scanResult.success) {
+        scanResults = scanResult.results;
+      } else {
+        console.error('AI lifecycle scan failed:', scanResult.error);
       }
+    } catch (scanError) {
+      console.error('AI lifecycle scan error (continuing with reconciliation):', scanError);
+    }
+
+    // Step 2: Reconcile all users' bills against actual transactions
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const scanResult = await scanResponse.json();
-    const duration = Date.now() - startTime;
+    const { data: activeUsers } = await supabase
+      .from('items')
+      .select('user_id')
+      .is('deleted_at', null);
 
-    if (!scanResult.success) {
-      throw new Error(`Scan failed: ${scanResult.error}`);
+    const userIds = [...new Set((activeUsers || []).map(item => item.user_id))];
+    
+    let totalReconciled = 0;
+    const reconcileErrors: string[] = [];
+
+    for (const uid of userIds) {
+      try {
+        const result = await reconcileUserBills(uid);
+        totalReconciled += result.reconciledCount;
+      } catch (err) {
+        reconcileErrors.push(`${uid}: ${err instanceof Error ? err.message : 'Unknown'}`);
+      }
     }
+
+    const duration = Date.now() - startTime;
 
     return NextResponse.json({
       success: true,
       duration,
-      results: scanResult.results,
+      scanResults,
+      reconciliation: {
+        usersProcessed: userIds.length,
+        billsReconciled: totalReconciled,
+        errors: reconcileErrors
+      },
       timestamp: new Date().toISOString()
     });
 
   } catch (error) {
-    console.error('❌ Expense lifecycle scan cron error:', error);
+    console.error('Expense lifecycle scan cron error:', error);
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -65,4 +86,3 @@ export async function GET(request: NextRequest) {
     }, { status: 500 });
   }
 }
-

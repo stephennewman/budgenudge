@@ -5,6 +5,7 @@ import { storeTransactions } from '@/utils/plaid/server-enhanced';
 import { createClient } from '@supabase/supabase-js';
 import { importJWK, jwtVerify, decodeProtectedHeader } from 'jose';
 import { createHash } from 'crypto';
+import { reconcileUserBills } from '@/utils/bills/reconcile';
 
 // Set timeout to 60 seconds for Hobby plan (prevents 503 errors)
 export const maxDuration = 60;
@@ -111,7 +112,7 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
       // Get access token for this item and verify it exists
       const { data: item } = await supabase
         .from('items')
-        .select('plaid_access_token, plaid_item_id')
+        .select('plaid_access_token, plaid_item_id, user_id')
         .eq('plaid_item_id', item_id)
         .single();
 
@@ -132,6 +133,12 @@ async function handleTransactionWebhook(webhook_code: string, item_id: string, b
         const storedTransactions = await storeTransactions(response.data.transactions, item.plaid_item_id);
         
         if (storedTransactions && storedTransactions.length > 0) {
+          // Reconcile bills against new transactions (non-blocking)
+          if (item.user_id) {
+            reconcileUserBills(item.user_id).catch(err =>
+              console.error('Background bill reconciliation failed:', err)
+            );
+          }
         }
         
         // Update account balances
