@@ -400,7 +400,7 @@ export default function RecurringBillsManager() {
             onClick={() => handleMerge(entry.id, mergeSourceId!)}
           >
             <Merge className="w-3 h-3" />
-            Merge "{allMerchants.find(m => m.id === mergeSourceId)?.merchant_name}" into this bill
+            Merge &quot;{allMerchants.find(m => m.id === mergeSourceId)?.merchant_name}&quot; into this bill
           </button>
         )}
         <div className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">

@@ -20,6 +20,14 @@
     {
       "path": "/api/cron/daily-email-insights",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/publix-deals",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/dinner-sms",
+      "schedule": "0 20 * * *"
     }
   ]
 } 
