@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { generateBOGODinnerPlan } from '@/utils/bogo-dinner-plan';
+import { generateMorningInsightText } from '@/utils/sms/morning-insights';
 
 // Create Supabase client for server-side operations
 const supabase = createClient(
@@ -1843,6 +1844,21 @@ export async function generateSMSMessage(userId: string, templateType: 'recurrin
 // MORNING EXPENSES SNAPSHOT TEMPLATE
 // ===================================
 async function generateMorningExpensesMessage(userId: string): Promise<string> {
+  // New behavioral morning text (Claude-composed from deterministic stats).
+  // Falls back to the legacy static snapshot below if it can't be produced.
+  try {
+    const insightText = await generateMorningInsightText(userId);
+    if (insightText && insightText.trim().length >= 15) {
+      return insightText.trim();
+    }
+  } catch (error) {
+    console.error('Error generating behavioral morning text, falling back to snapshot:', error);
+  }
+
+  return generateMorningExpensesSnapshot(userId);
+}
+
+async function generateMorningExpensesSnapshot(userId: string): Promise<string> {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
