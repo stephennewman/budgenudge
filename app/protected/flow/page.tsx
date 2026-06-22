@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import { FlowBreakdownModal } from '@/components/flow-breakdown-modal';
+import { createSupabaseClient } from '@/utils/supabase/client';
 import { 
   LineChart, 
   Line, 
@@ -82,14 +83,15 @@ export default function FlowPage() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'overview' | 'merchants' | 'categories' | 'timeline' | 'charts'>('charts');
   const [isBreakdownModalOpen, setIsBreakdownModalOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
-  const fetchFlowData = async () => {
+  const fetchFlowData = async (targetUserId: string) => {
     try {
       setLoading(true);
       setError(null);
-      
-      const response = await fetch('/api/adf-flow?userId=bc474c8b-4b47-4c7d-b202-f469330af2a2');
-      
+
+      const response = await fetch(`/api/adf-flow?userId=${encodeURIComponent(targetUserId)}`);
+
       if (!response.ok) {
         throw new Error(`Failed to fetch flow data: ${response.statusText}`);
       }
@@ -105,7 +107,16 @@ export default function FlowPage() {
   };
 
   useEffect(() => {
-    fetchFlowData();
+    const supabase = createSupabaseClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setUserId(user.id);
+        fetchFlowData(user.id);
+      } else {
+        setError('You must be signed in to view your flow.');
+        setLoading(false);
+      }
+    });
   }, []);
 
   const formatCurrency = (amount: number) => {
@@ -261,9 +272,11 @@ export default function FlowPage() {
         <div className="text-center">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 max-w-md mx-auto">
             <p className="text-red-700">Error: {error}</p>
-            <Button onClick={fetchFlowData} className="mt-2">
-              Try Again
-            </Button>
+            {userId && (
+              <Button onClick={() => fetchFlowData(userId)} className="mt-2">
+                Try Again
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -986,7 +999,7 @@ export default function FlowPage() {
       <FlowBreakdownModal 
         isOpen={isBreakdownModalOpen}
         onClose={() => setIsBreakdownModalOpen(false)}
-        userId="bc474c8b-4b47-4c7d-b202-f469330af2a2"
+        userId={userId ?? ''}
       />
     </div>
   );
