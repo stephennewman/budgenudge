@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
 import { generateSMSMessage } from '@/utils/sms/templates';
+import { requireUserOrSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -31,6 +32,9 @@ async function resolveUserPhone(userId?: string, provided?: string): Promise<str
 export async function POST(request: NextRequest) {
   try {
     const { message, phoneNumber, scheduledTime, userId, templateType } = await request.json();
+
+    const guard = await requireUserOrSuperAdmin(userId);
+    if (isGuardFailure(guard)) return guard.response;
 
     // Resolve primary phone
     const targetPhoneNumber = await resolveUserPhone(userId, phoneNumber);

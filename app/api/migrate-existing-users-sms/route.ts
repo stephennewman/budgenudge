@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -9,6 +10,9 @@ const supabase = createClient(
 
 // POST - Migrate existing users to complete SMS workflow
 export async function POST() {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     // Get all users who have Plaid connections but incomplete SMS setup
     const { data: users, error: usersError } = await supabase

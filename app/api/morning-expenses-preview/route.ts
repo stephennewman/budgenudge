@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -11,6 +12,9 @@ const supabase = createClient(
 const TARGET_USER_ID = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 
 export async function GET() {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     // Build the morning expenses message (same logic as the SMS route but don't send)
     const morningMessage = await buildMorningExpensesMessage(TARGET_USER_ID);

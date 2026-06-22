@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 export async function GET(request: Request) {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get('userId');
 

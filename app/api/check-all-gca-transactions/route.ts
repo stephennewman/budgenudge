@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,6 +8,9 @@ const supabase = createClient(
 );
 
 export async function POST(request: NextRequest) {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     const { userId } = await request.json();
     

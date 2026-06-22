@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
+import { requireUserOrSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // ADF Classification Logic
 function classifyForADF(tx: { ai_merchant_name?: string; merchant_name?: string; name?: string; ai_category_tag?: string }) {
@@ -54,6 +55,9 @@ export async function GET(request: Request) {
     if (!userId) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 });
     }
+
+    const guard = await requireUserOrSuperAdmin(userId);
+    if (isGuardFailure(guard)) return guard.response;
 
     const supabase = await createSupabaseClient();
     

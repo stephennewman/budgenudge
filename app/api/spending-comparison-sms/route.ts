@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireUserOrSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -9,6 +10,9 @@ export async function GET(request: Request) {
   if (!userId) {
     return NextResponse.json({ error: 'userId parameter required' }, { status: 400 });
   }
+
+  const guard = await requireUserOrSuperAdmin(userId);
+  if (isGuardFailure(guard)) return guard.response;
 
   try {
     const supabase = createClient(

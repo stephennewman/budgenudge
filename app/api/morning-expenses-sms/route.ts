@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -12,6 +13,9 @@ const supabase = createClient(
 const TARGET_USER_ID = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 
 export async function POST() {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     // Get user's phone number from SMS settings
     const { data: smsSettings } = await supabase

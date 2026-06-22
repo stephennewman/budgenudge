@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
+import { requireUserOrSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -20,7 +21,10 @@ interface RecurringTransaction {
 export async function POST(request: NextRequest) {
   try {
     const { phoneNumber, userId } = await request.json();
-    
+
+    const guard = await requireUserOrSuperAdmin(userId);
+    if (isGuardFailure(guard)) return guard.response;
+
     if (!userId) {
       return NextResponse.json({ 
         success: false, 

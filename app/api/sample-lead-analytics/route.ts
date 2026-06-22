@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create admin Supabase client
 const supabase = createClient(
@@ -11,6 +12,9 @@ const supabase = createClient(
  * Simple analytics: Show phone-to-email conversions
  */
 export async function GET() {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     // Get sample SMS leads with their conversion status
     const { data: leads, error: leadsError } = await supabase

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -9,6 +10,9 @@ const supabase = createClient(
 
 // POST - Complete SMS setup for Ashley Newman
 export async function POST() {
+  const guard = await requireSuperAdmin();
+  if (isGuardFailure(guard)) return guard.response;
+
   try {
     const ashleyUserId = 'd5671ac4-cd39-4c1b-a897-7298dd15938a';
     const ashleyPhone = '+15084934141';
