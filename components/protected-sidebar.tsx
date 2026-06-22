@@ -1,14 +1,9 @@
 import InPageSidebar from "@/components/in-page-sidebar";
 import { createSupabaseClient } from "@/utils/supabase/server";
 import { isSuperAdmin } from "@/utils/auth/superadmin";
-// DISABLED FOR PERFORMANCE: Subscription features
-// import { createUpdateClient } from "@/utils/update/server";
+import { getProtectedNavItems } from "@/components/protected-nav-items";
 
 export default async function ProtectedSidebar() {
-  // DISABLED FOR PERFORMANCE: Subscription entitlement check
-  // const client = await createUpdateClient();
-  // const { data } = await client.entitlements.check("premium");
-
   // Check if current user is superadmin to show Feed
   let isUserSuperAdmin = false;
   try {
@@ -19,67 +14,7 @@ export default async function ProtectedSidebar() {
     console.error('Error checking superadmin status:', error);
   }
 
-  const baseItems = [
-    {
-      label: "🏠 Account",
-      href: "/",
-    },
-    {
-      label: "💰 Income",
-      href: "/income",
-    },
-    {
-      label: "💸 Expenses",
-      href: "/recurring-bills",
-    },
-    {
-      label: "💳 Transactions",
-      href: "/transactions",
-    },
-    {
-      label: "🏪 Merchants",
-      href: "/ai-merchant-analysis",
-    },
-    {
-      label: "🗂️ Categories",
-      href: "/ai-category-analysis",
-    },
-    {
-      label: "📊 Insights",
-      href: "/insights",
-    },
-    {
-      label: "📈 Trends",
-      href: "/merchant-weekly-report",
-    },
-    {
-      label: "💰 Flow",
-      href: "/flow",
-    },
-    {
-      label: "📱 Texts",
-      href: "/texts",
-    },
-    {
-      label: "🧪 SMS Builder",
-      href: "/simple-builder",
-    },
-    {
-      label: "🛒 Deals",
-      href: "/deals",
-    },
-  ];
-
-  // Add Feed for superadmin only
-  const items = isUserSuperAdmin 
-    ? [
-        ...baseItems,
-        {
-          label: "📡 Feed",
-          href: "/admin-feed",
-        }
-      ]
-    : baseItems;
+  const items = getProtectedNavItems(isUserSuperAdmin);
 
   return (
     <div className="hidden lg:block">

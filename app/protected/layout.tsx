@@ -2,6 +2,7 @@ import ProtectedSidebar from "@/components/protected-sidebar";
 import MobileNavMenu from "@/components/mobile-nav-menu";
 import { createSupabaseClient } from "@/utils/supabase/server";
 import { isSuperAdmin } from "@/utils/auth/superadmin";
+import { getProtectedNavItems } from "@/components/protected-nav-items";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -25,59 +26,7 @@ export default async function ProtectedLayout({
     console.error('Error checking superadmin status for mobile nav:', error);
   }
 
-  const baseNavItems = [
-    {
-      label: "🏠 Account",
-      href: "/",
-    },
-    {
-      label: "💰 Income",
-      href: "/income",
-    },
-    {
-      label: "💸 Expenses",
-      href: "/recurring-bills",
-    },
-    {
-      label: "💳 Transactions",
-      href: "/transactions",
-    },
-    {
-      label: "🏪 Merchants",
-      href: "/ai-merchant-analysis",
-    },
-    {
-      label: "🗂️ Categories",
-      href: "/ai-category-analysis",
-    },
-    {
-      label: "📊 Insights",
-      href: "/insights",
-    },
-    {
-      label: "💰 Flow",
-      href: "/flow",
-    },
-    {
-      label: "📱 Texts",
-      href: "/texts",
-    },
-    {
-      label: "🛒 Deals",
-      href: "/deals",
-    },
-  ];
-
-  // Add Feed for superadmin only
-  const navItems = isUserSuperAdmin 
-    ? [
-        ...baseNavItems,
-        {
-          label: "📡 Feed",
-          href: "/admin-feed",
-        }
-      ]
-    : baseNavItems;
+  const navItems = getProtectedNavItems(isUserSuperAdmin);
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full">

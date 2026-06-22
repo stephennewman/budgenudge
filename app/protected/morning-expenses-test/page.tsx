@@ -14,8 +14,8 @@ export default function MorningExpensesTestPage() {
     setResult(null);
     
     try {
-      const response = await fetch('/api/test-morning-expenses', {
-        method: 'GET',
+      const response = await fetch('/api/morning-expenses-sms', {
+        method: 'POST',
       });
       
       const data = await response.json();
