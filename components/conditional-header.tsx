@@ -15,6 +15,11 @@ export default function ConditionalHeader() {
   if (pathname === '/plaid-success') {
     return null;
   }
+
+  // Hide header for the full-screen mirror dashboard
+  if (pathname.startsWith('/mirror')) {
+    return null;
+  }
   
   // Hide header for sign-up page for clean design with custom background
   if (pathname === '/sign-up') {
