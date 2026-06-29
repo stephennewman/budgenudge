@@ -40,6 +40,8 @@ import {
   LayoutDashboard,
   LayoutGrid,
   Lightbulb,
+  Maximize,
+  Minimize,
   MapPin,
   Moon,
   CalendarClock,
@@ -342,6 +344,7 @@ export default function MirrorPage() {
   const [spend, setSpend] = useState<SpendData | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authed, setAuthed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const hasInit = useRef(false);
 
   // Dashboard customization state.
@@ -602,6 +605,40 @@ export default function MirrorPage() {
     };
   }, []);
 
+  // Fullscreen toggle (with webkit fallback for older Safari). Kiosk mode for
+  // the bathroom mirror.
+  const toggleFullscreen = useCallback(() => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => void;
+    };
+    const el = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => void;
+    };
+    const isFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement);
+    try {
+      if (!isFs) {
+        (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.());
+      } else {
+        (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.());
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    const doc = document as Document & { webkitFullscreenElement?: Element };
+    const onChange = () =>
+      setIsFullscreen(!!(doc.fullscreenElement || doc.webkitFullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+
   // Detect a logged-in Supabase session so finance data can load without a token.
   useEffect(() => {
     let active = true;
@@ -623,13 +660,11 @@ export default function MirrorPage() {
     };
   }, []);
 
-  // Yesterday's spend. Loads for an authenticated user (their own data, via
-  // session cookies) or when a shared finance token is present. Refresh every 30 min.
+  // Yesterday's spend. The server authorizes via the logged-in session (the
+  // user's own data) or the shared finance token, so we always attempt the
+  // fetch and let a 401 simply hide the Money channel. Refetches on login and
+  // refreshes every 30 min. `authed` is a dependency so logging in re-triggers.
   useEffect(() => {
-    if (!token && !authed) {
-      setSpend(null);
-      return;
-    }
     let active = true;
     const tz = data?.timezone;
     const load = async () => {
@@ -965,6 +1000,20 @@ export default function MirrorPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={toggleFullscreen}
+              aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+              className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-md transition hover:bg-white/25"
+            >
+              {isFullscreen ? (
+                <Minimize className="h-4 w-4" />
+              ) : (
+                <Maximize className="h-4 w-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isFullscreen ? "Exit" : "Full screen"}
+              </span>
+            </button>
             <button
               onClick={() => setShowSearch((s) => !s)}
               className="flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur-md transition hover:bg-white/25"
