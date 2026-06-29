@@ -18,6 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/utils/styles";
+import { createSupabaseClient } from "@/utils/supabase/client";
 import {
   BookOpen,
   Check,
@@ -340,6 +341,7 @@ export default function MirrorPage() {
   const [together, setTogether] = useState<Together | null>(null);
   const [spend, setSpend] = useState<SpendData | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authed, setAuthed] = useState(false);
   const hasInit = useRef(false);
 
   // Dashboard customization state.
@@ -600,9 +602,31 @@ export default function MirrorPage() {
     };
   }, []);
 
-  // Yesterday's spend (only when a finance token is present). Refresh every 30 min.
+  // Detect a logged-in Supabase session so finance data can load without a token.
   useEffect(() => {
-    if (!token) {
+    let active = true;
+    const supabase = createSupabaseClient();
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        if (active) setAuthed(!!data.user);
+      })
+      .catch(() => {
+        if (active) setAuthed(false);
+      });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session?.user);
+    });
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
+  // Yesterday's spend. Loads for an authenticated user (their own data, via
+  // session cookies) or when a shared finance token is present. Refresh every 30 min.
+  useEffect(() => {
+    if (!token && !authed) {
       setSpend(null);
       return;
     }
@@ -610,9 +634,10 @@ export default function MirrorPage() {
     const tz = data?.timezone;
     const load = async () => {
       try {
-        const url = `/api/mirror/spend?token=${encodeURIComponent(token)}${
-          tz ? `&tz=${encodeURIComponent(tz)}` : ""
-        }`;
+        const qs = new URLSearchParams();
+        if (token) qs.set("token", token);
+        if (tz) qs.set("tz", tz);
+        const url = `/api/mirror/spend${qs.toString() ? `?${qs}` : ""}`;
         const res = await fetch(url);
         if (!res.ok) {
           if (active) setSpend(null);
@@ -630,7 +655,7 @@ export default function MirrorPage() {
       active = false;
       clearInterval(id);
     };
-  }, [token, data?.timezone]);
+  }, [token, authed, data?.timezone]);
 
   const part = dayPart(now.getHours());
   const gradient = GRADIENTS[part];

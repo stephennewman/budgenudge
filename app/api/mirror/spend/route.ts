@@ -2,13 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import { getSuperAdminId } from "@/utils/auth/superadmin";
+import { createSupabaseClient } from "@/utils/supabase/server";
 
 // Yesterday's spend snapshot for the bathroom dashboard.
 //
-// SECURITY: /mirror is a public, unauthenticated page, so this endpoint is
-// gated by a shared secret (MIRROR_TOKEN). Without a matching token it returns
-// 401 and never touches financial data. The token is passed from the saved
-// dashboard URL on the trusted in-home device.
+// AUTH: /mirror is a public page, so finance data is gated two ways:
+//   1. A logged-in Supabase user gets their OWN data (session cookies).
+//   2. A trusted in-home device passes the shared secret MIRROR_TOKEN, which
+//      returns the configured finance user's data.
+// Without either, it returns 401 and never touches financial data.
 export const dynamic = "force-dynamic";
 
 const supabase = createClient(
@@ -16,16 +18,36 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+async function resolveUserId(searchParams: URLSearchParams): Promise<string | null> {
+  // 1) Authenticated session → that user's own data.
+  try {
+    const authClient = await createSupabaseClient();
+    const {
+      data: { user },
+    } = await authClient.auth.getUser();
+    if (user) return user.id;
+  } catch {
+    // No/invalid session; fall through to token.
+  }
+
+  // 2) Shared finance token → configured finance user.
   const token = searchParams.get("token");
   const expected = process.env.MIRROR_TOKEN;
+  if (expected && token && token === expected) {
+    return process.env.MIRROR_FINANCE_USER_ID || getSuperAdminId();
+  }
 
-  if (!expected || !token || token !== expected) {
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+
+  const userId = await resolveUserId(searchParams);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = process.env.MIRROR_FINANCE_USER_ID || getSuperAdminId();
   const tz = searchParams.get("tz") || "America/New_York";
   const today = DateTime.now().setZone(tz).startOf("day");
   const yesterday = today.minus({ days: 1 }).toISODate();
