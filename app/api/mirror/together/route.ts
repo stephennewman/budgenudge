@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { challengeForDate } from "@/utils/mirror/connection-prompts";
 import { familyForDate } from "@/utils/mirror/family-prompts";
+import { loveQuoteForDate, marriageTipForDate } from "@/utils/mirror/love-content";
+import { parentingTipForDate } from "@/utils/mirror/parenting-content";
+import { faithFactForDate, faithTipForDate } from "@/utils/mirror/faith-content";
 
 // "For us" widgets: verse of the day, fun fact, dad joke, plus a daily couple
 // connection challenge and a family/parenting prompt. Verse, fun fact, and joke
@@ -67,5 +70,10 @@ export async function GET() {
     joke,
     challenge: challengeForDate(),
     family: familyForDate(),
+    loveQuote: loveQuoteForDate(),
+    marriageTip: marriageTipForDate(),
+    parentingTip: parentingTipForDate(),
+    faithFact: faithFactForDate(),
+    faithTip: faithTipForDate(),
   });
 }

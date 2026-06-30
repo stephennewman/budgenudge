@@ -18,6 +18,63 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Exclude money-movement (transfers, credit-card payments, P2P) so breakdowns
+// reflect true spending rather than cash shuffled around.
+const EXCLUDED_CATEGORIES = new Set([
+  "transfer",
+  "payment",
+  "credit card payment",
+  "credit card bill",
+]);
+const TRANSFER_MERCHANTS = ["venmo", "zelle", "cash app", "paypal", "apple cash"];
+
+type TxnRow = {
+  amount: number | string;
+  ai_category_tag?: string | null;
+  ai_merchant_name?: string | null;
+  merchant_name?: string | null;
+  name?: string | null;
+};
+
+function topN(m: Map<string, number>, n: number) {
+  return [...m.entries()]
+    .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, n);
+}
+
+// Aggregate a set of transactions into total + top categories + top vendors,
+// using the app's AI tags with sensible fallbacks and excluding money-movement.
+function buildBreakdown(txns: TxnRow[]) {
+  const catMap = new Map<string, number>();
+  const venMap = new Map<string, number>();
+  let total = 0;
+  for (const t of txns) {
+    const amt = Number(t.amount);
+    const cat = (t.ai_category_tag || "").trim() || "Uncategorized";
+    const ven =
+      (t.ai_merchant_name || "").trim() ||
+      (t.merchant_name || "").trim() ||
+      (t.name || "").trim() ||
+      "Unknown";
+    const venLower = ven.toLowerCase();
+    if (
+      EXCLUDED_CATEGORIES.has(cat.toLowerCase()) ||
+      TRANSFER_MERCHANTS.some((m) => venLower.includes(m))
+    ) {
+      continue;
+    }
+    total += amt;
+    catMap.set(cat, (catMap.get(cat) ?? 0) + amt);
+    venMap.set(ven, (venMap.get(ven) ?? 0) + amt);
+  }
+  return {
+    total: Math.round(total * 100) / 100,
+    categories: topN(catMap, 6),
+    vendors: topN(venMap, 6),
+  };
+}
+
 async function resolveUserId(searchParams: URLSearchParams): Promise<string | null> {
   // 1) Authenticated session → that user's own data.
   try {
@@ -73,7 +130,7 @@ export async function GET(request: NextRequest) {
     // definition of "spend" used by the app's SMS reports.
     const { data: rangeTxns } = await supabase
       .from("transactions")
-      .select("amount, date, merchant_name, name")
+      .select("amount, date, merchant_name, name, ai_category_tag, ai_merchant_name")
       .in("plaid_item_id", itemIds)
       .gte("date", trendStart!)
       .lte("date", trendEnd!)
@@ -132,8 +189,15 @@ export async function GET(request: NextRequest) {
     }));
     const billsTotal = billItems.reduce((s, b) => s + b.amount, 0);
 
-    // Month-to-date budget breakdown by category and by vendor, using the
-    // app's AI tags (ai_category_tag / ai_merchant_name) with sensible fallbacks.
+    // This-week breakdown: last 7 days (today-7 .. yesterday) from the range
+    // we already fetched, by category and vendor.
+    const weekStart = today.minus({ days: 7 }).toISODate()!;
+    const weekTxns = (rangeTxns || []).filter(
+      (t) => String(t.date) >= weekStart && String(t.date) <= yesterday!
+    );
+    const weekBreakdown = buildBreakdown(weekTxns as TxnRow[]);
+
+    // Month-to-date breakdown by category and vendor.
     const monthStart = today.startOf("month").toISODate();
     const { data: monthTxns } = await supabase
       .from("transactions")
@@ -142,52 +206,7 @@ export async function GET(request: NextRequest) {
       .gte("date", monthStart!)
       .lte("date", today.toISODate()!)
       .gt("amount", 0);
-
-    // Exclude money-movement (transfers, credit-card payments, P2P) so the
-    // breakdown reflects true spending rather than cash shuffled around.
-    const EXCLUDED_CATEGORIES = new Set([
-      "transfer",
-      "payment",
-      "credit card payment",
-      "credit card bill",
-    ]);
-    const TRANSFER_MERCHANTS = [
-      "venmo",
-      "zelle",
-      "cash app",
-      "paypal",
-      "apple cash",
-    ];
-
-    const catMap = new Map<string, number>();
-    const venMap = new Map<string, number>();
-    let monthTotal = 0;
-    for (const t of monthTxns || []) {
-      const amt = Number(t.amount);
-      const cat = (t.ai_category_tag || "").trim() || "Uncategorized";
-      const ven =
-        (t.ai_merchant_name || "").trim() ||
-        (t.merchant_name || "").trim() ||
-        (t.name || "").trim() ||
-        "Unknown";
-
-      const venLower = ven.toLowerCase();
-      if (
-        EXCLUDED_CATEGORIES.has(cat.toLowerCase()) ||
-        TRANSFER_MERCHANTS.some((m) => venLower.includes(m))
-      ) {
-        continue;
-      }
-
-      monthTotal += amt;
-      catMap.set(cat, (catMap.get(cat) ?? 0) + amt);
-      venMap.set(ven, (venMap.get(ven) ?? 0) + amt);
-    }
-    const topN = (m: Map<string, number>, n: number) =>
-      [...m.entries()]
-        .map(([name, amount]) => ({ name, amount: Math.round(amount * 100) / 100 }))
-        .sort((a, b) => b.amount - a.amount)
-        .slice(0, n);
+    const monthBreakdown = buildBreakdown((monthTxns || []) as TxnRow[]);
 
     return NextResponse.json({
       total,
@@ -196,12 +215,15 @@ export async function GET(request: NextRequest) {
       top,
       trend: { days, thisWeek, lastWeek, changePct },
       bills: { items: billItems.slice(0, 5), total: billsTotal, count: billItems.length },
+      // `breakdown` kept for backward compatibility (month-to-date).
       breakdown: {
         period: today.toFormat("LLLL"),
-        total: Math.round(monthTotal * 100) / 100,
-        categories: topN(catMap, 6),
-        vendors: topN(venMap, 6),
+        total: monthBreakdown.total,
+        categories: monthBreakdown.categories,
+        vendors: monthBreakdown.vendors,
       },
+      week: { label: "This week", ...weekBreakdown },
+      month: { label: today.toFormat("LLLL"), ...monthBreakdown },
     });
   } catch {
     return NextResponse.json({ error: "Failed to load spend" }, { status: 500 });

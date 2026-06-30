@@ -20,8 +20,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/utils/styles";
 import { createSupabaseClient } from "@/utils/supabase/client";
 import {
+  Baby,
   BookOpen,
   Check,
+  Church,
   Cloud,
   CloudDrizzle,
   CloudFog,
@@ -49,7 +51,9 @@ import {
   Pencil,
   Play,
   PieChart,
+  Quote,
   Smile,
+  Sparkles,
   Users,
   RotateCcw,
   Sailboat,
@@ -128,6 +132,17 @@ type Together = {
   challenge: string | null;
   joke: string | null;
   family: string | null;
+  loveQuote: { text: string; author: string } | null;
+  marriageTip: string | null;
+  parentingTip: string | null;
+  faithFact: string | null;
+  faithTip: string | null;
+};
+type Breakdown = {
+  label: string;
+  total: number;
+  categories: { name: string; amount: number }[];
+  vendors: { name: string; amount: number }[];
 };
 type SpendData = {
   total: number;
@@ -151,14 +166,16 @@ type SpendData = {
     categories: { name: string; amount: number }[];
     vendors: { name: string; amount: number }[];
   };
+  week?: Breakdown;
+  month?: Breakdown;
 };
 
 type Size = "small" | "medium" | "large";
 
 const STORAGE_KEY = "mirror.location";
-const ORDER_KEY = "mirror.order.v1";
-const SIZES_KEY = "mirror.sizes.v1";
-const HIDDEN_KEY = "mirror.hidden.v1";
+const ORDER_KEY = "mirror.order.v2";
+const SIZES_KEY = "mirror.sizes.v2";
+const HIDDEN_KEY = "mirror.hidden.v2";
 
 // Column span per size. Statically listed so Tailwind keeps the classes.
 const SIZE_SPAN: Record<Size, string> = {
@@ -174,12 +191,16 @@ const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
   {
     id: "weather",
     label: "Weather",
-    ids: ["current", "glance", "hourly", "beach", "boat", "forecast", "sun"],
+    ids: ["current", "forecast", "hourly", "glance", "beach", "boat", "sun"],
   },
-  { id: "money", label: "Money", ids: ["spend", "bills", "budget"] },
-  { id: "life", label: "Life", ids: ["together", "verse", "funfact"] },
-  { id: "family", label: "Family", ids: ["family", "joke"] },
+  { id: "money", label: "Money", ids: ["spend", "budget", "bills"] },
+  { id: "love", label: "Love", ids: ["together", "marriage", "lovequote"] },
+  { id: "family", label: "Family", ids: ["family", "parenting", "joke", "funfact"] },
+  { id: "faith", label: "Faith", ids: ["verse", "faithfact", "faithtip"] },
 ];
+
+// Flattened default widget order, derived from the channel layout above.
+const DEFAULT_ORDER = CATEGORIES.flatMap((c) => c.ids);
 
 // How long each channel stays on screen before auto-advancing.
 const ROTATE_MS = 30000;
@@ -191,16 +212,22 @@ const DEFAULT_SIZE: Record<string, Size> = {
   hourly: "large",
   beach: "small",
   boat: "small",
-  forecast: "medium",
+  forecast: "large",
   sun: "small",
   spend: "large",
   bills: "medium",
   budget: "large",
-  together: "medium",
-  verse: "medium",
-  funfact: "large",
-  family: "medium",
+  // Text content cards: large so they're easy to read on the mirror.
+  together: "large",
+  marriage: "large",
+  lovequote: "large",
+  family: "large",
+  parenting: "large",
   joke: "medium",
+  funfact: "medium",
+  verse: "large",
+  faithfact: "large",
+  faithtip: "large",
 };
 
 // Masonry tuning: tiny base row so item heights snap close to their content.
@@ -821,76 +848,101 @@ export default function MirrorPage() {
       },
       {
         id: "budget",
-        title: "Budget breakdown",
-        available: !!(spend?.breakdown && spend.breakdown.total > 0),
+        title: "Spending breakdown",
+        available: !!(
+          (spend?.week && spend.week.total > 0) ||
+          (spend?.month && spend.month.total > 0) ||
+          (spend?.breakdown && spend.breakdown.total > 0)
+        ),
         node:
-          spend?.breakdown && spend.breakdown.total > 0 ? (
-            <BudgetCard breakdown={spend.breakdown} />
+          spend?.week || spend?.month || spend?.breakdown ? (
+            <BudgetCard
+              week={spend.week}
+              month={
+                spend.month ??
+                (spend.breakdown
+                  ? {
+                      label: spend.breakdown.period,
+                      total: spend.breakdown.total,
+                      categories: spend.breakdown.categories,
+                      vendors: spend.breakdown.vendors,
+                    }
+                  : undefined)
+              }
+            />
           ) : null,
       },
+      // --- Love ---
       {
         id: "together",
         title: "Together today",
         available: !!together?.challenge,
         node: together?.challenge ? (
-          <MiniCard
+          <PromptCard
             icon={Heart}
             title="Together today"
             chip="bg-rose-400/25 text-rose-200"
             tint="rgba(244,114,182,0.18)"
-          >
-            <p className="text-sm leading-snug text-white/90">{together.challenge}</p>
-          </MiniCard>
+            text={together.challenge}
+          />
         ) : null,
       },
       {
-        id: "verse",
-        title: "Verse of the day",
-        available: !!together?.verse,
-        node: together?.verse ? (
-          <MiniCard
-            icon={BookOpen}
-            title="Verse of the day"
-            chip="bg-violet-400/25 text-violet-200"
-            tint="rgba(167,139,250,0.18)"
-          >
-            <p className="text-sm leading-snug text-white/90">{together.verse.text}</p>
-            {together.verse.reference && (
-              <p className="mt-1.5 text-xs font-medium text-violet-200/80">
-                {together.verse.reference}
-              </p>
-            )}
-          </MiniCard>
+        id: "marriage",
+        title: "Marriage tip",
+        available: !!together?.marriageTip,
+        node: together?.marriageTip ? (
+          <PromptCard
+            icon={Heart}
+            title="Marriage tip"
+            chip="bg-pink-400/25 text-pink-200"
+            tint="rgba(244,114,182,0.14)"
+            text={together.marriageTip}
+          />
         ) : null,
       },
       {
-        id: "funfact",
-        title: "Fun fact",
-        available: !!together?.funFact,
-        node: together?.funFact ? (
-          <MiniCard
-            icon={Lightbulb}
-            title="Fun fact"
-            chip="bg-amber-400/25 text-amber-200"
-            tint="rgba(251,191,36,0.16)"
-          >
-            <p className="text-sm leading-snug text-white/90">{together.funFact}</p>
-          </MiniCard>
+        id: "lovequote",
+        title: "Love note",
+        available: !!together?.loveQuote,
+        node: together?.loveQuote ? (
+          <PromptCard
+            icon={Quote}
+            title="Love note"
+            chip="bg-rose-400/25 text-rose-200"
+            tint="rgba(251,113,133,0.14)"
+            text={`“${together.loveQuote.text}”`}
+            footnote={`— ${together.loveQuote.author}`}
+          />
         ) : null,
       },
+      // --- Family ---
       {
         id: "family",
         title: "Family today",
         available: !!together?.family,
         node: together?.family ? (
-          <MiniCard
+          <PromptCard
             icon={Users}
             title="Family today"
             chip="bg-sky-400/25 text-sky-200"
             tint="rgba(56,189,248,0.16)"
-          >
-            <p className="text-sm leading-snug text-white/90">{together.family}</p>
-          </MiniCard>
+            text={together.family}
+          />
+        ) : null,
+      },
+      {
+        id: "parenting",
+        title: "Parenting tip",
+        available: !!together?.parentingTip,
+        node: together?.parentingTip ? (
+          <PromptCard
+            icon={Baby}
+            title="Parenting tip"
+            chip="bg-teal-400/25 text-teal-200"
+            tint="rgba(45,212,191,0.16)"
+            text={together.parentingTip}
+          />
         ) : null,
       },
       {
@@ -898,24 +950,88 @@ export default function MirrorPage() {
         title: "Daily laugh",
         available: !!together?.joke,
         node: together?.joke ? (
-          <MiniCard
+          <PromptCard
             icon={Smile}
             title="Daily laugh"
             chip="bg-emerald-400/25 text-emerald-200"
             tint="rgba(52,211,153,0.16)"
-          >
-            <p className="text-sm leading-snug text-white/90">{together.joke}</p>
-          </MiniCard>
+            text={together.joke}
+          />
+        ) : null,
+      },
+      {
+        id: "funfact",
+        title: "Fun fact",
+        available: !!together?.funFact,
+        node: together?.funFact ? (
+          <PromptCard
+            icon={Lightbulb}
+            title="Fun fact"
+            chip="bg-amber-400/25 text-amber-200"
+            tint="rgba(251,191,36,0.16)"
+            text={together.funFact}
+          />
+        ) : null,
+      },
+      // --- Faith ---
+      {
+        id: "verse",
+        title: "Verse of the day",
+        available: !!together?.verse,
+        node: together?.verse ? (
+          <PromptCard
+            icon={BookOpen}
+            title="Verse of the day"
+            chip="bg-violet-400/25 text-violet-200"
+            tint="rgba(167,139,250,0.18)"
+            text={together.verse.text}
+            footnote={together.verse.reference || undefined}
+          />
+        ) : null,
+      },
+      {
+        id: "faithfact",
+        title: "Faith fact",
+        available: !!together?.faithFact,
+        node: together?.faithFact ? (
+          <PromptCard
+            icon={Sparkles}
+            title="Faith fact"
+            chip="bg-indigo-400/25 text-indigo-200"
+            tint="rgba(129,140,248,0.16)"
+            text={together.faithFact}
+          />
+        ) : null,
+      },
+      {
+        id: "faithtip",
+        title: "Faith for today",
+        available: !!together?.faithTip,
+        node: together?.faithTip ? (
+          <PromptCard
+            icon={Church}
+            title="Faith for today"
+            chip="bg-purple-400/25 text-purple-200"
+            tint="rgba(192,132,252,0.16)"
+            text={together.faithTip}
+          />
         ) : null,
       },
     ];
   }, [current, currentInfo, data, unitLabel, conditions, hours, todaySun, spend, together]);
 
-  // Apply saved order, appending any new widgets at the end.
+  // Apply saved order; any widget without a saved position falls back to the
+  // default channel order (CATEGORIES), so a fresh layout matches the design.
   const orderedWidgets = useMemo(() => {
     const ids = widgets.map((w) => w.id);
     const known = order.filter((id) => ids.includes(id));
-    const missing = ids.filter((id) => !known.includes(id));
+    const missing = ids
+      .filter((id) => !known.includes(id))
+      .sort((a, b) => {
+        const ia = DEFAULT_ORDER.indexOf(a);
+        const ib = DEFAULT_ORDER.indexOf(b);
+        return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      });
     const finalOrder = [...known, ...missing];
     const byId = new Map(widgets.map((w) => [w.id, w]));
     return finalOrder.map((id) => byId.get(id)!);
@@ -1710,80 +1826,96 @@ function BillsCard({ spend }: { spend: SpendData }) {
   );
 }
 
-function BudgetCard({
-  breakdown,
-}: {
-  breakdown: NonNullable<SpendData["breakdown"]>;
-}) {
+function BudgetCard({ week, month }: { week?: Breakdown; month?: Breakdown }) {
+  const sections = [week, month].filter(
+    (b): b is Breakdown => !!b && b.total > 0
+  );
+  if (sections.length === 0) return null;
   return (
     <div className="rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-400/25 text-fuchsia-200">
-            <PieChart className="h-4 w-4" />
-          </span>
-          <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-            {breakdown.period} budget
-          </span>
-        </div>
-        <span className="text-lg font-light">
-          ${Math.round(breakdown.total).toLocaleString()}
+      <div className="mb-4 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-400/25 text-fuchsia-200">
+          <PieChart className="h-4 w-4" />
+        </span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+          Spending breakdown
         </span>
       </div>
-      <div className="grid gap-x-10 gap-y-2 sm:grid-cols-2">
-        <BreakdownList
-          heading="By category"
-          items={breakdown.categories}
-          from="#c084fc"
-          to="#f0abfc"
-        />
-        <BreakdownList
-          heading="By vendor"
-          items={breakdown.vendors}
-          from="#5eead4"
-          to="#7dd3fc"
-        />
+      <div className="grid gap-x-10 gap-y-6 lg:grid-cols-2">
+        {sections.map((b) => (
+          <div key={b.label}>
+            <div className="mb-3 flex items-baseline justify-between border-b border-white/10 pb-2">
+              <span className="text-sm font-semibold text-white/85">{b.label}</span>
+              <span className="text-lg font-light">
+                ${Math.round(b.total).toLocaleString()}
+              </span>
+            </div>
+            <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+              <BreakdownList
+                heading="By category"
+                items={b.categories}
+                from="#c084fc"
+                to="#f0abfc"
+              />
+              <BreakdownList
+                heading="By vendor"
+                items={b.vendors}
+                from="#5eead4"
+                to="#7dd3fc"
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-function MiniCard({
+// Large, easy-to-read card for a single line of daily content (Love / Family /
+// Faith channels). Optional footnote for an author or scripture reference.
+function PromptCard({
   icon: Icon,
   title,
   chip,
   tint,
-  children,
+  text,
+  footnote,
 }: {
   icon: LucideIcon;
   title: string;
   chip?: string;
   tint?: string;
-  children: React.ReactNode;
+  text: string;
+  footnote?: string;
 }) {
   return (
     <div
-      className="rounded-3xl border border-white/10 p-4 backdrop-blur-md"
+      className="flex h-full flex-col rounded-3xl border border-white/10 p-6 backdrop-blur-md"
       style={{
         background: tint
           ? `linear-gradient(135deg, ${tint} 0%, rgba(255,255,255,0.08) 70%)`
           : "rgba(255,255,255,0.12)",
       }}
     >
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2">
         <span
           className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-lg",
+            "flex h-8 w-8 items-center justify-center rounded-xl",
             chip ?? "bg-white/15 text-white/70"
           )}
         >
-          <Icon className="h-3.5 w-3.5" strokeWidth={2} />
+          <Icon className="h-4 w-4" strokeWidth={2} />
         </span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/70">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
           {title}
         </span>
       </div>
-      {children}
+      <p className="text-xl font-light leading-relaxed text-white md:text-2xl">
+        {text}
+      </p>
+      {footnote && (
+        <p className="mt-3 text-sm font-medium text-white/60">{footnote}</p>
+      )}
     </div>
   );
 }
