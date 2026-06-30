@@ -1711,71 +1711,105 @@ function SunCard({ sun }: { sun: { sunrise: string; sunset: string } }) {
 }
 
 function SpendCard({ spend }: { spend: SpendData }) {
+  const avgPerDay = spend.trend ? spend.trend.thisWeek / 7 : null;
+  const dateLabel = spend.date
+    ? new Date(spend.date + "T12:00:00").toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
+    <div className="rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
+      <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
+        {/* Yesterday */}
+        <div className="flex flex-col">
+          <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-400/25 text-emerald-200">
               <Wallet className="h-4 w-4" />
             </span>
             <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
               Spent yesterday
             </span>
+            {dateLabel && (
+              <span className="text-xs text-white/45">· {dateLabel}</span>
+            )}
           </div>
-          <div className="text-5xl font-light">
-            $
-            {spend.total.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+          <div className="flex items-end gap-3">
+            <span className="text-4xl font-light leading-none">
+              $
+              {spend.total.toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+            <span className="pb-0.5 text-sm text-white/55">
+              {spend.count} {spend.count === 1 ? "txn" : "txns"}
+            </span>
           </div>
-          <div className="mt-1 text-sm text-white/60">
-            {spend.count} {spend.count === 1 ? "transaction" : "transactions"}
-          </div>
+          {spend.top && spend.top.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/45">
+                Top purchases
+              </div>
+              <ul className="space-y-1.5">
+                {spend.top.map((t, i) => (
+                  <li
+                    key={`${t.name}-${i}`}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    <span className="truncate capitalize text-white/80">
+                      {t.name}
+                    </span>
+                    <span className="shrink-0 text-white/90">
+                      ${t.amount.toFixed(2)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
+
+        {/* 7-day trend */}
         {spend.trend && (
-          <div className="text-right">
-            <div className="text-[11px] uppercase tracking-wider text-white/55">
-              Last 7 days
-            </div>
-            <div className="text-2xl font-light">
-              ${Math.round(spend.trend.thisWeek).toLocaleString()}
-            </div>
-            {spend.trend.changePct != null && (
-              <div
-                className={cn(
-                  "mt-0.5 flex items-center justify-end gap-1 text-sm",
-                  spend.trend.changePct > 0 ? "text-rose-300" : "text-emerald-300"
+          <div className="flex flex-col">
+            <div className="mb-1 flex items-baseline justify-between gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/55">
+                Last 7 days
+              </span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-light">
+                  ${Math.round(spend.trend.thisWeek).toLocaleString()}
+                </span>
+                {spend.trend.changePct != null && (
+                  <span
+                    className={cn(
+                      "flex items-center gap-0.5 text-xs",
+                      spend.trend.changePct > 0
+                        ? "text-rose-300"
+                        : "text-emerald-300"
+                    )}
+                  >
+                    {spend.trend.changePct > 0 ? (
+                      <TrendingUp className="h-3.5 w-3.5" />
+                    ) : (
+                      <TrendingDown className="h-3.5 w-3.5" />
+                    )}
+                    {Math.abs(spend.trend.changePct)}%
+                  </span>
                 )}
-              >
-                {spend.trend.changePct > 0 ? (
-                  <TrendingUp className="h-4 w-4" />
-                ) : (
-                  <TrendingDown className="h-4 w-4" />
-                )}
-                {Math.abs(spend.trend.changePct)}% vs prior wk
+              </div>
+            </div>
+            <SpendTrend days={spend.trend.days} />
+            {avgPerDay != null && (
+              <div className="mt-2 text-xs text-white/50">
+                Avg ${Math.round(avgPerDay).toLocaleString()}/day · vs prior week
               </div>
             )}
           </div>
         )}
       </div>
-
-      {spend.trend && <SpendTrend days={spend.trend.days} />}
-
-      {spend.top && spend.top.length > 0 && (
-        <ul className="mt-4 space-y-1.5">
-          {spend.top.map((t, i) => (
-            <li
-              key={`${t.name}-${i}`}
-              className="flex items-center justify-between gap-3 text-sm"
-            >
-              <span className="truncate text-white/75">{t.name}</span>
-              <span className="shrink-0 text-white/90">${t.amount.toFixed(2)}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
@@ -1965,7 +1999,7 @@ function BreakdownList({
 function SpendTrend({ days }: { days: { date: string; total: number }[] }) {
   const max = Math.max(1, ...days.map((d) => d.total));
   return (
-    <div className="mt-5 flex h-24 items-end gap-2">
+    <div className="mt-1 flex h-28 items-end gap-2">
       {days.map((d, i) => {
         const pct = (d.total / max) * 100;
         const isYesterday = i === days.length - 1;
