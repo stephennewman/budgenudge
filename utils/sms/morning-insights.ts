@@ -279,7 +279,7 @@ export async function composeMorningTextWithLLM(
     system: SYSTEM_PROMPT,
     prompt,
     temperature: 0.8,
-    maxTokens: 260,
+    maxTokens: 500, // headroom so the JSON envelope never gets cut off mid-message
   });
 
   // Tolerant JSON extraction (strip code fences / surrounding prose).
@@ -294,7 +294,22 @@ export async function composeMorningTextWithLLM(
       // fall through
     }
   }
-  // If the model didn't return valid JSON, treat the whole output as the message.
+
+  // Truncated/malformed JSON (e.g. token cap hit): salvage the message field
+  // rather than ever texting raw JSON to a user.
+  const fieldMatch = raw.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (fieldMatch && fieldMatch[1].trim().length >= 15) {
+    const angleMatch = raw.match(/"angle"\s*:\s*"([^"]*)"/);
+    const salvaged = fieldMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+    return { angle: angleMatch?.[1] || 'unknown', message: salvaged };
+  }
+
+  // If the output looks like JSON but we couldn't extract a message, fail so
+  // the caller uses the deterministic fallback instead of texting JSON.
+  if (raw.trim().startsWith('{')) {
+    throw new Error('LLM returned unparseable JSON for morning text');
+  }
+  // Plain prose response: treat the whole output as the message.
   return { angle: 'unknown', message: raw.trim() };
 }
 
