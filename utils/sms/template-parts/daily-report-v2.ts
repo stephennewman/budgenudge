@@ -200,7 +200,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       .gt('amount', 0);
 
     // Aggregate: overall baseline/WTD/MTD plus per-merchant & per-category maps.
-    type Bucket = { label: string; baseline: number; mtd: number };
+    type Bucket = { label: string; baseline: number; mtd: number; mtdCount: number };
     const merchantMap = new Map<string, Bucket>();
     const categoryMap = new Map<string, Bucket>();
 
@@ -219,9 +219,12 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       inBaseline: boolean,
       inMonth: boolean,
     ) => {
-      const row = map.get(key) || { label, baseline: 0, mtd: 0 };
+      const row = map.get(key) || { label, baseline: 0, mtd: 0, mtdCount: 0 };
       if (inBaseline) row.baseline += amt;
-      if (inMonth) row.mtd += amt;
+      if (inMonth) {
+        row.mtd += amt;
+        row.mtdCount += 1;
+      }
       map.set(key, row);
     };
 
@@ -246,9 +249,14 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       if (date >= weekStartStr) wtd += amt;
       if (inMonth) mtd += amt;
 
-      bump(merchantMap, merchantKey, rawMerchant, amt, inBaseline, inMonth);
+      // Transfers / card payments are money movement, not spending — keep them
+      // out of the category/vendor pacing lists (totals are left unchanged).
       const cat = String((t as any).ai_category_tag || '').trim();
-      if (cat) bump(categoryMap, cat.toLowerCase(), cat, amt, inBaseline, inMonth);
+      const isMoneyMovement = /transfer|payment|zelle|venmo/i.test(cat) || /zelle|venmo/i.test(rawMerchant);
+      if (!isMoneyMovement) {
+        bump(merchantMap, merchantKey, rawMerchant, amt, inBaseline, inMonth);
+        if (cat) bump(categoryMap, cat.toLowerCase(), cat, amt, inBaseline, inMonth);
+      }
     }
 
     // Effective baseline length: from first observed spend (capped at 365d) to yesterday.
@@ -286,41 +294,54 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} usual by now\n${status}\n\n`;
     };
 
-    // ---- Callouts: one "running hot", one "easing up" ----
-    type Callout = { label: string; mtd: number; expected: number; delta: number };
-    const candidates: Callout[] = [];
-    const collect = (map: Map<string, Bucket>) => {
-      for (const row of map.values()) {
-        const dailyAvgItem = row.baseline / effectiveBaselineDays;
-        const expected = dailyAvgItem * daysElapsedMonth;
-        candidates.push({
-          label: clip(titleCase(row.label)),
-          mtd: row.mtd,
-          expected,
-          delta: row.mtd - expected,
-        });
-      }
-    };
-    collect(merchantMap);
-    collect(categoryMap);
+    // ---- Category & vendor pacing (month-to-date vs usual-by-now) ----
+    // "% of usual" = MTD spend / (item's baseline daily avg × days elapsed).
+    type PaceRow = { label: string; mtd: number; mtdCount: number; expected: number; pct: number | null };
+    const toPaceRows = (map: Map<string, Bucket>): PaceRow[] =>
+      Array.from(map.values())
+        .filter(row => row.mtd > 0)
+        .map(row => {
+          const expected = (row.baseline / effectiveBaselineDays) * daysElapsedMonth;
+          return {
+            label: clip(titleCase(row.label), 16),
+            mtd: row.mtd,
+            mtdCount: row.mtdCount,
+            expected,
+            // No meaningful baseline (< $10 expected) → new/rare, no % shown.
+            pct: expected >= 10 ? Math.round((row.mtd / expected) * 100) : null,
+          };
+        })
+        .sort((a, b) => b.mtd - a.mtd);
 
-    const hot = candidates
-      .filter(c => c.expected >= 40 && c.delta >= 30)
-      .sort((a, b) => b.delta - a.delta)[0];
-    const easing = candidates
-      .filter(c => c.expected >= 60 && c.delta <= -40 && (!hot || c.label !== hot.label))
-      .sort((a, b) => a.delta - b.delta)[0];
+    const paceEmoji = (pct: number | null) => {
+      if (pct === null) return '🆕';
+      if (pct > 115) return '🔴';
+      if (pct < 85) return '🟢';
+      return '🟡';
+    };
+
+    const paceLine = (r: PaceRow) => {
+      const pctPart = r.pct === null ? 'new' : `${r.pct}% of usual`;
+      return `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} · ${pctPart} (${r.mtdCount}x)`;
+    };
+
+    const topCategories = toPaceRows(categoryMap).slice(0, 5);
+    const topVendors = toPaceRows(merchantMap).slice(0, 4);
 
     // ---- Compose ----
     let msg = `Krezzo · ${dateLabel}\n\n`;
     msg += pacingBlock('📅', 'This week', wtd, expectedWeek);
     msg += pacingBlock('🗓️', 'This month', mtd, expectedMonth);
 
-    if (hot || easing) {
-      if (hot) msg += `🔥 Running hot: ${hot.label} ${money(hot.mtd)} mo (usually ~${money(hot.expected)})\n`;
-      if (easing)
-        msg += `✅ Easing up: ${easing.label} ${money(easing.mtd)} mo (usually ~${money(easing.expected)})\n`;
-      msg += `\n`;
+    if (topCategories.length > 0) {
+      msg += `📊 Categories (mo)\n`;
+      msg += topCategories.map(paceLine).join('\n');
+      msg += `\n\n`;
+    }
+    if (topVendors.length > 0) {
+      msg += `🏪 Top vendors (mo)\n`;
+      msg += topVendors.map(paceLine).join('\n');
+      msg += `\n\n`;
     }
 
     // ---- North star: Daily Burn (28d avg of discretionary spend/day) ----
