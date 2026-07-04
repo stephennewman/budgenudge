@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateDailyReportV2 } from '@/utils/sms/templates';
 import { sendUnifiedSMS } from '@/utils/sms/unified-sms';
 import { checkAndLogSMS } from '@/utils/sms/deduplication';
+import { recordNorthstarMetric } from '@/utils/metrics/northstar';
 
 // Create Supabase client with service role for server-side operations
 const supabase = createClient(
@@ -58,6 +59,10 @@ export async function GET(request: NextRequest) {
     for (const userId of uniqueUserIds) {
       try {
         usersProcessed++;
+
+        // Record the north-star metric (Daily Burn) for every connected user,
+        // independent of SMS preferences. Non-fatal on failure.
+        await recordNorthstarMetric(userId);
 
         // Check if user has enabled 4:15/5pm special template via preferences
         const { data: templatePref } = await supabase

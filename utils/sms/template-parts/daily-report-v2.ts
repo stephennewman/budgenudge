@@ -1,27 +1,44 @@
-import { supabase, type Transaction, type MerchantPacing } from './shared';
-import {
-  getUserFirstName,
-  runEnhancedBillDetectionInTemplate,
-  analyzeMerchantPatternForTemplate,
-  isNonBillMerchant,
-  calculateEnhancedBillScoreForTemplate,
-  isBillMerchant,
-  normalizeMerchantNameForTemplate,
-  calculateVarianceForTemplate,
-  findNextIncome,
-  normalizeIncomeSourceName,
-  generateAIVibeMessage,
-  generateEnhancedAIVibeMessage,
-  generateActionItems,
-} from './helpers';
+import { supabase } from './shared';
+
+/**
+ * Daily 5pm "Krezzo Report" — pacing edition.
+ *
+ * Instead of a static 90-day "top vendors" list, this answers two questions:
+ *   1. How are you doing THIS WEEK vs. your usual pace?
+ *   2. How are you doing THIS MONTH vs. your usual pace?
+ *
+ * "Usual pace" is a trailing ~12-month rolling daily average of DISCRETIONARY
+ * spend (everything except the user's tagged recurring bills). Week/month
+ * spend-to-date is compared against that baseline prorated to how far we are
+ * into the period, so the user gets rewarded when they're under their norm.
+ */
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MIN_BASELINE_DAYS = 28; // need ~4 weeks of history before pacing is meaningful
+
+// Parse a YYYY-MM-DD string to a stable UTC-noon Date (avoids TZ drift).
+const parseISO = (s: string) => new Date(`${s}T12:00:00Z`);
+const daysBetween = (a: string, b: string) =>
+  Math.round((parseISO(b).getTime() - parseISO(a).getTime()) / MS_PER_DAY);
+
+// Format a Date's wall-clock fields as YYYY-MM-DD.
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
+const titleCase = (s: string) =>
+  String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+const clip = (s: string, n = 18) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 export async function generateDailyReportV2(userId: string): Promise<string> {
   try {
-    // First name
     const { data: authUser } = await supabase.auth.admin.getUserById(userId);
-    const firstName = authUser?.user?.user_metadata?.firstName || authUser?.user?.user_metadata?.first_name || 'there';
+    const firstName =
+      authUser?.user?.user_metadata?.firstName ||
+      authUser?.user?.user_metadata?.first_name ||
+      'there';
 
-    // Items
+    // ---- Connected items ----
     const { data: userItems } = await supabase
       .from('items')
       .select('id, plaid_item_id')
@@ -29,51 +46,72 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       .is('deleted_at', null);
 
     if (!userItems || userItems.length === 0) {
-      return `📊 Daily snapshot\n\nHey ${firstName}!\nNo bank accounts connected yet. Connect to see your daily insights.`;
+      return `📊 Daily snapshot\n\nHey ${firstName}!\nNo bank accounts connected yet. Connect to see your daily pacing.`;
     }
 
     const itemDbIds = userItems.map(i => i.id);
     const plaidItemIds = userItems.map(i => i.plaid_item_id);
 
-    // Available balance (depository only)
+    // ---- Available balance (depository only) ----
     const { data: accounts } = await supabase
       .from('accounts')
       .select('type, subtype, available_balance')
       .in('item_id', itemDbIds);
 
     const availableBalance = (accounts || [])
-      .filter(acc => acc.type === 'depository' && (!acc.subtype || acc.subtype === 'checking' || acc.subtype === 'savings'))
+      .filter(
+        acc =>
+          acc.type === 'depository' &&
+          (!acc.subtype || acc.subtype === 'checking' || acc.subtype === 'savings'),
+      )
       .reduce((sum, acc) => sum + (acc.available_balance || 0), 0);
 
-    // Tagged recurring merchants for exclusion + bills
-    const todayISO = new Date().toISOString().split('T')[0];
+    // ---- Tagged recurring merchants (used to exclude bills from discretionary) ----
     const { data: taggedMerchants } = await supabase
       .from('tagged_merchants')
       .select('merchant_name, expected_amount, next_predicted_date, is_active')
       .eq('user_id', userId)
       .eq('is_active', true);
 
-    // Yesterday spend
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yISO = yesterday.toISOString().split('T')[0];
+    const billMerchantSet = new Set<string>(
+      (taggedMerchants || [])
+        .map(tm => (tm.merchant_name || '').toLowerCase().trim())
+        .filter(Boolean),
+    );
 
-    const { data: yesterdayTx } = await supabase
-      .from('transactions')
-      .select('date, merchant_name, name, amount')
-      .in('plaid_item_id', plaidItemIds)
-      .eq('date', yISO)
-      .gt('amount', 0) // spending only
-      .order('amount', { ascending: false });
-
-    const totalYesterdayAll = (yesterdayTx || []).reduce((sum, t) => sum + (t.amount || 0), 0);
-    const topYesterdayAll = (yesterdayTx || [])
-      .slice()
-      .sort((a, b) => (b.amount || 0) - (a.amount || 0))
-      .slice(0, 2);
-
-    // Next income (prefer profile, fallback to 30-day horizon)
+    // ---- Time anchors (Eastern wall-clock) ----
     const now = new Date();
+    // "Fake local" Date holding ET wall-clock values so getDay/getDate/etc. are ET.
+    const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const todayStr = ymd(etNow);
+
+    const yesterday = new Date(etNow);
+    yesterday.setDate(etNow.getDate() - 1);
+    const yesterdayStr = ymd(yesterday);
+
+    const dow = etNow.getDay(); // 0 = Sunday
+    const weekStart = new Date(etNow);
+    weekStart.setDate(etNow.getDate() - dow);
+    const weekStartStr = ymd(weekStart);
+    const daysElapsedWeek = dow + 1; // Sun = 1 ... Sat = 7
+
+    const monthStart = new Date(etNow.getFullYear(), etNow.getMonth(), 1);
+    const monthStartStr = ymd(monthStart);
+    const daysElapsedMonth = etNow.getDate();
+
+    const baselineStart = new Date(etNow);
+    baselineStart.setDate(etNow.getDate() - 365);
+    const baselineStartStr = ymd(baselineStart);
+
+    // North-star windows: 28 complete days ending yesterday, and the 28 before.
+    const burn28Start = new Date(etNow);
+    burn28Start.setDate(etNow.getDate() - 28); // yesterday - 27
+    const burn28StartStr = ymd(burn28Start);
+    const prior28Start = new Date(etNow);
+    prior28Start.setDate(etNow.getDate() - 56);
+    const prior28StartStr = ymd(prior28Start);
+
+    // ---- Next income / horizon (for bills line) ----
     let nextIncomeDate: Date | null = null;
     const { data: incomeProfile } = await supabase
       .from('user_income_profiles')
@@ -83,8 +121,9 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
 
     const sources = incomeProfile?.profile_data?.income_sources || [];
     try {
-      const structured = sources
-        .filter((s: any) => s && s.expected_amount > 0 && s.frequency && s.frequency !== 'irregular');
+      const structured = sources.filter(
+        (s: any) => s && s.expected_amount > 0 && s.frequency && s.frequency !== 'irregular',
+      );
       const candidates: Date[] = [];
       structured.forEach((s: any) => {
         let d: Date | null = null;
@@ -99,10 +138,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
           };
           if (freq === 'weekly') advance(7);
           else if (freq === 'bi-weekly' || freq === 'biweekly') advance(14);
-          else if (freq === 'monthly') {
-            while (d <= now) d.setMonth(d.getMonth() + 1);
-          } else {
-            // default monthly
+          else {
             while (d <= now) d.setMonth(d.getMonth() + 1);
           }
         }
@@ -112,10 +148,10 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       nextIncomeDate = candidates[0] || null;
     } catch {}
 
-    // Horizon (next income date if available, else 30 days)
-    const horizonDate = nextIncomeDate ? new Date(nextIncomeDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const horizonDate = nextIncomeDate
+      ? new Date(nextIncomeDate)
+      : new Date(now.getTime() + 30 * MS_PER_DAY);
 
-    // Bills until the day BEFORE income
     let totalBills = 0;
     let billsCount = 0;
     if (taggedMerchants && taggedMerchants.length > 0) {
@@ -124,171 +160,195 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
         .select('expected_amount, next_predicted_date')
         .eq('user_id', userId)
         .eq('is_active', true)
-        .gte('next_predicted_date', todayISO)
-        .lt('next_predicted_date', horizonDate.toISOString().split('T')[0]);
+        .gte('next_predicted_date', todayStr)
+        .lt('next_predicted_date', ymd(horizonDate));
 
       const list = billsWindow || [];
       billsCount = list.length;
       totalBills = list.reduce((sum, b) => sum + Number(b.expected_amount || 0), 0);
     }
 
-    // ---------- Top behavioral spend (last 90 days, 3+ times, bills excluded) ----------
-    // Behavioral = repeated discretionary spend. Recurring bills (mortgage, utilities,
-    // 1x bills) are excluded via the tagged-merchant set; only merchants/categories with
-    // 3+ purchases in the window qualify.
-    const lookback90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
-    const lb90ISO = lookback90.toISOString().split('T')[0];
+    const horizonLabel = nextIncomeDate
+      ? horizonDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          timeZone: 'America/New_York',
+        })
+      : null;
+    const dateLabel = now.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'America/New_York',
+    });
 
-    const billMerchantSet = new Set<string>(
-      (taggedMerchants || [])
-        .map(tm => (tm.merchant_name || '').toLowerCase().trim())
-        .filter(Boolean)
-    );
+    const balanceLine = () => {
+      let line = `💰 ${money(availableBalance)} available`;
+      if (billsCount > 0) {
+        line += ` · ${money(totalBills)} in bills`;
+        line += horizonLabel ? ` before ${horizonLabel}` : ` (next 30 days)`;
+      }
+      return line;
+    };
 
-    // Recent window (last 30d) vs the prior 60d, to detect spending "more than usual"
-    const recent30ISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    const { data: behaviorTx } = await supabase
+    // ---- Discretionary transactions over the trailing year ----
+    const { data: rangeTx } = await supabase
       .from('transactions')
       .select('amount, merchant_name, name, ai_category_tag, date')
       .in('plaid_item_id', plaidItemIds)
-      .gte('date', lb90ISO)
-      .gt('amount', 0); // spending only
+      .gte('date', baselineStartStr)
+      .gt('amount', 0);
 
-    type SpendRow = { label: string; count: number; total: number; recent: number; prior: number };
-    const merchantMap = new Map<string, SpendRow>();
-    const categoryMap = new Map<string, SpendRow>();
+    // Aggregate: overall baseline/WTD/MTD plus per-merchant & per-category maps.
+    type Bucket = { label: string; baseline: number; mtd: number };
+    const merchantMap = new Map<string, Bucket>();
+    const categoryMap = new Map<string, Bucket>();
 
-    const bump = (map: Map<string, SpendRow>, key: string, label: string, amt: number, isRecent: boolean) => {
-      const row = map.get(key) || { label, count: 0, total: 0, recent: 0, prior: 0 };
-      row.count += 1;
-      row.total += amt;
-      if (isRecent) row.recent += amt;
-      else row.prior += amt;
+    let baselineTotal = 0; // discretionary spend from baselineStart..yesterday
+    let wtd = 0; // week-to-date (incl. today)
+    let mtd = 0; // month-to-date (incl. today)
+    let burn28Total = 0; // last 28 complete days (ending yesterday)
+    let prior28Total = 0; // the 28 days before that
+    let earliestStr: string | null = null;
+
+    const bump = (
+      map: Map<string, Bucket>,
+      key: string,
+      label: string,
+      amt: number,
+      inBaseline: boolean,
+      inMonth: boolean,
+    ) => {
+      const row = map.get(key) || { label, baseline: 0, mtd: 0 };
+      if (inBaseline) row.baseline += amt;
+      if (inMonth) row.mtd += amt;
       map.set(key, row);
     };
 
-    for (const t of behaviorTx || []) {
+    for (const t of rangeTx || []) {
       const rawMerchant = String((t as any).merchant_name || (t as any).name || '').trim();
       const merchantKey = rawMerchant.toLowerCase();
+      if (!rawMerchant || billMerchantSet.has(merchantKey)) continue; // skip bills
+
       const amt = Math.max(0, Number((t as any).amount || 0));
+      const date = String((t as any).date || '');
+      if (!date) continue;
 
-      // Skip recurring bills entirely — they aren't behavioral
-      if (!rawMerchant || billMerchantSet.has(merchantKey)) continue;
+      const inBaseline = date <= yesterdayStr; // exclude today's partial from "usual"
+      const inMonth = date >= monthStartStr;
 
-      const isRecent = String((t as any).date || '') >= recent30ISO;
+      if (inBaseline) {
+        baselineTotal += amt;
+        if (!earliestStr || date < earliestStr) earliestStr = date;
+        if (date >= burn28StartStr) burn28Total += amt;
+        else if (date >= prior28StartStr) prior28Total += amt;
+      }
+      if (date >= weekStartStr) wtd += amt;
+      if (inMonth) mtd += amt;
 
-      bump(merchantMap, merchantKey, rawMerchant, amt, isRecent);
-
+      bump(merchantMap, merchantKey, rawMerchant, amt, inBaseline, inMonth);
       const cat = String((t as any).ai_category_tag || '').trim();
-      if (cat) bump(categoryMap, cat.toLowerCase(), cat, amt, isRecent);
+      if (cat) bump(categoryMap, cat.toLowerCase(), cat, amt, inBaseline, inMonth);
     }
 
-    // Top behavioral spend by frequency (3+ purchases in 90d)
-    const rankTop5 = (m: Map<string, SpendRow>): SpendRow[] =>
-      Array.from(m.values())
-        .filter(r => r.count >= 3)
-        .sort((a, b) => b.count - a.count || b.total - a.total)
-        .slice(0, 5);
+    // Effective baseline length: from first observed spend (capped at 365d) to yesterday.
+    const spanStartStr =
+      earliestStr && earliestStr > baselineStartStr ? earliestStr : baselineStartStr;
+    const effectiveBaselineDays = Math.max(1, daysBetween(spanStartStr, yesterdayStr) + 1);
+    const dailyAvg = baselineTotal / effectiveBaselineDays;
 
-    const topMerchants = rankTop5(merchantMap);
-    const topCategories = rankTop5(categoryMap);
+    // ---- Not enough history: skip pacing, show plain totals ----
+    if (effectiveBaselineDays < MIN_BASELINE_DAYS || dailyAvg <= 0) {
+      let msg = `Krezzo · ${dateLabel}\n\n`;
+      msg += `📅 This week: ${money(wtd)} spent\n`;
+      msg += `🗓️ This month: ${money(mtd)} spent\n\n`;
+      msg += `Still learning your usual pace — I need ~4 weeks of history before I can compare.\n\n`;
+      msg += `${balanceLine()}\n\n`;
+      msg += `Have a good one 👋`;
+      return msg;
+    }
 
-    // Overage: last 30d spend vs the prior 60d monthly-equivalent average.
-    // Requires a real baseline (≥$20/mo) and a meaningful jump to avoid noise.
-    type OverRow = { label: string; recent: number; baseline: number; delta: number; pct: number };
-    const rankOverage = (m: Map<string, SpendRow>): OverRow[] =>
-      Array.from(m.values())
-        .map(r => {
-          const baseline = r.prior / 2; // 60 days → monthly-equivalent
-          return {
-            label: r.label,
-            recent: r.recent,
-            baseline,
-            delta: r.recent - baseline,
-            pct: baseline > 0 ? Math.round((r.recent / baseline - 1) * 100) : 0,
-          };
-        })
-        .filter(r => r.baseline >= 20 && r.delta >= 15 && r.pct >= 15)
-        .sort((a, b) => b.delta - a.delta)
-        .slice(0, 5);
+    // ---- Pacing blocks ----
+    const expectedWeek = dailyAvg * daysElapsedWeek;
+    const expectedMonth = dailyAvg * daysElapsedMonth;
 
-    const overageMerchants = rankOverage(merchantMap);
-    const overageCategories = rankOverage(categoryMap);
+    const pacingBlock = (emoji: string, title: string, spent: number, expected: number) => {
+      const pct = expected > 0 ? Math.round((spent / expected - 1) * 100) : 0;
+      const delta = Math.round(spent - expected);
+      let status: string;
+      if (Math.abs(pct) < 8) {
+        status = `⚖️ right on your usual pace`;
+      } else if (delta > 0) {
+        status = `🔺 ${money(Math.abs(delta))} over your usual pace`;
+      } else {
+        status = `✅ ${money(Math.abs(delta))} under your usual pace — nice work`;
+      }
+      return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} usual by now\n${status}\n\n`;
+    };
 
-    // ---- Compose: status lead, exceptions, position, sign-off ----
-    const titleCase = (s: string) =>
-      String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    // ---- Callouts: one "running hot", one "easing up" ----
+    type Callout = { label: string; mtd: number; expected: number; delta: number };
+    const candidates: Callout[] = [];
+    const collect = (map: Map<string, Bucket>) => {
+      for (const row of map.values()) {
+        const dailyAvgItem = row.baseline / effectiveBaselineDays;
+        const expected = dailyAvgItem * daysElapsedMonth;
+        candidates.push({
+          label: clip(titleCase(row.label)),
+          mtd: row.mtd,
+          expected,
+          delta: row.mtd - expected,
+        });
+      }
+    };
+    collect(merchantMap);
+    collect(categoryMap);
 
-    const horizonLabel = nextIncomeDate
-      ? horizonDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })
-      : null;
-    const dateLabel = now.toLocaleDateString('en-US', {
-      weekday: 'short', month: 'short', day: 'numeric', timeZone: 'America/New_York'
-    });
+    const hot = candidates
+      .filter(c => c.expected >= 40 && c.delta >= 30)
+      .sort((a, b) => b.delta - a.delta)[0];
+    const easing = candidates
+      .filter(c => c.expected >= 60 && c.delta <= -40 && (!hot || c.label !== hot.label))
+      .sort((a, b) => a.delta - b.delta)[0];
 
+    // ---- Compose ----
     let msg = `Krezzo · ${dateLabel}\n\n`;
+    msg += pacingBlock('📅', 'This week', wtd, expectedWeek);
+    msg += pacingBlock('🗓️', 'This month', mtd, expectedMonth);
 
-    const clip = (label: string, applyTitleCase: boolean) =>
-      (applyTitleCase ? titleCase(label) : label).slice(0, 22);
-
-    // Overage first — where you're spending more than usual (30d vs prior 60d avg)
-    const fmtOver = (r: OverRow, applyTitleCase: boolean) =>
-      `${clip(r.label, applyTitleCase)} · $${Math.round(r.recent).toLocaleString()} · ↑${Math.min(r.pct, 300)}% vs usual`;
-
-    if (overageMerchants.length > 0 || overageCategories.length > 0) {
-      msg += `🔺 Spending more than usual\n`;
-      if (overageMerchants.length > 0) {
-        msg += overageMerchants.map(r => fmtOver(r, false)).join('\n') + `\n`;
-      }
-      if (overageCategories.length > 0) {
-        msg += overageCategories.map(r => fmtOver(r, true)).join('\n') + `\n`;
-      }
+    if (hot || easing) {
+      if (hot) msg += `🔥 Running hot: ${hot.label} ${money(hot.mtd)} mo (usually ~${money(hot.expected)})\n`;
+      if (easing)
+        msg += `✅ Easing up: ${easing.label} ${money(easing.mtd)} mo (usually ~${money(easing.expected)})\n`;
       msg += `\n`;
     }
 
-    // Top behavioral spend — vendors & categories by frequency (last 90 days)
-    const fmtRow = (r: SpendRow, applyTitleCase: boolean) =>
-      `${clip(r.label, applyTitleCase)} · ${r.count}x · $${Math.round(r.total).toLocaleString()}`;
-
-    if (topMerchants.length > 0) {
-      msg += `🔁 Top vendors (90d, 3+ visits)\n`;
-      msg += topMerchants.map(r => fmtRow(r, false)).join('\n') + `\n\n`;
-    }
-    if (topCategories.length > 0) {
-      msg += `📊 Top categories (90d, 3+ visits)\n`;
-      msg += topCategories.map(r => fmtRow(r, true)).join('\n') + `\n\n`;
-    }
-    if (topMerchants.length === 0 && topCategories.length === 0) {
-      msg += `Not enough repeat spending yet to spot patterns.\n\n`;
-    }
-
-    // Yesterday in one line — summarized, not itemized
-    const yCount = (yesterdayTx || []).length;
-    if (yCount > 0) {
-      const tops = topYesterdayAll
-        .map(t => {
-          const m = titleCase(String((t as any).merchant_name || (t as any).name || 'purchase').slice(0, 20));
-          return `${m} $${Math.round(Number((t as any).amount || 0)).toLocaleString()}`;
-        })
-        .join(', ');
-      msg += `Yesterday: $${Math.round(totalYesterdayAll).toLocaleString()} across ${yCount} buy${yCount !== 1 ? 's' : ''}`;
-      if (tops) msg += ` (${tops})`;
-      msg += `\n`;
-    } else {
-      msg += `Yesterday: nothing posted\n`;
+    // ---- North star: Daily Burn (28d avg of discretionary spend/day) ----
+    const burn28 = burn28Total / 28;
+    const hasPriorWindow = spanStartStr <= prior28StartStr;
+    if (burn28 > 0) {
+      let burnLine = `🎯 Daily burn: ${money(burn28)}/day`;
+      if (hasPriorWindow) {
+        const prior28 = prior28Total / 28;
+        const diff = burn28 - prior28;
+        if (Math.abs(diff) < prior28 * 0.03) {
+          burnLine += ` · steady vs last month`;
+        } else if (diff < 0) {
+          burnLine += ` · down from ${money(prior28)} ✅`;
+        } else {
+          burnLine += ` · up from ${money(prior28)} 🔺`;
+        }
+      } else {
+        burnLine += ` (28d avg)`;
+      }
+      msg += `${burnLine}\n`;
     }
 
-    // Financial position
-    msg += `💰 $${Math.round(availableBalance).toLocaleString()} available`;
-    if (billsCount > 0) {
-      msg += ` · $${Math.round(totalBills).toLocaleString()} in bills`;
-      msg += horizonLabel ? ` before ${horizonLabel}` : ` (next 30 days)`;
-    }
-    msg += `\n\n`;
+    msg += `${balanceLine()}\n\n`;
 
-    // Sign-off
-    msg += `Have a good one 👋`;
+    const weekUnder = wtd - expectedWeek < 0;
+    const monthUnder = mtd - expectedMonth < 0;
+    msg += weekUnder && monthUnder ? `Keep crushing it 👋` : `Have a good one 👋`;
 
     return msg;
   } catch (err) {
@@ -296,5 +356,3 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     return `📊 Daily snapshot\n\nHey there!\nWe couldn't generate your snapshot right now. Please try again later.`;
   }
 }
-
-// Simple and reliable income prediction function
