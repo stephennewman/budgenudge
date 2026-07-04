@@ -200,7 +200,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       .gt('amount', 0);
 
     // Aggregate: overall baseline/WTD/MTD plus per-merchant & per-category maps.
-    type Bucket = { label: string; baseline: number; mtd: number; mtdCount: number };
+    type Bucket = { label: string; baseline: number; baselineCount: number; mtd: number; mtdCount: number };
     const merchantMap = new Map<string, Bucket>();
     const categoryMap = new Map<string, Bucket>();
 
@@ -219,8 +219,11 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       inBaseline: boolean,
       inMonth: boolean,
     ) => {
-      const row = map.get(key) || { label, baseline: 0, mtd: 0, mtdCount: 0 };
-      if (inBaseline) row.baseline += amt;
+      const row = map.get(key) || { label, baseline: 0, baselineCount: 0, mtd: 0, mtdCount: 0 };
+      if (inBaseline) {
+        row.baseline += amt;
+        row.baselineCount += 1;
+      }
       if (inMonth) {
         row.mtd += amt;
         row.mtdCount += 1;
@@ -294,39 +297,39 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} usual by now\n${status}\n\n`;
     };
 
-    // ---- Category & vendor pacing (month-to-date vs usual-by-now) ----
-    // "% of usual" = MTD spend / (item's baseline daily avg × days elapsed).
-    type PaceRow = { label: string; mtd: number; mtdCount: number; expected: number; pct: number | null };
+    // ---- Category & vendor pacing: usual monthly avg vs current month ----
+    // Ranked by usual monthly spend, limited to habitual items (>2 tx/month
+    // on average) so steady under-pace items surface too. Color compares MTD
+    // against the usual amount prorated to today (so "green" is earnable).
+    const baselineMonths = effectiveBaselineDays / 30.44;
+    type PaceRow = { label: string; avgMonthly: number; mtd: number; mtdCount: number; pct: number };
     const toPaceRows = (map: Map<string, Bucket>): PaceRow[] =>
       Array.from(map.values())
-        .filter(row => row.mtd > 0)
+        .filter(row => row.baselineCount / baselineMonths > 2 && row.baseline / baselineMonths >= 10)
         .map(row => {
-          const expected = (row.baseline / effectiveBaselineDays) * daysElapsedMonth;
+          const avgMonthly = row.baseline / baselineMonths;
+          const expectedByNow = (row.baseline / effectiveBaselineDays) * daysElapsedMonth;
           return {
             label: clip(titleCase(row.label), 16),
+            avgMonthly,
             mtd: row.mtd,
             mtdCount: row.mtdCount,
-            expected,
-            // No meaningful baseline (< $10 expected) → new/rare, no % shown.
-            pct: expected >= 10 ? Math.round((row.mtd / expected) * 100) : null,
+            pct: Math.round((row.mtd / expectedByNow) * 100),
           };
         })
-        .sort((a, b) => b.mtd - a.mtd);
+        .sort((a, b) => b.avgMonthly - a.avgMonthly);
 
-    const paceEmoji = (pct: number | null) => {
-      if (pct === null) return '🆕';
+    const paceEmoji = (pct: number) => {
       if (pct > 115) return '🔴';
       if (pct < 85) return '🟢';
       return '🟡';
     };
 
-    const paceLine = (r: PaceRow) => {
-      const pctPart = r.pct === null ? 'new' : `${r.pct}% of usual`;
-      return `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} · ${pctPart} (${r.mtdCount}x)`;
-    };
+    const paceLine = (r: PaceRow) =>
+      `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} of ~${money(r.avgMonthly)}/mo (${r.mtdCount}x)`;
 
     const topCategories = toPaceRows(categoryMap).slice(0, 5);
-    const topVendors = toPaceRows(merchantMap).slice(0, 4);
+    const topVendors = toPaceRows(merchantMap).slice(0, 5);
 
     // ---- Compose ----
     let msg = `Krezzo · ${dateLabel}\n\n`;
