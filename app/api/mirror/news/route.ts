@@ -6,6 +6,18 @@ export const revalidate = 600; // 10 minutes
 
 const DEFAULT_FEED = "https://feeds.npr.org/1001/rss.xml";
 
+// Category feeds for the Today channel's sectioned view (?sections=1).
+// NPR topic feeds are free and keyless; ESPN covers sports.
+const CATEGORY_FEEDS: { id: string; label: string; feed: string }[] = [
+  { id: "top", label: "Top Stories", feed: "https://feeds.npr.org/1001/rss.xml" },
+  { id: "politics", label: "Politics", feed: "https://feeds.npr.org/1014/rss.xml" },
+  { id: "business", label: "Business", feed: "https://feeds.npr.org/1006/rss.xml" },
+  { id: "technology", label: "Technology", feed: "https://feeds.npr.org/1019/rss.xml" },
+  { id: "science", label: "Science", feed: "https://feeds.npr.org/1007/rss.xml" },
+  { id: "culture", label: "Culture", feed: "https://feeds.npr.org/1008/rss.xml" },
+  { id: "sports", label: "Sports", feed: "https://www.espn.com/espn/rss/news" },
+];
+
 function decode(text: string): string {
   return text
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
@@ -27,20 +39,16 @@ function extract(block: string, tag: string): string | null {
   return m ? decode(m[1]) : null;
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const feed =
-    searchParams.get("feed") || process.env.MIRROR_NEWS_FEED || DEFAULT_FEED;
-
+async function fetchFeed(
+  feed: string,
+  limit: number
+): Promise<{ items: { title: string; link: string | null }[]; source: string | null }> {
   try {
     const res = await fetch(feed, {
       next: { revalidate },
       headers: { "User-Agent": "Mozilla/5.0 (MirrorDashboard)" },
     });
-
-    if (!res.ok) {
-      return NextResponse.json({ items: [], source: null });
-    }
+    if (!res.ok) return { items: [], source: null };
 
     const xml = await res.text();
     const channelTitle = extract(xml.split("<item")[0] ?? "", "title");
@@ -48,15 +56,45 @@ export async function GET(request: NextRequest) {
     const items: { title: string; link: string | null }[] = [];
     const itemRegex = /<item[\s\S]*?<\/item>/gi;
     let match: RegExpExecArray | null;
-    while ((match = itemRegex.exec(xml)) && items.length < 6) {
+    while ((match = itemRegex.exec(xml)) && items.length < limit) {
       const block = match[0];
       const title = extract(block, "title");
       const link = extract(block, "link");
       if (title) items.push({ title, link });
     }
-
-    return NextResponse.json({ items, source: channelTitle });
+    return { items, source: channelTitle };
   } catch {
-    return NextResponse.json({ items: [], source: null });
+    return { items: [], source: null };
   }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+
+  // Sectioned mode: one call returns headlines grouped by category.
+  if (searchParams.get("sections")) {
+    const results = await Promise.all(
+      CATEGORY_FEEDS.map((c) => fetchFeed(c.feed, 8))
+    );
+    // NPR's topic feeds overlap (a politics story is often also a top story);
+    // keep each headline in the first section it appears in.
+    const seen = new Set<string>();
+    const sections = CATEGORY_FEEDS.map((c, i) => {
+      const items = results[i].items
+        .filter((it) => {
+          const key = it.title.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 5);
+      return { id: c.id, label: c.label, items };
+    }).filter((s) => s.items.length > 0);
+    return NextResponse.json({ sections });
+  }
+
+  const feed =
+    searchParams.get("feed") || process.env.MIRROR_NEWS_FEED || DEFAULT_FEED;
+  const { items, source } = await fetchFeed(feed, 6);
+  return NextResponse.json({ items, source });
 }

@@ -34,6 +34,7 @@ import {
   friendsKeepForDate,
 } from "@/utils/mirror/friends-content";
 import { HoneyDoCard } from "./honeydo-card";
+import { TodayChannel } from "./today-channel";
 import { STEPHEN_GROWTH, STEPHEN_CONNECT } from "@/utils/mirror/stephen-content";
 import { WHITNEY_GROWTH, WHITNEY_CONNECT } from "@/utils/mirror/whitney-content";
 import {
@@ -363,6 +364,7 @@ const DEFAULT_ORDER = CATEGORIES.flatMap((c) => c.ids);
 
 // Sidebar icon per channel.
 const NAV_ICONS: Record<string, LucideIcon> = {
+  today: CalendarClock,
   weather: Sun,
   events: Ticket,
   movies: Film,
@@ -1669,13 +1671,18 @@ export default function MirrorPage() {
     [orderedWidgets, save]
   );
 
-  // Group visible widgets into channels, dropping any empty channel.
+  // Group visible widgets into channels, dropping any empty channel. The
+  // "Today" channel is synthetic (no widgets) and always first — the clock
+  // card jumps to it.
   const sections = useMemo(() => {
-    return CATEGORIES.map((c) => ({
-      id: c.id,
-      label: c.label,
-      widgets: visibleWidgets.filter((w) => c.ids.includes(w.id)),
-    })).filter((s) => s.widgets.length > 0);
+    return [
+      { id: "today", label: "Today", widgets: [] as WidgetDef[] },
+      ...CATEGORIES.map((c) => ({
+        id: c.id,
+        label: c.label,
+        widgets: visibleWidgets.filter((w) => c.ids.includes(w.id)),
+      })).filter((s) => s.widgets.length > 0),
+    ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedWidgets, hidden]);
 
@@ -1699,16 +1706,19 @@ export default function MirrorPage() {
     return () => window.removeEventListener("pointerdown", bump);
   }, []);
 
+  // The Today channel holds rotation while its article reader is open.
+  const [holdRotation, setHoldRotation] = useState(false);
+
   // Auto-advance to the next channel. Resets whenever the index changes (so a
   // manual selection gives you a fresh 30s) or the screen is touched, and
-  // pauses while editing.
+  // pauses while editing or reading an article.
   useEffect(() => {
-    if (!autoRotate || editMode || sectionCount <= 1) return;
+    if (!autoRotate || editMode || holdRotation || sectionCount <= 1) return;
     const t = setTimeout(() => {
       setActiveIndex((i) => (i + 1) % sectionCount);
     }, ROTATE_MS);
     return () => clearTimeout(t);
-  }, [autoRotate, editMode, sectionCount, activeIndex, interactionTick]);
+  }, [autoRotate, editMode, holdRotation, sectionCount, activeIndex, interactionTick]);
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
@@ -1722,9 +1732,14 @@ export default function MirrorPage() {
         <aside className="flex w-44 shrink-0 flex-col border-r border-white/10 bg-black/25 p-3 backdrop-blur-md md:w-52">
           {/* In fullscreen, Safari/iPadOS overlays a system exit (X) control in
               the top-left corner; push the clock down so it stays readable. */}
-          <div
+          {/* Clock card jumps to the Today channel. */}
+          <button
+            onClick={() => {
+              const i = sections.findIndex((s) => s.id === "today");
+              if (i >= 0) goTo(i);
+            }}
             className={cn(
-              "rounded-2xl bg-white/10 p-3.5",
+              "block w-full rounded-2xl bg-white/10 p-3.5 text-left transition hover:bg-white/20",
               isFullscreen && "mt-8"
             )}
           >
@@ -1755,7 +1770,7 @@ export default function MirrorPage() {
                 {dateRest}
               </span>
             </div>
-          </div>
+          </button>
 
           <nav className="mt-3 flex-1 space-y-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {sections.map((s, i) => {
@@ -1990,7 +2005,12 @@ export default function MirrorPage() {
 
         {/* Active channel */}
         {activeSection &&
-          (["love", "family", "friends", "faith", "stephen", "whitney"].includes(
+          (activeSection.id === "today" ? (
+            <section key="today" className="flex flex-1 flex-col gap-2">
+              <SectionHeader title="Today" icon={CalendarClock} items={[]} />
+              <TodayChannel onHoldRotation={setHoldRotation} />
+            </section>
+          ) : ["love", "family", "friends", "faith", "stephen", "whitney"].includes(
             activeSection.id
           ) ? (
             <ChecklistChannel
