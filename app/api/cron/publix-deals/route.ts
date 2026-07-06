@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchPublixBogos, getWeeklyAdUrl, type ParsedDeal } from '@/utils/deals/publix';
+import { categorizeDeals } from '@/utils/deals/categorize';
 
 export const maxDuration = 90;
 
@@ -110,12 +111,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: dealsErr.message }, { status: 500 });
     }
 
+    // Categorize any uncategorized deals for this post (idempotent: re-runs of
+    // the same week only classify rows that are still null). Best-effort — a
+    // failed OpenAI call shouldn't fail the ingest.
+    let categorized = 0;
+    try {
+      const { data: uncategorized } = await supabase
+        .from('deals')
+        .select('id, title')
+        .eq('post_id', postId)
+        .is('category', null);
+
+      if (uncategorized && uncategorized.length > 0) {
+        const cats = await categorizeDeals(uncategorized.map((d) => d.title as string));
+        // One update per category (7 max) instead of one per row.
+        const byCategory = new Map<string, number[]>();
+        uncategorized.forEach((d, i) => {
+          const ids = byCategory.get(cats[i]) ?? [];
+          ids.push(d.id as number);
+          byCategory.set(cats[i], ids);
+        });
+        for (const [category, ids] of byCategory) {
+          const { error } = await supabase.from('deals').update({ category }).in('id', ids);
+          if (!error) categorized += ids.length;
+        }
+      }
+    } catch (err) {
+      console.error('Deal categorization failed:', err);
+    }
+
     return NextResponse.json({
       success: true,
       url: baseUrl,
       week: weekLabel,
       post_id: postId,
       deals_upserted: rows.length,
+      deals_categorized: categorized,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {

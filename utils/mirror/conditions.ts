@@ -23,6 +23,7 @@ export interface ConditionScore {
 
 export interface MirrorConditions {
   date: string;
+  day: "Today" | "Tomorrow";
   location: string;
   beach: ConditionScore;
   boat: ConditionScore;
@@ -155,12 +156,16 @@ function scoreBeach(d: ReturnType<typeof summarize>): ConditionScore {
 }
 
 export async function getMirrorConditions(): Promise<MirrorConditions> {
-  // Score for TODAY (the boat pipeline defaults to tomorrow).
-  const data = await fetchBoatData(new Date());
+  // Score today while the day is still usable; from 5 PM (ET) on, today's
+  // beach/boat window is over, so score tomorrow's outlook instead.
+  const isEvening = hourET(new Date().toISOString()) >= 17;
+  const target = isEvening ? new Date(Date.now() + 86400_000) : new Date();
+  const data = await fetchBoatData(target);
   const d = summarize(data);
 
   return {
     date: data.dateLabel,
+    day: isEvening ? "Tomorrow" : "Today",
     location: BOAT_CONFIG.locationName,
     beach: scoreBeach(d),
     boat: scoreBoat(d),

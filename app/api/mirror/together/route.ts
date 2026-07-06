@@ -4,6 +4,14 @@ import { familyForDate } from "@/utils/mirror/family-prompts";
 import { loveQuoteForDate, marriageTipForDate } from "@/utils/mirror/love-content";
 import { parentingTipForDate } from "@/utils/mirror/parenting-content";
 import { faithFactForDate, faithTipForDate } from "@/utils/mirror/faith-content";
+import {
+  stephenGrowthForDate,
+  stephenConnectForDate,
+} from "@/utils/mirror/stephen-content";
+import {
+  whitneyGrowthForDate,
+  whitneyConnectForDate,
+} from "@/utils/mirror/whitney-content";
 
 // "For us" widgets: verse of the day, fun fact, dad joke, plus a daily couple
 // connection challenge and a family/parenting prompt. Verse, fun fact, and joke
@@ -75,5 +83,9 @@ export async function GET() {
     parentingTip: parentingTipForDate(),
     faithFact: faithFactForDate(),
     faithTip: faithTipForDate(),
+    stephenGrowth: stephenGrowthForDate(),
+    stephenConnect: stephenConnectForDate(),
+    whitneyGrowth: whitneyGrowthForDate(),
+    whitneyConnect: whitneyConnectForDate(),
   });
 }

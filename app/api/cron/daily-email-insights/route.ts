@@ -9,7 +9,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-init so builds don't require RESEND_API_KEY at module load.
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
+  return _resend;
+}
 
 const TARGET_USER_ID = 'bc474c8b-4b47-4c7d-b202-f469330af2a2';
 const TARGET_EMAIL = 'stephen@krezzo.com';
@@ -50,7 +55,7 @@ export async function GET(request: NextRequest) {
     const html = buildEmailHtml(data, billTimeline);
     const subject = buildSubject(data);
 
-    const { error } = await resend.emails.send({
+    const { error } = await getResend().emails.send({
       from: 'Krezzo <insights@krezzo.com>',
       to: TARGET_EMAIL,
       subject,

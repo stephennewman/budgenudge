@@ -4,7 +4,7 @@ export interface LatestDeals {
   postId: number;
   weekLabel: string;
   weekEndsAt: string | null; // latest ends_at (ISO date) across the deals
-  deals: Array<{ id: number; title: string; price_text: string | null; ends_at: string | null }>;
+  deals: Array<{ id: number; title: string; price_text: string | null; ends_at: string | null; category: string | null; starred: boolean }>;
 }
 
 /** Load the most recent weekly deal_post and its BOGO deals. */
@@ -20,7 +20,7 @@ export async function loadLatestDeals(client: SupabaseClient): Promise<LatestDea
 
   const { data } = await client
     .from('deals')
-    .select('id, title, price_text, ends_at')
+    .select('id, title, price_text, ends_at, category, starred')
     .eq('post_id', post.id)
     .ilike('promo_type', '%BOGO%')
     .limit(300);

@@ -4,7 +4,9 @@ import { DateTime } from "luxon";
 import { getSuperAdminId } from "@/utils/auth/superadmin";
 import { createSupabaseClient } from "@/utils/supabase/server";
 
-// Yesterday's spend snapshot for the bathroom dashboard.
+// Yesterday's "daily burn" snapshot for the bathroom dashboard. Burn =
+// controllable spend: positive outflows excluding money movement (transfers,
+// CC payments, P2P) and tagged recurring bills.
 //
 // AUTH: /mirror is a public page, so finance data is gated two ways:
 //   1. A logged-in Supabase user gets their OWN data (session cookies).
@@ -30,11 +32,25 @@ const TRANSFER_MERCHANTS = ["venmo", "zelle", "cash app", "paypal", "apple cash"
 
 type TxnRow = {
   amount: number | string;
+  date?: string;
   ai_category_tag?: string | null;
   ai_merchant_name?: string | null;
   merchant_name?: string | null;
   name?: string | null;
 };
+
+// "Burn" = controllable daily spend: excludes money movement and tagged
+// recurring bills (mortgage, utilities, etc.), matching the pacing widget.
+function isBurn(t: TxnRow, billSet: Set<string>): boolean {
+  const cat = (t.ai_category_tag || "").trim().toLowerCase();
+  const raw = ((t.merchant_name || t.name || "") as string).trim().toLowerCase();
+  const ai = ((t.ai_merchant_name || "") as string).trim().toLowerCase();
+  if (EXCLUDED_CATEGORIES.has(cat)) return false;
+  const ven = ai || raw;
+  if (TRANSFER_MERCHANTS.some((m) => ven.includes(m))) return false;
+  if (billSet.has(raw) || (ai && billSet.has(ai))) return false;
+  return true;
+}
 
 function topN(m: Map<string, number>, n: number) {
   return [...m.entries()]
@@ -109,8 +125,10 @@ export async function GET(request: NextRequest) {
   const today = DateTime.now().setZone(tz).startOf("day");
   const yesterday = today.minus({ days: 1 }).toISODate();
 
-  // Trend window: 7 full days ending yesterday, plus the prior 7 for comparison.
-  const trendStart = today.minus({ days: 14 }).toISODate(); // inclusive
+  // Fetch window: 90 full days ending yesterday — the rolling daily-burn
+  // average benchmark. The chart shows the last 30 as bars; the transaction
+  // list shows the last 30 days.
+  const trendStart = today.minus({ days: 90 }).toISODate(); // inclusive
   const trendEnd = yesterday; // inclusive
 
   try {
@@ -126,46 +144,123 @@ export async function GET(request: NextRequest) {
 
     const itemIds = items.map((i) => i.plaid_item_id);
 
-    // Positive-amount transactions (outflows) across the trend window — same
-    // definition of "spend" used by the app's SMS reports.
-    const { data: rangeTxns } = await supabase
-      .from("transactions")
-      .select("amount, date, merchant_name, name, ai_category_tag, ai_merchant_name")
-      .in("plaid_item_id", itemIds)
-      .gte("date", trendStart!)
-      .lte("date", trendEnd!)
-      .gt("amount", 0);
+    // Tagged recurring bills — excluded from burn so the daily number reflects
+    // controllable spend, not mortgage/utility hits.
+    const { data: taggedBills } = await supabase
+      .from("tagged_merchants")
+      .select("merchant_name")
+      .eq("user_id", userId)
+      .eq("is_active", true);
+    const billSet = new Set(
+      (taggedBills || [])
+        .map((b) => (b.merchant_name || "").toLowerCase().trim())
+        .filter(Boolean)
+    );
 
-    // Bucket by date.
-    const byDate = new Map<string, number>();
-    for (const t of rangeTxns || []) {
-      const d = String(t.date);
-      byDate.set(d, (byDate.get(d) ?? 0) + Number(t.amount));
+    // Positive-amount transactions (outflows) across the trend window — same
+    // definition of "spend" used by the app's SMS reports. Paginated: 90 days
+    // can exceed Supabase's 1000-row cap.
+    const rangeTxns: TxnRow[] = [];
+    const PAGE = 1000;
+    for (let offset = 0; ; offset += PAGE) {
+      const { data: page } = await supabase
+        .from("transactions")
+        .select("amount, date, merchant_name, name, ai_category_tag, ai_merchant_name")
+        .in("plaid_item_id", itemIds)
+        .gte("date", trendStart!)
+        .lte("date", trendEnd!)
+        .gt("amount", 0)
+        .order("date", { ascending: false })
+        .range(offset, offset + PAGE - 1);
+      if (!page || page.length === 0) break;
+      rangeTxns.push(...(page as TxnRow[]));
+      if (page.length < PAGE) break;
     }
 
-    const days: { date: string; total: number }[] = [];
+    // Daily-burn buckets by date (burn = controllable spend only), keeping the
+    // individual transactions so the mirror can stack/list them per day.
+    const burnTxns = rangeTxns.filter((t) => isBurn(t, billSet));
+    const byDate = new Map<string, number>();
+    const txnsByDate = new Map<string, { name: string; amount: number }[]>();
+    for (const t of burnTxns) {
+      const d = String(t.date);
+      const amt = Number(t.amount);
+      byDate.set(d, (byDate.get(d) ?? 0) + amt);
+      const list = txnsByDate.get(d) ?? [];
+      list.push({
+        name: t.ai_merchant_name || t.merchant_name || t.name || "Purchase",
+        amount: amt,
+      });
+      txnsByDate.set(d, list);
+    }
+
+    // Rolling 90-day daily-burn average (or as much history as exists), the
+    // benchmark each day's bar is judged against.
+    const earliestBurn = burnTxns.reduce<string | null>(
+      (min, t) => (!min || String(t.date) < min ? String(t.date) : min),
+      null
+    );
+    const effectiveDays = earliestBurn
+      ? Math.max(
+          1,
+          Math.min(
+            90,
+            Math.round(
+              DateTime.fromISO(yesterday!, { zone: tz })
+                .diff(DateTime.fromISO(earliestBurn, { zone: tz }), "days")
+                .days
+            ) + 1
+          )
+        )
+      : 1;
+    const burn90 = burnTxns.reduce((s, t) => s + Number(t.amount), 0);
+    const avgDaily = Math.round(burn90 / effectiveDays);
+
+    // Full 30 days of burn bars ending yesterday; the last 7 (and prior 7)
+    // still drive the week-over-week comparison.
+    const days: {
+      date: string;
+      total: number;
+      txns: { name: string; amount: number }[];
+    }[] = [];
     let thisWeek = 0;
     let lastWeek = 0;
-    for (let i = 7; i >= 1; i--) {
+    for (let i = 30; i >= 1; i--) {
       const d = today.minus({ days: i }).toISODate()!;
       const amt = byDate.get(d) ?? 0;
-      days.push({ date: d, total: amt });
-      thisWeek += amt;
+      const dayTxns = (txnsByDate.get(d) ?? []).sort((a, b) => b.amount - a.amount);
+      days.push({ date: d, total: amt, txns: dayTxns.slice(0, 12) });
+      if (i <= 7) thisWeek += amt;
+      else if (i <= 14) lastWeek += amt;
     }
-    for (let i = 14; i >= 8; i--) {
-      const d = today.minus({ days: i }).toISODate()!;
-      lastWeek += byDate.get(d) ?? 0;
+    // Streak: consecutive days at/under the average, ending yesterday.
+    let streak = 0;
+    for (let i = days.length - 1; i >= 0 && days[i].total <= avgDaily; i--) {
+      streak++;
     }
     const changePct =
       lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : null;
 
-    // Yesterday detail (subset of the range already fetched).
-    const yTxns = (rangeTxns || [])
+    // Last 30 days of burn transactions, newest day first (largest first
+    // within a day), for the mirror's scrollable list.
+    const listStart = today.minus({ days: 30 }).toISODate()!;
+    const recent = burnTxns
+      .filter((t) => String(t.date) >= listStart)
+      .map((t) => ({
+        date: String(t.date),
+        name: t.ai_merchant_name || t.merchant_name || t.name || "Purchase",
+        amount: Number(t.amount),
+      }))
+      .sort((a, b) => (a.date === b.date ? b.amount - a.amount : b.date.localeCompare(a.date)))
+      .slice(0, 150);
+
+    // Yesterday's burn transactions (subset of the range already fetched).
+    const yTxns = burnTxns
       .filter((t) => String(t.date) === yesterday)
       .sort((a, b) => Number(b.amount) - Number(a.amount));
     const total = yTxns.reduce((sum, t) => sum + Number(t.amount), 0);
-    const top = yTxns.slice(0, 3).map((t) => ({
-      name: t.merchant_name || t.name || "Purchase",
+    const top = yTxns.slice(0, 6).map((t) => ({
+      name: t.ai_merchant_name || t.merchant_name || t.name || "Purchase",
       amount: Number(t.amount),
     }));
 
@@ -182,11 +277,13 @@ export async function GET(request: NextRequest) {
       .lte("next_predicted_date", billsEnd!)
       .order("next_predicted_date", { ascending: true });
 
-    const billItems = (billRows || []).map((b) => ({
-      name: b.merchant_name || "Bill",
-      amount: Number(b.expected_amount || 0),
-      date: b.next_predicted_date as string,
-    }));
+    const billItems = (billRows || [])
+      .map((b) => ({
+        name: b.merchant_name || "Bill",
+        amount: Number(b.expected_amount || 0),
+        date: b.next_predicted_date as string,
+      }))
+      .sort((a, b) => b.amount - a.amount);
     const billsTotal = billItems.reduce((s, b) => s + b.amount, 0);
 
     // This-week breakdown: last 7 days (today-7 .. yesterday) from the range
@@ -213,7 +310,8 @@ export async function GET(request: NextRequest) {
       count: yTxns.length,
       date: yesterday,
       top,
-      trend: { days, thisWeek, lastWeek, changePct },
+      recent,
+      trend: { days, thisWeek, lastWeek, changePct, avgDaily, streak },
       bills: { items: billItems.slice(0, 5), total: billsTotal, count: billItems.length },
       // `breakdown` kept for backward compatibility (month-to-date).
       breakdown: {

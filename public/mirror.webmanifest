@@ -1,0 +1,9 @@
+{
+  "name": "Mirror",
+  "short_name": "Mirror",
+  "start_url": "/mirror",
+  "scope": "/mirror",
+  "display": "fullscreen",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a"
+}
