@@ -1740,7 +1740,7 @@ export default function MirrorPage() {
             }}
             className={cn(
               "block w-full rounded-2xl bg-white/10 p-3.5 text-left transition hover:bg-white/20",
-              isFullscreen && "mt-8"
+              isFullscreen && "mt-16"
             )}
           >
             <div className="flex items-stretch gap-2">
