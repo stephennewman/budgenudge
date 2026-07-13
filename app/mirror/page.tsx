@@ -41,8 +41,10 @@ import {
   Baby,
   BookOpen,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Church,
   Cloud,
   CloudDrizzle,
@@ -75,6 +77,8 @@ import {
   Moon,
   MoreVertical,
   CalendarClock,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Pencil,
   Play,
@@ -299,6 +303,11 @@ const ORDER_KEY = "mirror.order.v3";
 const SIZES_KEY = "mirror.sizes.v3";
 const HIDDEN_KEY = "mirror.hidden.v3";
 
+// Sidebar display mode: full labels, icon-only rail, or fully hidden.
+type NavMode = "full" | "icons" | "hidden";
+const NAV_MODE_KEY = "mirror.nav.mode";
+const NAV_MODE_CYCLE: NavMode[] = ["full", "icons", "hidden"];
+
 // Column span per size — width only; every tile is the same (1-row) height.
 // Small = 1 col, Medium = 2, Large = 3, X-Large = 4 (full width on desktop).
 // Statically listed so Tailwind keeps the classes.
@@ -330,7 +339,7 @@ const TALL_WIDGETS = new Set(["events", "movies", "bogos", "dinner", "pacing", "
 // Widgets are grouped into auto-rotating channels. Order here is the channel order.
 const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
   { id: "faith", label: "Faith", ids: ["verse", "faithfact", "faithtip"] },
-  { id: "love", label: "Love", ids: ["together", "marriage", "lovequote"] },
+  { id: "love", label: "For You Both", ids: ["together", "marriage", "lovequote"] },
   {
     id: "stephen",
     label: "For Stephen",
@@ -389,8 +398,10 @@ const DEFAULT_SIZE: Record<string, Size> = {
   forecast: "large",
   hourly: "xlarge",
   glance: "medium",
-  beach: "small",
-  boat: "small",
+  // Beach/Boat need two columns so the score, bar, and reason all fit
+  // without clipping inside the fixed-height tile.
+  beach: "medium",
+  boat: "medium",
   sun: "medium",
   // Out & About (full-width weekly calendar: ticketed + hyperlocal merged)
   events: "xlarge",
@@ -615,6 +626,12 @@ export default function MirrorPage() {
   // Channel navigation state.
   const [activeIndex, setActiveIndex] = useState(0);
   const [autoRotate, setAutoRotate] = useState(true);
+  // When the next auto-advance fires (ms epoch), for the countdown display.
+  const [rotateAt, setRotateAt] = useState<number | null>(null);
+  const [navMode, setNavMode] = useState<NavMode>("full");
+  // Card layout for the Today channel (its content lives in TodayChannel but
+  // the header toggle is rendered here).
+  const [todayView, setTodayView] = useState<CardView>(3);
 
   // Load saved customization once on mount.
   useEffect(() => {
@@ -626,6 +643,12 @@ export default function MirrorPage() {
     if (savedHidden) setHidden(new Set(savedHidden));
     const savedProviders = readJSON<number[]>(PROVIDERS_KEY);
     if (savedProviders) setExtraProviders(savedProviders);
+    const savedNav = readJSON<NavMode>(NAV_MODE_KEY);
+    if (savedNav && NAV_MODE_CYCLE.includes(savedNav)) setNavMode(savedNav);
+    const savedTodayView = readJSON<number>(`${CARDS_VIEW_PREFIX}today`);
+    if (savedTodayView === 1 || savedTodayView === 2 || savedTodayView === 3) {
+      setTodayView(savedTodayView as CardView);
+    }
   }, []);
 
   const save = useCallback((key: string, value: unknown) => {
@@ -1713,7 +1736,11 @@ export default function MirrorPage() {
   // manual selection gives you a fresh 30s) or the screen is touched, and
   // pauses while editing or reading an article.
   useEffect(() => {
-    if (!autoRotate || editMode || holdRotation || sectionCount <= 1) return;
+    if (!autoRotate || editMode || holdRotation || sectionCount <= 1) {
+      setRotateAt(null);
+      return;
+    }
+    setRotateAt(Date.now() + ROTATE_MS);
     const t = setTimeout(() => {
       setActiveIndex((i) => (i + 1) % sectionCount);
     }, ROTATE_MS);
@@ -1722,17 +1749,72 @@ export default function MirrorPage() {
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
+  // Seconds until the next channel, driven by the 1s clock tick.
+  const rotateSecondsLeft =
+    autoRotate && rotateAt !== null
+      ? Math.max(0, Math.ceil((rotateAt - now.getTime()) / 1000))
+      : null;
+
+  const goPrev = useCallback(() => {
+    setActiveIndex((i) => (i - 1 + sectionCount) % sectionCount);
+  }, [sectionCount]);
+  const goNext = useCallback(() => {
+    setActiveIndex((i) => (i + 1) % sectionCount);
+  }, [sectionCount]);
+
+  const cycleNavMode = useCallback(() => {
+    setNavMode((m) => {
+      const next =
+        NAV_MODE_CYCLE[(NAV_MODE_CYCLE.indexOf(m) + 1) % NAV_MODE_CYCLE.length];
+      writeJSON(NAV_MODE_KEY, next);
+      return next;
+    });
+  }, []);
+
   return (
     <div
       className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
       style={{ background: gradient }}
     >
       <div className="flex h-full">
-        {/* Left rail: persistent clock + channel nav + controls */}
-        <aside className="flex w-44 shrink-0 flex-col border-r border-white/10 bg-black/25 p-3 backdrop-blur-md md:w-52">
+        {/* Left rail: persistent clock + channel nav + controls. Collapsible:
+            full labels -> icon-only rail -> hidden (floating reopen button). */}
+        {navMode === "hidden" && (
+          <button
+            onClick={cycleNavMode}
+            aria-label="Show menu"
+            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white"
+          >
+            <PanelLeftOpen className="h-5 w-5" />
+          </button>
+        )}
+        {navMode !== "hidden" && (
+        <aside
+          className={cn(
+            "flex shrink-0 flex-col border-r border-white/10 bg-black/25 backdrop-blur-md",
+            navMode === "full" ? "w-44 p-3 md:w-52" : "w-16 p-2"
+          )}
+        >
           {/* In fullscreen, Safari/iPadOS overlays a system exit (X) control in
-              the top-left corner; push the clock down so it stays readable. */}
+              the top-left corner; push the clock down so it stays clear of it. */}
           {/* Clock card jumps to the Today channel. */}
+          {navMode === "icons" ? (
+            <button
+              onClick={() => {
+                const i = sections.findIndex((s) => s.id === "today");
+                if (i >= 0) goTo(i);
+              }}
+              className={cn(
+                "block w-full rounded-xl bg-white/10 px-1 py-2 text-center transition hover:bg-white/20",
+                isFullscreen && "mt-24"
+              )}
+            >
+              <div className="text-sm font-semibold leading-tight tabular-nums">
+                {clockDigits}
+              </div>
+              <div className="text-[10px] font-medium text-white/60">{meridiem}</div>
+            </button>
+          ) : (
           <button
             onClick={() => {
               const i = sections.findIndex((s) => s.id === "today");
@@ -1740,7 +1822,7 @@ export default function MirrorPage() {
             }}
             className={cn(
               "block w-full rounded-2xl bg-white/10 p-3.5 text-left transition hover:bg-white/20",
-              isFullscreen && "mt-16"
+              isFullscreen && "mt-24"
             )}
           >
             <div className="flex items-stretch gap-2">
@@ -1771,6 +1853,7 @@ export default function MirrorPage() {
               </span>
             </div>
           </button>
+          )}
 
           <nav className="mt-3 flex-1 space-y-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {sections.map((s, i) => {
@@ -1779,50 +1862,100 @@ export default function MirrorPage() {
                 <button
                   key={s.id}
                   onClick={() => goTo(i)}
+                  title={s.label}
                   className={cn(
-                    "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition",
+                    "flex w-full items-center rounded-xl text-left text-sm font-medium transition",
+                    navMode === "icons"
+                      ? "justify-center px-0 py-2.5"
+                      : "gap-2.5 px-3 py-2.5",
                     i === activeIndex
                       ? "bg-white/25 text-white"
                       : "text-white/60 hover:bg-white/10 hover:text-white/90"
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{s.label}</span>
+                  {navMode === "full" && <span className="truncate">{s.label}</span>}
                 </button>
               );
             })}
           </nav>
 
-          <div className="relative mt-3 flex items-center gap-2">
-            <button
-              onClick={() => setAutoRotate((a) => !a)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-2 py-2 text-xs font-medium transition hover:bg-white/20"
-              aria-label={autoRotate ? "Pause auto-rotate" : "Resume auto-rotate"}
-            >
-              {autoRotate ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-              {autoRotate ? "Auto" : "Paused"}
-            </button>
-            {editMode && (
+          <div className="mt-3 space-y-1.5">
+            {/* Channel up/down + auto-advance countdown */}
+            <div className={cn("flex gap-1.5", navMode === "icons" && "flex-col")}>
               <button
-                onClick={() => setEditMode(false)}
-                aria-label="Done editing"
-                className="rounded-xl bg-emerald-400/30 p-2 transition hover:bg-emerald-400/40"
+                onClick={goPrev}
+                aria-label="Previous channel"
+                className="flex items-center justify-center rounded-xl bg-white/10 p-2 text-white/70 transition hover:bg-white/20 hover:text-white"
               >
-                <Check className="h-4 w-4" />
+                <ChevronUp className="h-4 w-4" />
               </button>
-            )}
-            <button
-              onClick={() => setShowMenu((m) => !m)}
-              aria-label="Menu"
-              className={cn(
-                "rounded-xl p-2 transition",
-                showMenu
-                  ? "bg-white/30 text-white"
-                  : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+              <button
+                onClick={goNext}
+                aria-label="Next channel"
+                className="flex items-center justify-center rounded-xl bg-white/10 p-2 text-white/70 transition hover:bg-white/20 hover:text-white"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              {/* Auto-advance: shows a live countdown to the next channel;
+                  tap to pause/resume. */}
+              <button
+                onClick={() => setAutoRotate((a) => !a)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 px-2 py-2 text-xs font-medium tabular-nums transition hover:bg-white/20",
+                  navMode === "icons" && "flex-col gap-0.5 text-[10px]"
+                )}
+                aria-label={autoRotate ? "Pause auto-advance" : "Resume auto-advance"}
+                title={
+                  autoRotate
+                    ? "Auto-advancing to the next channel — tap to pause"
+                    : "Paused — tap to resume auto-advance"
+                }
+              >
+                {autoRotate ? (
+                  <Pause className="h-3.5 w-3.5" />
+                ) : (
+                  <Play className="h-3.5 w-3.5" />
+                )}
+                {autoRotate
+                  ? rotateSecondsLeft !== null
+                    ? `${rotateSecondsLeft}s`
+                    : "Auto"
+                  : navMode === "full"
+                    ? "Paused"
+                    : null}
+              </button>
+            </div>
+            <div className={cn("relative flex gap-1.5", navMode === "icons" && "flex-col")}>
+              <button
+                onClick={cycleNavMode}
+                aria-label={navMode === "full" ? "Collapse menu to icons" : "Hide menu"}
+                title={navMode === "full" ? "Collapse menu to icons" : "Hide menu"}
+                className="flex flex-1 items-center justify-center rounded-xl bg-white/10 p-2 text-white/60 transition hover:bg-white/20 hover:text-white"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+              {editMode && (
+                <button
+                  onClick={() => setEditMode(false)}
+                  aria-label="Done editing"
+                  className="flex flex-1 items-center justify-center rounded-xl bg-emerald-400/30 p-2 transition hover:bg-emerald-400/40"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
               )}
-            >
-              <MoreVertical className="h-4 w-4" />
-            </button>
+              <button
+                onClick={() => setShowMenu((m) => !m)}
+                aria-label="Menu"
+                className={cn(
+                  "flex flex-1 items-center justify-center rounded-xl p-2 transition",
+                  showMenu
+                    ? "bg-white/30 text-white"
+                    : "bg-white/10 text-white/60 hover:bg-white/20 hover:text-white"
+                )}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
             {showMenu && (
               <>
                 {/* Click-away backdrop */}
@@ -1831,7 +1964,12 @@ export default function MirrorPage() {
                   aria-label="Close menu"
                   onClick={() => setShowMenu(false)}
                 />
-                <div className="absolute bottom-12 left-0 z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl">
+                <div
+                  className={cn(
+                    "absolute z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl",
+                    navMode === "icons" ? "bottom-0 left-14" : "bottom-12 left-0"
+                  )}
+                >
                   {!isStandalone && (
                     <MenuItem
                       icon={isFullscreen ? Minimize : Maximize}
@@ -1871,8 +2009,10 @@ export default function MirrorPage() {
                 </div>
               </>
             )}
+            </div>
           </div>
         </aside>
+        )}
 
         {/* Main content area */}
         <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -2006,9 +2146,22 @@ export default function MirrorPage() {
         {/* Active channel */}
         {activeSection &&
           (activeSection.id === "today" ? (
-            <section key="today" className="flex flex-1 flex-col gap-2">
-              <SectionHeader title="Today" icon={CalendarClock} items={[]} />
-              <TodayChannel onHoldRotation={setHoldRotation} />
+            <section key="today" className="flex min-h-0 flex-1 flex-col gap-2">
+              <SectionHeader
+                title="Today"
+                icon={CalendarClock}
+                items={[]}
+                controls={
+                  <ViewToggle
+                    view={todayView}
+                    onChange={(v) => {
+                      setTodayView(v);
+                      writeJSON(`${CARDS_VIEW_PREFIX}today`, v);
+                    }}
+                  />
+                }
+              />
+              <TodayChannel onHoldRotation={setHoldRotation} view={todayView} />
             </section>
           ) : ["love", "family", "friends", "faith", "stephen", "whitney"].includes(
             activeSection.id
@@ -2100,6 +2253,60 @@ export default function MirrorPage() {
 
 const CARDS_HIDDEN_PREFIX = "mirror.cards.hidden.";
 const CARDS_OFFSET_PREFIX = "mirror.cards.offsets.";
+
+// Per-channel card layout: 1 = one big card per screen, 2 = two stacked,
+// 3 = side-by-side columns. Persisted per channel (not per day).
+type CardView = 1 | 2 | 3;
+const CARDS_VIEW_PREFIX = "mirror.cards.view.";
+
+const VIEW_LABEL: Record<CardView, string> = {
+  1: "1 card",
+  2: "2 stacked",
+  3: "Columns",
+};
+
+// Left/right arrows that cycle a channel's card layout. Lives in the section
+// header, next to the three-dot menu.
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: CardView;
+  onChange: (v: CardView) => void;
+}) {
+  const cycle = (dir: 1 | -1) =>
+    onChange(((((view - 1 + dir) % 3) + 3) % 3 + 1) as CardView);
+  return (
+    <div className="flex items-center gap-0.5 rounded-full bg-white/10 px-1 py-0.5">
+      <button
+        onClick={() => cycle(-1)}
+        aria-label="Previous layout"
+        className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <span className="w-16 text-center text-[11px] font-medium text-white/65">
+        {VIEW_LABEL[view]}
+      </span>
+      <button
+        onClick={() => cycle(1)}
+        aria-label="Next layout"
+        className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// Body type size steps down as the text gets longer so every card stays
+// readable without spilling out of its square.
+function cardBodyClass(text: string): string {
+  const len = text.length;
+  if (len > 260) return "text-lg font-light leading-relaxed text-white md:text-xl lg:text-2xl";
+  if (len > 150) return "text-xl font-light leading-relaxed text-white md:text-2xl lg:text-3xl";
+  return "text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl";
+}
 
 type CardVariant = { text: string; footnote?: string | null };
 
@@ -2332,6 +2539,7 @@ function ChecklistChannel({
   // Which card's menu is open, or null. The section-level menu lives in
   // SectionHeader and manages its own state.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [view, setView] = useState<CardView>(3);
 
   useEffect(() => {
     setHidden(new Set(readJSON<string[]>(hiddenKey) ?? []));
@@ -2340,7 +2548,14 @@ function ChecklistChannel({
 
   useEffect(() => {
     setOpenMenu(null);
+    const saved = readJSON<number>(`${CARDS_VIEW_PREFIX}${channel}`);
+    setView(saved === 1 || saved === 2 || saved === 3 ? (saved as CardView) : 3);
   }, [channel]);
+
+  const changeView = (next: CardView) => {
+    setView(next);
+    writeJSON(`${CARDS_VIEW_PREFIX}${channel}`, next);
+  };
 
   const items: ChecklistItem[] = useMemo(() => {
     // Friends cards come from authored pools with no API dependency, so that
@@ -2395,9 +2610,10 @@ function ChecklistChannel({
   const hiddenCount = items.length - visibleItems.length;
   const canRegenerate = items.some((it) => it.variants.length > 1);
 
-  // 3 cards sit in one row; 4 (Family) go 2x2 so each stays large.
+  // Columns view: 3 cards sit in one row; 4 (Family) go 2x2 so each stays large.
   const gridCols =
     visibleItems.length >= 4 ? "md:grid-cols-2" : "md:grid-cols-3";
+
 
   // The personal channels carry a quiet doorway to /mirror/extra-fun.
   const hasExtraFun = channel === "stephen" || channel === "whitney";
@@ -2429,12 +2645,88 @@ function ChecklistChannel({
       : []),
   ];
 
+  const renderCard = (
+    item: ChecklistItem,
+    style?: React.CSSProperties,
+    extraClass?: string
+  ) => {
+    const Icon = item.icon;
+    const variant = variantFor(item);
+    const menuOpen = openMenu === item.id;
+    return (
+      <div
+        key={item.id}
+        className={cn(
+          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md md:p-8",
+          extraClass
+        )}
+        style={{
+          background: `linear-gradient(135deg, ${item.tint} 0%, rgba(255,255,255,0.08) 70%)`,
+          ...style,
+        }}
+      >
+        <div className="relative flex items-center gap-2.5">
+          <button
+            onClick={() => setOpenMenu(menuOpen ? null : item.id)}
+            aria-label={`Options for "${item.title}"`}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-xl transition hover:brightness-125",
+              item.chip,
+              menuOpen && "ring-2 ring-white/50"
+            )}
+          >
+            <Icon className="h-4.5 w-4.5" strokeWidth={2} />
+          </button>
+          <span className="text-sm font-semibold uppercase tracking-wider text-white/75">
+            {item.title}
+          </span>
+          {menuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-30"
+                onClick={() => setOpenMenu(null)}
+              />
+              <div className="absolute left-0 top-11 z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl">
+                <MenuItem
+                  icon={EyeOff}
+                  label="Hide card"
+                  onClick={() => hideCard(item.id)}
+                />
+                {item.variants.length > 1 && (
+                  <MenuItem
+                    icon={RotateCcw}
+                    label="Show a different card"
+                    onClick={() => swapCard(item.id)}
+                  />
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Scrollable, vertically centered body; type size adapts to length
+            so the text stays inside the card. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="my-auto py-2">
+            <p className={cardBodyClass(variant.text)}>{variant.text}</p>
+            {variant.footnote && (
+              <p className="mt-4 text-base font-medium text-white/60">
+                {variant.footnote}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="relative flex flex-1 flex-col gap-2">
     <SectionHeader
       title={label}
       icon={NAV_ICONS[channel] ?? LayoutGrid}
       items={menuItems}
+      controls={<ViewToggle view={view} onChange={changeView} />}
     />
     {visibleItems.length === 0 ? (
       <div className="flex flex-1 items-center justify-center">
@@ -2442,73 +2734,21 @@ function ChecklistChannel({
           All cards hidden — use the menu to bring them back.
         </p>
       </div>
+    ) : view === 3 ? (
+      <div className={cn("grid flex-1 grid-cols-1 gap-3", gridCols)}>
+        {visibleItems.map((item) => renderCard(item))}
+      </div>
     ) : (
-    <div className={cn("grid flex-1 grid-cols-1 gap-3", gridCols)}>
-      {visibleItems.map((item) => {
-        const Icon = item.icon;
-        const variant = variantFor(item);
-        const menuOpen = openMenu === item.id;
-        return (
-          <div
-            key={item.id}
-            className="relative flex flex-col rounded-3xl border border-white/10 p-6 backdrop-blur-md md:p-8"
-            style={{
-              background: `linear-gradient(135deg, ${item.tint} 0%, rgba(255,255,255,0.08) 70%)`,
-            }}
-          >
-            <div className="relative flex items-center gap-2.5">
-              <button
-                onClick={() => setOpenMenu(menuOpen ? null : item.id)}
-                aria-label={`Options for "${item.title}"`}
-                className={cn(
-                  "flex h-9 w-9 items-center justify-center rounded-xl transition hover:brightness-125",
-                  item.chip,
-                  menuOpen && "ring-2 ring-white/50"
-                )}
-              >
-                <Icon className="h-4.5 w-4.5" strokeWidth={2} />
-              </button>
-              <span className="text-sm font-semibold uppercase tracking-wider text-white/75">
-                {item.title}
-              </span>
-              {menuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setOpenMenu(null)}
-                  />
-                  <div className="absolute left-0 top-11 z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl">
-                    <MenuItem
-                      icon={EyeOff}
-                      label="Hide card"
-                      onClick={() => hideCard(item.id)}
-                    />
-                    {item.variants.length > 1 && (
-                      <MenuItem
-                        icon={RotateCcw}
-                        label="Show a different card"
-                        onClick={() => swapCard(item.id)}
-                      />
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="flex flex-1 flex-col justify-center">
-              <p className="text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl">
-                {variant.text}
-              </p>
-              {variant.footnote && (
-                <p className="mt-4 text-base font-medium text-white/60">
-                  {variant.footnote}
-                </p>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+      // 1-up / 2-up: big cards that snap-scroll vertically through the set.
+      <div className="flex min-h-0 flex-1 snap-y snap-mandatory flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {visibleItems.map((item) =>
+          renderCard(
+            item,
+            { height: view === 1 ? "100%" : "calc(50% - 6px)" },
+            "shrink-0 snap-start"
+          )
+        )}
+      </div>
     )}
     {hasExtraFun && (
       <a
@@ -2532,10 +2772,13 @@ function SectionHeader({
   title,
   icon: Icon,
   items,
+  controls,
 }: {
   title: string;
   icon: LucideIcon;
   items: SectionMenuItem[];
+  // Optional extra controls rendered to the left of the three-dot menu.
+  controls?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -2544,6 +2787,8 @@ function SectionHeader({
         <Icon className="h-4 w-4 shrink-0" />
         {title}
       </span>
+      <div className="flex items-center gap-1.5">
+      {controls}
       {items.length > 0 && (
         <div className="relative">
           <button
@@ -2576,6 +2821,7 @@ function SectionHeader({
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -3443,51 +3689,75 @@ function MoviesCard({
   const active =
     sections.find((s) => s.id === activeId) ?? sections[0] ?? null;
 
-  const grid = (list: MediaItem[]) => (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-      {list.map((m) => {
-        const inner = (
-          <>
-            {m.poster ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={m.poster}
-                alt={m.title}
-                className="aspect-[2/3] w-full rounded-xl object-cover transition group-hover:opacity-85"
-              />
-            ) : (
-              <div className="flex aspect-[2/3] w-full items-center justify-center rounded-xl bg-white/10 p-1 text-center text-xs text-white/60">
-                {m.title}
-              </div>
-            )}
-            <div className="mt-1.5 truncate text-xs text-white/90">{m.title}</div>
-            <div className="text-[11px] text-white/55">
-              {m.rtScore
-                ? `🍅 ${m.rtScore}`
-                : m.tmdbScore !== null
-                  ? `★ ${m.tmdbScore}%`
-                  : ""}
-            </div>
-          </>
-        );
-        return m.url ? (
-          <a
-            key={`${m.type}-${m.title}`}
-            href={m.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group min-w-0"
-          >
-            {inner}
-          </a>
+  // Featured row of big posters that scrolls left/right, with the rest as a
+  // smaller scrollable strip underneath.
+  const FEATURED_COUNT = 6;
+  const tile = (m: MediaItem, large: boolean) => {
+    const inner = (
+      <>
+        {m.poster ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={m.poster}
+            alt={m.title}
+            className="aspect-[2/3] w-full rounded-xl object-cover transition group-hover:opacity-85"
+          />
         ) : (
-          <div key={`${m.type}-${m.title}`} className="min-w-0">
-            {inner}
+          <div className="flex aspect-[2/3] w-full items-center justify-center rounded-xl bg-white/10 p-1 text-center text-xs text-white/60">
+            {m.title}
           </div>
-        );
-      })}
-    </div>
-  );
+        )}
+        <div
+          className={cn(
+            "mt-1.5 truncate text-white/90",
+            large ? "text-sm font-medium" : "text-[11px]"
+          )}
+        >
+          {m.title}
+        </div>
+        <div className={cn("text-white/55", large ? "text-xs" : "text-[10px]")}>
+          {m.rtScore
+            ? `🍅 ${m.rtScore}`
+            : m.tmdbScore !== null
+              ? `★ ${m.tmdbScore}%`
+              : ""}
+        </div>
+      </>
+    );
+    const width = large ? "w-44 md:w-52" : "w-24 md:w-28";
+    return m.url ? (
+      <a
+        key={`${m.type}-${m.title}`}
+        href={m.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn("group shrink-0 snap-start", width)}
+      >
+        {inner}
+      </a>
+    ) : (
+      <div key={`${m.type}-${m.title}`} className={cn("shrink-0 snap-start", width)}>
+        {inner}
+      </div>
+    );
+  };
+
+  const grid = (list: MediaItem[]) => {
+    const featured = list.slice(0, FEATURED_COUNT);
+    const rest = list.slice(FEATURED_COUNT);
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <div className="flex snap-x gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {featured.map((m) => tile(m, true))}
+        </div>
+        {rest.length > 0 && (
+          <div className="flex snap-x gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {rest.map((m) => tile(m, false))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
@@ -4472,7 +4742,7 @@ function ScoreCard({
           <Icon className="h-5 w-5" strokeWidth={1.6} />
           <span className="text-sm font-semibold uppercase tracking-wider">{title}</span>
           {day && (
-            <span className="rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-white/70">
+            <span className="rounded-full bg-white/25 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-white/90">
               {day}
             </span>
           )}
@@ -4499,7 +4769,7 @@ function ScoreCard({
           style={{ width: `${score}%`, backgroundColor: color }}
         />
       </div>
-      <p className="relative mt-2 text-xs text-white/75">{reason}</p>
+      <p className="relative mt-2 text-sm leading-snug text-white/75">{reason}</p>
     </div>
   );
 }

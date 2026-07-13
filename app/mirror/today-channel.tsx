@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Cake, ExternalLink, Landmark, Newspaper, PartyPopper, X } from "lucide-react";
 import { cn } from "@/utils/styles";
 
@@ -52,9 +52,13 @@ function isoDate(d: Date): string {
 
 export function TodayChannel({
   onHoldRotation,
+  view = 3,
 }: {
   // Lets the mirror pause channel auto-rotation while an article is open.
   onHoldRotation?: (hold: boolean) => void;
+  // Card layout, driven by the header toggle: 1 = one big card at a time,
+  // 2 = two stacked, 3 = side-by-side columns.
+  view?: 1 | 2 | 3;
 }) {
   const today = useMemo(() => new Date(), []);
   const todayIso = isoDate(today);
@@ -98,9 +102,9 @@ export function TodayChannel({
       if (!active) return;
       if (todayRes.status === "fulfilled" && todayRes.value.ok) {
         const d = await todayRes.value.json();
-        setNationalDays((d.nationalDays ?? []).slice(0, 6));
-        setHistory((d.history ?? []).slice(0, 4));
-        setBirths((d.births ?? []).slice(0, 4));
+        setNationalDays((d.nationalDays ?? []).slice(0, 4));
+        setHistory((d.history ?? []).slice(0, 3));
+        setBirths((d.births ?? []).slice(0, 3));
       }
       if (newsRes.status === "fulfilled" && newsRes.value.ok) {
         const d = await newsRes.value.json();
@@ -120,8 +124,112 @@ export function TodayChannel({
   const daysInYear = isLeap ? 366 : 365;
   const yearPct = Math.round((dayOfYear / daysInYear) * 100);
 
+  // The three content cards, built once and laid out per the view toggle.
+  // Each fills its wrapper and scrolls internally so nothing spills out.
+  const cardShell =
+    "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md";
+  const cardBody =
+    "min-h-0 flex-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden";
+  const topSection =
+    newsSections.find((s) => s.id === "top") ?? newsSections[0] ?? null;
+  const accent = SECTION_ACCENT.top;
+
+  const cards: ReactNode[] = [];
+  if (topSection) {
+    // Only the top stories make the cut — the category-by-category headline
+    // wall was too much text for a glanceable channel.
+    cards.push(
+      <div key="news" className={cardShell}>
+        <div className="mb-3 flex items-center gap-2">
+          <span
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-lg",
+              accent.icon
+            )}
+          >
+            <Newspaper className="h-4 w-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+            Top stories
+          </span>
+        </div>
+        <ul className={cn("space-y-2", cardBody)}>
+          {topSection.items.slice(0, HEADLINES_SHOWN).map((n, i) => (
+            <li key={i}>
+              <button
+                onClick={() => openArticle(n, "Top stories")}
+                disabled={!n.link}
+                className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/10"
+              >
+                <span
+                  className={cn(
+                    "mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full",
+                    accent.dot
+                  )}
+                />
+                <span className="text-base font-medium leading-snug text-white/90 md:text-lg">
+                  {n.title}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (history.length > 0) {
+    cards.push(
+      <div key="history" className={cardShell}>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-400/25 text-violet-200">
+            <Landmark className="h-4 w-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+            On this day
+          </span>
+        </div>
+        <ul className={cn("space-y-3", cardBody)}>
+          {history.map((h, i) => (
+            <li key={i} className="flex gap-2.5">
+              <span className="mt-0.5 shrink-0 rounded-md bg-violet-400/20 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-violet-200">
+                {h.year}
+              </span>
+              <span className="text-sm leading-snug text-white/85">{h.text}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (births.length > 0) {
+    cards.push(
+      <div key="births" className={cardShell}>
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-400/25 text-rose-200">
+            <Cake className="h-4 w-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+            Born on this day
+          </span>
+        </div>
+        <ul className={cn("space-y-2.5", cardBody)}>
+          {births.map((b, i) => (
+            <li key={i} className="text-sm leading-snug">
+              <span className="font-medium text-white/90">{b.name}</span>
+              <span className="text-white/55">
+                {" "}
+                · {today.getFullYear() - b.year}
+                {b.description ? ` · ${b.description}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Day progress + national days, one compact strip */}
       <div className="rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
@@ -159,106 +267,27 @@ export function TodayChannel({
         )}
       </div>
 
-      {/* News, organized by category */}
+      {/* Top 3 stories, on-this-day, birthdays — laid out per the toggle. */}
       {newsSections.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/15 p-6 text-sm text-white/50 backdrop-blur-md">
           Loading today&apos;s news…
         </div>
+      ) : view === 3 ? (
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto lg:grid-cols-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {cards}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {newsSections.map((s) => {
-            const accent = SECTION_ACCENT[s.id] ?? SECTION_ACCENT.top;
-            return (
-              <div
-                key={s.id}
-                className="rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md"
-              >
-                <div className="mb-3 flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-lg",
-                      accent.icon
-                    )}
-                  >
-                    <Newspaper className="h-4 w-4" />
-                  </span>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                    {s.label}
-                  </span>
-                </div>
-                <ul className="space-y-1">
-                  {s.items.slice(0, HEADLINES_SHOWN).map((n, i) => (
-                    <li key={i}>
-                      <button
-                        onClick={() => openArticle(n, s.label)}
-                        disabled={!n.link}
-                        className="flex w-full items-start gap-2.5 rounded-lg px-2 py-1.5 text-left transition hover:bg-white/10"
-                      >
-                        <span
-                          className={cn(
-                            "mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full",
-                            accent.dot
-                          )}
-                        />
-                        <span className="text-sm leading-snug text-white/85">
-                          {n.title}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-
-          {/* Fun sprinkles alongside the news cards */}
-          {history.length > 0 && (
-            <div className="rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-400/25 text-violet-200">
-                  <Landmark className="h-4 w-4" />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                  On this day
-                </span>
-              </div>
-              <ul className="space-y-3">
-                {history.map((h, i) => (
-                  <li key={i} className="flex gap-2.5">
-                    <span className="mt-0.5 shrink-0 rounded-md bg-violet-400/20 px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-violet-200">
-                      {h.year}
-                    </span>
-                    <span className="text-sm leading-snug text-white/85">{h.text}</span>
-                  </li>
-                ))}
-              </ul>
+        // 1-up / 2-up: big cards that snap-scroll vertically through the set.
+        <div className="flex min-h-0 flex-1 snap-y snap-mandatory flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {cards.map((c, i) => (
+            <div
+              key={i}
+              className="shrink-0 snap-start"
+              style={{ height: view === 1 ? "100%" : "calc(50% - 6px)" }}
+            >
+              {c}
             </div>
-          )}
-
-          {births.length > 0 && (
-            <div className="rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-400/25 text-rose-200">
-                  <Cake className="h-4 w-4" />
-                </span>
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-                  Born on this day
-                </span>
-              </div>
-              <ul className="space-y-2.5">
-                {births.map((b, i) => (
-                  <li key={i} className="text-sm leading-snug">
-                    <span className="font-medium text-white/90">{b.name}</span>
-                    <span className="text-white/55">
-                      {" "}
-                      · {today.getFullYear() - b.year}
-                      {b.description ? ` · ${b.description}` : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          ))}
         </div>
       )}
 

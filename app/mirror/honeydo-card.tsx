@@ -70,6 +70,23 @@ export function HoneyDoCard({ token }: { token: string | null }) {
   const [list, setList] = useState<HoneyDoList | null>(null);
   const [recording, setRecording] = useState(false);
 
+  // Recording doesn't work in browser fullscreen (the mic permission prompt
+  // gets suppressed), so hide the whole voice-capture row there.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => {
+      const d = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullscreen(Boolean(document.fullscreenElement ?? d.webkitFullscreenElement));
+    };
+    onChange();
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+
   // The card remounts whenever its channel rotates back in, so paint the last
   // known list from localStorage immediately instead of waiting on the fetch.
   const updateList = useCallback((next: HoneyDoList) => {
@@ -364,7 +381,8 @@ export function HoneyDoCard({ token }: { token: string | null }) {
         )}
       </div>
 
-      {/* Voice capture — anchored bottom right. */}
+      {/* Voice capture — anchored bottom right; hidden in fullscreen. */}
+      {!isFullscreen && (
       <div className="mt-3 flex items-center justify-end gap-3">
         <div className="min-w-0 text-right text-sm leading-snug">
           {recording ? (
@@ -387,7 +405,7 @@ export function HoneyDoCard({ token }: { token: string | null }) {
           onClick={recording ? stopRecording : startRecording}
           disabled={processing}
           className={cn(
-            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition",
+            "flex h-16 w-16 shrink-0 items-center justify-center rounded-full transition",
             recording
               ? "animate-pulse bg-red-500/90 text-white"
               : processing
@@ -397,14 +415,15 @@ export function HoneyDoCard({ token }: { token: string | null }) {
           aria-label={recording ? "Stop and save" : "Record a task"}
         >
           {processing ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="h-7 w-7 animate-spin" />
           ) : recording ? (
-            <Square className="h-5 w-5" fill="currentColor" />
+            <Square className="h-7 w-7" fill="currentColor" />
           ) : (
-            <Mic className="h-5 w-5" />
+            <Mic className="h-7 w-7" />
           )}
         </button>
       </div>
+      )}
 
       {editing &&
         createPortal(
