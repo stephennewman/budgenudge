@@ -356,7 +356,7 @@ const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
     label: "Friends",
     ids: ["friendsreach", "friendshello", "friendskeep"],
   },
-  { id: "honeydo", label: "HoneyDo", ids: ["honeydo"] },
+  // HoneyDo is hidden from the mirror: it's not actionable on a wall display.
   { id: "money", label: "Money", ids: ["pacing", "spend", "bills", "budget"] },
   { id: "deals", label: "BOGO Deals", ids: ["bogos", "dinner"] },
   { id: "movies", label: "Now Showing", ids: ["movies"] },
@@ -629,9 +629,6 @@ export default function MirrorPage() {
   // When the next auto-advance fires (ms epoch), for the countdown display.
   const [rotateAt, setRotateAt] = useState<number | null>(null);
   const [navMode, setNavMode] = useState<NavMode>("full");
-  // Card layout for the Today channel (its content lives in TodayChannel but
-  // the header toggle is rendered here).
-  const [todayView, setTodayView] = useState<CardView>(3);
 
   // Load saved customization once on mount.
   useEffect(() => {
@@ -645,10 +642,6 @@ export default function MirrorPage() {
     if (savedProviders) setExtraProviders(savedProviders);
     const savedNav = readJSON<NavMode>(NAV_MODE_KEY);
     if (savedNav && NAV_MODE_CYCLE.includes(savedNav)) setNavMode(savedNav);
-    const savedTodayView = readJSON<number>(`${CARDS_VIEW_PREFIX}today`);
-    if (savedTodayView === 1 || savedTodayView === 2 || savedTodayView === 3) {
-      setTodayView(savedTodayView as CardView);
-    }
   }, []);
 
   const save = useCallback((key: string, value: unknown) => {
@@ -1771,6 +1764,19 @@ export default function MirrorPage() {
     });
   }, []);
 
+  // Fullscreen toggle button shown at the top right of every channel header.
+  // Hidden in standalone (installed PWA) mode, where fullscreen is moot.
+  const fullscreenControl = !isStandalone ? (
+    <button
+      onClick={toggleFullscreen}
+      aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+      title={isFullscreen ? "Exit full screen" : "Full screen"}
+      className="flex h-8 w-8 items-center justify-center rounded-full text-white/55 transition hover:bg-white/15 hover:text-white"
+    >
+      {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+    </button>
+  ) : null;
+
   return (
     <div
       className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
@@ -2151,17 +2157,9 @@ export default function MirrorPage() {
                 title="Today"
                 icon={CalendarClock}
                 items={[]}
-                controls={
-                  <ViewToggle
-                    view={todayView}
-                    onChange={(v) => {
-                      setTodayView(v);
-                      writeJSON(`${CARDS_VIEW_PREFIX}today`, v);
-                    }}
-                  />
-                }
+                controls={fullscreenControl}
               />
-              <TodayChannel onHoldRotation={setHoldRotation} view={todayView} />
+              <TodayChannel onHoldRotation={setHoldRotation} />
             </section>
           ) : ["love", "family", "friends", "faith", "stephen", "whitney"].includes(
             activeSection.id
@@ -2170,12 +2168,14 @@ export default function MirrorPage() {
               channel={activeSection.id}
               label={activeSection.label}
               together={together}
+              headerExtra={fullscreenControl}
             />
           ) : (
             <section key={activeSection.id} className="flex flex-1 flex-col gap-2">
               <SectionHeader
                 title={activeSection.label}
                 icon={NAV_ICONS[activeSection.id] ?? LayoutGrid}
+                controls={fullscreenControl}
                 items={[
                   ...(activeSection.id === "events"
                     ? [
@@ -2526,10 +2526,13 @@ function ChecklistChannel({
   channel,
   label,
   together,
+  headerExtra,
 }: {
   channel: string;
   label: string;
   together: Together | null;
+  // Extra header controls (e.g. the fullscreen toggle) from the page.
+  headerExtra?: React.ReactNode;
 }) {
   const dayKey = new Date().toISOString().slice(0, 10);
   const hiddenKey = `${CARDS_HIDDEN_PREFIX}${dayKey}`;
@@ -2726,7 +2729,12 @@ function ChecklistChannel({
       title={label}
       icon={NAV_ICONS[channel] ?? LayoutGrid}
       items={menuItems}
-      controls={<ViewToggle view={view} onChange={changeView} />}
+      controls={
+        <>
+          <ViewToggle view={view} onChange={changeView} />
+          {headerExtra}
+        </>
+      }
     />
     {visibleItems.length === 0 ? (
       <div className="flex flex-1 items-center justify-center">

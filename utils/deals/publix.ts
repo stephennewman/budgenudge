@@ -47,7 +47,9 @@ export async function fetchAsMarkdown(url: string): Promise<string> {
   const res = await fetch(jinaUrl, {
     method: 'GET',
     headers,
-    signal: AbortSignal.timeout(70_000),
+    // Keep each attempt short enough that the retry loop in fetchPublixBogos
+    // (3 attempts) still fits inside the cron route's 90s maxDuration.
+    signal: AbortSignal.timeout(25_000),
   });
 
   if (!res.ok) {
@@ -162,7 +164,22 @@ export function parsePublixBogos(markdown: string): ParsedDeal[] {
 
 export async function fetchPublixBogos(): Promise<{ url: string; deals: ParsedDeal[] }> {
   const url = getWeeklyAdUrl();
-  const markdown = await fetchAsMarkdown(url);
-  const deals = parsePublixBogos(markdown);
-  return { url, deals };
+
+  // Jina's live render of the Publix SPA is flaky — the same request can come
+  // back without any deal blocks. Retry a couple of times before giving up so
+  // one bad render doesn't cost us the whole day's ingest.
+  const ATTEMPTS = 3;
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+    try {
+      const markdown = await fetchAsMarkdown(url);
+      const deals = parsePublixBogos(markdown);
+      if (deals.length > 0) return { url, deals };
+    } catch (err) {
+      lastError = err;
+    }
+    if (attempt < ATTEMPTS) await new Promise((r) => setTimeout(r, 2000));
+  }
+  if (lastError) throw lastError;
+  return { url, deals: [] };
 }
