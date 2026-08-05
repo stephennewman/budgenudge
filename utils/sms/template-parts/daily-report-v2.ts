@@ -15,6 +15,9 @@ import { supabase } from './shared';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MIN_BASELINE_DAYS = 28; // need ~4 weeks of history before pacing is meaningful
+// Spend within this % of pace counts as "on pace". A percentage rather than a
+// flat dollar band so large categories don't alarm on normal day-to-day noise.
+const PACE_OK_BAND_PCT = 15;
 
 // Parse a YYYY-MM-DD string to a stable UTC-noon Date (avoids TZ drift).
 const parseISO = (s: string) => new Date(`${s}T12:00:00Z`);
@@ -287,46 +290,55 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       const pct = expected > 0 ? Math.round((spent / expected - 1) * 100) : 0;
       const delta = Math.round(spent - expected);
       let status: string;
-      if (Math.abs(pct) < 8) {
-        status = `⚖️ right on your usual pace`;
+      if (Math.abs(pct) <= PACE_OK_BAND_PCT) {
+        status = `⚖️ right on pace`;
       } else if (delta > 0) {
-        status = `🔺 ${money(Math.abs(delta))} over your usual pace`;
+        status = `🔺 ${money(Math.abs(delta))} over pace`;
       } else {
-        status = `✅ ${money(Math.abs(delta))} under your usual pace — nice work`;
+        status = `✅ ${money(Math.abs(delta))} under pace — nice work`;
       }
-      return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} usual by now\n${status}\n\n`;
+      return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} pace by now\n${status}\n\n`;
     };
 
     // ---- Category & vendor pacing: usual monthly avg vs current month ----
     // Ranked by usual monthly spend, limited to habitual items (>2 tx/month
-    // on average) so steady under-pace items surface too. Color compares MTD
-    // against the usual amount prorated to today (so "green" is earnable).
+    // on average) so steady under-pace items surface too. Pace is the usual
+    // monthly amount spread over a day and multiplied by days elapsed, so
+    // "green" is earnable rather than just a function of where we are in the month.
     const baselineMonths = effectiveBaselineDays / 30.44;
-    type PaceRow = { label: string; avgMonthly: number; mtd: number; mtdCount: number; pct: number };
+    type PaceRow = {
+      label: string;
+      avgMonthly: number;
+      paceToDate: number;
+      mtd: number;
+      mtdCount: number;
+      pct: number;
+    };
     const toPaceRows = (map: Map<string, Bucket>): PaceRow[] =>
       Array.from(map.values())
         .filter(row => row.baselineCount / baselineMonths > 2 && row.baseline / baselineMonths >= 10)
         .map(row => {
           const avgMonthly = row.baseline / baselineMonths;
-          const expectedByNow = (row.baseline / effectiveBaselineDays) * daysElapsedMonth;
+          const paceToDate = (row.baseline / effectiveBaselineDays) * daysElapsedMonth;
           return {
             label: clip(titleCase(row.label), 16),
             avgMonthly,
+            paceToDate,
             mtd: row.mtd,
             mtdCount: row.mtdCount,
-            pct: Math.round((row.mtd / expectedByNow) * 100),
+            pct: paceToDate > 0 ? Math.round((row.mtd / paceToDate) * 100) : 100,
           };
         })
         .sort((a, b) => b.avgMonthly - a.avgMonthly);
 
     const paceEmoji = (pct: number) => {
-      if (pct > 115) return '🔴';
-      if (pct < 85) return '🟢';
+      if (pct > 100 + PACE_OK_BAND_PCT) return '🔴';
+      if (pct < 100 - PACE_OK_BAND_PCT) return '🟢';
       return '🟡';
     };
 
     const paceLine = (r: PaceRow) =>
-      `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} of ~${money(r.avgMonthly)}/mo (${r.mtdCount}x)`;
+      `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} vs ${money(r.paceToDate)} pace · ~${money(r.avgMonthly)}/mo (${r.mtdCount}x)`;
 
     const topCategories = toPaceRows(categoryMap).slice(0, 5);
     const topVendors = toPaceRows(merchantMap).slice(0, 5);
