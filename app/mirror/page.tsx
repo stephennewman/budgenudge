@@ -79,6 +79,7 @@ import {
   CalendarClock,
   PanelLeftClose,
   PanelLeftOpen,
+  PartyPopper,
   Pause,
   Pencil,
   Play,
@@ -1186,6 +1187,11 @@ export default function MirrorPage() {
   // "Monday, July 6" -> weekday on the left, "July 6" on the right.
   const [dateWeekday, dateRest = ""] = dateStr.split(/,\s*/);
 
+  // How much of the current day has elapsed (0–100), for the clock card bar.
+  const dayPct =
+    ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) *
+    100;
+
   const unitLabel = data?.tempUnit === "celsius" ? "°C" : "°F";
 
   const current = data?.current;
@@ -1827,7 +1833,7 @@ export default function MirrorPage() {
               if (i >= 0) goTo(i);
             }}
             className={cn(
-              "block w-full rounded-2xl bg-white/10 p-3.5 text-left transition hover:bg-white/20",
+              "block w-full rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-3.5 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30",
               isFullscreen && "mt-24"
             )}
           >
@@ -1839,13 +1845,10 @@ export default function MirrorPage() {
                   {clockDigits}
                 </div>
               </div>
-              {/* AM/PM stacked over the temperature, right of the digits. */}
-              <div className="flex w-9 shrink-0 flex-col gap-1">
+              {/* AM/PM, right of the digits. */}
+              <div className="flex w-9 shrink-0 flex-col">
                 <span className="flex flex-1 items-center justify-center rounded-md bg-white/10 text-[11px] font-semibold leading-none text-white/80">
                   {meridiem}
-                </span>
-                <span className="flex flex-1 items-center justify-center rounded-md bg-white/10 text-[11px] font-semibold leading-none text-white/80">
-                  {current ? `${Math.round(current.temperature_2m)}${unitLabel}` : "--"}
                 </span>
               </div>
             </div>
@@ -1856,6 +1859,19 @@ export default function MirrorPage() {
               </span>
               <span className="text-[8cqw] font-medium leading-none text-white/60">
                 {dateRest}
+              </span>
+            </div>
+            {/* Day completion: how far through today we are, with a noon tick. */}
+            <div className="relative mt-2.5 pb-3">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
+                  style={{ width: `${dayPct}%` }}
+                />
+              </div>
+              <div className="absolute left-1/2 top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-white/50" />
+              <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[9px] font-medium leading-none text-white/45">
+                12p
               </span>
             </div>
           </button>
@@ -2237,8 +2253,256 @@ export default function MirrorPage() {
             </section>
           ))}
         </main>
+
+        {/* Persistent right rail: day progress + national days + a compact
+            weather snapshot. Stays put across every channel. Hidden on
+            narrow screens so it never crowds the main content. */}
+        <RightRail
+          current={current}
+          currentInfo={currentInfo}
+          data={data}
+          unitLabel={unitLabel}
+          hours={hours}
+        />
       </div>
     </div>
+  );
+}
+
+// --- Persistent right rail --------------------------------------------------
+//
+// A static third column that mirrors the two most-glanced things — where we
+// are in the year (with the day's national days) and a compact weather
+// snapshot — so they're always visible regardless of the active channel.
+
+function RightRail({
+  current,
+  currentInfo,
+  data,
+  unitLabel,
+  hours,
+}: {
+  current: NonNullable<WeatherData["current"]> | undefined;
+  currentInfo: { label: string; Icon: LucideIcon } | null;
+  data: WeatherData | null;
+  unitLabel: string;
+  hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
+}) {
+  const today = useMemo(() => new Date(), []);
+  const todayIso = useMemo(
+    () =>
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
+        today.getDate()
+      ).padStart(2, "0")}`,
+    [today]
+  );
+
+  const [nationalDays, setNationalDays] = useState<{ name: string }[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/mirror/today?date=${todayIso}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (active && d) setNationalDays((d.nationalDays ?? []).slice(0, 4));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [todayIso]);
+
+  const startOfYear = new Date(today.getFullYear(), 0, 1);
+  const dayOfYear =
+    Math.floor((today.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
+  const isLeap = new Date(today.getFullYear(), 1, 29).getDate() === 29;
+  const daysInYear = isLeap ? 366 : 365;
+  const yearPct = Math.round((dayOfYear / daysInYear) * 100);
+
+  const chipStyles = [
+    "bg-amber-400/25 text-amber-100",
+    "bg-rose-400/25 text-rose-100",
+    "bg-sky-400/25 text-sky-100",
+    "bg-emerald-400/25 text-emerald-100",
+  ];
+  const miniShell =
+    "rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md";
+
+  const forecastDays = data?.daily.time.slice(0, 7) ?? [];
+  const lows = data?.daily.temperature_2m_min ?? [];
+  const highs = data?.daily.temperature_2m_max ?? [];
+  const weekMin = lows.length ? Math.min(...lows.slice(0, 7)) : 0;
+  const weekMax = highs.length ? Math.max(...highs.slice(0, 7)) : 1;
+  const span = Math.max(1, weekMax - weekMin);
+
+  return (
+    <aside className="hidden w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex xl:w-72 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Day of year + national days */}
+      <div className={miniShell}>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-lg font-semibold text-white/90">
+            Day {dayOfYear}
+          </span>
+          <span className="text-xs text-white/55">of {daysInYear}</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
+            style={{ width: `${yearPct}%` }}
+          />
+        </div>
+        <div className="mt-1.5 text-[11px] text-white/50">
+          {daysInYear - dayOfYear} days left in {today.getFullYear()}
+        </div>
+        {nationalDays.length > 0 && (
+          <>
+            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+              <PartyPopper className="h-3.5 w-3.5 text-amber-300/90" />
+              Today is
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {nationalDays.map((d, i) => (
+                <span
+                  key={d.name}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium leading-tight",
+                    chipStyles[i % chipStyles.length]
+                  )}
+                >
+                  {d.name}
+                </span>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Current weather */}
+      {current && currentInfo ? (
+        <div className={miniShell}>
+          <div className="flex items-center gap-3">
+            <currentInfo.Icon
+              className={cn(
+                "h-12 w-12 shrink-0",
+                weatherColor(current.weather_code, current.is_day === 1)
+              )}
+              strokeWidth={1.3}
+            />
+            <div className="min-w-0">
+              <div className="text-3xl font-light leading-none">
+                {Math.round(current.temperature_2m)}
+                {unitLabel}
+              </div>
+              <div className="mt-1 truncate text-xs text-white/75">
+                {currentInfo.label}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-[11px] text-white/60">
+            Feels {Math.round(current.apparent_temperature)}
+            {unitLabel}
+            {data && (
+              <>
+                {" · H "}
+                {Math.round(data.daily.temperature_2m_max[0])}° L{" "}
+                {Math.round(data.daily.temperature_2m_min[0])}°
+              </>
+            )}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-white/60">
+            <span className="flex items-center gap-1">
+              <Droplets className="h-3 w-3 text-sky-300" />
+              {current.relative_humidity_2m}%
+            </span>
+            <span className="flex items-center gap-1">
+              <Wind className="h-3 w-3 text-teal-300" />
+              {Math.round(current.wind_speed_10m)} {data?.windUnit ?? ""}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className={cn(miniShell, "text-xs text-white/50")}>
+          Set a location to see the weather.
+        </div>
+      )}
+
+      {/* Next hours */}
+      {hours.length > 0 && (
+        <div className={miniShell}>
+          <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+            Next hours
+          </h3>
+          <div className="flex justify-between gap-1">
+            {hours.slice(0, 6).map((h, i) => {
+              const info = weatherInfo(h.code, h.isDay);
+              return (
+                <div key={h.time} className="flex flex-col items-center gap-1.5">
+                  <span className="text-[10px] text-white/60">
+                    {i === 0
+                      ? "Now"
+                      : new Date(h.time).toLocaleTimeString(undefined, {
+                          hour: "numeric",
+                        })}
+                  </span>
+                  <info.Icon
+                    className={cn("h-5 w-5", weatherColor(h.code, h.isDay))}
+                    strokeWidth={1.5}
+                  />
+                  <span className="text-xs font-semibold">
+                    {Math.round(h.temp)}°
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 7-day forecast */}
+      {forecastDays.length > 0 && (
+        <div className={miniShell}>
+          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+            7-day forecast
+          </h3>
+          <div className="space-y-1">
+            {forecastDays.map((day, i) => {
+              const info = weatherInfo(data!.daily.weather_code[i], true);
+              const left = ((lows[i] - weekMin) / span) * 100;
+              const width = ((highs[i] - lows[i]) / span) * 100;
+              return (
+                <div key={day} className="flex items-center gap-2">
+                  <span className="w-8 text-[11px] text-white/80">
+                    {i === 0
+                      ? "Today"
+                      : new Date(day).toLocaleDateString(undefined, {
+                          weekday: "short",
+                        })}
+                  </span>
+                  <info.Icon
+                    className={cn(
+                      "h-4 w-4 shrink-0",
+                      weatherColor(data!.daily.weather_code[i], true)
+                    )}
+                    strokeWidth={1.6}
+                  />
+                  <span className="w-6 text-right text-[11px] text-white/55">
+                    {Math.round(lows[i])}°
+                  </span>
+                  <div className="relative h-1.5 flex-1 rounded-full bg-white/10">
+                    <div
+                      className="absolute h-full rounded-full bg-gradient-to-r from-sky-300 via-amber-200 to-orange-300"
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                    />
+                  </div>
+                  <span className="w-6 text-[11px] font-semibold">
+                    {Math.round(highs[i])}°
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </aside>
   );
 }
 
