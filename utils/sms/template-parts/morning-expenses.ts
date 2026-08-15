@@ -1,3 +1,4 @@
+import { DateTime } from 'luxon';
 import { supabase, type Transaction, type MerchantPacing } from './shared';
 import {
   getUserFirstName,
@@ -17,18 +18,66 @@ import {
 import { generateMorningInsightText } from '@/utils/sms/morning-insights';
 
 export async function generateMorningExpensesMessage(userId: string): Promise<string> {
+  // Deterministic list of yesterday's POSTED transactions, appended to whatever
+  // morning message we send (AI nudge or snapshot fallback).
+  const postedBlock = await getYesterdayPostedBlock(userId).catch(() => '');
+  const withPosted = (msg: string) => (postedBlock ? `${msg.trim()}\n\n${postedBlock}` : msg.trim());
+
   // New behavioral morning text (Claude-composed from deterministic stats).
   // Falls back to the legacy static snapshot below if it can't be produced.
   try {
     const insightText = await generateMorningInsightText(userId);
     if (insightText && insightText.trim().length >= 15) {
-      return insightText.trim();
+      return withPosted(insightText);
     }
   } catch (error) {
     console.error('Error generating behavioral morning text, falling back to snapshot:', error);
   }
 
-  return generateMorningExpensesSnapshot(userId);
+  return withPosted(await generateMorningExpensesSnapshot(userId));
+}
+
+/**
+ * Builds a plain-text list of yesterday's POSTED transactions (vendor + amount).
+ * "Yesterday" is Eastern wall-clock, and only settled (pending === false)
+ * spending transactions are included, most expensive first.
+ */
+export async function getYesterdayPostedBlock(userId: string): Promise<string> {
+  const { data: userItems } = await supabase
+    .from('items')
+    .select('plaid_item_id')
+    .eq('user_id', userId)
+    .is('deleted_at', null);
+
+  if (!userItems || userItems.length === 0) return '';
+  const plaidItemIds = userItems.map(i => i.plaid_item_id);
+
+  const yesterday = DateTime.now().setZone('America/New_York').minus({ days: 1 });
+  const yesterdayStr = yesterday.toISODate()!;
+  const label = yesterday.toFormat('ccc, LLL d');
+
+  const { data: txns } = await supabase
+    .from('transactions')
+    .select('merchant_name, name, amount')
+    .in('plaid_item_id', plaidItemIds)
+    .eq('date', yesterdayStr)
+    .eq('pending', false) // posted only
+    .gt('amount', 0) // spending only
+    .order('amount', { ascending: false });
+
+  if (!txns || txns.length === 0) {
+    return `🧾 Yesterday's posted (${label})\nNothing posted yet.`;
+  }
+
+  let total = 0;
+  const lines = txns.map(t => {
+    const amount = Math.max(0, Number(t.amount || 0));
+    total += amount;
+    const merchant = String(t.merchant_name || t.name || 'Unknown').slice(0, 22);
+    return `${merchant}: $${amount.toFixed(2)}`;
+  });
+
+  return `🧾 Yesterday's posted (${label})\n${lines.join('\n')}\nTotal: $${total.toFixed(2)}`;
 }
 
 export async function generateMorningExpensesSnapshot(userId: string): Promise<string> {
