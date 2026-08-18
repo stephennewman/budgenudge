@@ -2288,14 +2288,33 @@ function RightRail({
   unitLabel: string;
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
 }) {
-  const today = useMemo(() => new Date(), []);
-  const todayIso = useMemo(
-    () =>
-      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
-        today.getDate()
-      ).padStart(2, "0")}`,
-    [today]
-  );
+  // The rail never unmounts, so a mount-only date would go stale on a display
+  // left running for days. Roll `today` over at the day boundary (checked each
+  // minute and whenever the tab wakes) so the day count and national days stay
+  // in sync with the calendar.
+  const [today, setToday] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const sameDay = (a: Date, b: Date) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+    const check = () =>
+      setToday((prev) => {
+        const nowDate = new Date();
+        return sameDay(prev, nowDate) ? prev : nowDate;
+      });
+    const id = setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
+  }, []);
+
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(today.getDate()).padStart(2, "0")}`;
 
   const [nationalDays, setNationalDays] = useState<{ name: string }[]>([]);
   useEffect(() => {
