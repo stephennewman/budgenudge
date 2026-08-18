@@ -66,7 +66,7 @@ export async function getYesterdayPostedBlock(userId: string): Promise<string> {
     .order('amount', { ascending: false });
 
   if (!txns || txns.length === 0) {
-    return `🧾 Yesterday's posted (${label})\nNothing posted yet.`;
+    return `Yesterday's posted (${label})\nNothing posted yet.`;
   }
 
   let total = 0;
@@ -77,7 +77,7 @@ export async function getYesterdayPostedBlock(userId: string): Promise<string> {
     return `${merchant}: $${amount.toFixed(2)}`;
   });
 
-  return `🧾 Yesterday's posted (${label})\n${lines.join('\n')}\nTotal: $${total.toFixed(2)}`;
+  return `Yesterday's posted (${label})\n${lines.join('\n')}\nTotal: $${total.toFixed(2)}`;
 }
 
 export async function generateMorningExpensesSnapshot(userId: string): Promise<string> {

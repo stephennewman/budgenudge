@@ -4,6 +4,8 @@
  * Documentation: https://api.slicktext.com/docs/v2/overview
  */
 
+import { toGsm7 } from './gsm7';
+
 export interface SlickTextConfig {
   apiKey: string;
   brandId: string;
@@ -196,6 +198,10 @@ export class SlickTextClient {
         throw new Error('No phone numbers provided');
       }
 
+      // Force GSM-7 encoding to keep each SMS at 160 chars/segment (vs ~67 in
+      // UCS-2). This strips emoji/special chars and roughly halves credit cost.
+      const content = toGsm7(message.content);
+
       // Method 1: First try to find or create contact, then send message
       try {
         let phoneNumber = phoneNumbers[0].replace(/\D/g, '');
@@ -276,7 +282,7 @@ export class SlickTextClient {
             send_immediately: boolean;
             scheduled_at?: string;
           } = {
-            body: message.content,  // Changed from 'message' to 'body'
+            body: content,  // Changed from 'message' to 'body'
             contact_id: contactId,
             send_immediately: !message.scheduled_at
           };
@@ -310,7 +316,7 @@ export class SlickTextClient {
               scheduled_at?: string;
             } = {
               name: `Krezzo Alert ${Date.now()}`,
-              body: message.content,  // Changed from 'message' to 'body'
+              body: content,  // Changed from 'message' to 'body'
               contact_ids: contactId ? [contactId] : undefined,
               phone_numbers: contactId ? undefined : [`+1${phoneNumber}`],
               send_immediately: !message.scheduled_at

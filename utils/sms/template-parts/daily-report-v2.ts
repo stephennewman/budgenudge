@@ -31,7 +31,7 @@ const ymd = (d: Date) =>
 const money = (n: number) => `$${Math.round(n).toLocaleString()}`;
 const titleCase = (s: string) =>
   String(s || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-const clip = (s: string, n = 18) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+const clip = (s: string, n = 18) => (s.length > n ? s.slice(0, n - 1) + '.' : s);
 
 export async function generateDailyReportV2(userId: string): Promise<string> {
   try {
@@ -49,7 +49,7 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
       .is('deleted_at', null);
 
     if (!userItems || userItems.length === 0) {
-      return `📊 Daily snapshot\n\nHey ${firstName}!\nNo bank accounts connected yet. Connect to see your daily pacing.`;
+      return `Krezzo Daily\n\nHey ${firstName}!\nNo bank accounts connected yet. Connect to see your daily pacing.`;
     }
 
     const itemDbIds = userItems.map(i => i.id);
@@ -186,9 +186,9 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     });
 
     const balanceLine = () => {
-      let line = `💰 ${money(availableBalance)} available`;
+      let line = `${money(availableBalance)} available`;
       if (billsCount > 0) {
-        line += ` · ${money(totalBills)} in bills`;
+        line += `, ${money(totalBills)} in bills`;
         line += horizonLabel ? ` before ${horizonLabel}` : ` (next 30 days)`;
       }
       return line;
@@ -273,12 +273,12 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
 
     // ---- Not enough history: skip pacing, show plain totals ----
     if (effectiveBaselineDays < MIN_BASELINE_DAYS || dailyAvg <= 0) {
-      let msg = `Krezzo · ${dateLabel}\n\n`;
-      msg += `📅 This week: ${money(wtd)} spent\n`;
-      msg += `🗓️ This month: ${money(mtd)} spent\n\n`;
-      msg += `Still learning your usual pace — I need ~4 weeks of history before I can compare.\n\n`;
+      let msg = `Krezzo - ${dateLabel}\n\n`;
+      msg += `This week: ${money(wtd)} spent\n`;
+      msg += `This month: ${money(mtd)} spent\n\n`;
+      msg += `Still learning your usual pace - I need ~4 weeks of history before I can compare.\n\n`;
       msg += `${balanceLine()}\n\n`;
-      msg += `Have a good one 👋`;
+      msg += `Have a good one`;
       return msg;
     }
 
@@ -286,18 +286,18 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     const expectedWeek = dailyAvg * daysElapsedWeek;
     const expectedMonth = dailyAvg * daysElapsedMonth;
 
-    const pacingBlock = (emoji: string, title: string, spent: number, expected: number) => {
+    const pacingBlock = (title: string, spent: number, expected: number) => {
       const pct = expected > 0 ? Math.round((spent / expected - 1) * 100) : 0;
       const delta = Math.round(spent - expected);
       let status: string;
       if (Math.abs(pct) <= PACE_OK_BAND_PCT) {
-        status = `⚖️ right on pace`;
+        status = `right on pace`;
       } else if (delta > 0) {
-        status = `🔺 ${money(Math.abs(delta))} over pace`;
+        status = `${money(Math.abs(delta))} over pace`;
       } else {
-        status = `✅ ${money(Math.abs(delta))} under pace — nice work`;
+        status = `${money(Math.abs(delta))} under pace - nice work`;
       }
-      return `${emoji} ${title}\n${money(spent)} spent · ~${money(expected)} pace by now\n${status}\n\n`;
+      return `${title}\n${money(spent)} spent, ~${money(expected)} pace by now\n${status}\n\n`;
     };
 
     // ---- Category & vendor pacing: usual monthly avg vs current month ----
@@ -331,30 +331,30 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
         })
         .sort((a, b) => b.avgMonthly - a.avgMonthly);
 
-    const paceEmoji = (pct: number) => {
-      if (pct > 100 + PACE_OK_BAND_PCT) return '🔴';
-      if (pct < 100 - PACE_OK_BAND_PCT) return '🟢';
-      return '🟡';
+    const paceTag = (pct: number) => {
+      if (pct > 100 + PACE_OK_BAND_PCT) return 'over';
+      if (pct < 100 - PACE_OK_BAND_PCT) return 'under';
+      return 'ok';
     };
 
     const paceLine = (r: PaceRow) =>
-      `${paceEmoji(r.pct)} ${r.label} ${money(r.mtd)} vs ${money(r.paceToDate)} pace · ~${money(r.avgMonthly)}/mo (${r.mtdCount}x)`;
+      `${r.label} ${money(r.mtd)} vs ${money(r.paceToDate)} (${paceTag(r.pct)}), ~${money(r.avgMonthly)}/mo (${r.mtdCount}x)`;
 
-    const topCategories = toPaceRows(categoryMap).slice(0, 5);
-    const topVendors = toPaceRows(merchantMap).slice(0, 5);
+    const topCategories = toPaceRows(categoryMap).slice(0, 3);
+    const topVendors = toPaceRows(merchantMap).slice(0, 3);
 
     // ---- Compose ----
-    let msg = `Krezzo · ${dateLabel}\n\n`;
-    msg += pacingBlock('📅', 'This week', wtd, expectedWeek);
-    msg += pacingBlock('🗓️', 'This month', mtd, expectedMonth);
+    let msg = `Krezzo - ${dateLabel}\n\n`;
+    msg += pacingBlock('This week', wtd, expectedWeek);
+    msg += pacingBlock('This month', mtd, expectedMonth);
 
     if (topCategories.length > 0) {
-      msg += `📊 Categories (mo)\n`;
+      msg += `Categories (mo)\n`;
       msg += topCategories.map(paceLine).join('\n');
       msg += `\n\n`;
     }
     if (topVendors.length > 0) {
-      msg += `🏪 Top vendors (mo)\n`;
+      msg += `Top vendors (mo)\n`;
       msg += topVendors.map(paceLine).join('\n');
       msg += `\n\n`;
     }
@@ -363,16 +363,16 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
     const burn28 = burn28Total / 28;
     const hasPriorWindow = spanStartStr <= prior28StartStr;
     if (burn28 > 0) {
-      let burnLine = `🎯 Daily burn: ${money(burn28)}/day`;
+      let burnLine = `Daily burn: ${money(burn28)}/day`;
       if (hasPriorWindow) {
         const prior28 = prior28Total / 28;
         const diff = burn28 - prior28;
         if (Math.abs(diff) < prior28 * 0.03) {
-          burnLine += ` · steady vs last month`;
+          burnLine += `, steady vs last month`;
         } else if (diff < 0) {
-          burnLine += ` · down from ${money(prior28)} ✅`;
+          burnLine += `, down from ${money(prior28)}`;
         } else {
-          burnLine += ` · up from ${money(prior28)} 🔺`;
+          burnLine += `, up from ${money(prior28)}`;
         }
       } else {
         burnLine += ` (28d avg)`;
@@ -384,11 +384,11 @@ export async function generateDailyReportV2(userId: string): Promise<string> {
 
     const weekUnder = wtd - expectedWeek < 0;
     const monthUnder = mtd - expectedMonth < 0;
-    msg += weekUnder && monthUnder ? `Keep crushing it 👋` : `Have a good one 👋`;
+    msg += weekUnder && monthUnder ? `Keep crushing it` : `Have a good one`;
 
     return msg;
   } catch (err) {
     console.error('❌ Error in generateDailyReportV2:', err);
-    return `📊 Daily snapshot\n\nHey there!\nWe couldn't generate your snapshot right now. Please try again later.`;
+    return `Krezzo Daily\n\nHey there!\nWe couldn't generate your snapshot right now. Please try again later.`;
   }
 }

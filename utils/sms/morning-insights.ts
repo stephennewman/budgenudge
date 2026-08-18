@@ -251,7 +251,7 @@ Rules:
 - Treat "fixed" categories (rent, loans, transfers, utilities) as non-discretionary; focus nudges on controllable spending (food, merchandise, entertainment).
 - Tone: warm, specific, encouraging. Like a sharp friend, not a scold or a robot.
 - End with ONE concrete action the user can take today.
-- The SMS text must be plain text: max ~320 characters, no markdown, no links, at most 1-2 emoji. Round dollars sensibly.
+- The SMS text must be plain GSM-7 text: max ~320 characters, no markdown, no links, NO emoji and no special characters (no bullets, em dashes, or curly quotes). Round dollars sensibly.
 - Respond with STRICT JSON only, no prose around it: {"angle":"<one angle key>","message":"<the sms text>"}`;
 
 export interface ComposedMorningText {
@@ -343,13 +343,13 @@ export function deterministicMorningText(insights: MorningInsights): string {
   const { food, dayName, topMerchantsMTD, yesterday } = insights;
   const dollars = (n: number) => `$${Math.round(n)}`;
 
-  const lines: string[] = [`☀️ ${dayName} money check`];
+  const lines: string[] = [`${dayName} money check`];
 
   if (yesterday.items.length > 0) {
     const top = yesterday.items[0];
     lines.push(`Yesterday: ${dollars(yesterday.total)} across ${yesterday.items.length} buys (${top.merchant} ${dollars(top.amount)}).`);
   } else {
-    lines.push(`Yesterday: no spending logged. Nice. 👏`);
+    lines.push(`Yesterday: no spending logged. Nice.`);
   }
 
   if (food.mtdTotal > 0) {
