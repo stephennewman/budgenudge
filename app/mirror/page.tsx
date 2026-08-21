@@ -528,6 +528,19 @@ const GRADIENTS: Record<DayPart, string> = {
   night: "linear-gradient(160deg, #020111 0%, #0a1a3f 55%, #20305f 100%)",
 };
 
+// Channel-specific backgrounds so the people channels read differently at a
+// glance (masculine steel for Stephen, rose for Whitney, etc.). Channels not
+// listed here keep the time-of-day gradient. All stops stay dark enough for
+// white text at >=4.5:1 contrast.
+const CHANNEL_GRADIENTS: Record<string, string> = {
+  stephen: "linear-gradient(160deg, #0a1c29 0%, #14384b 55%, #1f566b 100%)",
+  whitney: "linear-gradient(160deg, #2b0a22 0%, #571c40 55%, #7c2f57 100%)",
+  love: "linear-gradient(160deg, #290713 0%, #55132c 60%, #75253c 100%)",
+  family: "linear-gradient(160deg, #04231c 0%, #0d4234 60%, #175442 100%)",
+  friends: "linear-gradient(160deg, #291402 0%, #4f320d 60%, #6e4513 100%)",
+  faith: "linear-gradient(160deg, #140b33 0%, #2a1d59 60%, #3d2c6e 100%)",
+};
+
 function aqiInfo(aqi: number): { label: string; color: string } {
   if (aqi <= 50) return { label: "Good", color: "#9be89b" };
   if (aqi <= 100) return { label: "Moderate", color: "#f7e479" };
@@ -1169,7 +1182,6 @@ export default function MirrorPage() {
   );
 
   const part = dayPart(now.getHours());
-  const gradient = GRADIENTS[part];
 
   const timeStr = now.toLocaleTimeString(undefined, {
     hour: "2-digit",
@@ -1748,6 +1760,11 @@ export default function MirrorPage() {
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
+  // Channel-tinted background where defined; otherwise shift with the time of
+  // day. The 1s background transition on the wrapper smooths channel changes.
+  const gradient =
+    (activeSection && CHANNEL_GRADIENTS[activeSection.id]) || GRADIENTS[part];
+
   // Seconds until the next channel, driven by the 1s clock tick.
   const rotateSecondsLeft =
     autoRotate && rotateAt !== null
@@ -2186,6 +2203,14 @@ export default function MirrorPage() {
               together={together}
               headerExtra={fullscreenControl}
             />
+          ) : activeSection.id === "deals" &&
+            ((bogos?.deals.length ?? 0) > 0 || (dinner?.meals.length ?? 0) > 0) ? (
+            <DealsChannel
+              bogos={bogos}
+              dinner={dinner}
+              onToggleStar={toggleStar}
+              headerExtra={fullscreenControl}
+            />
           ) : (
             <section key={activeSection.id} className="flex flex-1 flex-col gap-2">
               <SectionHeader
@@ -2537,15 +2562,17 @@ function RightRail({
 const CARDS_HIDDEN_PREFIX = "mirror.cards.hidden.";
 const CARDS_OFFSET_PREFIX = "mirror.cards.offsets.";
 
-// Per-channel card layout: 1 = one big card per screen, 2 = two stacked,
-// 3 = side-by-side columns. Persisted per channel (not per day).
-type CardView = 1 | 2 | 3;
+// Per-channel card layout: 1 = one big card that auto-cycles through the
+// channel's items, 2 = two stacked. Persisted per channel (not per day).
+type CardView = 1 | 2;
 const CARDS_VIEW_PREFIX = "mirror.cards.view.";
+
+// How long the 1-up view lingers on each card before showing the next.
+const CARD_CYCLE_MS = 10000;
 
 const VIEW_LABEL: Record<CardView, string> = {
   1: "1 card",
   2: "2 stacked",
-  3: "Columns",
 };
 
 // Left/right arrows that cycle a channel's card layout. Lives in the section
@@ -2557,12 +2584,11 @@ function ViewToggle({
   view: CardView;
   onChange: (v: CardView) => void;
 }) {
-  const cycle = (dir: 1 | -1) =>
-    onChange(((((view - 1 + dir) % 3) + 3) % 3 + 1) as CardView);
+  const cycle = () => onChange(view === 1 ? 2 : 1);
   return (
     <div className="flex items-center gap-0.5 rounded-full bg-white/10 px-1 py-0.5">
       <button
-        onClick={() => cycle(-1)}
+        onClick={cycle}
         aria-label="Previous layout"
         className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
       >
@@ -2572,7 +2598,7 @@ function ViewToggle({
         {VIEW_LABEL[view]}
       </span>
       <button
-        onClick={() => cycle(1)}
+        onClick={cycle}
         aria-label="Next layout"
         className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
       >
@@ -2825,7 +2851,9 @@ function ChecklistChannel({
   // Which card's menu is open, or null. The section-level menu lives in
   // SectionHeader and manages its own state.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [view, setView] = useState<CardView>(3);
+  const [view, setView] = useState<CardView>(1);
+  // Which card the 1-up view is currently showing (mod visible count).
+  const [cycleIdx, setCycleIdx] = useState(0);
 
   useEffect(() => {
     setHidden(new Set(readJSON<string[]>(hiddenKey) ?? []));
@@ -2834,8 +2862,10 @@ function ChecklistChannel({
 
   useEffect(() => {
     setOpenMenu(null);
+    // Older saved layouts could be 3 (columns); that view is gone, so fall
+    // back to the 1-up default.
     const saved = readJSON<number>(`${CARDS_VIEW_PREFIX}${channel}`);
-    setView(saved === 1 || saved === 2 || saved === 3 ? (saved as CardView) : 3);
+    setView(saved === 1 || saved === 2 ? (saved as CardView) : 1);
   }, [channel]);
 
   const changeView = (next: CardView) => {
@@ -2884,6 +2914,19 @@ function ChecklistChannel({
     setOpenMenu(null);
   };
 
+  // 1-up view auto-advances through the visible cards so one big readable
+  // card still surfaces everything. Paused while a card menu is open so the
+  // card doesn't swap out from under it.
+  const visibleCount = items.filter((it) => !hidden.has(it.id)).length;
+  useEffect(() => {
+    setCycleIdx(0);
+  }, [channel, view]);
+  useEffect(() => {
+    if (view !== 1 || visibleCount < 2 || openMenu !== null) return;
+    const id = setInterval(() => setCycleIdx((i) => i + 1), CARD_CYCLE_MS);
+    return () => clearInterval(id);
+  }, [view, visibleCount, openMenu]);
+
   if (items.length === 0) return null;
 
   const dayIdx = cardDayIndex();
@@ -2895,11 +2938,6 @@ function ChecklistChannel({
   const visibleItems = items.filter((it) => !hidden.has(it.id));
   const hiddenCount = items.length - visibleItems.length;
   const canRegenerate = items.some((it) => it.variants.length > 1);
-
-  // Columns view: 3 cards sit in one row; 4 (Family) go 2x2 so each stays large.
-  const gridCols =
-    visibleItems.length >= 4 ? "md:grid-cols-2" : "md:grid-cols-3";
-
 
   // The personal channels carry a quiet doorway to /mirror/extra-fun.
   const hasExtraFun = channel === "stephen" || channel === "whitney";
@@ -3025,19 +3063,20 @@ function ChecklistChannel({
           All cards hidden — use the menu to bring them back.
         </p>
       </div>
-    ) : view === 3 ? (
-      <div className={cn("grid flex-1 grid-cols-1 gap-3", gridCols)}>
-        {visibleItems.map((item) => renderCard(item))}
+    ) : view === 1 ? (
+      // 1-up: one big card at a time, auto-cycling through the set.
+      <div className="flex min-h-0 flex-1 flex-col">
+        {renderCard(
+          visibleItems[cycleIdx % visibleItems.length],
+          undefined,
+          "min-h-0 flex-1"
+        )}
       </div>
     ) : (
-      // 1-up / 2-up: big cards that snap-scroll vertically through the set.
+      // 2-up: big cards that snap-scroll vertically through the set.
       <div className="flex min-h-0 flex-1 snap-y snap-mandatory flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visibleItems.map((item) =>
-          renderCard(
-            item,
-            { height: view === 1 ? "100%" : "calc(50% - 6px)" },
-            "shrink-0 snap-start"
-          )
+          renderCard(item, { height: "calc(50% - 6px)" }, "shrink-0 snap-start")
         )}
       </div>
     )}
@@ -4149,7 +4188,7 @@ function BogoRow({
   onToggleStar: (id: number, starred: boolean) => void;
 }) {
   return (
-    <li className="flex items-baseline gap-2 text-sm">
+    <li className="flex items-baseline gap-2 text-base">
       <button
         onClick={() => onToggleStar(deal.id, !deal.starred)}
         aria-label={deal.starred ? "Unstar deal" : "Star deal"}
@@ -4285,6 +4324,54 @@ function MealsCard({ dinner }: { dinner: DinnerData }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+// Dedicated full-screen Deals channel: one big column that rotates between
+// the BOGO deals list and this week's meal ideas (when both exist), so the
+// content gets the whole screen instead of a small widget tile.
+const DEALS_ROTATE_MS = 15000;
+
+function DealsChannel({
+  bogos,
+  dinner,
+  onToggleStar,
+  headerExtra,
+}: {
+  bogos: BogoData | null;
+  dinner: DinnerData | null;
+  onToggleStar: (id: number, starred: boolean) => void;
+  headerExtra?: React.ReactNode;
+}) {
+  const hasDeals = (bogos?.deals.length ?? 0) > 0;
+  const hasMeals = (dinner?.meals.length ?? 0) > 0;
+  const paneCount = (hasDeals ? 1 : 0) + (hasMeals ? 1 : 0);
+
+  const [paneIdx, setPaneIdx] = useState(0);
+  useEffect(() => {
+    if (paneCount < 2) return;
+    const id = setInterval(() => setPaneIdx((i) => i + 1), DEALS_ROTATE_MS);
+    return () => clearInterval(id);
+  }, [paneCount]);
+
+  const showMeals = hasMeals && (!hasDeals || paneIdx % 2 === 1);
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col gap-2">
+      <SectionHeader
+        title={showMeals ? "This Week's Meals" : "BOGO Deals"}
+        icon={showMeals ? UtensilsCrossed : Tag}
+        items={[]}
+        controls={headerExtra}
+      />
+      <div className="min-h-0 flex-1">
+        {showMeals && dinner ? (
+          <MealsCard dinner={dinner} />
+        ) : bogos ? (
+          <BogosCard bogos={bogos} onToggleStar={onToggleStar} />
+        ) : null}
+      </div>
+    </section>
   );
 }
 
