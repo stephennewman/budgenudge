@@ -1698,7 +1698,7 @@ export default function MirrorPage() {
   // card jumps to it.
   const sections = useMemo(() => {
     return [
-      { id: "today", label: "Today", widgets: [] as WidgetDef[] },
+      { id: "today", label: "News", widgets: [] as WidgetDef[] },
       ...CATEGORIES.map((c) => ({
         id: c.id,
         label: c.label,
@@ -2170,7 +2170,7 @@ export default function MirrorPage() {
           (activeSection.id === "today" ? (
             <section key="today" className="flex min-h-0 flex-1 flex-col gap-2">
               <SectionHeader
-                title="Today"
+                title="News"
                 icon={CalendarClock}
                 items={[]}
                 controls={fullscreenControl}

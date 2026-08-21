@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Newspaper, PartyPopper, X } from "lucide-react";
-import { cn } from "@/utils/styles";
+import { ExternalLink, Newspaper, X } from "lucide-react";
 
-// "Today" channel for the mirror: two glanceable columns — the day's progress
-// with its national days, and the top news stories (tap to read in place).
+// "News" channel for the mirror: one big card with the top news stories as
+// glanceable bullet points (tap to read in place).
 
-type NationalDay = { name: string; url: string | null };
 type NewsItem = { title: string; link: string | null };
 type NewsSection = { id: string; label: string; items: NewsItem[] };
 
@@ -18,17 +16,8 @@ type Reader = {
   paragraphs: string[] | null; // null = loading
 };
 
-// Headlines shown in the top-stories column.
+// Headlines shown as bullet points.
 const HEADLINES_SHOWN = 3;
-
-const CHIP_STYLES = [
-  "bg-amber-400/25 text-amber-100",
-  "bg-rose-400/25 text-rose-100",
-  "bg-sky-400/25 text-sky-100",
-  "bg-emerald-400/25 text-emerald-100",
-  "bg-violet-400/25 text-violet-100",
-  "bg-orange-400/25 text-orange-100",
-];
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -45,7 +34,6 @@ export function TodayChannel({
   const today = useMemo(() => new Date(), []);
   const todayIso = isoDate(today);
 
-  const [nationalDays, setNationalDays] = useState<NationalDay[]>([]);
   const [newsSections, setNewsSections] = useState<NewsSection[]>([]);
   const [reader, setReader] = useState<Reader | null>(null);
 
@@ -75,19 +63,12 @@ export function TodayChannel({
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const [todayRes, newsRes] = await Promise.allSettled([
-        fetch(`/api/mirror/today?date=${todayIso}`),
-        fetch("/api/mirror/news?sections=1"),
-      ]);
-      if (!active) return;
-      if (todayRes.status === "fulfilled" && todayRes.value.ok) {
-        const d = await todayRes.value.json();
-        setNationalDays((d.nationalDays ?? []).slice(0, 4));
-      }
-      if (newsRes.status === "fulfilled" && newsRes.value.ok) {
-        const d = await newsRes.value.json();
-        setNewsSections(d.sections ?? []);
-      }
+      const newsRes = await fetch("/api/mirror/news?sections=1").catch(
+        () => null
+      );
+      if (!active || !newsRes || !newsRes.ok) return;
+      const d = await newsRes.json();
+      setNewsSections(d.sections ?? []);
     };
     load();
     return () => {
@@ -95,92 +76,44 @@ export function TodayChannel({
     };
   }, [todayIso]);
 
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
-  const dayOfYear =
-    Math.floor((today.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
-  const isLeap = new Date(today.getFullYear(), 1, 29).getDate() === 29;
-  const daysInYear = isLeap ? 366 : 365;
-  const yearPct = Math.round((dayOfYear / daysInYear) * 100);
-
   const topSection =
     newsSections.find((s) => s.id === "top") ?? newsSections[0] ?? null;
 
   const cardShell =
-    "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md";
+    "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-8 backdrop-blur-md";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2">
-        {/* Column 1: day progress + national days */}
-        <div className={cardShell}>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-            <span className="text-xl font-semibold text-white/90 md:text-2xl">
-              Day {dayOfYear} of {daysInYear}
-            </span>
-            <span className="text-sm text-white/55">
-              {daysInYear - dayOfYear} days left in {today.getFullYear()}
-            </span>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
-              style={{ width: `${yearPct}%` }}
-            />
-          </div>
-          {nationalDays.length > 0 && (
-            <div className="mt-6">
-              <span className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/60">
-                <PartyPopper className="h-3.5 w-3.5 text-amber-300/90" />
-                Today is
-              </span>
-              <div className="mt-3 flex flex-wrap items-center gap-2.5">
-                {nationalDays.map((d, i) => (
-                  <span
-                    key={d.name}
-                    className={cn(
-                      "rounded-full px-4 py-1.5 text-sm font-medium md:text-base",
-                      CHIP_STYLES[i % CHIP_STYLES.length]
-                    )}
-                  >
-                    {d.name}
+      {/* One big card: top stories as bullet points */}
+      <div className={cardShell}>
+        <div className="mb-6 flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-400/25 text-sky-200">
+            <Newspaper className="h-4 w-4" />
+          </span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
+            Top stories
+          </span>
+        </div>
+        {topSection ? (
+          <ul className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {topSection.items.slice(0, HEADLINES_SHOWN).map((n, i) => (
+              <li key={i}>
+                <button
+                  onClick={() => openArticle(n, "Top stories")}
+                  disabled={!n.link}
+                  className="flex w-full items-start gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-white/10"
+                >
+                  <span className="mt-4 h-2 w-2 shrink-0 rounded-full bg-sky-300/70" />
+                  <span className="text-[30px] font-medium leading-snug text-white/90">
+                    {n.title}
                   </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Column 2: top stories */}
-        <div className={cardShell}>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-400/25 text-sky-200">
-              <Newspaper className="h-4 w-4" />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider text-white/70">
-              Top stories
-            </span>
-          </div>
-          {topSection ? (
-            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {topSection.items.slice(0, HEADLINES_SHOWN).map((n, i) => (
-                <li key={i}>
-                  <button
-                    onClick={() => openArticle(n, "Top stories")}
-                    disabled={!n.link}
-                    className="flex w-full items-start gap-3 rounded-lg px-2 py-2 text-left transition hover:bg-white/10"
-                  >
-                    <span className="mt-2.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300/70" />
-                    <span className="text-base font-medium leading-snug text-white/90 md:text-lg">
-                      {n.title}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="text-sm text-white/50">Loading today&apos;s news…</div>
-          )}
-        </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-sm text-white/50">Loading today&apos;s news…</div>
+        )}
       </div>
 
       {/* Slide-out article reader */}
