@@ -34,6 +34,7 @@ import {
   friendsKeepForDate,
 } from "@/utils/mirror/friends-content";
 import { HoneyDoCard } from "./honeydo-card";
+import { SparkTeaser } from "./spark/teaser";
 import { TodayChannel } from "./today-channel";
 import { STEPHEN_GROWTH, STEPHEN_CONNECT } from "@/utils/mirror/stephen-content";
 import { WHITNEY_GROWTH, WHITNEY_CONNECT } from "@/utils/mirror/whitney-content";
@@ -304,6 +305,21 @@ const ORDER_KEY = "mirror.order.v3";
 const SIZES_KEY = "mirror.sizes.v3";
 const HIDDEN_KEY = "mirror.hidden.v3";
 
+// Right rail width: draggable via the divider, persisted per device.
+const RAIL_WIDTH_KEY = "mirror.rail.width";
+const RAIL_DEFAULT_WIDTH = 480;
+const RAIL_MIN_WIDTH = 280;
+const RAIL_MAX_WIDTH = 800;
+
+// Keep the rail within bounds and leave the main column at least 400px.
+function clampRailWidth(w: number): number {
+  const max = Math.min(
+    RAIL_MAX_WIDTH,
+    typeof window !== "undefined" ? window.innerWidth - 400 : RAIL_MAX_WIDTH
+  );
+  return Math.min(max, Math.max(RAIL_MIN_WIDTH, Math.round(w)));
+}
+
 // Sidebar display mode: full labels, icon-only rail, or fully hidden.
 type NavMode = "full" | "icons" | "hidden";
 const NAV_MODE_KEY = "mirror.nav.mode";
@@ -391,6 +407,49 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 
 // How long each channel stays on screen before auto-advancing.
 const ROTATE_MS = 30000;
+
+// --- Smart rotation playlist -------------------------------------------------
+//
+// The mirror is view-only (nobody taps it day to day), so instead of looping
+// every channel equally, auto-rotation plays a curated set per time of day
+// and day of week, tuned for Stephen & Whitney:
+//   - Dawn/morning: faith, weather, news, money, and each person's own focus.
+//   - Weekday midday: news, money, and a nudge to reach out to friends.
+//   - Late afternoon: dinner-decision time, so BOGO/dinner deals surface.
+//   - Thu/Fri + weekend: events and deals lead, for weekend planning.
+//   - Evening/night: family, marriage, faith, and what to watch.
+//   - Sunday leans on faith.
+// Channels not in the current playlist are still reachable from the left nav;
+// playlist channels with no data today are skipped automatically.
+function smartPlaylist(part: DayPart, day: number): string[] {
+  const weekend = day === 0 || day === 6;
+  const sunday = day === 0;
+  const planning = day === 4 || day === 5; // Thu/Fri: weekend planning
+  switch (part) {
+    case "dawn":
+      return sunday
+        ? ["faith", "weather", "today", "love"]
+        : ["faith", "weather", "today", "stephen", "whitney"];
+    case "morning":
+      if (sunday) return ["faith", "weather", "family", "today", "events"];
+      if (weekend) return ["weather", "events", "family", "deals", "today"];
+      return ["weather", "today", "money", "stephen", "whitney", "faith"];
+    case "midday":
+      return weekend
+        ? ["events", "weather", "family", "movies", "today"]
+        : ["today", "weather", "money", "friends"];
+    case "afternoon":
+      if (weekend) return ["events", "weather", "family", "deals", "today"];
+      if (planning) return ["weather", "events", "deals", "today", "family"];
+      return ["weather", "deals", "family", "friends", "today"];
+    case "evening":
+      return planning
+        ? ["events", "movies", "deals", "love", "family"]
+        : ["family", "love", "movies", "faith", "weather"];
+    case "night":
+      return ["love", "faith", "movies", "weather"];
+  }
+}
 
 // Sensible default width for each widget based on how much it shows.
 const DEFAULT_SIZE: Record<string, Size> = {
@@ -643,6 +702,40 @@ export default function MirrorPage() {
   // When the next auto-advance fires (ms epoch), for the countdown display.
   const [rotateAt, setRotateAt] = useState<number | null>(null);
   const [navMode, setNavMode] = useState<NavMode>("full");
+
+  // Right rail width, adjustable by dragging the divider next to it.
+  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT_WIDTH);
+  useEffect(() => {
+    const saved = readJSON<number>(RAIL_WIDTH_KEY);
+    setRailWidth(
+      clampRailWidth(typeof saved === "number" ? saved : RAIL_DEFAULT_WIDTH)
+    );
+  }, []);
+
+  const startRailDrag = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const move = (ev: PointerEvent) => {
+      setRailWidth(clampRailWidth(window.innerWidth - ev.clientX));
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setRailWidth((w) => {
+        writeJSON(RAIL_WIDTH_KEY, w);
+        return w;
+      });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }, []);
+
+  const resetRailWidth = useCallback(() => {
+    const w = clampRailWidth(RAIL_DEFAULT_WIDTH);
+    setRailWidth(w);
+    writeJSON(RAIL_WIDTH_KEY, w);
+  }, []);
 
   // Load saved customization once on mount.
   useEffect(() => {
@@ -1743,9 +1836,26 @@ export default function MirrorPage() {
   // The Today channel holds rotation while its article reader is open.
   const [holdRotation, setHoldRotation] = useState(false);
 
-  // Auto-advance to the next channel. Resets whenever the index changes (so a
-  // manual selection gives you a fresh 30s) or the screen is touched, and
+  // The playlist auto-rotation follows right now, given the time of day and
+  // day of week. Recomputes when the day part or weekday rolls over.
+  const dayOfWeek = now.getDay();
+  const playlistIds = useMemo(
+    () => smartPlaylist(part, dayOfWeek),
+    [part, dayOfWeek]
+  );
+
+  // Auto-advance to the next channel in the smart playlist. If the viewer
+  // manually navigated to a channel outside the playlist, the next advance
+  // returns to the top of the playlist. Resets whenever the index changes (so
+  // a manual selection gives you a fresh 30s) or the screen is touched, and
   // pauses while editing or reading an article.
+  //
+  // `sections` gets a fresh identity on most renders (and the clock re-renders
+  // every second), so the effect keys off a stable id string and reads the
+  // live array through a ref — depending on the array itself would loop.
+  const sectionsRef = useRef(sections);
+  sectionsRef.current = sections;
+  const sectionIdsKey = sections.map((s) => s.id).join(",");
   useEffect(() => {
     if (!autoRotate || editMode || holdRotation || sectionCount <= 1) {
       setRotateAt(null);
@@ -1753,10 +1863,32 @@ export default function MirrorPage() {
     }
     setRotateAt(Date.now() + ROTATE_MS);
     const t = setTimeout(() => {
-      setActiveIndex((i) => (i + 1) % sectionCount);
+      setActiveIndex((i) => {
+        const secs = sectionsRef.current;
+        // Playlist entries only count if the channel actually has data today.
+        const available = playlistIds.filter((id) =>
+          secs.some((s) => s.id === id)
+        );
+        // Not enough playlist channels to rotate through: plain loop keeps
+        // the display alive rather than sticking on one channel.
+        if (available.length < 2) return (i + 1) % secs.length;
+        const pos = available.indexOf(secs[i]?.id ?? "");
+        const nextId = available[(pos + 1) % available.length];
+        const nextIdx = secs.findIndex((s) => s.id === nextId);
+        return nextIdx >= 0 ? nextIdx : (i + 1) % secs.length;
+      });
     }, ROTATE_MS);
     return () => clearTimeout(t);
-  }, [autoRotate, editMode, holdRotation, sectionCount, activeIndex, interactionTick]);
+  }, [
+    autoRotate,
+    editMode,
+    holdRotation,
+    sectionCount,
+    activeIndex,
+    interactionTick,
+    playlistIds,
+    sectionIdsKey,
+  ]);
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
@@ -1825,76 +1957,14 @@ export default function MirrorPage() {
           )}
         >
           {/* In fullscreen, Safari/iPadOS overlays a system exit (X) control in
-              the top-left corner; push the clock down so it stays clear of it. */}
-          {/* Clock card jumps to the Today channel. */}
-          {navMode === "icons" ? (
-            <button
-              onClick={() => {
-                const i = sections.findIndex((s) => s.id === "today");
-                if (i >= 0) goTo(i);
-              }}
-              className={cn(
-                "block w-full rounded-xl bg-white/10 px-1 py-2 text-center transition hover:bg-white/20",
-                isFullscreen && "mt-24"
-              )}
-            >
-              <div className="text-sm font-semibold leading-tight tabular-nums">
-                {clockDigits}
-              </div>
-              <div className="text-[10px] font-medium text-white/60">{meridiem}</div>
-            </button>
-          ) : (
-          <button
-            onClick={() => {
-              const i = sections.findIndex((s) => s.id === "today");
-              if (i >= 0) goTo(i);
-            }}
+              the top-left corner; push the nav down so it stays clear of it.
+              The clock lives at the top of the right rail. */}
+          <nav
             className={cn(
-              "block w-full rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-3.5 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30",
+              "flex-1 space-y-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
               isFullscreen && "mt-24"
             )}
           >
-            <div className="flex items-stretch gap-2">
-              {/* Digits scale with the card width (cqw units) but keep the
-                  font's natural proportions, so they match the product UI. */}
-              <div className="min-w-0 flex-1 [container-type:inline-size]">
-                <div className="whitespace-nowrap text-[35cqw] font-semibold leading-none tracking-tight tabular-nums">
-                  {clockDigits}
-                </div>
-              </div>
-              {/* AM/PM, right of the digits. */}
-              <div className="flex w-9 shrink-0 flex-col">
-                <span className="flex flex-1 items-center justify-center rounded-md bg-white/10 text-[11px] font-semibold leading-none text-white/80">
-                  {meridiem}
-                </span>
-              </div>
-            </div>
-            {/* Date spans the card: weekday left, month + day right. */}
-            <div className="mt-2 flex items-baseline justify-between gap-2 [container-type:inline-size]">
-              <span className="text-[8cqw] font-medium leading-none text-white/85">
-                {dateWeekday}
-              </span>
-              <span className="text-[8cqw] font-medium leading-none text-white/60">
-                {dateRest}
-              </span>
-            </div>
-            {/* Day completion: how far through today we are, with a noon tick. */}
-            <div className="relative mt-2.5 pb-3">
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
-                  style={{ width: `${dayPct}%` }}
-                />
-              </div>
-              <div className="absolute left-1/2 top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-white/50" />
-              <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[9px] font-medium leading-none text-white/45">
-                12p
-              </span>
-            </div>
-          </button>
-          )}
-
-          <nav className="mt-3 flex-1 space-y-1 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {sections.map((s, i) => {
               const Icon = NAV_ICONS[s.id] ?? LayoutGrid;
               return (
@@ -2279,15 +2349,37 @@ export default function MirrorPage() {
           ))}
         </main>
 
+        {/* Draggable divider: resize the right rail (double-tap to reset). */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize right column"
+          onPointerDown={startRailDrag}
+          onDoubleClick={resetRailWidth}
+          className="group hidden w-2 shrink-0 cursor-col-resize touch-none items-center justify-center sm:flex"
+        >
+          <div className="h-12 w-1 rounded-full bg-white/20 transition group-hover:bg-white/50 group-active:bg-white/60" />
+        </div>
+
         {/* Persistent right rail: day progress + national days + a compact
             weather snapshot. Stays put across every channel. Hidden on
             narrow screens so it never crowds the main content. */}
         <RightRail
+          width={railWidth}
           current={current}
           currentInfo={currentInfo}
           data={data}
           unitLabel={unitLabel}
           hours={hours}
+          clockDigits={clockDigits}
+          meridiem={meridiem}
+          dateWeekday={dateWeekday}
+          dateRest={dateRest}
+          dayPct={dayPct}
+          onClockClick={() => {
+            const i = sections.findIndex((s) => s.id === "today");
+            if (i >= 0) goTo(i);
+          }}
         />
       </div>
     </div>
@@ -2301,17 +2393,31 @@ export default function MirrorPage() {
 // snapshot — so they're always visible regardless of the active channel.
 
 function RightRail({
+  width,
   current,
   currentInfo,
   data,
   unitLabel,
   hours,
+  clockDigits,
+  meridiem,
+  dateWeekday,
+  dateRest,
+  dayPct,
+  onClockClick,
 }: {
+  width: number;
   current: NonNullable<WeatherData["current"]> | undefined;
   currentInfo: { label: string; Icon: LucideIcon } | null;
   data: WeatherData | null;
   unitLabel: string;
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
+  clockDigits: string;
+  meridiem: string | undefined;
+  dateWeekday: string;
+  dateRest: string;
+  dayPct: number;
+  onClockClick: () => void;
 }) {
   // The rail never unmounts, so a mount-only date would go stale on a display
   // left running for days. Roll `today` over at the day boundary (checked each
@@ -2379,7 +2485,55 @@ function RightRail({
   const span = Math.max(1, weekMax - weekMin);
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex xl:w-72 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <aside
+      className="hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ width }}
+    >
+      {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
+          the Today channel. */}
+      <button
+        onClick={onClockClick}
+        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30"
+      >
+        <div className="flex items-stretch gap-3">
+          {/* Digits scale with the card width (cqw units) but keep the
+              font's natural proportions. */}
+          <div className="min-w-0 flex-1 [container-type:inline-size]">
+            <div className="whitespace-nowrap text-[19cqw] font-semibold leading-none tracking-tight tabular-nums">
+              {clockDigits}
+            </div>
+          </div>
+          {/* AM/PM, right of the digits. */}
+          <div className="flex w-12 shrink-0 flex-col">
+            <span className="flex flex-1 items-center justify-center rounded-md bg-white/10 text-sm font-semibold leading-none text-white/80">
+              {meridiem}
+            </span>
+          </div>
+        </div>
+        {/* Date spans the card: weekday left, month + day right. */}
+        <div className="mt-2 flex items-baseline justify-between gap-2 [container-type:inline-size]">
+          <span className="text-[5cqw] font-medium leading-none text-white/85">
+            {dateWeekday}
+          </span>
+          <span className="text-[5cqw] font-medium leading-none text-white/60">
+            {dateRest}
+          </span>
+        </div>
+        {/* Day completion: how far through today we are, with a noon tick. */}
+        <div className="relative mt-3 pb-3">
+          <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
+              style={{ width: `${dayPct}%` }}
+            />
+          </div>
+          <div className="absolute left-1/2 top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-white/50" />
+          <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[9px] font-medium leading-none text-white/45">
+            12p
+          </span>
+        </div>
+      </button>
+
       {/* Day of year + national days */}
       <div className={miniShell}>
         <div className="flex items-baseline justify-between gap-2">
@@ -2567,8 +2721,19 @@ const CARDS_OFFSET_PREFIX = "mirror.cards.offsets.";
 type CardView = 1 | 2;
 const CARDS_VIEW_PREFIX = "mirror.cards.view.";
 
-// How long the 1-up view lingers on each card before showing the next.
-const CARD_CYCLE_MS = 10000;
+// How long the 1-up view lingers on each card: driven by how long a normal
+// person needs to read it (~200 wpm), plus a beat to settle, clamped so very
+// short cards don't flash by and very long ones don't stall the rotation.
+const CARD_READ_WPM = 200;
+const CARD_READ_BASE_MS = 3000;
+const CARD_READ_MIN_MS = 6000;
+const CARD_READ_MAX_MS = 30000;
+
+function cardReadMs(text: string, footnote?: string | null): number {
+  const words = `${text} ${footnote ?? ""}`.trim().split(/\s+/).filter(Boolean).length;
+  const ms = CARD_READ_BASE_MS + words * (60_000 / CARD_READ_WPM);
+  return Math.min(CARD_READ_MAX_MS, Math.max(CARD_READ_MIN_MS, Math.round(ms)));
+}
 
 const VIEW_LABEL: Record<CardView, string> = {
   1: "1 card",
@@ -2642,6 +2807,18 @@ const asVariants = (pool: string[]): CardVariant[] =>
 // Card definitions per channel. Pool-backed cards rotate daily through the
 // same authored lists the `together` API uses; API-backed cards (verse, joke,
 // fun fact) show whatever today's fetch returned.
+// Spark's doorway, present in the couple/personal channels as a card that
+// looks stuck loading. renderCard special-cases "*-spark" ids to render
+// <SparkTeaser /> (see spark/teaser.tsx).
+const sparkCard = (channel: string): ChecklistItem => ({
+  id: `${channel}-spark`,
+  title: "Loading",
+  chip: "bg-white/15 text-white/70",
+  tint: "rgba(255,255,255,0.10)",
+  icon: Sparkles,
+  variants: [{ text: "Loading ;)" }],
+});
+
 function channelCards(
   channel: string,
   together: Together | null
@@ -2665,14 +2842,7 @@ function channelCards(
           icon: HeartHandshake,
           variants: asVariants(STEPHEN_CONNECT),
         },
-        {
-          id: "stephen-girls",
-          title: "With the girls",
-          chip: "bg-teal-400/25 text-teal-200",
-          tint: "rgba(45,212,191,0.16)",
-          icon: Baby,
-          variants: asVariants(PARENTING_TIPS),
-        },
+        sparkCard(channel),
       ];
     case "whitney":
       return [
@@ -2692,14 +2862,7 @@ function channelCards(
           icon: Heart,
           variants: asVariants(WHITNEY_CONNECT),
         },
-        {
-          id: "whitney-family",
-          title: "Family moment",
-          chip: "bg-sky-400/25 text-sky-200",
-          tint: "rgba(56,189,248,0.16)",
-          icon: Users,
-          variants: asVariants(FAMILY_PROMPTS),
-        },
+        sparkCard(channel),
       ];
     case "love":
       return [
@@ -2730,6 +2893,7 @@ function channelCards(
             footnote: `— ${q.author}`,
           })),
         },
+        sparkCard(channel),
       ];
     case "family":
       return [
@@ -2914,21 +3078,6 @@ function ChecklistChannel({
     setOpenMenu(null);
   };
 
-  // 1-up view auto-advances through the visible cards so one big readable
-  // card still surfaces everything. Paused while a card menu is open so the
-  // card doesn't swap out from under it.
-  const visibleCount = items.filter((it) => !hidden.has(it.id)).length;
-  useEffect(() => {
-    setCycleIdx(0);
-  }, [channel, view]);
-  useEffect(() => {
-    if (view !== 1 || visibleCount < 2 || openMenu !== null) return;
-    const id = setInterval(() => setCycleIdx((i) => i + 1), CARD_CYCLE_MS);
-    return () => clearInterval(id);
-  }, [view, visibleCount, openMenu]);
-
-  if (items.length === 0) return null;
-
   const dayIdx = cardDayIndex();
   const variantFor = (item: ChecklistItem): CardVariant => {
     const len = item.variants.length;
@@ -2936,6 +3085,29 @@ function ChecklistChannel({
   };
 
   const visibleItems = items.filter((it) => !hidden.has(it.id));
+  const visibleCount = visibleItems.length;
+
+  // 1-up view auto-advances through the visible cards so one big readable
+  // card still surfaces everything. Each card stays up for as long as a
+  // normal reader needs for its text, then the next one shows. Paused while
+  // a card menu is open so the card doesn't swap out from under it.
+  const cycleItem =
+    visibleCount > 0 ? visibleItems[cycleIdx % visibleCount] : null;
+  const cycleVariant = cycleItem ? variantFor(cycleItem) : null;
+  const cycleMs = cycleVariant
+    ? cardReadMs(cycleVariant.text, cycleVariant.footnote)
+    : 0;
+  useEffect(() => {
+    setCycleIdx(0);
+  }, [channel, view]);
+  useEffect(() => {
+    if (view !== 1 || visibleCount < 2 || openMenu !== null) return;
+    const id = setTimeout(() => setCycleIdx((i) => i + 1), cycleMs);
+    return () => clearTimeout(id);
+  }, [view, visibleCount, openMenu, cycleIdx, cycleMs]);
+
+  if (items.length === 0) return null;
+
   const hiddenCount = items.length - visibleItems.length;
   const canRegenerate = items.some((it) => it.variants.length > 1);
 
@@ -2974,6 +3146,14 @@ function ChecklistChannel({
     style?: React.CSSProperties,
     extraClass?: string
   ) => {
+    // Spark's doorway renders its own card chrome (fake loading widget).
+    if (item.id.endsWith("-spark")) {
+      return (
+        <div key={item.id} className={cn("relative", extraClass)} style={style}>
+          <SparkTeaser />
+        </div>
+      );
+    }
     const Icon = item.icon;
     const variant = variantFor(item);
     const menuOpen = openMenu === item.id;
@@ -2989,6 +3169,13 @@ function ChecklistChannel({
           ...style,
         }}
       >
+        {/* Oversized watermark icon gives each card a visual identity without
+            competing with the text. */}
+        <Icon
+          aria-hidden
+          className="pointer-events-none absolute -bottom-10 -right-10 h-52 w-52 text-white/[0.08] md:h-72 md:w-72"
+          strokeWidth={0.9}
+        />
         <div className="relative flex items-center gap-2.5">
           <button
             onClick={() => setOpenMenu(menuOpen ? null : item.id)}
@@ -3030,7 +3217,7 @@ function ChecklistChannel({
 
         {/* Scrollable, vertically centered body; type size adapts to length
             so the text stays inside the card. */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="my-auto py-2">
             <p className={cardBodyClass(variant.text)}>{variant.text}</p>
             {variant.footnote && (
@@ -3063,13 +3250,42 @@ function ChecklistChannel({
           All cards hidden — use the menu to bring them back.
         </p>
       </div>
-    ) : view === 1 ? (
-      // 1-up: one big card at a time, auto-cycling through the set.
-      <div className="flex min-h-0 flex-1 flex-col">
-        {renderCard(
-          visibleItems[cycleIdx % visibleItems.length],
-          undefined,
-          "min-h-0 flex-1"
+    ) : view === 1 && cycleItem ? (
+      // 1-up: one big card at a time. A progress bar fills story-style
+      // over the card's reading time; when it empties, the next card shows.
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        {renderCard(cycleItem, undefined, "min-h-0 flex-1")}
+        {visibleCount > 1 && (
+          <div className="flex shrink-0 items-center gap-3">
+            {/* Which cards are in today's cycle; the current one is lit. */}
+            <div className="flex items-center gap-1.5">
+              {visibleItems.map((it, idx) => {
+                const DotIcon = it.icon;
+                const active = idx === cycleIdx % visibleCount;
+                return (
+                  <span
+                    key={it.id}
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-500",
+                      active ? it.chip : "bg-white/5 text-white/30"
+                    )}
+                  >
+                    <DotIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                  </span>
+                );
+              })}
+            </div>
+            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                key={`${cycleItem.id}-${cycleIdx}-${openMenu ? "paused" : "run"}`}
+                className="h-full origin-left rounded-full bg-gradient-to-r from-white/75 to-white/45"
+                style={{
+                  animation: `mirror-card-fill ${cycleMs}ms linear forwards`,
+                  animationPlayState: openMenu !== null ? "paused" : "running",
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
     ) : (
