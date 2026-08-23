@@ -91,7 +91,7 @@ const DOUBLE_TAP_MS = 450;
 const IDLE_SECONDS = 30;
 
 // What each fire level asks the generator for (mirrors HEAT_LABELS in the API).
-const HEAT_NAMES = ["Flirty", "Explicit", "No limits"];
+const HEAT_NAMES = ["Flirty", "Explicit", "No limits", "Off the charts"];
 
 // Rotates on the loading card while a batch generates (~10-17s).
 const LOADING_LINES = [
@@ -300,34 +300,16 @@ export default function SparkPage() {
       ) : (
         // ----------------------------- UNLOCKED -----------------------------
         <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
-          {/* Top bar: obvious exit straight back to the mirror, fires beside
-              it, person label + auto-return countdown on the right. */}
+          {/* Top bar: obvious exit straight back to the mirror on the left,
+              person label + auto-return countdown on the right. */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push("/mirror")}
-              className="flex items-center gap-1.5 rounded-full border border-neutral-700 px-3.5 py-1.5 text-xs font-medium text-neutral-300 hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-700 px-3.5 py-1.5 text-xs font-medium text-neutral-300 hover:bg-white/10 hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Back to app
             </button>
-            {[1, 2, 3].map((h) => (
-              <button
-                key={h}
-                onClick={() => {
-                  setHeat(h);
-                  generate(h); // deal a fresh batch at the new heat right away
-                }}
-                disabled={loading}
-                className="rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
-                style={{
-                  backgroundColor: heat === h ? accent : "transparent",
-                  color: heat === h ? "#0a0a0a" : "#737373",
-                  border: `1px solid ${heat === h ? accent : "#404040"}`,
-                }}
-              >
-                {"\u{1F525}".repeat(h)}
-              </button>
-            ))}
             <div className="ml-auto flex items-center gap-2">
               <span
                 className="text-xs font-semibold uppercase tracking-[0.2em]"
@@ -339,6 +321,28 @@ export default function SparkPage() {
                 {idleLeft}s
               </span>
             </div>
+          </div>
+
+          {/* Heat selector on its own row so the four levels have room. */}
+          <div className="mt-3 flex items-center gap-2">
+            {[1, 2, 3, 4].map((h) => (
+              <button
+                key={h}
+                onClick={() => {
+                  setHeat(h);
+                  generate(h); // deal a fresh batch at the new heat right away
+                }}
+                disabled={loading}
+                className="whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                style={{
+                  backgroundColor: heat === h ? accent : "transparent",
+                  color: heat === h ? "#0a0a0a" : "#737373",
+                  border: `1px solid ${heat === h ? accent : "#404040"}`,
+                }}
+              >
+                {h === 4 ? "XXXX" : "\u{1F525}".repeat(h)}
+              </button>
+            ))}
           </div>
           <div className="mt-2 text-[11px] text-neutral-500">
             {HEAT_NAMES[heat - 1]} — tap a fire level for a fresh batch

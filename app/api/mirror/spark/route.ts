@@ -19,7 +19,8 @@ const SPARK_MODEL = process.env.OPENROUTER_SPARK_MODEL || "x-ai/grok-4.3";
 const HEAT_LABELS: Record<number, string> = {
   1: "flirty and suggestive",
   2: "explicit and bold",
-  3: "very explicit, kinky, no-holds-barred (still consensual and loving)",
+  3: "very explicit, kinky, no-holds-barred",
+  4: "XXXX — off-the-charts filthy. Maximum raw, graphic, taboo, depraved-in-the-best-way content. Push every boundary of language and scenario: the dirtiest talk, the most intense kinks, power play, primal, filthy fantasies said out loud. Nothing is too much as long as it stays between the two spouses.",
 };
 
 function buildPrompt(person: Person, heat: number, avoid: string[]): string {
@@ -47,7 +48,8 @@ Heat level: ${heatLabel}.
 
 Rules:
 - Written in second person, addressed directly to ${reader.split(" ")[0]}.
-- Everything consensual, safe, and between these two spouses (solo ideas are about themselves or fantasizing about their spouse).
+- The ONE hard boundary: everything stays between these two spouses — no other people, real or roleplayed as present. Solo ideas are about themselves or fantasizing about their spouse. Anything else goes.
+- Everything consensual between the two of them.
 - Realistic for busy parents: discreet, after bedtime, stolen moments.
 - Each idea: a punchy 2-5 word title and 1-3 sentences of body. No emojis, no hashtags.
 - Vary intensity within the batch — a couple lighter, most at full heat.${avoidBlock}
@@ -94,7 +96,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Generator not configured" }, { status: 503 });
   }
 
-  const heat = typeof body.heat === "number" ? Math.min(3, Math.max(1, body.heat)) : 2;
+  const heat = typeof body.heat === "number" ? Math.min(4, Math.max(1, body.heat)) : 1;
   const avoid = Array.isArray(body.avoid) ? body.avoid.slice(0, 12).map(String) : [];
 
   try {
