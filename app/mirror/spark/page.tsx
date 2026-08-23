@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlarmClock,
   ArrowLeft,
+  Brain,
   Crown,
   Dices,
   Eye,
@@ -24,9 +25,12 @@ import {
   Gift,
   Hand,
   Heart,
+  HelpCircle,
   History,
   Home,
   Hourglass,
+  ListChecks,
+  Lock,
   MessageSquare,
   Mic,
   Move,
@@ -34,6 +38,8 @@ import {
   Shirt,
   Shuffle,
   Sparkles,
+  Split,
+  Star,
   Sunrise,
   Timer,
   VenetianMask,
@@ -82,6 +88,12 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   worship: Heart,
   hotpast: History,
   challenges: AlarmClock,
+  confessions: Lock,
+  "truth-or-dare": HelpCircle,
+  "would-you-rather": Split,
+  "bucket-list": ListChecks,
+  "know-me": Brain,
+  firsts: Star,
 };
 
 const PINK = "#ec4899";

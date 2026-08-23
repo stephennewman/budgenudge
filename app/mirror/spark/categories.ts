@@ -158,4 +158,34 @@ export const CATEGORIES: SparkCategory[] = [
     name: "Challenges",
     hint: "timed challenges with concrete numbers — sprints, marathons, quickies, speed rounds, endurance tests, beat-the-clock, number of positions before the timer, hold-out-as-long-as-you-can. Every idea includes a specific time limit, duration, or count",
   },
+  {
+    id: "confessions",
+    name: "Confessions",
+    hint: "present-day confessions to make to their spouse — secret desires, dirty thoughts they've had about them this week, things they've never admitted wanting, moments they were secretly turned on",
+  },
+  {
+    id: "truth-or-dare",
+    name: "Truth or Dare",
+    hint: "classic truth-or-dare between the two of them — each idea is one truth question or one dare, clearly labeled, ready to fire at their spouse",
+  },
+  {
+    id: "would-you-rather",
+    name: "Would You Rather",
+    hint: "dirty either/or questions to ask their spouse — two tempting options, spouse must pick one and explain why",
+  },
+  {
+    id: "bucket-list",
+    name: "Bucket List",
+    hint: "a sexual bucket-list item to propose adding to their shared list — something they've never done together, pitched with when and how to make it happen",
+  },
+  {
+    id: "know-me",
+    name: "How Well You Know Me",
+    hint: "sexy quiz questions to ask their spouse about themselves — what gets me going, my favorite spot, what I think about — with stakes for right and wrong answers",
+  },
+  {
+    id: "firsts",
+    name: "New Firsts",
+    hint: "a brand-new first for the two of them to have together — something neither has ever done with anyone, claimed as theirs alone",
+  },
 ];
