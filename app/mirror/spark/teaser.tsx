@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 // Spark's doorway, disguised as a channel card stuck loading. Mirrors the
@@ -12,6 +13,7 @@ const DOUBLE_TAP_MS = 450;
 
 export function SparkTeaser() {
   const lastTap = useRef<{ id: string; at: number }>({ id: "", at: 0 });
+  const router = useRouter();
 
   const onGlyphTap = (glyph: "word" | "wink") => {
     const now = Date.now();
@@ -19,7 +21,9 @@ export function SparkTeaser() {
       lastTap.current.id === glyph && now - lastTap.current.at < DOUBLE_TAP_MS;
     lastTap.current = { id: glyph, at: now };
     if (!isDouble) return;
-    window.location.href = `/mirror/spark?p=${glyph === "wink" ? "whitney" : "stephen"}`;
+    // Client-side navigation: no full page load, so no flash of the spark
+    // page's locked screen on the way in.
+    router.push(`/mirror/spark?p=${glyph === "wink" ? "whitney" : "stephen"}`);
   };
 
   return (

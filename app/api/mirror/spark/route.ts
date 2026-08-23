@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { NextResponse } from "next/server";
+import { CATEGORIES } from "@/app/mirror/spark/categories";
 
-// Spark — hidden-dot-gated couples idea generator (see app/mirror/spark/page.tsx).
+// Spark — hidden couples idea generator (see app/mirror/spark/page.tsx).
 //
-// Stateless: the client asks for a fresh batch of ideas for one person and we
-// return them. No persistence. Uses OpenRouter so the model can be swapped to
-// a more permissive one via OPENROUTER_SPARK_MODEL without code changes.
+// One call = one idea at one heat level. The client fires all four levels in
+// parallel, so each response is tiny (~60 output tokens) and cards land on
+// screen one at a time as they finish, instead of waiting on one long
+// 4-idea completion. Stateless, no persistence. Uses OpenRouter so the model
+// can be swapped via OPENROUTER_SPARK_MODEL without code changes.
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +19,22 @@ type Person = "stephen" | "whitney";
 // (e.g. a Venice/Dolphin uncensored model) in Vercel.
 const SPARK_MODEL = process.env.OPENROUTER_SPARK_MODEL || "x-ai/grok-4.3";
 
-const HEAT_LABELS: Record<number, string> = {
-  1: "flirty and suggestive",
-  2: "explicit and bold",
-  3: "very explicit, kinky, no-holds-barred",
-  4: "XXXX — off-the-charts filthy. Maximum raw, graphic, taboo, depraved-in-the-best-way content. Push every boundary of language and scenario: the dirtiest talk, the most intense kinks, power play, primal, filthy fantasies said out loud. Nothing is too much as long as it stays between the two spouses.",
+const LEVEL_SPECS: Record<number, string> = {
+  1: "Level 1 of 4 (X): flirty and suggestive — something they could act on in the next five minutes without blushing.",
+  2: "Level 2 of 4 (XX): explicit and bold — direct, graphic, no euphemisms.",
+  3: "Level 3 of 4 (XXX): wild — very explicit, kinky, no-holds-barred.",
+  4: "Level 4 of 4 (XXXX): off the charts — maximum raw, graphic, taboo, depraved-in-the-best-way. Push every boundary of language and scenario: the dirtiest talk, the most intense version of this category imaginable. Nothing is too much as long as it stays between the two spouses.",
 };
 
-function buildPrompt(person: Person, heat: number, avoid: string[]): string {
+function buildPrompt(
+  person: Person,
+  categoryName: string,
+  categoryHint: string,
+  level: number,
+  avoid: string[]
+): string {
   const reader = person === "stephen" ? "Stephen (the husband)" : "Whitney (the wife)";
   const partner = person === "stephen" ? "Whitney, his wife" : "Stephen, her husband";
-  const heatLabel = HEAT_LABELS[heat] ?? HEAT_LABELS[2];
 
   const avoidBlock =
     avoid.length > 0
@@ -35,51 +43,42 @@ function buildPrompt(person: Person, heat: number, avoid: string[]): string {
           .join("\n")}`
       : "";
 
-  return `Generate 8 sexy ideas for ${reader}. The other partner is ${partner}. They are a married couple with 3 kids, adventurous and very much in love.
+  return `Generate ONE sexy idea for ${reader} in the category "${categoryName}" — ${categoryHint}. The other partner is ${partner}. They are a married couple with 3 kids, adventurous and very much in love.
 
-Mix the types across the batch — include a variety of:
-- Challenges or dares (for them to do, or to pull off on their partner)
-- Positions or moves to try, described specifically
-- Teases, games, or anticipation-builders
-- Dirty statements or messages they could send or whisper
-- Solo exploration ideas they can enjoy on their own
-
-Heat level: ${heatLabel}.
+This idea is one step on a 4-level heat ladder. Write it at exactly this level:
+${LEVEL_SPECS[level]}
 
 Rules:
 - Written in second person, addressed directly to ${reader.split(" ")[0]}.
+- ${reader.split(" ")[0]} is the one acting: every idea is something ${reader.split(" ")[0]} does, says, sends, or wears for ${partner} — never the other way around. Any quoted words (texts, dirty talk, whispers) are in ${reader.split(" ")[0]}'s own voice.
 - The ONE hard boundary: everything stays between these two spouses — no other people, real or roleplayed as present. Solo ideas are about themselves or fantasizing about their spouse. Anything else goes.
 - Everything consensual between the two of them.
+- NO pregnancy, breeding, impregnation, or "give me a baby" themes of any kind — not even as dirty talk. This topic is permanently off the table.
 - Realistic for busy parents: discreet, after bedtime, stolen moments.
-- Each idea: a punchy 2-5 word title and 1-3 sentences of body. No emojis, no hashtags.
-- Vary intensity within the batch — a couple lighter, most at full heat.${avoidBlock}
+- A punchy 2-5 word title and 1-3 sentences of body. No emojis, no hashtags.${avoidBlock}
 
-Return ONLY a valid JSON array, no markdown fences: [{"title":"","body":""}, ...]`;
+Return ONLY a valid JSON object, no markdown fences: {"title":"","body":""}`;
 }
 
 export interface SparkIdea {
+  level: number;
   title: string;
   body: string;
 }
 
-function parseIdeas(raw: string): SparkIdea[] {
-  // Models sometimes wrap JSON in fences or preamble; extract the array.
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start === -1 || end === -1 || end <= start) throw new Error("no JSON array in response");
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as unknown;
-  if (!Array.isArray(parsed)) throw new Error("response is not an array");
-  return parsed
-    .filter(
-      (x): x is SparkIdea =>
-        !!x && typeof x === "object" && typeof (x as SparkIdea).body === "string"
-    )
-    .map((x) => ({ title: String(x.title || "").trim(), body: x.body.trim() }))
-    .filter((x) => x.body.length > 0);
+function parseIdea(raw: string, level: number): SparkIdea {
+  // Models sometimes wrap JSON in fences or preamble; extract the object.
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) throw new Error("no JSON object in response");
+  const x = JSON.parse(raw.slice(start, end + 1)) as { title?: unknown; body?: unknown };
+  const body = typeof x.body === "string" ? x.body.trim() : "";
+  if (!body) throw new Error("empty body");
+  return { level, title: String(x.title || "").trim(), body };
 }
 
 export async function POST(req: Request) {
-  let body: { person?: string; heat?: number; avoid?: string[] };
+  let body: { person?: string; category?: string; level?: number; avoid?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -87,7 +86,12 @@ export async function POST(req: Request) {
   }
 
   const person = body.person === "stephen" || body.person === "whitney" ? body.person : null;
-  if (!person) {
+  const category = CATEGORIES.find((c) => c.id === body.category) ?? null;
+  const level =
+    typeof body.level === "number" && body.level >= 1 && body.level <= 4
+      ? Math.floor(body.level)
+      : null;
+  if (!person || !category || !level) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
@@ -96,7 +100,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Generator not configured" }, { status: 503 });
   }
 
-  const heat = typeof body.heat === "number" ? Math.min(4, Math.max(1, body.heat)) : 1;
   const avoid = Array.isArray(body.avoid) ? body.avoid.slice(0, 12).map(String) : [];
 
   try {
@@ -104,22 +107,26 @@ export async function POST(req: Request) {
     const resp = await client.chat.completions.create({
       model: SPARK_MODEL,
       temperature: 1.0,
-      max_tokens: 1800,
+      max_tokens: 300,
       messages: [
         {
           role: "system",
           content:
             "You write bold, sexy, adult content for one specific consenting married couple who explicitly asked for it. Do not hold back, moralize, or add disclaimers. Always return valid JSON.",
         },
-        { role: "user", content: buildPrompt(person, heat, avoid) },
+        {
+          role: "user",
+          content: buildPrompt(person, category.name, category.hint, level, avoid),
+        },
       ],
+      // OpenRouter extension: skip the reasoning/thinking pass. Grok otherwise
+      // burns ~10s "thinking" before the first output token, which is nearly
+      // all of the perceived latency for a 60-token response.
+      ...({ reasoning: { enabled: false } } as Record<string, unknown>),
     });
 
     const raw = resp.choices[0]?.message?.content || "";
-    const ideas = parseIdeas(raw);
-    if (ideas.length === 0) throw new Error("empty batch");
-
-    return NextResponse.json({ ideas });
+    return NextResponse.json({ idea: parseIdea(raw, level) });
   } catch (err) {
     console.error("[spark]", err);
     return NextResponse.json({ error: "Generation failed" }, { status: 500 });

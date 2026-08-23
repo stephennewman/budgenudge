@@ -3922,9 +3922,9 @@ function BillsCard({ spend }: { spend: SpendData }) {
   );
 }
 
-// "Out & About" weekly calendar: 7 days as full-height vertical columns,
-// merging ticketed events with hyperlocal dated happenings. Cycles through
-// future weeks and filters by category with one tap (iPad-friendly).
+// "Out & About" highlights: a handful of big, readable cards — the soonest
+// upcoming event from each category (ticketed + hyperlocal merged) — instead
+// of an exhaustive calendar. The full list lives at /mirror/events.
 const EVENT_CATEGORY_STYLE: Record<
   string,
   { bg: string; time: string; dot: string }
@@ -3942,6 +3942,10 @@ function eventCategoryStyle(category: string) {
   return EVENT_CATEGORY_STYLE[category] ?? EVENT_CATEGORY_STYLE.Other;
 }
 
+// Events hidden via each card's eye button (device-local, keyed by title so
+// recurring listings — e.g. a daily attraction — stay hidden on every date).
+const EVENTS_HIDDEN_KEY = "mirror.events.hidden.v1";
+
 function WeekCalendarCard({
   events,
   localItems,
@@ -3949,18 +3953,48 @@ function WeekCalendarCard({
   events: MirrorEvent[];
   localItems: LocalItem[];
 }) {
-  type DayItem = {
+  type Highlight = {
     title: string;
+    date: Date;
+    dayKey: string;
     time: string | null;
     minutes: number;
     detail: string | null;
     category: string;
+    url: string | null;
   };
   const UNKNOWN_TIME = 24 * 60;
-  const MAX_WEEK_OFFSET = 3; // events API fetches ~28 days
+  const MAX_HIGHLIGHTS = 6;
+  const WINDOW_DAYS = 14;
 
-  const [weekOffset, setWeekOffset] = useState(0);
   const [category, setCategory] = useState<string | null>(null);
+
+  // Titles the user hid with the eye button on a card.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setHidden(new Set(readJSON<string[]>(EVENTS_HIDDEN_KEY) ?? []));
+  }, []);
+  const normTitle = (t: string) => t.trim().toLowerCase();
+  const hideEvent = (title: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev);
+      next.add(normTitle(title));
+      try {
+        localStorage.setItem(EVENTS_HIDDEN_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+  const restoreHidden = () => {
+    setHidden(new Set());
+    try {
+      localStorage.removeItem(EVENTS_HIDDEN_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   // "HH:MM(:SS)" from the events API → display label + sortable minutes.
   const fmtTime = (
@@ -3990,89 +4024,214 @@ function WeekCalendarCard({
     return h * 60 + min;
   };
 
-  // The 7-day window being shown, keyed by local YYYY-MM-DD.
-  const now = new Date();
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate() + weekOffset * 7 + i
-    );
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    return { key, date };
-  });
+  const parseDayKey = (key: string): Date | null => {
+    const [y, mo, d] = key.split("-").map(Number);
+    if (!y || !mo || !d) return null;
+    return new Date(y, mo - 1, d);
+  };
 
-  const byDay = new Map<string, DayItem[]>(days.map((d) => [d.key, []]));
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const windowEnd = new Date(todayStart);
+  windowEnd.setDate(windowEnd.getDate() + WINDOW_DAYS);
+  const todayKey = `${todayStart.getFullYear()}-${String(todayStart.getMonth() + 1).padStart(2, "0")}-${String(todayStart.getDate()).padStart(2, "0")}`;
+  const tomorrow = new Date(todayStart);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+
+  // Pool every upcoming item in the window, soonest first.
+  const pool: Highlight[] = [];
   const present = new Set<string>();
   for (const ev of events) {
-    const bucket = byDay.get(ev.localDate);
-    if (!bucket) continue;
+    if (hidden.has(normTitle(ev.name))) continue;
+    const date = parseDayKey(ev.localDate);
+    if (!date || date < todayStart || date >= windowEnd) continue;
     const cat =
       ev.category && EVENT_CATEGORY_STYLE[ev.category] ? ev.category : "Other";
     present.add(cat);
-    if (category && cat !== category) continue;
     const { label, minutes } = fmtTime(ev.localTime);
-    bucket.push({
+    pool.push({
       title: ev.name,
+      date,
+      dayKey: ev.localDate,
       time: label,
       minutes,
       detail: [ev.venue, ev.city].filter(Boolean).join(" · ") || null,
       category: cat,
+      url: ev.url,
     });
   }
   for (const it of localItems) {
     if (it.kind !== "event" || !it.date) continue;
-    const bucket = byDay.get(it.date);
-    if (!bucket) continue;
+    if (hidden.has(normTitle(it.title))) continue;
+    const date = parseDayKey(it.date);
+    if (!date || date < todayStart || date >= windowEnd) continue;
     present.add("Local");
-    if (category && category !== "Local") continue;
-    bucket.push({
+    pool.push({
       title: it.title,
+      date,
+      dayKey: it.date,
       time: it.time,
       minutes: parseLooseTime(it.time),
       detail: [it.venue, it.town].filter(Boolean).join(" · ") || null,
       category: "Local",
+      url: null,
     });
   }
-  for (const list of byDay.values()) list.sort((a, b) => a.minutes - b.minutes);
+  pool.sort(
+    (a, b) => a.date.getTime() - b.date.getTime() || a.minutes - b.minutes
+  );
+
+  // Curate: with no filter, lead with the soonest event from each category
+  // (one per category), then fill remaining slots with the soonest of what's
+  // left. With a filter, just show the soonest few in that category.
+  let highlights: Highlight[];
+  if (category) {
+    highlights = pool
+      .filter((h) => h.category === category)
+      .slice(0, MAX_HIGHLIGHTS);
+  } else {
+    const picked: Highlight[] = [];
+    const chosen = new Set<Highlight>();
+    for (const cat of Object.keys(EVENT_CATEGORY_STYLE)) {
+      if (picked.length >= MAX_HIGHLIGHTS) break;
+      const first = pool.find((h) => h.category === cat);
+      if (first) {
+        picked.push(first);
+        chosen.add(first);
+      }
+    }
+    for (const h of pool) {
+      if (picked.length >= MAX_HIGHLIGHTS) break;
+      if (!chosen.has(h)) {
+        picked.push(h);
+        chosen.add(h);
+      }
+    }
+    picked.sort(
+      (a, b) => a.date.getTime() - b.date.getTime() || a.minutes - b.minutes
+    );
+    highlights = picked;
+  }
 
   // Stable pill order: the style map's order, only categories with events.
   const categories = Object.keys(EVENT_CATEGORY_STYLE).filter((c) =>
     present.has(c)
   );
 
-  const rangeLabel = `${days[0].date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })} – ${days[6].date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })}`;
+  const dayLabel = (h: Highlight) =>
+    h.dayKey === todayKey
+      ? "Today"
+      : h.dayKey === tomorrowKey
+        ? "Tomorrow"
+        : h.date.toLocaleDateString(undefined, { weekday: "short" });
+
+  const card = (h: Highlight, i: number) => {
+    const style = eventCategoryStyle(h.category);
+    const inner = (
+      <>
+        {/* Big date block so it's readable from across the room. */}
+        <div
+          className={cn(
+            "flex w-16 shrink-0 flex-col items-center justify-center rounded-xl py-2",
+            h.dayKey === todayKey ? "bg-lime-400/15" : "bg-white/10"
+          )}
+        >
+          <div
+            className={cn(
+              "text-[11px] font-semibold uppercase tracking-wider",
+              h.dayKey === todayKey ? "text-lime-200" : "text-white/60"
+            )}
+          >
+            {dayLabel(h)}
+          </div>
+          <div className="text-2xl font-light text-white/95">
+            {h.date.getDate()}
+          </div>
+          <div className="text-[11px] text-white/55">
+            {h.date.toLocaleDateString(undefined, { month: "short" })}
+          </div>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-0.5 flex items-center gap-1.5">
+            <span className={cn("h-2 w-2 rounded-full", style.dot)} />
+            <span className="text-[11px] font-medium uppercase tracking-wide text-white/55">
+              {h.category === "Local" ? "Around town" : h.category}
+            </span>
+            {h.time && (
+              <span className={cn("text-[11px] font-medium", style.time)}>
+                · {h.time}
+              </span>
+            )}
+          </div>
+          <div className="overflow-hidden text-base font-medium leading-snug text-white/95 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] md:text-lg">
+            {h.title}
+          </div>
+          {h.detail && (
+            <div className="mt-0.5 truncate text-sm text-white/55">
+              {h.detail}
+            </div>
+          )}
+        </div>
+        {/* Hide this event; the next-best highlight fills its slot. */}
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hideEvent(h.title);
+          }}
+          className="absolute right-2 top-2 rounded-full p-1.5 text-white/40 transition hover:bg-white/15 hover:text-white/80"
+          aria-label={`Hide ${h.title}`}
+        >
+          <EyeOff className="h-3.5 w-3.5" />
+        </button>
+      </>
+    );
+    const className = cn(
+      "relative flex items-center gap-3 rounded-2xl border border-white/10 p-3 pr-9",
+      style.bg
+    );
+    return h.url ? (
+      <a
+        key={`${h.title}-${i}`}
+        href={h.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(className, "transition hover:border-white/25")}
+      >
+        {inner}
+      </a>
+    ) : (
+      <div key={`${h.title}-${i}`} className={className}>
+        {inner}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
-      {/* Single top row: category filter pills left, week nav right.
-          (The section header above the card carries the title.) */}
+      {/* Category filter pills. (The section header above the card carries
+          the title; the expand button there opens the full events page.) */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
         {categories.length > 1 && (
           <>
             <button
               onClick={() => setCategory(null)}
               className={cn(
-                "rounded-full px-3 py-1 text-[11px] font-medium transition",
+                "rounded-full px-3 py-1.5 text-xs font-medium transition",
                 !category
                   ? "bg-white/30 text-white"
                   : "bg-white/10 text-white/60 hover:bg-white/20"
               )}
             >
-              All
+              Highlights
             </button>
             {categories.map((c) => (
               <button
                 key={c}
                 onClick={() => setCategory(category === c ? null : c)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition",
+                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition",
                   category === c
                     ? "bg-white/30 text-white"
                     : "bg-white/10 text-white/60 hover:bg-white/20"
@@ -4089,103 +4248,28 @@ function WeekCalendarCard({
             ))}
           </>
         )}
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => setWeekOffset((w) => Math.max(0, w - 1))}
-            disabled={weekOffset === 0}
-            className="rounded-full p-1.5 text-white/70 transition hover:bg-white/15 disabled:opacity-30"
-            aria-label="Previous week"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() =>
-              setWeekOffset((w) => (w >= MAX_WEEK_OFFSET ? 0 : w + 1))
-            }
-            className="min-w-[110px] rounded-full bg-white/10 px-3 py-1 text-center text-xs text-white/70 transition hover:bg-white/20"
-            aria-label="Next week"
-          >
-            {weekOffset === 0 ? `This week · ${rangeLabel}` : rangeLabel}
-          </button>
-          <button
-            onClick={() =>
-              setWeekOffset((w) => Math.min(MAX_WEEK_OFFSET, w + 1))
-            }
-            disabled={weekOffset >= MAX_WEEK_OFFSET}
-            className="rounded-full p-1.5 text-white/70 transition hover:bg-white/15 disabled:opacity-30"
-            aria-label="Next week"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+        <div className="ml-auto flex items-center gap-2">
+          {hidden.size > 0 && (
+            <button
+              onClick={restoreHidden}
+              className="flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/60 transition hover:bg-white/20 hover:text-white/85"
+            >
+              <RotateCcw className="h-3 w-3" />
+              {hidden.size} hidden
+            </button>
+          )}
+          <span className="text-xs text-white/50">Next two weeks</span>
         </div>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-7 gap-2">
-        {days.map(({ key, date }, i) => {
-          const items = byDay.get(key) ?? [];
-          const isToday = weekOffset === 0 && i === 0;
-          return (
-            <div
-              key={key}
-              className={cn(
-                "flex min-h-0 flex-col rounded-2xl border p-2",
-                isToday
-                  ? "border-lime-300/40 bg-lime-400/10"
-                  : "border-white/10 bg-white/5"
-              )}
-            >
-              <div className="mb-2 shrink-0 text-center">
-                <div
-                  className={cn(
-                    "text-[10px] font-semibold uppercase tracking-wider",
-                    isToday ? "text-lime-200" : "text-white/55"
-                  )}
-                >
-                  {isToday
-                    ? "Today"
-                    : date.toLocaleDateString(undefined, { weekday: "short" })}
-                </div>
-                <div className="text-lg font-light text-white/90">
-                  {date.getDate()}
-                </div>
-              </div>
-              <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {items.length === 0 ? (
-                  <div className="pt-2 text-center text-[11px] text-white/50">—</div>
-                ) : (
-                  items.map((it, j) => (
-                    <div
-                      key={`${it.title}-${j}`}
-                      className={cn(
-                        "rounded-lg p-1.5",
-                        eventCategoryStyle(it.category).bg
-                      )}
-                    >
-                      {it.time && (
-                        <div
-                          className={cn(
-                            "text-[10px] font-medium",
-                            eventCategoryStyle(it.category).time
-                          )}
-                        >
-                          {it.time}
-                        </div>
-                      )}
-                      <div className="overflow-hidden text-xs leading-snug text-white/90 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-                        {it.title}
-                      </div>
-                      {it.detail && (
-                        <div className="truncate text-[10px] text-white/50">
-                          {it.detail}
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {highlights.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center text-sm text-white/60">
+          Nothing coming up in the next two weeks.
+        </div>
+      ) : (
+        <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto md:grid-cols-2 xl:grid-cols-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {highlights.map((h, i) => card(h, i))}
+        </div>
+      )}
     </div>
   );
 }
