@@ -104,8 +104,9 @@ function todayKey(): string {
 }
 // Version suffix busts previously cached content when the prompt changes
 // materially (v2: fixed sender/receiver voice direction; v3: excluded
-// breeding/pregnancy themes; v4: tightened perspective + level wording).
-const CACHE_PREFIX = "spark.prog4.";
+// breeding/pregnancy themes; v4: tightened perspective + level wording;
+// v5: no names inside quoted texts/spoken lines).
+const CACHE_PREFIX = "spark.prog5.";
 const progressionCacheKey = (p: Person, categoryId: string) =>
   `${CACHE_PREFIX}${p}.${categoryId}.${todayKey()}`;
 

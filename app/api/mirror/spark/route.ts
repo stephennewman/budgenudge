@@ -51,6 +51,7 @@ ${LEVEL_SPECS[level]}
 Rules:
 - Perspective: speak directly TO ${reader.split(" ")[0]} as "you", and refer to ${partner} by name in the third person (e.g. ${person === "stephen" ? '"tell Whitney...", "watch her..."' : '"tell Stephen...", "watch him..."'}). Never call ${partner.split(",")[0]} "you".
 - The ONE exception: quoted words meant to be copied or spoken (a text message, a whispered line, dirty talk) are written in first person, in ${reader.split(" ")[0]}'s own voice, as if ${reader.split(" ")[0]} is saying them to ${partner.split(",")[0]}.
+- Inside those quoted words, NEVER use either spouse's name — spouses talking to each other say "you" (or a pet name like "babe"), not each other's names. Names only appear in the surrounding instructions, never in the quote itself.
 - ${reader.split(" ")[0]} is the one acting: every idea is something ${reader.split(" ")[0]} does, says, sends, or wears for ${partner.split(",")[0]} — never the other way around.
 - The ONE hard boundary: everything stays between these two spouses — no other people, real or roleplayed as present. Solo ideas are about themselves or fantasizing about their spouse. Anything else goes.
 - Everything consensual between the two of them.
