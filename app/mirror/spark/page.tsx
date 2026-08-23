@@ -92,7 +92,14 @@ const IDLE_SECONDS = 45;
 // How many categories are dealt per hand (4 columns x 3 rows on the tablet).
 const HAND_SIZE = 12;
 
-const LEVEL_BADGES = ["\u{1F525}", "\u{1F525}\u{1F525}", "\u{1F525}\u{1F525}\u{1F525}", "\u274C\u274C\u274C\u274C"];
+// A distinct emoji per level, repeated to match its number: smirk, fire,
+// devil, splash.
+const LEVEL_BADGES = [
+  "\u{1F60F}",
+  "\u{1F525}\u{1F525}",
+  "\u{1F608}\u{1F608}\u{1F608}",
+  "\u{1F4A6}\u{1F4A6}\u{1F4A6}\u{1F4A6}",
+];
 const LEVEL_NAMES = ["Warm", "Hot", "Wild", "Off the charts"];
 
 // Daily cache: the first tap on a category generates fresh content per
