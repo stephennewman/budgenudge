@@ -350,7 +350,7 @@ export default function SparkPage() {
                   border: `1px solid ${heat === h ? accent : "#404040"}`,
                 }}
               >
-                {h === 4 ? "XXXX" : "\u{1F525}".repeat(h)}
+                {h === 4 ? "\u274C".repeat(4) : "\u{1F525}".repeat(h)}
               </button>
             ))}
           </div>
