@@ -1,35 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { Loader2 } from "lucide-react";
 
 // Spark's doorway, disguised as a channel card stuck loading. Mirrors the
 // exact chrome of the other ChecklistChannel cards (watermark icon, chip +
 // title header, big light body text) so it blends into the rotation.
-// Double-tap the ";" for Stephen's section, the ")" for Whitney's.
+// Double-tap the word "Loading" for Stephen's section, the ";)" for Whitney's.
 
 const DOUBLE_TAP_MS = 450;
 
 export function SparkTeaser() {
   const lastTap = useRef<{ id: string; at: number }>({ id: "", at: 0 });
-  // Fake progress: rushes early then crawls toward ~95% and stalls, like a
-  // download that's never quite done.
-  const [progress, setProgress] = useState(8);
 
-  useEffect(() => {
-    const id = setInterval(() => {
-      setProgress((p) => p + (95 - p) * 0.06);
-    }, 900);
-    return () => clearInterval(id);
-  }, []);
-
-  const onGlyphTap = (glyph: "semi" | "paren") => {
+  const onGlyphTap = (glyph: "word" | "wink") => {
     const now = Date.now();
     const isDouble =
       lastTap.current.id === glyph && now - lastTap.current.at < DOUBLE_TAP_MS;
     lastTap.current = { id: glyph, at: now };
     if (!isDouble) return;
-    window.location.href = `/mirror/spark?p=${glyph === "paren" ? "whitney" : "stephen"}`;
+    window.location.href = `/mirror/spark?p=${glyph === "wink" ? "whitney" : "stephen"}`;
   };
 
   return (
@@ -61,26 +51,19 @@ export function SparkTeaser() {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="my-auto py-2">
           <p className="flex items-center text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl">
-            <span>Loading</span>
             <span
-              onPointerDown={() => onGlyphTap("semi")}
-              className="cursor-default py-4 pl-2"
+              onPointerDown={() => onGlyphTap("word")}
+              className="cursor-default py-4"
             >
-              ;
+              Loading
             </span>
             <span
-              onPointerDown={() => onGlyphTap("paren")}
-              className="cursor-default py-4 pr-3"
+              onPointerDown={() => onGlyphTap("wink")}
+              className="cursor-default py-4 pl-2 pr-3"
             >
-              )
+              ;)
             </span>
           </p>
-          <div className="mt-6 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-white/40 transition-[width] duration-1000 ease-linear"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
         </div>
       </div>
     </div>

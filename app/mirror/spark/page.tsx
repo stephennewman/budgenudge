@@ -103,6 +103,40 @@ const LOADING_LINES = [
   "Almost there…",
 ];
 
+// Daily deck cache: the first visit of the day generates fresh content per
+// person; revisits that day reuse it so the page opens instantly.
+function todayKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+  }).format(new Date());
+}
+const deckCacheKey = (p: Person) => `spark.deck.${p}.${todayKey()}`;
+
+function readDeckCache(p: Person): SparkIdea[] | null {
+  try {
+    const raw = localStorage.getItem(deckCacheKey(p));
+    const parsed = raw ? (JSON.parse(raw) as SparkIdea[]) : null;
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDeckCache(p: Person, deck: SparkIdea[]) {
+  try {
+    // Drop stale days so the cache never accumulates.
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("spark.deck.") && !key.endsWith(todayKey())) {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.setItem(deckCacheKey(p), JSON.stringify(deck));
+  } catch {
+    // Storage full/unavailable: content still works, just regenerates.
+  }
+}
+
 export default function SparkPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [deck, setDeck] = useState<SparkIdea[]>([]);
@@ -146,17 +180,21 @@ export default function SparkPage() {
     return () => clearInterval(id);
   }, [router]);
 
-  const lock = useCallback(() => {
-    setPerson(null);
-    setDeck([]);
-    setIndex(0);
-    setGenError(false);
-  }, []);
+  // Set when the day's deck should be freshly generated right after unlock.
+  const [needsFresh, setNeedsFresh] = useState(false);
 
   const unlock = useCallback((p: Person) => {
     setPerson(p);
-    setDeck(shuffle(STARTER[p]));
     setIndex(0);
+    // Fresh content every day: the first visit of the day generates a new
+    // deck (cached in localStorage); later visits that day reuse it.
+    const cached = readDeckCache(p);
+    if (cached) {
+      setDeck(cached);
+    } else {
+      setDeck(shuffle(STARTER[p]));
+      setNeedsFresh(true);
+    }
   }, []);
 
   // The mirror's teaser card links here with ?p=stephen|whitney after its own
@@ -166,16 +204,16 @@ export default function SparkPage() {
     if (p === "stephen" || p === "whitney") unlock(p);
   }, [unlock]);
 
-  // The ";" and ")" in "Loading ;)" are the secret unlocks: double-tap the
-  // semicolon for Stephen, the parenthesis for Whitney.
+  // Fallback for direct visits without ?p=: same taps as the teaser card —
+  // double-tap the word "Loading" for Stephen, the ";)" for Whitney.
   const onGlyphTap = useCallback(
-    (glyph: "semi" | "paren") => {
+    (glyph: "word" | "wink") => {
       const now = Date.now();
       const isDouble =
         lastTap.current.id === glyph && now - lastTap.current.at < DOUBLE_TAP_MS;
       lastTap.current = { id: glyph, at: now };
       if (!isDouble) return;
-      unlock(glyph === "paren" ? "whitney" : "stephen");
+      unlock(glyph === "wink" ? "whitney" : "stephen");
     },
     [unlock]
   );
@@ -200,6 +238,7 @@ export default function SparkPage() {
         if (!data.ideas?.length) throw new Error("empty");
         setDeck(data.ideas);
         setIndex(0);
+        writeDeckCache(person, data.ideas);
       } catch {
         setGenError(true);
       } finally {
@@ -209,6 +248,14 @@ export default function SparkPage() {
     },
     [person, heat, deck, loading, touch]
   );
+
+  // First visit of the day: generate today's deck automatically.
+  useEffect(() => {
+    if (person && needsFresh && !loading) {
+      setNeedsFresh(false);
+      generate();
+    }
+  }, [person, needsFresh, loading, generate]);
 
   const accent = person === "whitney" ? PINK : TEAL;
   const card = deck[index];
@@ -231,58 +278,38 @@ export default function SparkPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
 
-          {/* Styled like a mirror main-column card. The progress bar is really
-              the 30s idle timer: it "finishes loading" right as the page
-              returns to the rotation. */}
+          {/* Styled like a mirror main-column card. Same taps as the teaser:
+              double-tap "Loading" for Stephen, ";)" for Whitney. */}
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-8 backdrop-blur-md">
             <div className="flex animate-pulse items-center justify-center text-3xl font-light tracking-wide text-neutral-400">
-              <span>Loading</span>
               <span
-                onPointerDown={() => onGlyphTap("semi")}
-                className="cursor-default py-4 pl-1.5"
+                onPointerDown={() => onGlyphTap("word")}
+                className="cursor-default py-4"
               >
-                ;
+                Loading
               </span>
               <span
-                onPointerDown={() => onGlyphTap("paren")}
-                className="cursor-default py-4 pr-3"
+                onPointerDown={() => onGlyphTap("wink")}
+                className="cursor-default py-4 pl-2 pr-3"
               >
-                )
+                ;)
               </span>
-            </div>
-            <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-white/40 transition-[width] duration-1000 ease-linear"
-                style={{ width: `${((IDLE_SECONDS - idleLeft) / IDLE_SECONDS) * 100}%` }}
-              />
             </div>
           </div>
         </div>
       ) : (
         // ----------------------------- UNLOCKED -----------------------------
         <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
-          <div className="flex items-center justify-between">
-            <div
-              className="text-xs font-semibold uppercase tracking-[0.3em]"
-              style={{ color: accent }}
+          {/* Top bar: obvious exit straight back to the mirror, fires beside
+              it, person label + auto-return countdown on the right. */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push("/mirror")}
+              className="flex items-center gap-1.5 rounded-full border border-neutral-700 px-3.5 py-1.5 text-xs font-medium text-neutral-300 hover:bg-white/10 hover:text-white"
             >
-              {person === "whitney" ? "For Whitney" : "For Stephen"}
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-xs tabular-nums text-neutral-600">
-                {idleLeft}s
-              </span>
-              <button
-                onClick={lock}
-                className="rounded-full border border-neutral-700 px-4 py-1.5 text-xs text-neutral-400 hover:text-neutral-200"
-              >
-                Lock
-              </button>
-            </div>
-          </div>
-
-          {/* Heat selector — controls how far the next generated batch goes */}
-          <div className="mt-5 flex items-center gap-2">
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Back to app
+            </button>
             {[1, 2, 3].map((h) => (
               <button
                 key={h}
@@ -301,9 +328,20 @@ export default function SparkPage() {
                 {"\u{1F525}".repeat(h)}
               </button>
             ))}
-            <span className="ml-1 text-[11px] text-neutral-500">
-              {HEAT_NAMES[heat - 1]} — tap a level for a fresh batch
-            </span>
+            <div className="ml-auto flex items-center gap-2">
+              <span
+                className="text-xs font-semibold uppercase tracking-[0.2em]"
+                style={{ color: accent }}
+              >
+                {person === "whitney" ? "Whitney" : "Stephen"}
+              </span>
+              <span className="text-xs tabular-nums text-neutral-600">
+                {idleLeft}s
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 text-[11px] text-neutral-500">
+            {HEAT_NAMES[heat - 1]} — tap a fire level for a fresh batch
           </div>
 
           {/* Card (or the loading card while a batch generates) */}
