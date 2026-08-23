@@ -31,6 +31,7 @@ import {
   Hourglass,
   ListChecks,
   Lock,
+  Lollipop,
   MessageSquare,
   Mic,
   Move,
@@ -94,6 +95,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "bucket-list": ListChecks,
   "know-me": Brain,
   firsts: Star,
+  oral: Lollipop,
 };
 
 const PINK = "#ec4899";

@@ -188,4 +188,9 @@ export const CATEGORIES: SparkCategory[] = [
     name: "New Firsts",
     hint: "a brand-new first for the two of them to have together — something neither has ever done with anyone, claimed as theirs alone",
   },
+  {
+    id: "oral",
+    name: "Oral",
+    hint: "going down on their spouse — giving and receiving, techniques, positions, teasing starts, timing, places, making them beg for it or finish from it",
+  },
 ];
