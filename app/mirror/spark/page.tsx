@@ -93,12 +93,12 @@ const IDLE_SECONDS = 45;
 const HAND_SIZE = 12;
 
 // A distinct emoji per level, repeated to match its number: smirk, fire,
-// devil, splash.
+// devil, red X.
 const LEVEL_BADGES = [
   "\u{1F60F}",
   "\u{1F525}\u{1F525}",
   "\u{1F608}\u{1F608}\u{1F608}",
-  "\u{1F4A6}\u{1F4A6}\u{1F4A6}\u{1F4A6}",
+  "\u274C\u274C\u274C\u274C",
 ];
 const LEVEL_NAMES = ["Warm", "Hot", "Wild", "Off the charts"];
 
