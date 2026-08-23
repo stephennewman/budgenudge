@@ -153,4 +153,9 @@ export const CATEGORIES: SparkCategory[] = [
     name: "Hot Past",
     hint: "swapping kinky confessions about their sexual histories — wild past experiences, former partners, firsts, secrets never told — shared as stories or questions to turn each other on",
   },
+  {
+    id: "challenges",
+    name: "Challenges",
+    hint: "timed challenges with concrete numbers — sprints, marathons, quickies, speed rounds, endurance tests, beat-the-clock, number of positions before the timer, hold-out-as-long-as-you-can. Every idea includes a specific time limit, duration, or count",
+  },
 ];

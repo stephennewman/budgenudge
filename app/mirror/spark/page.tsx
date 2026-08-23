@@ -13,6 +13,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  AlarmClock,
   ArrowLeft,
   Crown,
   Dices,
@@ -80,6 +81,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   mirror: Eye,
   worship: Heart,
   hotpast: History,
+  challenges: AlarmClock,
 };
 
 const PINK = "#ec4899";
