@@ -141,7 +141,7 @@ export default function SparkPage() {
   const [person, setPerson] = useState<Person | null>(null);
   const [deck, setDeck] = useState<SparkIdea[]>([]);
   const [index, setIndex] = useState(0);
-  const [heat, setHeat] = useState(2);
+  const [heat, setHeat] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadingLine, setLoadingLine] = useState(0);
   const [genError, setGenError] = useState(false);
