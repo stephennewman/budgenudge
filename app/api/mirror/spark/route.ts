@@ -20,10 +20,10 @@ type Person = "stephen" | "whitney";
 const SPARK_MODEL = process.env.OPENROUTER_SPARK_MODEL || "x-ai/grok-4.3";
 
 const LEVEL_SPECS: Record<number, string> = {
-  1: "Level 1 of 4 (X): flirty and suggestive — something they could act on in the next five minutes without blushing.",
-  2: "Level 2 of 4 (XX): explicit and bold — direct, graphic, no euphemisms.",
-  3: "Level 3 of 4 (XXX): wild — very explicit, kinky, no-holds-barred.",
-  4: "Level 4 of 4 (XXXX): off the charts — maximum raw, graphic, taboo, depraved-in-the-best-way. Push every boundary of language and scenario: the dirtiest talk, the most intense version of this category imaginable. Nothing is too much as long as it stays between the two spouses.",
+  1: "Level 1 of 4 (X): sexy but clean — little to no swearing or explicitly dirty words. Suggestive, flirty, charged.",
+  2: "Level 2 of 4 (XX): very sexy — some swearing and dirty language, bolder and more direct.",
+  3: "Level 3 of 4 (XXX): very dirty — explicit language throughout, lots of sucking and fucking, noticeably more intense.",
+  4: "Level 4 of 4 (XXXX): raunchy and filthy — anything goes. The most graphic language and the most intense scenario in this category. Nothing is too much as long as it stays between the two spouses.",
 };
 
 function buildPrompt(
@@ -49,8 +49,9 @@ This idea is one step on a 4-level heat ladder. Write it at exactly this level:
 ${LEVEL_SPECS[level]}
 
 Rules:
-- Written in second person, addressed directly to ${reader.split(" ")[0]}.
-- ${reader.split(" ")[0]} is the one acting: every idea is something ${reader.split(" ")[0]} does, says, sends, or wears for ${partner} — never the other way around. Any quoted words (texts, dirty talk, whispers) are in ${reader.split(" ")[0]}'s own voice.
+- Perspective: speak directly TO ${reader.split(" ")[0]} as "you", and refer to ${partner} by name in the third person (e.g. ${person === "stephen" ? '"tell Whitney...", "watch her..."' : '"tell Stephen...", "watch him..."'}). Never call ${partner.split(",")[0]} "you".
+- The ONE exception: quoted words meant to be copied or spoken (a text message, a whispered line, dirty talk) are written in first person, in ${reader.split(" ")[0]}'s own voice, as if ${reader.split(" ")[0]} is saying them to ${partner.split(",")[0]}.
+- ${reader.split(" ")[0]} is the one acting: every idea is something ${reader.split(" ")[0]} does, says, sends, or wears for ${partner.split(",")[0]} — never the other way around.
 - The ONE hard boundary: everything stays between these two spouses — no other people, real or roleplayed as present. Solo ideas are about themselves or fantasizing about their spouse. Anything else goes.
 - Everything consensual between the two of them.
 - NO pregnancy, breeding, impregnation, or "give me a baby" themes of any kind — not even as dirty talk. This topic is permanently off the table.
