@@ -218,15 +218,23 @@ export default function SparkPage() {
     [unlock]
   );
 
+  // Tapping a heat pill mid-generation cancels the in-flight request and
+  // starts over at the new heat, so the pills never need to be disabled.
+  const abortRef = useRef<AbortController | null>(null);
+
   const generate = useCallback(
     async (heatOverride?: number) => {
-      if (!person || loading) return;
+      if (!person) return;
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
       setLoading(true);
       setGenError(false);
       try {
         const res = await fetch("/api/mirror/spark", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: ctrl.signal,
           body: JSON.stringify({
             person,
             heat: heatOverride ?? heat,
@@ -240,13 +248,16 @@ export default function SparkPage() {
         setIndex(0);
         writeDeckCache(person, data.ideas);
       } catch {
+        if (ctrl.signal.aborted) return; // superseded by a newer request
         setGenError(true);
       } finally {
-        setLoading(false);
-        touch(); // full reading time after a slow generation
+        if (abortRef.current === ctrl) {
+          setLoading(false);
+          touch(); // full reading time after a slow generation
+        }
       }
     },
-    [person, heat, deck, loading, touch]
+    [person, heat, deck, touch]
   );
 
   // First visit of the day: generate today's deck automatically.
@@ -332,8 +343,7 @@ export default function SparkPage() {
                   setHeat(h);
                   generate(h); // deal a fresh batch at the new heat right away
                 }}
-                disabled={loading}
-                className="whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50"
+                className="whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors"
                 style={{
                   backgroundColor: heat === h ? accent : "transparent",
                   color: heat === h ? "#0a0a0a" : "#737373",
