@@ -23,6 +23,7 @@ import {
   Gift,
   Hand,
   Heart,
+  History,
   Home,
   Hourglass,
   MessageSquare,
@@ -78,6 +79,7 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "date-finale": Wine,
   mirror: Eye,
   worship: Heart,
+  hotpast: History,
 };
 
 const PINK = "#ec4899";

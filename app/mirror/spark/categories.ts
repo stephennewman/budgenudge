@@ -148,4 +148,9 @@ export const CATEGORIES: SparkCategory[] = [
     name: "Body Worship",
     hint: "slow, focused adoration of one specific part of their spouse's body",
   },
+  {
+    id: "hotpast",
+    name: "Hot Past",
+    hint: "swapping kinky confessions about their sexual histories — wild past experiences, former partners, firsts, secrets never told — shared as stories or questions to turn each other on",
+  },
 ];

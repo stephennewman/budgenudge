@@ -56,7 +56,7 @@ Rules:
 - The ONE exception: quoted words meant to be copied or spoken (a text message, a whispered line, dirty talk) are written in first person, in ${reader.split(" ")[0]}'s own voice, as if ${reader.split(" ")[0]} is saying them to ${partner.split(",")[0]}.
 - Inside those quoted words, NEVER use either spouse's name — spouses talking to each other say "you" (or a pet name like "babe"), not each other's names. Names only appear in the surrounding instructions, never in the quote itself.
 - ${reader.split(" ")[0]} is the one acting: every idea is something ${reader.split(" ")[0]} does, says, sends, or wears for ${partner.split(",")[0]} — never the other way around.
-- The ONE hard boundary: everything stays between these two spouses — no other people, real or roleplayed as present. Solo ideas are about themselves or fantasizing about their spouse. Anything else goes.
+- The ONE hard boundary: everything they DO stays between these two spouses — no other people, real or roleplayed, involved in anything happening now. Solo ideas are about themselves or fantasizing about their spouse. Telling each other true stories or confessions about their own pasts (including past partners) is fine when the category calls for it. Anything else goes.
 - Everything consensual between the two of them.
 - NO pregnancy, breeding, impregnation, or "give me a baby" themes of any kind — not even as dirty talk. This topic is permanently off the table.
 - Realistic for busy parents: discreet, after bedtime, stolen moments.
