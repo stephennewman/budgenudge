@@ -89,8 +89,8 @@ const DOUBLE_TAP_MS = 450;
 // holds a whole 4-level progression, so give plenty of reading time.
 const IDLE_SECONDS = 45;
 
-// How many categories are dealt per hand.
-const HAND_SIZE = 8;
+// How many categories are dealt per hand (4 columns x 3 rows on the tablet).
+const HAND_SIZE = 12;
 
 const LEVEL_BADGES = ["\u{1F525}", "\u{1F525}\u{1F525}", "\u{1F525}\u{1F525}\u{1F525}", "\u274C\u274C\u274C\u274C"];
 const LEVEL_NAMES = ["Warm", "Hot", "Wild", "Off the charts"];
@@ -342,7 +342,9 @@ function Spark() {
         </div>
       ) : (
         // ----------------------------- UNLOCKED -----------------------------
-        <div className="mx-auto flex min-h-screen max-w-md flex-col px-5 py-6">
+        // Sized for the iPad in landscape: wide container, 4x3 category grid,
+        // 2x2 progression that fits above the fold without scrolling.
+        <div className="mx-auto flex h-screen w-full max-w-6xl flex-col px-6 py-5">
           {/* Top bar: exit back to the mirror (or back to the hand from a
               progression), person label + auto-return countdown. */}
           <div className="flex items-center gap-2">
@@ -369,30 +371,30 @@ function Spark() {
           {category === null ? (
             // -------------------------- CATEGORY HAND --------------------------
             <>
-              <div className="mt-5 text-[11px] text-neutral-500">
+              <div className="mt-4 text-xs text-neutral-500">
                 Pick a category — you&apos;ll get all four levels at once, warm to
                 off the charts
               </div>
-              <div className="mt-3 grid flex-1 auto-rows-fr grid-cols-2 content-start gap-3">
+              <div className="mt-3 grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3 sm:grid-cols-3 sm:grid-rows-4 lg:grid-cols-4 lg:grid-rows-3">
                 {hand.map((cat) => {
                   const Icon = CATEGORY_ICONS[cat.id] ?? Sparkles;
                   return (
                     <button
                       key={cat.id}
                       onClick={() => pickCategory(cat)}
-                      className="flex flex-col items-center justify-center gap-2.5 rounded-2xl border bg-neutral-900 px-3 py-5 text-sm font-semibold text-neutral-200 transition hover:bg-neutral-800"
+                      className="flex min-h-0 flex-col items-center justify-center gap-2.5 rounded-2xl border bg-neutral-900 px-3 text-base font-semibold text-neutral-200 transition hover:bg-neutral-800"
                       style={{ borderColor: `${accent}33` }}
                     >
-                      <Icon className="h-6 w-6" style={{ color: accent }} strokeWidth={1.6} />
+                      <Icon className="h-7 w-7" style={{ color: accent }} strokeWidth={1.6} />
                       {cat.name}
                     </button>
                   );
                 })}
               </div>
-              <div className="mt-4 pb-4">
+              <div className="mt-3 pb-1">
                 <button
                   onClick={() => setHand(shuffle(CATEGORIES).slice(0, HAND_SIZE))}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-medium"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border py-2.5 text-sm font-medium"
                   style={{ borderColor: accent, color: accent }}
                 >
                   <Shuffle className="h-4 w-4" />
@@ -413,10 +415,12 @@ function Spark() {
                 </span>
               </div>
 
-              <div className="mt-4 flex-1 space-y-3 overflow-y-auto pb-2">
+              {/* 2x2 above the fold on the tablet — no scrolling to see all
+                  four levels. Long bodies scroll inside their own card. */}
+              <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-2">
                 {slots.map((slot, i) => {
                   const header = (
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
                       <span>{LEVEL_BADGES[i]}</span>
                       <span>{LEVEL_NAMES[i]}</span>
                     </div>
@@ -425,7 +429,7 @@ function Spark() {
                     return (
                       <div
                         key={i}
-                        className="animate-pulse rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5"
+                        className="flex min-h-0 animate-pulse flex-col rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5"
                       >
                         {header}
                         <div className="mt-3 h-3 w-2/3 rounded bg-neutral-800" />
@@ -438,7 +442,7 @@ function Spark() {
                       <button
                         key={i}
                         onClick={() => retryLevel(i + 1)}
-                        className="block w-full rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5 text-left"
+                        className="flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5 text-left"
                       >
                         {header}
                         <p className="mt-2 text-sm text-neutral-500">
@@ -450,27 +454,29 @@ function Spark() {
                   return (
                     <div
                       key={i}
-                      className="rounded-3xl border bg-neutral-900 p-5"
+                      className="flex min-h-0 flex-col rounded-3xl border bg-neutral-900 p-5"
                       style={{
                         borderColor: `${accent}${(22 + i * 22).toString(16).padStart(2, "0")}`,
                         boxShadow: i === 3 ? `0 0 40px ${accent}22` : undefined,
                       }}
                     >
                       {header}
-                      {slot.title && (
-                        <div className="mt-2 text-base font-bold" style={{ color: accent }}>
-                          {slot.title}
-                        </div>
-                      )}
-                      <p className="mt-1.5 text-sm leading-relaxed text-neutral-200">
-                        {slot.body}
-                      </p>
+                      <div className="min-h-0 overflow-y-auto">
+                        {slot.title && (
+                          <div className="mt-2 text-base font-bold" style={{ color: accent }}>
+                            {slot.title}
+                          </div>
+                        )}
+                        <p className="mt-1.5 text-sm leading-relaxed text-neutral-200">
+                          {slot.body}
+                        </p>
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-4 pb-4">
+              <div className="mt-3 pb-1">
                 <button
                   onClick={() => generate(category, { fresh: true })}
                   disabled={anyPending}
