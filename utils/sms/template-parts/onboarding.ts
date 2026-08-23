@@ -1,4 +1,5 @@
 import { supabase, type Transaction, type MerchantPacing } from './shared';
+import { SITE_URL } from '@/lib/brand';
 import {
   getUserFirstName,
   runEnhancedBillDetectionInTemplate,
@@ -181,7 +182,7 @@ Your ${timeframeDesc} history: ${transactionCount} transactions, $${totalSpendin
 📋 DETECTED BILLS (${enhancedBills.length + (bills?.length || 0)} total):
 ${billsText}
 
-🔧 Manage bills: https://get.krezzo.com/protected/recurring-bills
+🔧 Manage bills: ${SITE_URL}/protected/recurring-bills
 
 ✅ Profile optimized with ${timeframeDesc} of data!`;
 

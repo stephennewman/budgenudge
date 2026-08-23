@@ -3,6 +3,7 @@
 import { createSupabaseClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { encodedRedirect } from "@/utils/redirect";
+import { SITE_URL } from "@/lib/brand";
 
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
@@ -32,7 +33,7 @@ export const signUpAction = async (formData: FormData) => {
 
   // Use the correct URL for the current environment
   const url = process.env.NODE_ENV === 'production'
-    ? "https://get.krezzo.com/auth/callback"
+    ? `${SITE_URL}/auth/callback`
     : "http://localhost:3000/auth/callback";
 
   // Clean phone number if provided
@@ -64,7 +65,7 @@ export const googleSignInAction = async () => {
   
   // Use the correct URL for the current environment
   const redirectTo = process.env.NODE_ENV === 'production'
-    ? "https://get.krezzo.com/auth/callback"
+    ? `${SITE_URL}/auth/callback`
     : "http://localhost:3000/auth/callback";
 
   const { data, error } = await client.auth.signInWithOAuth({

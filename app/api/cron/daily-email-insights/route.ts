@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { reconcileUserBills } from '@/utils/bills/reconcile';
 import type { ReconciliationResult } from '@/utils/bills/reconcile';
+import { EMAIL_FROM_INSIGHTS, SITE_URL } from '@/lib/brand';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
     const subject = buildSubject(data);
 
     const { error } = await getResend().emails.send({
-      from: 'Krezzo <insights@krezzo.com>',
+      from: EMAIL_FROM_INSIGHTS,
       to: TARGET_EMAIL,
       subject,
       html,
@@ -589,7 +590,7 @@ function buildEmailHtml(data: Awaited<ReturnType<typeof gatherInsights>>, billTi
   <!-- Footer -->
   <tr><td style="background:#f9fafb;padding:20px 32px;border-top:1px solid #eee;">
     <div style="font-size:12px;color:#999;text-align:center;">
-      Krezzo · Daily financial insights · <a href="https://get.krezzo.com" style="color:#1a73e8;">Dashboard</a>
+      Krezzo · Daily financial insights · <a href="${SITE_URL}" style="color:#1a73e8;">Dashboard</a>
     </div>
   </td></tr>
 

@@ -159,3 +159,14 @@
 .font-outfit {
   font-family: var(--font-outfit);
 }
+
+/* Mirror: card progress bar fills left-to-right over the card's reading
+   time (story-style); when it's full, the next card is shown. */
+@keyframes mirror-card-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

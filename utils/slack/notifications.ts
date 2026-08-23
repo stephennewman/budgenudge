@@ -3,6 +3,8 @@
  * Handles sending notifications to Slack channels via webhooks
  */
 
+import { SITE_URL } from '@/lib/brand';
+
 interface SlackUser {
   id: string;
   email?: string;
@@ -128,7 +130,7 @@ export async function notifySlackNewUserSignup(user: SlackUser): Promise<boolean
           type: "plain_text",
           text: "Open Dashboard"
         },
-        url: `https://get.krezzo.com/protected`
+        url: `${SITE_URL}/protected`
       }
     });
 

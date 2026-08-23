@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 import { requireUserOrSuperAdmin, isGuardFailure } from '@/utils/auth/api-auth';
+import { EMAIL_FROM_ALERTS } from '@/lib/brand';
 
 // Create a Supabase client for server-side operations
 const supabase = createClient(
@@ -80,7 +81,7 @@ Generated: ${new Date().toLocaleString('en-US', {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: 'Krezzo <noreply@krezzo.com>',
+          from: EMAIL_FROM_ALERTS,
           to: [targetPhoneNumber],
           subject: 'Krezzo Alert',
           text: noRecurringMessage,
@@ -164,7 +165,7 @@ Generated: ${new Date().toLocaleString('en-US', {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Krezzo <noreply@krezzo.com>',
+        from: EMAIL_FROM_ALERTS,
         to: [targetPhoneNumber],
         subject: 'Krezzo Alert',
         text: smsMessage,

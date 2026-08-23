@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { BRAND_NAME, SITE_URL } from '@/lib/brand';
 
 /**
  * Shared LLM client for Krezzo, backed by OpenRouter (Claude by default).
@@ -31,8 +32,8 @@ function getClient(): OpenAI {
       baseURL: OPENROUTER_BASE_URL,
       defaultHeaders: {
         // Optional attribution headers used by OpenRouter analytics.
-        'HTTP-Referer': 'https://get.krezzo.com',
-        'X-Title': 'Krezzo',
+        'HTTP-Referer': SITE_URL,
+        'X-Title': BRAND_NAME,
       },
     });
   }

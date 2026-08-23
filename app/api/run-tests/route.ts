@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/utils/supabase/server';
 import { getSmsGatewayWithFallback } from '@/utils/sms/user-phone';
 import { formatPhoneForSms } from '@/utils/sms/carrier-detection';
+import { EMAIL_FROM_ALERTS } from '@/lib/brand';
 
 interface TestResult {
   name: string;
@@ -199,7 +200,7 @@ export async function POST() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-                  from: 'Krezzo Test <noreply@krezzo.com>',
+                  from: EMAIL_FROM_ALERTS,
         to: [smsGateway],
         subject: 'Test Suite SMS',
         text: testMessage,

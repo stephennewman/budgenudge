@@ -3,15 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 import { loadLatestDeals, dealsAreStale } from '@/utils/deals/load';
 import { getOrGenerateDinnerPlan, pickTonightsDinner } from '@/utils/deals/dinner-engine';
 import { sendEnhancedSlickTextSMS } from '@/utils/sms/slicktext-client';
+import { SITE_URL } from '@/lib/brand';
 
 export const maxDuration = 60;
 
 function siteUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_BASE_URL ||
-    'https://get.krezzo.com'
-  );
+  return SITE_URL;
 }
 
 export async function GET(request: NextRequest) {

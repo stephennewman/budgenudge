@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import SampleSMSModal from '@/components/sample-sms-modal';
 import HomepageSignUpForm from '@/components/homepage-signup-form';
+import { SITE_HOST } from '@/lib/brand';
 
 export default function SampleSMSSection() {
   const [showSampleModal, setShowSampleModal] = useState(false);
@@ -42,7 +43,7 @@ export default function SampleSMSSection() {
                 2. Starbucks: $89<br/>
                 3. Shell: $67<br/><br/>
                 <span className="text-blue-600">Want to see YOUR real data?<br/>
-                👉 get.krezzo.com/sign-up</span>
+                👉 {SITE_HOST}/sign-up</span>
               </div>
             </div>
           </div>

@@ -20,7 +20,6 @@ export default function ConditionalHeader() {
   if (pathname.startsWith('/mirror')) {
     return null;
   }
-  
   // Hide header for sign-up page for clean design with custom background
   if (pathname === '/sign-up') {
     return null;

@@ -5,6 +5,7 @@
  */
 
 import { createSlickTextClient, sendEnhancedSlickTextSMS } from './slicktext-client';
+import { EMAIL_FROM_ALERTS } from '@/lib/brand';
 
 // Migration configuration
 interface SMSConfig {
@@ -76,7 +77,7 @@ async function sendViaResend({ phoneNumber, message, userEmail }: SMSRequest): P
     const emailAddress = `${cleanPhone}@${gateway}`;
 
     const result = await resend.emails.send({
-              from: 'Krezzo <alerts@krezzo.com>',
+              from: EMAIL_FROM_ALERTS,
       to: [emailAddress],
       subject: 'Transaction Alert',
       text: message,

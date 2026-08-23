@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ProductWithPrices } from "@updatedev/js";
 import { createUpdateClient } from "@/utils/update/client";
+import { SITE_URL } from "@/lib/brand";
 import { useState } from "react";
 
 interface PricingCardProps {
@@ -40,7 +41,7 @@ export default function PricingCard({
   async function handleSelectPlan(priceId: string) {
     setIsLoading(true);
     const client = createUpdateClient();
-    const redirectUrl = `https://get.krezzo.com/protected`;
+    const redirectUrl = `${SITE_URL}/protected`;
     const { data, error } = await client.billing.createCheckoutSession(
       priceId,
       {

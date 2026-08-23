@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSlickTextClient } from '@/utils/sms/slicktext-client';
 import { createClient } from '@supabase/supabase-js';
+import { SITE_HOST } from '@/lib/brand';
 
 // Create admin Supabase client
 const supabase = createClient(
@@ -28,7 +29,7 @@ July 2025
 3. Shell: $67
 
 Want to see YOUR real data? 
-👉 get.krezzo.com/sign-up
+👉 ${SITE_HOST}/sign-up
 
 Reply STOP to opt-out`;
 

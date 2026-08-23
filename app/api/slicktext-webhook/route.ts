@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { SITE_URL } from '@/lib/brand';
 
 // Type definitions for webhook data
 interface ContactData {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     switch (userMessage) {
       case 'STOP':
       case 'UNSUBSCRIBE':
-                  responseMessage = "You've been unsubscribed from Krezzo texts. Text START to resume. For support: https://get.krezzo.com";
+                  responseMessage = `You've been unsubscribed from Krezzo texts. Text START to resume. For support: ${SITE_URL}`;
         break;
         
       case 'START':
@@ -64,11 +65,11 @@ export async function POST(request: NextRequest) {
         break;
         
       case 'HELP':
-                  responseMessage = "Krezzo texts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: https://get.krezzo.com";
+                  responseMessage = `Krezzo texts 💰\n\nCommands:\n• BALANCE - Check account\n• STOP - Unsubscribe\n• START - Resubscribe\n\nOr ask questions about your spending! Visit: ${SITE_URL}`;
         break;
         
       case 'BALANCE':
-                  responseMessage = "💰 To check your account balance and recent transactions, please log into Krezzo at https://get.krezzo.com. For immediate help, text HELP.";
+                  responseMessage = `💰 To check your account balance and recent transactions, please log into Krezzo at ${SITE_URL}. For immediate help, text HELP.`;
         break;
         
       default:
@@ -154,7 +155,7 @@ Key features:
 - Weekly spending summaries
 - Recurring bill tracking
 
-Respond helpfully but keep responses under 300 characters for SMS. Direct users to https://get.krezzo.com for detailed account access. Be concise, friendly and professional.`
+Respond helpfully but keep responses under 300 characters for SMS. Direct users to ${SITE_URL} for detailed account access. Be concise, friendly and professional.`
           },
           {
             role: 'user',
@@ -186,19 +187,19 @@ function getKeywordResponse(message: string): string {
   const lowerMessage = message.toLowerCase();
   
   if (lowerMessage.includes('spend') || lowerMessage.includes('money') || lowerMessage.includes('transaction')) {
-                return "💰 To view your spending and transactions, please log into Krezzo at https://get.krezzo.com. Text HELP for more options!";
+                return `💰 To view your spending and transactions, please log into Krezzo at ${SITE_URL}. Text HELP for more options!`;
   }
   
   if (lowerMessage.includes('balance') || lowerMessage.includes('account')) {
-                return "💳 Check your account balance and recent activity on the Krezzo dashboard: https://get.krezzo.com";
+                return `💳 Check your account balance and recent activity on the Krezzo dashboard: ${SITE_URL}`;
   }
   
   if (lowerMessage.includes('alert') || lowerMessage.includes('notification')) {
-                return "🔔 Krezzo sends texts about your money and spending. Manage alerts at https://get.krezzo.com or text STOP to unsubscribe.";
+                return `🔔 Krezzo sends texts about your money and spending. Manage alerts at ${SITE_URL} or text STOP to unsubscribe.`;
   }
   
     // Default helpful response
-  return "Hi! I'm Krezzo AI. I help with financial monitoring questions. Visit https://get.krezzo.com or text HELP for commands!";
+  return `Hi! I'm Krezzo AI. I help with financial monitoring questions. Visit ${SITE_URL} or text HELP for commands!`;
 }
 
 /**
