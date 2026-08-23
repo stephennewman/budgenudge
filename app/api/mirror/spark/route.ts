@@ -57,7 +57,7 @@ Rules:
 - Everything consensual between the two of them.
 - NO pregnancy, breeding, impregnation, or "give me a baby" themes of any kind — not even as dirty talk. This topic is permanently off the table.
 - Realistic for busy parents: discreet, after bedtime, stolen moments.
-- A punchy 2-5 word title and 1-3 sentences of body. No emojis, no hashtags.${avoidBlock}
+- A punchy 2-4 word title and a SHORT body: 1-2 sentences, 30 words max. Every word earns its place. No emojis, no hashtags.${avoidBlock}
 
 Return ONLY a valid JSON object, no markdown fences: {"title":"","body":""}`;
 }

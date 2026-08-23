@@ -105,8 +105,8 @@ function todayKey(): string {
 // Version suffix busts previously cached content when the prompt changes
 // materially (v2: fixed sender/receiver voice direction; v3: excluded
 // breeding/pregnancy themes; v4: tightened perspective + level wording;
-// v5: no names inside quoted texts/spoken lines).
-const CACHE_PREFIX = "spark.prog5.";
+// v5: no names inside quoted texts/spoken lines; v6: shorter bodies).
+const CACHE_PREFIX = "spark.prog6.";
 const progressionCacheKey = (p: Person, categoryId: string) =>
   `${CACHE_PREFIX}${p}.${categoryId}.${todayKey()}`;
 
@@ -464,11 +464,11 @@ function Spark() {
                       {header}
                       <div className="min-h-0 overflow-y-auto">
                         {slot.title && (
-                          <div className="mt-2 text-base font-bold" style={{ color: accent }}>
+                          <div className="mt-2 text-sm font-bold" style={{ color: accent }}>
                             {slot.title}
                           </div>
                         )}
-                        <p className="mt-1.5 text-sm leading-relaxed text-neutral-200">
+                        <p className="mt-1 text-[13px] leading-snug text-neutral-300">
                           {slot.body}
                         </p>
                       </div>
