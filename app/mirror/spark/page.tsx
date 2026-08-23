@@ -39,12 +39,13 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { CATEGORIES, type SparkCategory } from "./categories";
+import { ACTION_TAGS, CATEGORIES, type SparkCategory } from "./categories";
 
 type Person = "stephen" | "whitney";
 
 interface SparkIdea {
   level: number;
+  tag: string;
   title: string;
   body: string;
 }
@@ -112,8 +113,9 @@ function todayKey(): string {
 // Version suffix busts previously cached content when the prompt changes
 // materially (v2: fixed sender/receiver voice direction; v3: excluded
 // breeding/pregnancy themes; v4: tightened perspective + level wording;
-// v5: no names inside quoted texts/spoken lines; v6: shorter bodies).
-const CACHE_PREFIX = "spark.prog6.";
+// v5: no names inside quoted texts/spoken lines; v6: shorter bodies;
+// v7: action tags).
+const CACHE_PREFIX = "spark.prog7.";
 const progressionCacheKey = (p: Person, categoryId: string) =>
   `${CACHE_PREFIX}${p}.${categoryId}.${todayKey()}`;
 
@@ -227,14 +229,20 @@ function Spark() {
   // One level = one tiny request. Fired four at a time by generate(), or
   // singly when a failed slot is retried.
   const generateLevel = useCallback(
-    async (cat: SparkCategory, level: number, ctrl: AbortController, avoid: string[]) => {
+    async (
+      cat: SparkCategory,
+      level: number,
+      tag: string,
+      ctrl: AbortController,
+      avoid: string[]
+    ) => {
       if (!person) return;
       try {
         const res = await fetch("/api/mirror/spark", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: ctrl.signal,
-          body: JSON.stringify({ person, category: cat.id, level, avoid }),
+          body: JSON.stringify({ person, category: cat.id, level, tag, avoid }),
         });
         if (!res.ok) throw new Error(String(res.status));
         const data = (await res.json()) as { idea: SparkIdea };
@@ -277,8 +285,12 @@ function Spark() {
       abortRef.current = ctrl;
       resultsRef.current = [null, null, null, null];
       setSlots(["pending", "pending", "pending", "pending"]);
+      // Four distinct action tags per batch so the levels come out as
+      // different kinds of ideas (a text, a dare, a move...), not four
+      // variations of the same thing.
+      const tags = shuffle(ACTION_TAGS).slice(0, 4);
       for (let level = 1; level <= 4; level++) {
-        generateLevel(cat, level, ctrl, avoid);
+        generateLevel(cat, level, tags[level - 1].id, ctrl, avoid);
       }
     },
     [person, generateLevel]
@@ -290,7 +302,8 @@ function Spark() {
       const ctrl = abortRef.current ?? new AbortController();
       abortRef.current = ctrl;
       setSlots((prev) => prev.map((s, i) => (i === level - 1 ? "pending" : s)));
-      generateLevel(category, level, ctrl, []);
+      const tag = ACTION_TAGS[Math.floor(Math.random() * ACTION_TAGS.length)].id;
+      generateLevel(category, level, tag, ctrl, []);
     },
     [category, generateLevel]
   );
@@ -468,7 +481,17 @@ function Spark() {
                         boxShadow: i === 3 ? `0 0 40px ${accent}22` : undefined,
                       }}
                     >
-                      {header}
+                      <div className="flex shrink-0 items-center justify-between gap-2">
+                        {header}
+                        {slot.tag && (
+                          <span
+                            className="rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                            style={{ borderColor: `${accent}66`, color: accent }}
+                          >
+                            {slot.tag}
+                          </span>
+                        )}
+                      </div>
                       <div className="min-h-0 overflow-y-auto">
                         {slot.title && (
                           <div className="mt-2 text-sm font-bold" style={{ color: accent }}>

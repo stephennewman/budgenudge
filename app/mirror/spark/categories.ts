@@ -8,6 +8,35 @@ export interface SparkCategory {
   hint: string;
 }
 
+// Action tags: each generated idea is steered toward one verb so a batch of
+// four never comes out as four variations of "do this tonight". The client
+// deals four distinct random tags per generation, one per level.
+export interface SparkTag {
+  id: string;
+  gloss: string;
+}
+
+export const ACTION_TAGS: SparkTag[] = [
+  { id: "do", gloss: "a physical act to perform" },
+  { id: "say", gloss: "an exact line to speak out loud, face to face" },
+  { id: "send", gloss: "an exact text message to send right now" },
+  { id: "share", gloss: "a fantasy or confession to share with their spouse" },
+  { id: "record", gloss: "a voice note or private video to record for their spouse" },
+  { id: "try", gloss: "a new position, technique, or move to try" },
+  { id: "wear", gloss: "something to wear — or deliberately not wear" },
+  { id: "tease", gloss: "a slow tease to run on their spouse" },
+  { id: "touch", gloss: "a specific way to touch their spouse" },
+  { id: "watch", gloss: "something for the two of them to watch each other do" },
+  { id: "whisper", gloss: "an exact line to whisper at close range in passing" },
+  { id: "plan", gloss: "something to secretly set up for later tonight or this week" },
+  { id: "play", gloss: "a quick two-person game to play, with rules and stakes" },
+  { id: "buy", gloss: "something inexpensive to buy or order for use together soon" },
+  { id: "think", gloss: "a fantasy about their spouse to dwell on when apart" },
+  { id: "dare", gloss: "a dare to issue to their spouse" },
+  { id: "show", gloss: "something to show or reveal to their spouse" },
+  { id: "act", gloss: "a small scene or role to act out, just the two of them" },
+];
+
 export const CATEGORIES: SparkCategory[] = [
   {
     id: "texts",

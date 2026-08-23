@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { CATEGORIES } from "@/app/mirror/spark/categories";
+import { ACTION_TAGS, CATEGORIES, type SparkTag } from "@/app/mirror/spark/categories";
 
 // Spark — hidden couples idea generator (see app/mirror/spark/page.tsx).
 //
@@ -31,6 +31,7 @@ function buildPrompt(
   categoryName: string,
   categoryHint: string,
   level: number,
+  tag: SparkTag,
   avoid: string[]
 ): string {
   const reader = person === "stephen" ? "Stephen (the husband)" : "Whitney (the wife)";
@@ -48,6 +49,8 @@ function buildPrompt(
 This idea is one step on a 4-level heat ladder. Write it at exactly this level:
 ${LEVEL_SPECS[level]}
 
+The idea's action type is "${tag.id.toUpperCase()}" — it must be ${tag.gloss}. Stay true to both the category and this action type.
+
 Rules:
 - Perspective: speak directly TO ${reader.split(" ")[0]} as "you", and refer to ${partner} by name in the third person (e.g. ${person === "stephen" ? '"tell Whitney...", "watch her..."' : '"tell Stephen...", "watch him..."'}). Never call ${partner.split(",")[0]} "you".
 - The ONE exception: quoted words meant to be copied or spoken (a text message, a whispered line, dirty talk) are written in first person, in ${reader.split(" ")[0]}'s own voice, as if ${reader.split(" ")[0]} is saying them to ${partner.split(",")[0]}.
@@ -64,11 +67,12 @@ Return ONLY a valid JSON object, no markdown fences: {"title":"","body":""}`;
 
 export interface SparkIdea {
   level: number;
+  tag: string;
   title: string;
   body: string;
 }
 
-function parseIdea(raw: string, level: number): SparkIdea {
+function parseIdea(raw: string, level: number, tag: string): SparkIdea {
   // Models sometimes wrap JSON in fences or preamble; extract the object.
   const start = raw.indexOf("{");
   const end = raw.lastIndexOf("}");
@@ -76,11 +80,17 @@ function parseIdea(raw: string, level: number): SparkIdea {
   const x = JSON.parse(raw.slice(start, end + 1)) as { title?: unknown; body?: unknown };
   const body = typeof x.body === "string" ? x.body.trim() : "";
   if (!body) throw new Error("empty body");
-  return { level, title: String(x.title || "").trim(), body };
+  return { level, tag, title: String(x.title || "").trim(), body };
 }
 
 export async function POST(req: Request) {
-  let body: { person?: string; category?: string; level?: number; avoid?: string[] };
+  let body: {
+    person?: string;
+    category?: string;
+    level?: number;
+    tag?: string;
+    avoid?: string[];
+  };
   try {
     body = await req.json();
   } catch {
@@ -93,6 +103,10 @@ export async function POST(req: Request) {
     typeof body.level === "number" && body.level >= 1 && body.level <= 4
       ? Math.floor(body.level)
       : null;
+  // Tag optional for compatibility; falls back to a random one.
+  const tag =
+    ACTION_TAGS.find((t) => t.id === body.tag) ??
+    ACTION_TAGS[Math.floor(Math.random() * ACTION_TAGS.length)];
   if (!person || !category || !level) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
@@ -118,7 +132,7 @@ export async function POST(req: Request) {
         },
         {
           role: "user",
-          content: buildPrompt(person, category.name, category.hint, level, avoid),
+          content: buildPrompt(person, category.name, category.hint, level, tag, avoid),
         },
       ],
       // OpenRouter extension: skip the reasoning/thinking pass. Grok otherwise
@@ -128,7 +142,7 @@ export async function POST(req: Request) {
     });
 
     const raw = resp.choices[0]?.message?.content || "";
-    return NextResponse.json({ idea: parseIdea(raw, level) });
+    return NextResponse.json({ idea: parseIdea(raw, level, tag.id) });
   } catch (err) {
     console.error("[spark]", err);
     return NextResponse.json({ error: "Generation failed" }, { status: 500 });
