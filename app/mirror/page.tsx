@@ -3257,21 +3257,27 @@ function ChecklistChannel({
         {renderCard(cycleItem, undefined, "min-h-0 flex-1")}
         {visibleCount > 1 && (
           <div className="flex shrink-0 items-center gap-3">
-            {/* Which cards are in today's cycle; the current one is lit. */}
+            {/* Which cards are in today's cycle; the current one is lit.
+                Tapping an icon jumps straight to that card. */}
             <div className="flex items-center gap-1.5">
               {visibleItems.map((it, idx) => {
                 const DotIcon = it.icon;
                 const active = idx === cycleIdx % visibleCount;
                 return (
-                  <span
+                  <button
                     key={it.id}
+                    onClick={() => setCycleIdx(idx)}
+                    aria-label={`Show ${it.title}`}
+                    title={it.title}
                     className={cn(
                       "flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-500",
-                      active ? it.chip : "bg-white/5 text-white/30"
+                      active
+                        ? it.chip
+                        : "bg-white/5 text-white/30 hover:bg-white/15 hover:text-white/60"
                     )}
                   >
                     <DotIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                  </span>
+                  </button>
                 );
               })}
             </div>
