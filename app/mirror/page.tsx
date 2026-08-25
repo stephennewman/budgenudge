@@ -1440,9 +1440,9 @@ export default function MirrorPage() {
       {
         id: "dinner",
         title: "This week's meals",
-        available: !!dinner && dinner.meals.length > 0,
+        available: !!dinner && (dinner.meals?.length ?? 0) > 0,
         node:
-          dinner && dinner.meals.length > 0 ? (
+          dinner && (dinner.meals?.length ?? 0) > 0 ? (
             <MealsCard dinner={dinner} />
           ) : null,
       },
