@@ -2528,7 +2528,7 @@ function RightRail({
             />
           </div>
           <div className="absolute left-1/2 top-1/2 h-2.5 w-px -translate-x-1/2 -translate-y-1/2 bg-white/50" />
-          <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[9px] font-medium leading-none text-white/45">
+          <span className="absolute left-1/2 top-3 -translate-x-1/2 text-[11px] font-medium leading-none text-white/50">
             12p
           </span>
         </div>
@@ -2540,7 +2540,7 @@ function RightRail({
           <span className="text-lg font-semibold text-white/90">
             Day {dayOfYear}
           </span>
-          <span className="text-xs text-white/55">of {daysInYear}</span>
+          <span className="text-sm text-white/55">of {daysInYear}</span>
         </div>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
           <div
@@ -2548,13 +2548,13 @@ function RightRail({
             style={{ width: `${yearPct}%` }}
           />
         </div>
-        <div className="mt-1.5 text-[11px] text-white/50">
+        <div className="mt-1.5 text-sm text-white/55">
           {daysInYear - dayOfYear} days left in {today.getFullYear()}
         </div>
         {nationalDays.length > 0 && (
           <>
-            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/55">
-              <PartyPopper className="h-3.5 w-3.5 text-amber-300/90" />
+            <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-white/55">
+              <PartyPopper className="h-4 w-4 text-amber-300/90" />
               Today is
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -2562,7 +2562,7 @@ function RightRail({
                 <span
                   key={d.name}
                   className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium leading-tight",
+                    "rounded-full px-2.5 py-1 text-sm font-medium leading-tight",
                     chipStyles[i % chipStyles.length]
                   )}
                 >
@@ -2590,12 +2590,12 @@ function RightRail({
                 {Math.round(current.temperature_2m)}
                 {unitLabel}
               </div>
-              <div className="mt-1 truncate text-xs text-white/75">
+              <div className="mt-1 truncate text-sm text-white/75">
                 {currentInfo.label}
               </div>
             </div>
           </div>
-          <div className="mt-3 text-[11px] text-white/60">
+          <div className="mt-3 text-sm text-white/65">
             Feels {Math.round(current.apparent_temperature)}
             {unitLabel}
             {data && (
@@ -2606,7 +2606,7 @@ function RightRail({
               </>
             )}
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-white/60">
+          <div className="mt-2 flex items-center justify-between text-sm text-white/65">
             <span className="flex items-center gap-1">
               <Droplets className="h-3 w-3 text-sky-300" />
               {current.relative_humidity_2m}%
@@ -2618,7 +2618,7 @@ function RightRail({
           </div>
         </div>
       ) : (
-        <div className={cn(miniShell, "text-xs text-white/50")}>
+        <div className={cn(miniShell, "text-sm text-white/55")}>
           Set a location to see the weather.
         </div>
       )}
@@ -2626,7 +2626,7 @@ function RightRail({
       {/* Next hours */}
       {hours.length > 0 && (
         <div className={miniShell}>
-          <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+          <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-white/55">
             Next hours
           </h3>
           <div className="flex justify-between gap-1">
@@ -2634,7 +2634,7 @@ function RightRail({
               const info = weatherInfo(h.code, h.isDay);
               return (
                 <div key={h.time} className="flex flex-col items-center gap-1.5">
-                  <span className="text-[10px] text-white/60">
+                  <span className="text-xs text-white/65">
                     {i === 0
                       ? "Now"
                       : new Date(h.time).toLocaleTimeString(undefined, {
@@ -2645,7 +2645,7 @@ function RightRail({
                     className={cn("h-5 w-5", weatherColor(h.code, h.isDay))}
                     strokeWidth={1.5}
                   />
-                  <span className="text-xs font-semibold">
+                  <span className="text-sm font-semibold">
                     {Math.round(h.temp)}°
                   </span>
                 </div>
@@ -2658,7 +2658,7 @@ function RightRail({
       {/* 7-day forecast */}
       {forecastDays.length > 0 && (
         <div className={miniShell}>
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/55">
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/55">
             7-day forecast
           </h3>
           <div className="space-y-1">
@@ -2668,7 +2668,7 @@ function RightRail({
               const width = ((highs[i] - lows[i]) / span) * 100;
               return (
                 <div key={day} className="flex items-center gap-2">
-                  <span className="w-8 text-[11px] text-white/80">
+                  <span className="w-9 text-sm text-white/80">
                     {i === 0
                       ? "Today"
                       : new Date(day).toLocaleDateString(undefined, {
@@ -2682,7 +2682,7 @@ function RightRail({
                     )}
                     strokeWidth={1.6}
                   />
-                  <span className="w-6 text-right text-[11px] text-white/55">
+                  <span className="w-7 text-right text-sm text-white/60">
                     {Math.round(lows[i])}°
                   </span>
                   <div className="relative h-1.5 flex-1 rounded-full bg-white/10">
@@ -2691,7 +2691,7 @@ function RightRail({
                       style={{ left: `${left}%`, width: `${width}%` }}
                     />
                   </div>
-                  <span className="w-6 text-[11px] font-semibold">
+                  <span className="w-7 text-sm font-semibold">
                     {Math.round(highs[i])}°
                   </span>
                 </div>
