@@ -17,7 +17,7 @@ export async function GET() {
   try {
     const latest = await loadLatestDeals(supabase);
     if (!latest || latest.deals.length === 0 || dealsAreStale(latest.weekEndsAt)) {
-      return NextResponse.json({ dinner: null });
+      return NextResponse.json({ meals: [] });
     }
 
     const { data: cached } = await supabase

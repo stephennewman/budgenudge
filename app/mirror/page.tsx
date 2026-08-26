@@ -1054,8 +1054,16 @@ export default function MirrorPage() {
           fetch("/api/mirror/dinner"),
         ]);
         if (!active) return;
-        if (bogoRes.ok) setBogos(await bogoRes.json());
-        if (dinRes.ok) setDinner(await dinRes.json());
+        if (bogoRes.ok) {
+          const json = await bogoRes.json();
+          setBogos(Array.isArray(json?.deals) ? json : null);
+        }
+        if (dinRes.ok) {
+          const json = await dinRes.json();
+          // Empty weeks used to return `{dinner:null}` (no `meals`), which
+          // crashed the widgets useMemo on `dinner.meals.length`.
+          setDinner(Array.isArray(json?.meals) ? json : null);
+        }
       } catch {
         /* ignore */
       }
@@ -1310,7 +1318,9 @@ export default function MirrorPage() {
     const nowMs = Date.now();
     const out: { time: string; temp: number; pop: number; code: number; isDay: boolean }[] =
       [];
-    for (let i = 0; i < data.hourly.time.length && out.length < 8; i++) {
+    const times = data.hourly?.time;
+    if (!times) return [];
+    for (let i = 0; i < times.length && out.length < 8; i++) {
       const t = new Date(data.hourly.time[i]).getTime();
       if (t < nowMs - 60 * 60 * 1000) continue;
       out.push({
@@ -1431,18 +1441,18 @@ export default function MirrorPage() {
       {
         id: "bogos",
         title: "Publix BOGOs",
-        available: !!bogos && bogos.deals.length > 0,
+        available: !!bogos && (bogos.deals?.length ?? 0) > 0,
         node:
-          bogos && bogos.deals.length > 0 ? (
+          bogos && (bogos.deals?.length ?? 0) > 0 ? (
             <BogosCard bogos={bogos} onToggleStar={toggleStar} />
           ) : null,
       },
       {
         id: "dinner",
         title: "This week's meals",
-        available: !!dinner && dinner.meals.length > 0,
+        available: !!dinner && (dinner.meals?.length ?? 0) > 0,
         node:
-          dinner && dinner.meals.length > 0 ? (
+          dinner && (dinner.meals?.length ?? 0) > 0 ? (
             <MealsCard dinner={dinner} />
           ) : null,
       },
@@ -1459,14 +1469,14 @@ export default function MirrorPage() {
         title: "Budget pacing",
         available: !!(
           pacing &&
-          (pacing.categories.length > 0 ||
-            pacing.vendors.length > 0 ||
+          ((pacing.categories?.length ?? 0) > 0 ||
+            (pacing.vendors?.length ?? 0) > 0 ||
             (pacing.bills?.length ?? 0) > 0)
         ),
         node:
           pacing &&
-          (pacing.categories.length > 0 ||
-            pacing.vendors.length > 0 ||
+          ((pacing.categories?.length ?? 0) > 0 ||
+            (pacing.vendors?.length ?? 0) > 0 ||
             (pacing.bills?.length ?? 0) > 0) ? (
             <PacingCard
               pacing={pacing}
@@ -2274,7 +2284,7 @@ export default function MirrorPage() {
               headerExtra={fullscreenControl}
             />
           ) : activeSection.id === "deals" &&
-            ((bogos?.deals.length ?? 0) > 0 || (dinner?.meals.length ?? 0) > 0) ? (
+            ((bogos?.deals?.length ?? 0) > 0 || (dinner?.meals?.length ?? 0) > 0) ? (
             <DealsChannel
               bogos={bogos}
               dinner={dinner}
@@ -4649,8 +4659,8 @@ function DealsChannel({
   onToggleStar: (id: number, starred: boolean) => void;
   headerExtra?: React.ReactNode;
 }) {
-  const hasDeals = (bogos?.deals.length ?? 0) > 0;
-  const hasMeals = (dinner?.meals.length ?? 0) > 0;
+  const hasDeals = (bogos?.deals?.length ?? 0) > 0;
+  const hasMeals = (dinner?.meals?.length ?? 0) > 0;
   const paneCount = (hasDeals ? 1 : 0) + (hasMeals ? 1 : 0);
 
   const [paneIdx, setPaneIdx] = useState(0);
