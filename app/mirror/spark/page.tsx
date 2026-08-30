@@ -2,12 +2,10 @@
 
 // Spark — a hidden page for two.
 //
-// Locked state: a card that looks stuck loading. Double-tap the word
-// "Loading" for Stephen's side, the ";)" for Whitney's (same taps as the
-// teaser card on the mirror). Unlocked state: a dealt hand of random
-// categories; tapping one shows the four-level progression (X → XXXX) for
-// that theme. All four levels are requested in parallel — each is a tiny
-// one-idea generation — so cards pop in one at a time within a few seconds.
+// Locked: looks like a stuck loading card. Double-tap "Loading" (Stephen) or
+// ";)" (Whitney). Unlocked: one idea at a time — adjust heat, regenerate in
+// the same or a new category, or step back/forward through history. The next
+// random idea preloads in the background so "Next" feels instant.
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -16,6 +14,8 @@ import {
   AlarmClock,
   ArrowLeft,
   Brain,
+  ChevronLeft,
+  ChevronRight,
   Crown,
   Dices,
   Eye,
@@ -36,6 +36,7 @@ import {
   Mic,
   Move,
   Quote,
+  RefreshCw,
   Shirt,
   Shuffle,
   Sparkles,
@@ -59,11 +60,12 @@ interface SparkIdea {
   body: string;
 }
 
-// Each level's card is a slot: still generating, failed (tap to retry), or done.
-type Slot = "pending" | "error" | SparkIdea;
+interface HistoryEntry {
+  idea: SparkIdea;
+  category: SparkCategory;
+  level: number;
+}
 
-// Icons live here rather than in categories.ts so the shared data file stays
-// importable by the server route without pulling lucide-react into it.
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
   texts: MessageSquare,
   "dirty-talk": Quote,
@@ -102,71 +104,15 @@ const PINK = "#ec4899";
 const TEAL = "#14b8a6";
 
 const DOUBLE_TAP_MS = 450;
-
-// With no touches for this long, the page bails back to the mirror rotation
-// (which also relocks it, since all state lives in the component). One screen
-// holds a whole 4-level progression, so give plenty of reading time.
 const IDLE_SECONDS = 45;
 
-// How many categories are dealt per hand (4 columns x 3 rows on the tablet).
-const HAND_SIZE = 12;
+const HEAT_LEVELS = [
+  { level: 1, badge: "\u{1F525}", name: "Warm" },
+  { level: 2, badge: "\u{1F525}\u{1F525}", name: "Hot" },
+  { level: 3, badge: "\u{1F525}\u{1F525}\u{1F525}", name: "Wild" },
+  { level: 4, badge: "XXXX", name: "Off the charts" },
+] as const;
 
-// A distinct emoji per level, repeated to match its number: smirk, fire,
-// devil, red X.
-const LEVEL_BADGES = [
-  "\u{1F60F}",
-  "\u{1F525}\u{1F525}",
-  "\u{1F608}\u{1F608}\u{1F608}",
-  "\u274C\u274C\u274C\u274C",
-];
-const LEVEL_NAMES = ["Warm", "Hot", "Wild", "Off the charts"];
-
-// Daily cache: the first tap on a category generates fresh content per
-// person; revisits that day reuse it so the progression opens instantly.
-function todayKey(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/New_York",
-  }).format(new Date());
-}
-// Version suffix busts previously cached content when the prompt changes
-// materially (v2: fixed sender/receiver voice direction; v3: excluded
-// breeding/pregnancy themes; v4: tightened perspective + level wording;
-// v5: no names inside quoted texts/spoken lines; v6: shorter bodies;
-// v7: action tags).
-const CACHE_PREFIX = "spark.prog7.";
-const progressionCacheKey = (p: Person, categoryId: string) =>
-  `${CACHE_PREFIX}${p}.${categoryId}.${todayKey()}`;
-
-function readProgressionCache(p: Person, categoryId: string): SparkIdea[] | null {
-  try {
-    const raw = localStorage.getItem(progressionCacheKey(p, categoryId));
-    const parsed = raw ? (JSON.parse(raw) as SparkIdea[]) : null;
-    return Array.isArray(parsed) && parsed.length === 4 ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeProgressionCache(p: Person, categoryId: string, ideas: SparkIdea[]) {
-  try {
-    // Drop stale days and older cache formats so storage never accumulates.
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (
-        key?.startsWith("spark.") &&
-        (!key.startsWith(CACHE_PREFIX) || !key.endsWith(todayKey()))
-      ) {
-        localStorage.removeItem(key);
-      }
-    }
-    localStorage.setItem(progressionCacheKey(p, categoryId), JSON.stringify(ideas));
-  } catch {
-    // Storage full/unavailable: content still works, just regenerates.
-  }
-}
-
-// useSearchParams requires a Suspense boundary; the fallback is a plain black
-// screen, only ever visible for a frame on a hard load.
 export default function SparkPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-neutral-950" />}>
@@ -176,34 +122,33 @@ export default function SparkPage() {
 }
 
 function Spark() {
-  // Unlock during the very first render when the teaser passed ?p=, so the
-  // locked "Loading ;)" screen never flashes on the way in. The initial hand
-  // uses a per-day seeded shuffle (not Math.random) so server and client
-  // render the same grid — no hydration mismatch on hard loads.
   const searchParams = useSearchParams();
   const paramPerson = searchParams.get("p");
   const initialPerson: Person | null =
     paramPerson === "stephen" || paramPerson === "whitney" ? paramPerson : null;
 
   const [person, setPerson] = useState<Person | null>(initialPerson);
-  const [hand, setHand] = useState<SparkCategory[]>(() =>
-    initialPerson
-      ? seededShuffle(CATEGORIES, `${todayKey()}.${initialPerson}`).slice(0, HAND_SIZE)
-      : []
-  );
-  const [category, setCategory] = useState<SparkCategory | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
+  const [heatLevel, setHeatLevel] = useState(1);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+  const [preloaded, setPreloaded] = useState<HistoryEntry | null>(null);
+
   const lastTap = useRef<{ id: string; at: number }>({ id: "", at: 0 });
   const [idleLeft, setIdleLeft] = useState(IDLE_SECONDS);
   const lastActivity = useRef(Date.now());
   const router = useRouter();
+  const abortRef = useRef<AbortController | null>(null);
+  const preloadAbortRef = useRef<AbortController | null>(null);
+  const bootedRef = useRef(false);
+
+  const current = history[historyIndex] ?? null;
 
   const touch = useCallback(() => {
     lastActivity.current = Date.now();
   }, []);
 
-  // Idle watchdog: any tap resets the clock; when it runs out, return to the
-  // mirror rotation. Unmounting relocks the page automatically.
   useEffect(() => {
     const id = setInterval(() => {
       const left =
@@ -217,15 +162,162 @@ function Spark() {
     return () => clearInterval(id);
   }, [router]);
 
-  const unlock = useCallback((p: Person) => {
-    setPerson(p);
-    setCategory(null);
-    setSlots([]);
-    setHand(shuffle(CATEGORIES).slice(0, HAND_SIZE));
+  const pickCategory = useCallback((excludeId?: string) => {
+    const pool = excludeId
+      ? CATEGORIES.filter((c) => c.id !== excludeId)
+      : CATEGORIES;
+    return pool[Math.floor(Math.random() * pool.length)] ?? CATEGORIES[0];
   }, []);
 
-  // Fallback for direct visits without ?p=: same taps as the teaser card —
-  // double-tap the word "Loading" for Stephen, the ";)" for Whitney.
+  const randomTag = () =>
+    ACTION_TAGS[Math.floor(Math.random() * ACTION_TAGS.length)].id;
+
+  const fetchIdea = useCallback(
+    async (
+      p: Person,
+      cat: SparkCategory,
+      level: number,
+      avoid: string[],
+      signal: AbortSignal
+    ): Promise<SparkIdea> => {
+      const res = await fetch("/api/mirror/spark", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal,
+        body: JSON.stringify({
+          person: p,
+          category: cat.id,
+          level,
+          tag: randomTag(),
+          avoid,
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as { idea: SparkIdea };
+      if (!data.idea?.body) throw new Error("empty");
+      return data.idea;
+    },
+    []
+  );
+
+  const generateEntry = useCallback(
+    async (
+      p: Person,
+      cat: SparkCategory,
+      level: number,
+      avoid: string[],
+      signal: AbortSignal
+    ): Promise<HistoryEntry> => {
+      const idea = await fetchIdea(p, cat, level, avoid, signal);
+      return { idea, category: cat, level };
+    },
+    [fetchIdea]
+  );
+
+  const startPreload = useCallback(
+    (p: Person, level: number, excludeIds: string[] = []) => {
+      preloadAbortRef.current?.abort();
+      const ctrl = new AbortController();
+      preloadAbortRef.current = ctrl;
+      const cat = pickCategory(
+        excludeIds.length ? excludeIds[excludeIds.length - 1] : undefined
+      );
+      generateEntry(p, cat, level, [], ctrl.signal)
+        .then((entry) => {
+          if (!ctrl.signal.aborted) setPreloaded(entry);
+        })
+        .catch(() => {
+          if (!ctrl.signal.aborted) setPreloaded(null);
+        });
+    },
+    [generateEntry, pickCategory]
+  );
+
+  const replaceAtIndex = useCallback(
+    (index: number, entry: HistoryEntry, truncateForward = true) => {
+      setHistory((prev) => {
+        const next = truncateForward ? prev.slice(0, index + 1) : [...prev];
+        next[index] = entry;
+        return next;
+      });
+      setHistoryIndex(index);
+      setError(false);
+    },
+    []
+  );
+
+  const loadFresh = useCallback(
+    async (
+      cat: SparkCategory,
+      level: number,
+      opts?: { avoid?: string[]; atIndex?: number; preload?: boolean }
+    ) => {
+      if (!person) return;
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      setLoading(true);
+      setError(false);
+      touch();
+
+      const avoid =
+        opts?.avoid ??
+        (current
+          ? [current.idea.title || current.idea.body.slice(0, 60)]
+          : []);
+
+      try {
+        const entry = await generateEntry(
+          person,
+          cat,
+          level,
+          avoid,
+          ctrl.signal
+        );
+        if (ctrl.signal.aborted) return;
+        const idx = opts?.atIndex ?? historyIndex;
+        replaceAtIndex(idx, entry);
+        if (opts?.preload !== false) {
+          setPreloaded(null);
+          startPreload(person, level, [cat.id]);
+        }
+      } catch {
+        if (ctrl.signal.aborted) return;
+        setError(true);
+      } finally {
+        if (!ctrl.signal.aborted) setLoading(false);
+      }
+    },
+    [
+      person,
+      current,
+      historyIndex,
+      generateEntry,
+      replaceAtIndex,
+      startPreload,
+      touch,
+    ]
+  );
+
+  const unlock = useCallback(
+    (p: Person) => {
+      setPerson(p);
+      setHeatLevel(1);
+      setHistory([]);
+      setHistoryIndex(0);
+      setPreloaded(null);
+      bootedRef.current = false;
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!person || bootedRef.current) return;
+    bootedRef.current = true;
+    const cat = pickCategory();
+    loadFresh(cat, 1, { atIndex: 0 });
+  }, [person, pickCategory, loadFresh]);
+
   const onGlyphTap = useCallback(
     (glyph: "word" | "wink") => {
       const now = Date.now();
@@ -238,111 +330,81 @@ function Spark() {
     [unlock]
   );
 
-  // Switching categories mid-generation aborts the in-flight batch.
-  const abortRef = useRef<AbortController | null>(null);
-  // Collects finished ideas for the current batch so we can cache once all
-  // four are in (state updates are functional, so we track alongside).
-  const resultsRef = useRef<(SparkIdea | null)[]>([null, null, null, null]);
-
-  // One level = one tiny request. Fired four at a time by generate(), or
-  // singly when a failed slot is retried.
-  const generateLevel = useCallback(
-    async (
-      cat: SparkCategory,
-      level: number,
-      tag: string,
-      ctrl: AbortController,
-      avoid: string[]
-    ) => {
-      if (!person) return;
-      try {
-        const res = await fetch("/api/mirror/spark", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: ctrl.signal,
-          body: JSON.stringify({ person, category: cat.id, level, tag, avoid }),
-        });
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { idea: SparkIdea };
-        if (!data.idea?.body) throw new Error("empty");
-        resultsRef.current[level - 1] = data.idea;
-        setSlots((prev) => prev.map((s, i) => (i === level - 1 ? data.idea : s)));
-        touch(); // reading time as cards land
-        if (resultsRef.current.every((x): x is SparkIdea => x !== null)) {
-          writeProgressionCache(person, cat.id, resultsRef.current);
-        }
-      } catch {
-        if (ctrl.signal.aborted) return; // superseded
-        setSlots((prev) => prev.map((s, i) => (i === level - 1 ? "error" : s)));
-      }
-    },
-    [person, touch]
-  );
-
-  const generate = useCallback(
-    (cat: SparkCategory, opts?: { fresh?: boolean }) => {
-      if (!person) return;
-      abortRef.current?.abort();
-
-      // "New take" (fresh) skips the cache and avoids what's on screen now.
-      const avoid = opts?.fresh
-        ? resultsRef.current
-            .filter((x): x is SparkIdea => x !== null)
-            .map((i) => i.title || i.body.slice(0, 60))
-        : [];
-      if (!opts?.fresh) {
-        const cached = readProgressionCache(person, cat.id);
-        if (cached) {
-          resultsRef.current = [...cached];
-          setSlots(cached);
-          return;
-        }
-      }
-
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
-      resultsRef.current = [null, null, null, null];
-      setSlots(["pending", "pending", "pending", "pending"]);
-      // Four distinct action tags per batch so the levels come out as
-      // different kinds of ideas (a text, a dare, a move...), not four
-      // variations of the same thing.
-      const tags = shuffle(ACTION_TAGS).slice(0, 4);
-      for (let level = 1; level <= 4; level++) {
-        generateLevel(cat, level, tags[level - 1].id, ctrl, avoid);
-      }
-    },
-    [person, generateLevel]
-  );
-
-  const retryLevel = useCallback(
+  const onHeat = useCallback(
     (level: number) => {
-      if (!category) return;
-      const ctrl = abortRef.current ?? new AbortController();
-      abortRef.current = ctrl;
-      setSlots((prev) => prev.map((s, i) => (i === level - 1 ? "pending" : s)));
-      const tag = ACTION_TAGS[Math.floor(Math.random() * ACTION_TAGS.length)].id;
-      generateLevel(category, level, tag, ctrl, []);
+      if (!person || !current || loading) return;
+      setHeatLevel(level);
+      loadFresh(current.category, level);
     },
-    [category, generateLevel]
+    [person, current, loading, loadFresh]
   );
 
-  const pickCategory = useCallback(
-    (cat: SparkCategory) => {
-      setCategory(cat);
-      generate(cat);
-    },
-    [generate]
-  );
+  const onRegenSame = useCallback(() => {
+    if (!person || !current || loading) return;
+    loadFresh(current.category, heatLevel);
+  }, [person, current, loading, heatLevel, loadFresh]);
 
-  const backToHand = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setCategory(null);
-    setSlots([]);
-  }, []);
+  const onRegenNew = useCallback(() => {
+    if (!person || loading) return;
+    const cat = pickCategory(current?.category.id);
+    loadFresh(cat, heatLevel);
+  }, [person, current, loading, heatLevel, pickCategory, loadFresh]);
+
+  const onNext = useCallback(() => {
+    if (!person || loading) return;
+    touch();
+
+    if (historyIndex < history.length - 1) {
+      setHistoryIndex((i) => i + 1);
+      const nextEntry = history[historyIndex + 1];
+      if (nextEntry) setHeatLevel(nextEntry.level);
+      return;
+    }
+
+    if (preloaded) {
+      const entry = preloaded;
+      setHistory((prev) => [...prev, entry]);
+      setHistoryIndex(history.length);
+      setHeatLevel(entry.level);
+      setPreloaded(null);
+      startPreload(person, entry.level, [entry.category.id]);
+      return;
+    }
+
+    const cat = pickCategory(current?.category.id);
+    loadFresh(cat, heatLevel, { atIndex: history.length });
+  }, [
+    person,
+    loading,
+    historyIndex,
+    history,
+    preloaded,
+    current,
+    heatLevel,
+    pickCategory,
+    loadFresh,
+    startPreload,
+    touch,
+  ]);
+
+  const onBack = useCallback(() => {
+    if (historyIndex <= 0 || loading) return;
+    touch();
+    const nextIdx = historyIndex - 1;
+    setHistoryIndex(nextIdx);
+    setHeatLevel(history[nextIdx]?.level ?? 1);
+  }, [historyIndex, history, loading, touch]);
+
+  const onRetry = useCallback(() => {
+    if (!current) return;
+    loadFresh(current.category, heatLevel);
+  }, [current, heatLevel, loadFresh]);
 
   const accent = person === "whitney" ? PINK : TEAL;
-  const anyPending = slots.some((s) => s === "pending");
+  const canBack = historyIndex > 0;
+  const atEnd = historyIndex >= history.length - 1;
+  const Icon = current ? (CATEGORY_ICONS[current.category.id] ?? Sparkles) : Sparkles;
+  const heatMeta = HEAT_LEVELS.find((h) => h.level === (current?.level ?? heatLevel));
 
   return (
     <div
@@ -350,10 +412,7 @@ function Spark() {
       onPointerDownCapture={touch}
     >
       {person === null ? (
-        // ------------------------------ LOCKED ------------------------------
-        // Looks like a stuck loading screen. The word and the ";)" are the keys.
         <div className="relative flex h-screen items-center justify-center overflow-hidden">
-          {/* Quiet exit back to the mirror (the iPad app has no browser chrome) */}
           <Link
             href="/mirror"
             aria-label="Back to mirror"
@@ -380,19 +439,14 @@ function Spark() {
           </div>
         </div>
       ) : (
-        // ----------------------------- UNLOCKED -----------------------------
-        // Sized for the iPad in landscape: wide container, 4x3 category grid,
-        // 2x2 progression that fits above the fold without scrolling.
-        <div className="mx-auto flex h-screen w-full max-w-6xl flex-col px-6 py-5">
-          {/* Top bar: exit back to the mirror (or back to the hand from a
-              progression), person label + auto-return countdown. */}
+        <div className="mx-auto flex h-screen w-full max-w-2xl flex-col px-5 py-5">
           <div className="flex items-center gap-2">
             <button
-              onClick={() => (category ? backToHand() : router.push("/mirror"))}
+              onClick={() => router.push("/mirror")}
               className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-700 px-3.5 py-1.5 text-xs font-medium text-neutral-300 hover:bg-white/10 hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              {category ? "Categories" : "Back to app"}
+              Back to app
             </button>
             <div className="ml-auto flex items-center gap-2">
               <span
@@ -407,168 +461,135 @@ function Spark() {
             </div>
           </div>
 
-          {category === null ? (
-            // -------------------------- CATEGORY HAND --------------------------
-            <>
-              <div className="mt-4 text-xs text-neutral-500">
-                Pick a category — you&apos;ll get all four levels at once, warm to
-                off the charts
-              </div>
-              <div className="mt-3 grid min-h-0 flex-1 grid-cols-2 grid-rows-6 gap-3 sm:grid-cols-3 sm:grid-rows-4 lg:grid-cols-4 lg:grid-rows-3">
-                {hand.map((cat) => {
-                  const Icon = CATEGORY_ICONS[cat.id] ?? Sparkles;
-                  return (
-                    <button
-                      key={cat.id}
-                      onClick={() => pickCategory(cat)}
-                      className="flex min-h-0 flex-col items-center justify-center gap-2.5 rounded-2xl border bg-neutral-900 px-3 text-base font-semibold text-neutral-200 transition hover:bg-neutral-800"
-                      style={{ borderColor: `${accent}33` }}
-                    >
-                      <Icon className="h-7 w-7" style={{ color: accent }} strokeWidth={1.6} />
-                      {cat.name}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-3 pb-1">
-                <button
-                  onClick={() => setHand(shuffle(CATEGORIES).slice(0, HAND_SIZE))}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border py-2.5 text-sm font-medium"
-                  style={{ borderColor: accent, color: accent }}
-                >
-                  <Shuffle className="h-4 w-4" />
-                  Deal new categories
-                </button>
-              </div>
-            </>
-          ) : (
-            // -------------------------- PROGRESSION --------------------------
-            <>
-              <div className="mt-4 flex items-center gap-2.5">
-                {(() => {
-                  const Icon = CATEGORY_ICONS[category.id] ?? Sparkles;
-                  return <Icon className="h-5 w-5" style={{ color: accent }} strokeWidth={1.8} />;
-                })()}
-                <span className="text-lg font-bold" style={{ color: accent }}>
-                  {category.name}
-                </span>
-              </div>
-
-              {/* 2x2 above the fold on the tablet — no scrolling to see all
-                  four levels. Long bodies scroll inside their own card. */}
-              <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:grid-rows-2">
-                {slots.map((slot, i) => {
-                  const header = (
-                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-                      <span>{LEVEL_BADGES[i]}</span>
-                      <span>{LEVEL_NAMES[i]}</span>
-                    </div>
-                  );
-                  if (slot === "pending") {
-                    return (
-                      <div
-                        key={i}
-                        className="flex min-h-0 animate-pulse flex-col rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5"
-                      >
-                        {header}
-                        <div className="mt-3 h-3 w-2/3 rounded bg-neutral-800" />
-                        <div className="mt-2 h-3 w-full rounded bg-neutral-800" />
-                      </div>
-                    );
-                  }
-                  if (slot === "error") {
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => retryLevel(i + 1)}
-                        className="flex min-h-0 flex-col rounded-3xl border border-neutral-800 bg-neutral-900/60 p-5 text-left"
-                      >
-                        {header}
-                        <p className="mt-2 text-sm text-neutral-500">
-                          Didn&apos;t come through — tap to retry
-                        </p>
-                      </button>
-                    );
-                  }
-                  return (
-                    <div
-                      key={i}
-                      className="flex min-h-0 flex-col rounded-3xl border bg-neutral-900 p-5"
-                      style={{
-                        borderColor: `${accent}${(22 + i * 22).toString(16).padStart(2, "0")}`,
-                        boxShadow: i === 3 ? `0 0 40px ${accent}22` : undefined,
-                      }}
-                    >
-                      <div className="flex shrink-0 items-center justify-between gap-2">
-                        {header}
-                        {slot.tag && (
-                          <span
-                            className="rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                            style={{ borderColor: `${accent}66`, color: accent }}
-                          >
-                            {slot.tag}
-                          </span>
-                        )}
-                      </div>
-                      <div className="min-h-0 overflow-y-auto">
-                        {slot.title && (
-                          <div className="mt-2 text-sm font-bold" style={{ color: accent }}>
-                            {slot.title}
-                          </div>
-                        )}
-                        <p className="mt-1 text-[13px] leading-snug text-neutral-300">
-                          {slot.body}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-3 pb-1">
-                <button
-                  onClick={() => generate(category, { fresh: true })}
-                  disabled={anyPending}
-                  className="w-full rounded-2xl border py-3 text-sm font-medium disabled:opacity-40"
-                  style={{ borderColor: accent, color: accent }}
-                >
-                  {anyPending ? "Conjuring..." : `New take on ${category.name}`}
-                </button>
-              </div>
-            </>
+          {current && (
+            <div className="mt-5 flex items-center gap-2.5">
+              <Icon className="h-6 w-6" style={{ color: accent }} strokeWidth={1.8} />
+              <span className="text-xl font-bold" style={{ color: accent }}>
+                {current.category.name}
+              </span>
+            </div>
           )}
+
+          <div
+            className="mt-4 flex min-h-0 flex-1 flex-col rounded-3xl border bg-neutral-900 p-6"
+            style={{ borderColor: `${accent}44` }}
+          >
+            {loading && !current ? (
+              <div className="flex flex-1 animate-pulse flex-col justify-center gap-3">
+                <div className="h-4 w-1/3 rounded bg-neutral-800" />
+                <div className="h-4 w-full rounded bg-neutral-800" />
+                <div className="h-4 w-5/6 rounded bg-neutral-800" />
+              </div>
+            ) : error ? (
+              <button
+                onClick={onRetry}
+                className="flex flex-1 flex-col items-center justify-center gap-2 text-neutral-400"
+              >
+                <RefreshCw className="h-8 w-8" />
+                <span className="text-sm">Didn&apos;t come through — tap to retry</span>
+              </button>
+            ) : current ? (
+              <>
+                <div className="flex shrink-0 items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    <span>{heatMeta?.badge}</span>
+                    <span>{heatMeta?.name}</span>
+                  </div>
+                  {current.idea.tag && (
+                    <span
+                      className="rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                      style={{ borderColor: `${accent}66`, color: accent }}
+                    >
+                      {current.idea.tag}
+                    </span>
+                  )}
+                </div>
+                <div
+                  className={`min-h-0 flex-1 overflow-y-auto ${loading ? "opacity-50" : ""}`}
+                >
+                  {current.idea.title && (
+                    <div className="mt-4 text-lg font-bold" style={{ color: accent }}>
+                      {current.idea.title}
+                    </div>
+                  )}
+                  <p className="mt-2 text-base leading-relaxed text-neutral-200">
+                    {current.idea.body}
+                  </p>
+                </div>
+              </>
+            ) : null}
+          </div>
+
+          <div className="mt-4">
+            <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+              Hotter or colder
+            </p>
+            <div className="flex gap-2">
+              {HEAT_LEVELS.map((h) => {
+                const active = (current?.level ?? heatLevel) === h.level;
+                return (
+                  <button
+                    key={h.level}
+                    onClick={() => onHeat(h.level)}
+                    className="flex flex-1 flex-col items-center gap-1 rounded-2xl border py-2.5 text-sm font-semibold transition"
+                    style={{
+                      borderColor: active ? accent : `${accent}33`,
+                      color: active ? accent : `${accent}99`,
+                      backgroundColor: active ? `${accent}15` : "transparent",
+                    }}
+                  >
+                    <span className="text-base leading-none">{h.badge}</span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide opacity-80">
+                      {h.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={onRegenSame}
+              disabled={loading || !current}
+              className="flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-medium disabled:opacity-40"
+              style={{ borderColor: accent, color: accent }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Same category
+            </button>
+            <button
+              onClick={onRegenNew}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 rounded-2xl border py-3 text-sm font-medium disabled:opacity-40"
+              style={{ borderColor: accent, color: accent }}
+            >
+              <Shuffle className="h-4 w-4" />
+              New category
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 pb-1">
+            <button
+              onClick={onBack}
+              disabled={!canBack || loading}
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-neutral-700 py-3 text-sm font-medium text-neutral-300 disabled:opacity-30"
+            >
+              <ChevronLeft className="h-5 w-5" />
+              Back
+            </button>
+            <button
+              onClick={onNext}
+              disabled={loading}
+              className="flex items-center justify-center gap-1.5 rounded-2xl border py-3 text-sm font-medium disabled:opacity-40"
+              style={{ borderColor: accent, color: accent }}
+            >
+              {loading && atEnd && !preloaded ? "Conjuring..." : "Next"}
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       )}
     </div>
   );
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// Deterministic shuffle for the initial hand: seeded by day + person so SSR
-// and the client agree. "Deal new categories" uses the random shuffle above.
-function seededShuffle<T>(arr: T[], seed: string): T[] {
-  let h = 2166136261;
-  for (let i = 0; i < seed.length; i++) {
-    h ^= seed.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const rand = () => {
-    h = Math.imul(h ^ (h >>> 15), h | 1);
-    h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
-    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
-  };
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
