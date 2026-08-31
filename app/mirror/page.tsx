@@ -405,7 +405,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   whitney: Flower2,
 };
 
-// How long each channel stays on screen before auto-advancing.
+// Default how long each channel stays on screen before auto-advancing.
+// Channels that cycle cards (1-up love/family/etc., deals panes) override
+// this with one full inner-cycle duration so the section doesn't swipe
+// away mid-card (e.g. 3 cards × 10s = 30s).
 const ROTATE_MS = 30000;
 
 // --- Smart rotation playlist -------------------------------------------------
@@ -1845,6 +1848,12 @@ export default function MirrorPage() {
 
   // The Today channel holds rotation while its article reader is open.
   const [holdRotation, setHoldRotation] = useState(false);
+  // Inner card/pane cycle length for the active channel. When set, section
+  // dwell matches one full pass so auto-advance doesn't cut a card short.
+  const [channelDwellMs, setChannelDwellMs] = useState<number | null>(null);
+  const handleChannelDwell = useCallback((ms: number | null) => {
+    setChannelDwellMs(ms);
+  }, []);
 
   // The playlist auto-rotation follows right now, given the time of day and
   // day of week. Recomputes when the day part or weekday rolls over.
@@ -1857,8 +1866,13 @@ export default function MirrorPage() {
   // Auto-advance to the next channel in the smart playlist. If the viewer
   // manually navigated to a channel outside the playlist, the next advance
   // returns to the top of the playlist. Resets whenever the index changes (so
-  // a manual selection gives you a fresh 30s) or the screen is touched, and
+  // a manual selection gives you a fresh dwell) or the screen is touched, and
   // pauses while editing or reading an article.
+  //
+  // When the active channel reports an inner card/pane cycle length, dwell
+  // is that full pass (3×10s cards → 30s) instead of the default 30s — so
+  // the section never swipes away mid-card. Taps don't restart that dwell;
+  // restarting would desync from the card timer that's already running.
   //
   // `sections` gets a fresh identity on most renders (and the clock re-renders
   // every second), so the effect keys off a stable id string and reads the
@@ -1866,12 +1880,14 @@ export default function MirrorPage() {
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
   const sectionIdsKey = sections.map((s) => s.id).join(",");
+  const rotateMs = channelDwellMs ?? ROTATE_MS;
+  const rotateResetKey = channelDwellMs == null ? interactionTick : 0;
   useEffect(() => {
     if (!autoRotate || editMode || holdRotation || sectionCount <= 1) {
       setRotateAt(null);
       return;
     }
-    setRotateAt(Date.now() + ROTATE_MS);
+    setRotateAt(Date.now() + rotateMs);
     const t = setTimeout(() => {
       setActiveIndex((i) => {
         const secs = sectionsRef.current;
@@ -1887,7 +1903,7 @@ export default function MirrorPage() {
         const nextIdx = secs.findIndex((s) => s.id === nextId);
         return nextIdx >= 0 ? nextIdx : (i + 1) % secs.length;
       });
-    }, ROTATE_MS);
+    }, rotateMs);
     return () => clearTimeout(t);
   }, [
     autoRotate,
@@ -1895,9 +1911,10 @@ export default function MirrorPage() {
     holdRotation,
     sectionCount,
     activeIndex,
-    interactionTick,
+    rotateResetKey,
     playlistIds,
     sectionIdsKey,
+    rotateMs,
   ]);
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
@@ -2278,10 +2295,12 @@ export default function MirrorPage() {
             activeSection.id
           ) ? (
             <ChecklistChannel
+              key={activeSection.id}
               channel={activeSection.id}
               label={activeSection.label}
               together={together}
               headerExtra={fullscreenControl}
+              onDwellMs={handleChannelDwell}
             />
           ) : activeSection.id === "deals" &&
             ((bogos?.deals?.length ?? 0) > 0 || (dinner?.meals?.length ?? 0) > 0) ? (
@@ -2290,6 +2309,7 @@ export default function MirrorPage() {
               dinner={dinner}
               onToggleStar={toggleStar}
               headerExtra={fullscreenControl}
+              onDwellMs={handleChannelDwell}
             />
           ) : (
             <section key={activeSection.id} className="flex flex-1 flex-col gap-2">
@@ -3010,12 +3030,15 @@ function ChecklistChannel({
   label,
   together,
   headerExtra,
+  onDwellMs,
 }: {
   channel: string;
   label: string;
   together: Together | null;
   // Extra header controls (e.g. the fullscreen toggle) from the page.
   headerExtra?: React.ReactNode;
+  // One full 1-up card pass, so the parent section timer can match it.
+  onDwellMs?: (ms: number | null) => void;
 }) {
   const dayKey = new Date().toISOString().slice(0, 10);
   const hiddenKey = `${CARDS_HIDDEN_PREFIX}${dayKey}`;
@@ -3107,6 +3130,21 @@ function ChecklistChannel({
   const cycleMs = cycleVariant
     ? cardReadMs(cycleVariant.text, cycleVariant.footnote)
     : 0;
+  // Sum of each visible card's reading time. The section should linger this
+  // long so it doesn't swipe away before the last card has been shown.
+  const cycleTotalMs =
+    view === 1 && visibleCount >= 2
+      ? visibleItems.reduce((sum, it) => {
+          const v = variantFor(it);
+          return sum + cardReadMs(v.text, v.footnote);
+        }, 0)
+      : null;
+  useEffect(() => {
+    onDwellMs?.(cycleTotalMs);
+  }, [cycleTotalMs, onDwellMs]);
+  useEffect(() => {
+    return () => onDwellMs?.(null);
+  }, [onDwellMs]);
   useEffect(() => {
     setCycleIdx(0);
   }, [channel, view]);
@@ -4653,17 +4691,26 @@ function DealsChannel({
   dinner,
   onToggleStar,
   headerExtra,
+  onDwellMs,
 }: {
   bogos: BogoData | null;
   dinner: DinnerData | null;
   onToggleStar: (id: number, starred: boolean) => void;
   headerExtra?: React.ReactNode;
+  onDwellMs?: (ms: number | null) => void;
 }) {
   const hasDeals = (bogos?.deals?.length ?? 0) > 0;
   const hasMeals = (dinner?.meals?.length ?? 0) > 0;
   const paneCount = (hasDeals ? 1 : 0) + (hasMeals ? 1 : 0);
+  const cycleTotalMs = paneCount >= 2 ? paneCount * DEALS_ROTATE_MS : null;
 
   const [paneIdx, setPaneIdx] = useState(0);
+  useEffect(() => {
+    onDwellMs?.(cycleTotalMs);
+  }, [cycleTotalMs, onDwellMs]);
+  useEffect(() => {
+    return () => onDwellMs?.(null);
+  }, [onDwellMs]);
   useEffect(() => {
     if (paneCount < 2) return;
     const id = setInterval(() => setPaneIdx((i) => i + 1), DEALS_ROTATE_MS);

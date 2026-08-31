@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ExternalLink, Newspaper, X } from "lucide-react";
 
 // "News" channel for the mirror: one big card with the top news stories as
-// glanceable bullet points (tap to read in place).
+// glanceable bullet points (tap to read in place; small link opens source).
 
 type NewsItem = { title: string; link: string | null };
 type NewsSection = { id: string; label: string; items: NewsItem[] };
@@ -34,7 +34,7 @@ export function TodayChannel({
   const today = useMemo(() => new Date(), []);
   const todayIso = isoDate(today);
 
-  const [newsSections, setNewsSections] = useState<NewsSection[]>([]);
+  const [headlines, setHeadlines] = useState<NewsItem[]>([]);
   const [reader, setReader] = useState<Reader | null>(null);
 
   useEffect(() => {
@@ -68,16 +68,20 @@ export function TodayChannel({
       );
       if (!active || !newsRes || !newsRes.ok) return;
       const d = await newsRes.json();
-      setNewsSections(d.sections ?? []);
+      const ranked = (d.headlines ?? []) as NewsItem[];
+      if (ranked.length > 0) {
+        setHeadlines(ranked.slice(0, HEADLINES_SHOWN));
+        return;
+      }
+      const sections = (d.sections ?? []) as NewsSection[];
+      const top = sections.find((s) => s.id === "top") ?? sections[0] ?? null;
+      setHeadlines((top?.items ?? []).slice(0, HEADLINES_SHOWN));
     };
     load();
     return () => {
       active = false;
     };
   }, [todayIso]);
-
-  const topSection =
-    newsSections.find((s) => s.id === "top") ?? newsSections[0] ?? null;
 
   const cardShell =
     "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-8 backdrop-blur-md";
@@ -94,20 +98,32 @@ export function TodayChannel({
             Top stories
           </span>
         </div>
-        {topSection ? (
+        {headlines.length > 0 ? (
           <ul className="flex min-h-0 flex-1 flex-col justify-center gap-4 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {topSection.items.slice(0, HEADLINES_SHOWN).map((n, i) => (
-              <li key={i}>
+            {headlines.map((n, i) => (
+              <li key={n.link ?? `${n.title}-${i}`} className="flex items-start gap-1">
                 <button
                   onClick={() => openArticle(n, "Top stories")}
                   disabled={!n.link}
-                  className="flex w-full items-start gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-white/10"
+                  className="flex min-w-0 flex-1 items-start gap-4 rounded-xl px-3 py-3 text-left transition hover:bg-white/10"
                 >
                   <span className="mt-4 h-2 w-2 shrink-0 rounded-full bg-sky-300/70" />
                   <span className="text-[30px] font-medium leading-snug text-white/90">
                     {n.title}
                   </span>
                 </button>
+                {n.link && (
+                  <a
+                    href={n.link}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open “${n.title}” in a new tab`}
+                    title="Open in new tab"
+                    className="mt-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/80"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                )}
               </li>
             ))}
           </ul>

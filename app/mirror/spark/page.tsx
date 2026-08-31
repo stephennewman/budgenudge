@@ -2,12 +2,12 @@
 
 // Spark — a hidden page for two.
 //
-// Locked state: a card that looks stuck loading. Double-tap the word
-// "Loading" for Stephen's side, the ";)" for Whitney's (same taps as the
-// teaser card on the mirror). Unlocked state: a dealt hand of random
-// categories; tapping one shows the four-level progression (X → XXXX) for
-// that theme. All four levels are requested in parallel — each is a tiny
-// one-idea generation — so cards pop in one at a time within a few seconds.
+// Locked state: a card that looks stuck loading. Tap the word "Loading"
+// for Whitney's side, the ";)" for Stephen's (same taps as the teaser
+// card on the mirror). Unlocked state: a dealt hand of random categories;
+// tapping one shows the four-level progression (X → XXXX) for that theme.
+// All four levels are requested in parallel — each is a tiny one-idea
+// generation — so cards pop in one at a time within a few seconds.
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -101,8 +101,6 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 const PINK = "#ec4899";
 const TEAL = "#14b8a6";
 
-const DOUBLE_TAP_MS = 450;
-
 // With no touches for this long, the page bails back to the mirror rotation
 // (which also relocks it, since all state lives in the component). One screen
 // holds a whole 4-level progression, so give plenty of reading time.
@@ -193,7 +191,6 @@ function Spark() {
   );
   const [category, setCategory] = useState<SparkCategory | null>(null);
   const [slots, setSlots] = useState<Slot[]>([]);
-  const lastTap = useRef<{ id: string; at: number }>({ id: "", at: 0 });
   const [idleLeft, setIdleLeft] = useState(IDLE_SECONDS);
   const lastActivity = useRef(Date.now());
   const router = useRouter();
@@ -225,15 +222,10 @@ function Spark() {
   }, []);
 
   // Fallback for direct visits without ?p=: same taps as the teaser card —
-  // double-tap the word "Loading" for Stephen, the ";)" for Whitney.
+  // "Loading" for Whitney, the ";)" for Stephen.
   const onGlyphTap = useCallback(
     (glyph: "word" | "wink") => {
-      const now = Date.now();
-      const isDouble =
-        lastTap.current.id === glyph && now - lastTap.current.at < DOUBLE_TAP_MS;
-      lastTap.current = { id: glyph, at: now };
-      if (!isDouble) return;
-      unlock(glyph === "wink" ? "whitney" : "stephen");
+      unlock(glyph === "wink" ? "stephen" : "whitney");
     },
     [unlock]
   );

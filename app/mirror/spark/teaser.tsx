@@ -1,29 +1,20 @@
 "use client";
 
-import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 // Spark's doorway, disguised as a channel card stuck loading. Mirrors the
 // exact chrome of the other ChecklistChannel cards (watermark icon, chip +
 // title header, big light body text) so it blends into the rotation.
-// Double-tap the word "Loading" for Stephen's section, the ";)" for Whitney's.
-
-const DOUBLE_TAP_MS = 450;
+// Tap the word "Loading" for Whitney's challenges, the ";)" for Stephen's.
 
 export function SparkTeaser() {
-  const lastTap = useRef<{ id: string; at: number }>({ id: "", at: 0 });
   const router = useRouter();
 
-  const onGlyphTap = (glyph: "word" | "wink") => {
-    const now = Date.now();
-    const isDouble =
-      lastTap.current.id === glyph && now - lastTap.current.at < DOUBLE_TAP_MS;
-    lastTap.current = { id: glyph, at: now };
-    if (!isDouble) return;
+  const open = (person: "stephen" | "whitney") => {
     // Client-side navigation: no full page load, so no flash of the spark
     // page's locked screen on the way in.
-    router.push(`/mirror/spark?p=${glyph === "wink" ? "whitney" : "stephen"}`);
+    router.push(`/mirror/spark?p=${person}`);
   };
 
   return (
@@ -47,7 +38,10 @@ export function SparkTeaser() {
             strokeWidth={2}
           />
         </span>
-        <span className="text-sm font-semibold uppercase tracking-wider text-white/75">
+        <span
+          onPointerDown={() => open("whitney")}
+          className="flex min-h-11 min-w-11 cursor-default items-center text-sm font-semibold uppercase tracking-wider text-white/75"
+        >
           Loading
         </span>
       </div>
@@ -56,13 +50,13 @@ export function SparkTeaser() {
         <div className="my-auto py-2">
           <p className="flex items-center text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl">
             <span
-              onPointerDown={() => onGlyphTap("word")}
+              onPointerDown={() => open("whitney")}
               className="cursor-default py-4"
             >
               Loading
             </span>
             <span
-              onPointerDown={() => onGlyphTap("wink")}
+              onPointerDown={() => open("stephen")}
               className="cursor-default py-4 pl-2 pr-3"
             >
               ;)
