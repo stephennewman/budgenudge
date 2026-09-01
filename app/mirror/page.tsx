@@ -411,49 +411,6 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 // away mid-card (e.g. 3 cards × 10s = 30s).
 const ROTATE_MS = 30000;
 
-// --- Smart rotation playlist -------------------------------------------------
-//
-// The mirror is view-only (nobody taps it day to day), so instead of looping
-// every channel equally, auto-rotation plays a curated set per time of day
-// and day of week, tuned for Stephen & Whitney:
-//   - Dawn/morning: faith, weather, news, money, and each person's own focus.
-//   - Weekday midday: news, money, and a nudge to reach out to friends.
-//   - Late afternoon: dinner-decision time, so BOGO/dinner deals surface.
-//   - Thu/Fri + weekend: events and deals lead, for weekend planning.
-//   - Evening/night: family, marriage, faith, and what to watch.
-//   - Sunday leans on faith.
-// Channels not in the current playlist are still reachable from the left nav;
-// playlist channels with no data today are skipped automatically.
-function smartPlaylist(part: DayPart, day: number): string[] {
-  const weekend = day === 0 || day === 6;
-  const sunday = day === 0;
-  const planning = day === 4 || day === 5; // Thu/Fri: weekend planning
-  switch (part) {
-    case "dawn":
-      return sunday
-        ? ["faith", "weather", "today", "love"]
-        : ["faith", "weather", "today", "stephen", "whitney"];
-    case "morning":
-      if (sunday) return ["faith", "weather", "family", "today", "events"];
-      if (weekend) return ["weather", "events", "family", "deals", "today"];
-      return ["weather", "today", "money", "stephen", "whitney", "faith"];
-    case "midday":
-      return weekend
-        ? ["events", "weather", "family", "movies", "today"]
-        : ["today", "weather", "money", "friends"];
-    case "afternoon":
-      if (weekend) return ["events", "weather", "family", "deals", "today"];
-      if (planning) return ["weather", "events", "deals", "today", "family"];
-      return ["weather", "deals", "family", "friends", "today"];
-    case "evening":
-      return planning
-        ? ["events", "movies", "deals", "love", "family"]
-        : ["family", "love", "movies", "faith", "weather"];
-    case "night":
-      return ["love", "faith", "movies", "weather"];
-  }
-}
-
 // Sensible default width for each widget based on how much it shows.
 const DEFAULT_SIZE: Record<string, Size> = {
   // Weather
@@ -601,6 +558,7 @@ const CHANNEL_GRADIENTS: Record<string, string> = {
   family: "linear-gradient(160deg, #04231c 0%, #0d4234 60%, #175442 100%)",
   friends: "linear-gradient(160deg, #291402 0%, #4f320d 60%, #6e4513 100%)",
   faith: "linear-gradient(160deg, #140b33 0%, #2a1d59 60%, #3d2c6e 100%)",
+  money: "linear-gradient(160deg, #04221a 0%, #0b3d2e 55%, #145c44 100%)",
 };
 
 function aqiInfo(aqi: number): { label: string; color: string } {
@@ -688,6 +646,10 @@ export default function MirrorPage() {
   const [moneyRefresh, setMoneyRefresh] = useState(0);
   const [token, setToken] = useState<string | null>(null);
   const [authed, setAuthed] = useState(false);
+  // True after we've read the saved/URL finance token so Money doesn't 401
+  // once with no token, then flash back in once localStorage loads.
+  const [tokenReady, setTokenReady] = useState(false);
+  const [moneyReady, setMoneyReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasInit = useRef(false);
 
@@ -864,6 +826,7 @@ export default function MirrorPage() {
         /* ignore */
       }
     }
+    setTokenReady(true);
 
     const lat = params.get("lat");
     const lon = params.get("lon");
@@ -1169,10 +1132,11 @@ export default function MirrorPage() {
   }, []);
 
   // Yesterday's spend. The server authorizes via the logged-in session (the
-  // user's own data) or the shared finance token, so we always attempt the
-  // fetch and let a 401 simply hide the Money channel. Refetches on login and
-  // refreshes every 30 min. `authed` is a dependency so logging in re-triggers.
+  // user's own data) or the shared finance token. Wait until the token has
+  // been read from localStorage so a first unauthenticated 401 doesn't make
+  // Money look empty. Refetches on login and every 30 min.
   useEffect(() => {
+    if (!tokenReady) return;
     let active = true;
     const tz = data?.timezone;
     const load = async () => {
@@ -1207,6 +1171,8 @@ export default function MirrorPage() {
           setSpend(null);
           setPacing(null);
         }
+      } finally {
+        if (active) setMoneyReady(true);
       }
     };
     load();
@@ -1215,7 +1181,7 @@ export default function MirrorPage() {
       active = false;
       clearInterval(id);
     };
-  }, [token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
+  }, [tokenReady, token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
 
   // Tag a burn transaction's merchant as a recurring bill, then refresh the
   // money widgets so it moves from burn/pacing into the bills group.
@@ -1811,9 +1777,9 @@ export default function MirrorPage() {
     [orderedWidgets, save]
   );
 
-  // Group visible widgets into channels, dropping any empty channel. The
-  // "Today" channel is synthetic (no widgets) and always first — the clock
-  // card jumps to it.
+  // Group visible widgets into channels. Empty channels are dropped, except
+  // Money — it stays in the nav even before finance data loads (or if this
+  // display isn't connected), so it doesn't vanish from the lineup.
   const sections = useMemo(() => {
     return [
       { id: "today", label: "News", widgets: [] as WidgetDef[] },
@@ -1821,7 +1787,7 @@ export default function MirrorPage() {
         id: c.id,
         label: c.label,
         widgets: visibleWidgets.filter((w) => c.ids.includes(w.id)),
-      })).filter((s) => s.widgets.length > 0),
+      })).filter((s) => s.widgets.length > 0 || s.id === "money"),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedWidgets, hidden]);
@@ -1855,19 +1821,10 @@ export default function MirrorPage() {
     setChannelDwellMs(ms);
   }, []);
 
-  // The playlist auto-rotation follows right now, given the time of day and
-  // day of week. Recomputes when the day part or weekday rolls over.
-  const dayOfWeek = now.getDay();
-  const playlistIds = useMemo(
-    () => smartPlaylist(part, dayOfWeek),
-    [part, dayOfWeek]
-  );
-
-  // Auto-advance to the next channel in the smart playlist. If the viewer
-  // manually navigated to a channel outside the playlist, the next advance
-  // returns to the top of the playlist. Resets whenever the index changes (so
-  // a manual selection gives you a fresh dwell) or the screen is touched, and
-  // pauses while editing or reading an article.
+  // Auto-advance walks the left nav in order (News → Faith → … → Out & About
+  // → News). Resets whenever the index changes (so a manual selection gives
+  // you a fresh dwell) or the screen is touched, and pauses while editing or
+  // reading an article.
   //
   // When the active channel reports an inner card/pane cycle length, dwell
   // is that full pass (3×10s cards → 30s) instead of the default 30s — so
@@ -1890,18 +1847,8 @@ export default function MirrorPage() {
     setRotateAt(Date.now() + rotateMs);
     const t = setTimeout(() => {
       setActiveIndex((i) => {
-        const secs = sectionsRef.current;
-        // Playlist entries only count if the channel actually has data today.
-        const available = playlistIds.filter((id) =>
-          secs.some((s) => s.id === id)
-        );
-        // Not enough playlist channels to rotate through: plain loop keeps
-        // the display alive rather than sticking on one channel.
-        if (available.length < 2) return (i + 1) % secs.length;
-        const pos = available.indexOf(secs[i]?.id ?? "");
-        const nextId = available[(pos + 1) % available.length];
-        const nextIdx = secs.findIndex((s) => s.id === nextId);
-        return nextIdx >= 0 ? nextIdx : (i + 1) % secs.length;
+        const n = sectionsRef.current.length;
+        return n > 0 ? (i + 1) % n : 0;
       });
     }, rotateMs);
     return () => clearTimeout(t);
@@ -1912,7 +1859,6 @@ export default function MirrorPage() {
     sectionCount,
     activeIndex,
     rotateResetKey,
-    playlistIds,
     sectionIdsKey,
     rotateMs,
   ]);
@@ -2302,6 +2248,31 @@ export default function MirrorPage() {
               headerExtra={fullscreenControl}
               onDwellMs={handleChannelDwell}
             />
+          ) : activeSection.id === "money" && activeSection.widgets.length === 0 ? (
+            <section key="money" className="flex min-h-0 flex-1 flex-col gap-2">
+              <SectionHeader
+                title="Money"
+                icon={Wallet}
+                items={[]}
+                controls={fullscreenControl}
+              />
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center backdrop-blur-md">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
+                  <Wallet className="h-6 w-6" />
+                </span>
+                <p className="text-lg font-light text-white/80">
+                  {moneyReady
+                    ? "Spending isn’t connected on this display."
+                    : "Loading spending…"}
+                </p>
+                {moneyReady && (
+                  <p className="max-w-sm text-sm text-white/50">
+                    Open this page once with your finance link, or sign in, and
+                    Money stays in the lineup.
+                  </p>
+                )}
+              </div>
+            </section>
           ) : activeSection.id === "deals" &&
             ((bogos?.deals?.length ?? 0) > 0 || (dinner?.meals?.length ?? 0) > 0) ? (
             <DealsChannel
