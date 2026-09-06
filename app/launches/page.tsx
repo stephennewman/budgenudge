@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { headers } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import LaunchFeedActions from "@/components/launch-feed-actions";
+import { getAuthedUser } from "@/utils/auth/api-auth";
 import {
   allDayDateStamp,
   formatLocalTime,
@@ -52,12 +54,21 @@ function statusTone(launch: Row): string {
 }
 
 export default async function LaunchesPage() {
-  const [launches, headerList] = await Promise.all([loadLaunches(), headers()]);
+  const [launches, headerList, user] = await Promise.all([
+    loadLaunches(),
+    headers(),
+    getAuthedUser(),
+  ]);
 
   const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
   const protocol = host.startsWith("localhost") ? "http" : "https";
   const token = process.env.LAUNCH_FEED_TOKEN;
-  const query = token ? `?key=${encodeURIComponent(token)}` : "";
+
+  // The page itself is public, so printing a configured feed token on it would
+  // hand out the secret it exists to protect. The schedule below is public
+  // information either way; only the subscribe link needs signing in for.
+  const canSubscribe = !token || Boolean(user);
+  const query = token && user ? `?key=${encodeURIComponent(token)}` : "";
 
   const feedUrl = `${protocol}://${host}/api/calendar/launches.ics${query}`;
   // webcal:// is what Apple Calendar and Outlook register as "subscribe".
@@ -81,27 +92,43 @@ export default async function LaunchesPage() {
 
         <section className="flex flex-col gap-4 rounded-2xl bg-slate-900/60 p-5 ring-1 ring-slate-800">
           <h2 className="text-lg font-semibold">Subscribe</h2>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <a
-              href={webcalUrl}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-            >
-              Apple Calendar / Outlook
-            </a>
-            <a
-              href={googleUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-slate-100 ring-1 ring-slate-700 transition hover:bg-slate-700"
-            >
-              Google Calendar
-            </a>
-          </div>
-          <LaunchFeedActions feedUrl={feedUrl} />
-          <p className="text-xs leading-relaxed text-slate-500">
-            Subscribe once. Apple Calendar can be set to refresh every 5 minutes under Settings
-            &rarr; Accounts; Google refreshes subscribed URLs on its own slower cadence.
-          </p>
+          {canSubscribe ? (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <a
+                  href={webcalUrl}
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
+                >
+                  Apple Calendar / Outlook
+                </a>
+                <a
+                  href={googleUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-slate-100 ring-1 ring-slate-700 transition hover:bg-slate-700"
+                >
+                  Google Calendar
+                </a>
+              </div>
+              <LaunchFeedActions feedUrl={feedUrl} />
+              <p className="text-xs leading-relaxed text-slate-500">
+                Subscribe once. Apple Calendar can be set to refresh every 5 minutes under Settings
+                &rarr; Accounts; Google refreshes subscribed URLs on its own slower cadence.
+              </p>
+            </>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm leading-relaxed text-slate-400">
+                This feed is private. Sign in to get your subscribe link.
+              </p>
+              <Link
+                href="/sign-in"
+                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:self-start sm:px-6"
+              >
+                Sign in
+              </Link>
+            </div>
+          )}
         </section>
 
         <section className="flex flex-col gap-3">
