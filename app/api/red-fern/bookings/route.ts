@@ -3,7 +3,7 @@ import { prepareBooking } from "@/utils/red-fern/booking";
 import { checkSlot } from "@/utils/red-fern/availability";
 import { buildBookingEmail } from "@/utils/red-fern/email";
 import { VENUE_ORGANIZER } from "@/utils/red-fern/ics";
-import { todayAtVenue } from "@/utils/red-fern/dates";
+import { addDays, todayAtVenue } from "@/utils/red-fern/dates";
 import { deliverEmail, loadBookings, saveBooking, senderAddress } from "@/utils/red-fern/server/store";
 
 /**
@@ -21,6 +21,15 @@ import { deliverEmail, loadBookings, saveBooking, senderAddress } from "@/utils/
  */
 export const dynamic = "force-dynamic";
 
+/**
+ * How far back to read the schedule when checking a date.
+ *
+ * A booking that started last week can still be sitting on the date being
+ * requested — a wedding weekend, a five-night lodge stay — so the conflict
+ * check has to see rows that begin before the date it is testing.
+ */
+const LONGEST_BOOKING_DAYS = 14;
+
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -36,7 +45,9 @@ export async function POST(request: NextRequest) {
 
   const { booking, experience, quote } = prepared.value;
   const today = todayAtVenue();
-  const { bookings } = await loadBookings({ from: booking.start_date });
+  const { bookings } = await loadBookings({
+    from: addDays(booking.start_date, -LONGEST_BOOKING_DAYS),
+  });
 
   const check = checkSlot({
     experience,
