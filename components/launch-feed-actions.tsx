@@ -23,7 +23,9 @@ export default function LaunchFeedActions({ feedUrl }: { feedUrl: string }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <code className="block overflow-x-auto rounded-lg bg-slate-900 px-3 py-3 text-xs text-slate-300 ring-1 ring-slate-700">
+      {/* The URL has no spaces to wrap on, so break anywhere rather than
+          clipping it to the container on a narrow screen. */}
+      <code className="block break-all rounded-lg bg-slate-900 px-3 py-3 text-xs leading-relaxed text-slate-300 ring-1 ring-slate-700">
         {feedUrl}
       </code>
       <button
