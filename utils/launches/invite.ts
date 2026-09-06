@@ -50,6 +50,28 @@ export type PlannedInvite = {
  * after it slips past the cutoff, or the recipient is left holding an event at
  * a time that no longer exists.
  */
+/** Trim, lowercase, and reject values that are not a plausible email. */
+export function normalizeInviteEmail(value: string): string | null {
+  const email = value.trim().toLowerCase();
+  if (email.length > 254) return null;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
+  return email;
+}
+
+/**
+ * Overlay per-subscriber delivery receipts onto stored launches so planning
+ * can decide what this inbox has already received.
+ */
+export function applyInviteReceipts(
+  rows: InvitableLaunch[],
+  receipts: Readonly<Record<string, number>>
+): InvitableLaunch[] {
+  return rows.map((row) => ({
+    ...row,
+    invited_sequence: Object.hasOwn(receipts, row.launch_id) ? receipts[row.launch_id] : null,
+  }));
+}
+
 export function planLaunchInvites(
   rows: InvitableLaunch[],
   options: { now?: Date; limit?: number } = {}
@@ -121,6 +143,8 @@ export type InviteEmail = {
   subject: string;
   text: string;
   html: string;
+  launchId: string;
+  sequence: number;
   /** The raw iCalendar body, for inspection; the wire copy is base64 in `attachments`. */
   calendar: string;
   attachments: {
@@ -233,6 +257,8 @@ export function buildInviteEmail(
     subject,
     text,
     html,
+    launchId: launch.launch_id,
+    sequence: launch.sequence,
     calendar,
     attachments: [
       {

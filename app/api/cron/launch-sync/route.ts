@@ -1,46 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { Resend } from "resend";
-import { EMAIL_FROM_ALERTS, SITE_URL } from "@/lib/brand";
 import { isAuthorizedCron } from "@/utils/auth/api-auth";
 import { detectScrubs, diffLaunch, type StoredLaunch } from "@/utils/launches/changes";
 import {
+  canSendLaunchInvites,
+  listLaunchSubscriberEmails,
+  loadInviteReceipts,
+  planInvitesForSubscriber,
+  sendPlannedInvitesToEmail,
+} from "@/utils/launches/deliver";
+import {
   DEFAULT_INVITE_COUNT,
-  planLaunchInvites,
-  sendLaunchInvites,
   type InvitableLaunch,
-  type InviteEmail,
   type SendResult,
 } from "@/utils/launches/invite";
 import { fetchFloridaLaunches } from "@/utils/launches/source";
 
-/** Resend reads `content_type`; the SDK's own type only declares `contentType`. */
-type ResendAttachment = { filename: string; content: string; content_type: string };
-
 /**
  * Keeps launch_schedule in step with the published Florida manifest, then
- * emails calendar invites for the launches coming up next.
+ * emails calendar invites to everyone on the subscribe list.
  *
- * Runs hourly. Everything downstream is derived from this table, so the
- * subscribed calendar picks up a slipped T-0, a brand new launch, or a scrub
- * without anyone touching it.
+ * Runs hourly. A new T-0, a slip, or a scrub is emailed to each subscriber
+ * that does not already hold that version of the invite.
  *
  * Pass ?dry=1 to see what the run would write and send without doing either.
  */
 export const maxDuration = 60;
-
-/** Recipient of the emailed invites. Unset disables them; the feed still works. */
-const INVITE_EMAIL = process.env.LAUNCH_INVITE_EMAIL || "stephen.p.newman@gmail.com";
-
-/** Scheduling identity on the invites; must be a domain Resend can send from. */
-const ORGANIZER = { email: "alerts@krezzo.com", name: "Krezzo Launch Calendar" };
-
-// Lazy-init so builds don't require RESEND_API_KEY at module load.
-let _resend: Resend | null = null;
-function getResend(): Resend {
-  if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY);
-  return _resend;
-}
 
 const inviteCount = () => {
   const parsed = Number(process.env.LAUNCH_INVITE_COUNT);
@@ -50,56 +35,38 @@ const inviteCount = () => {
 async function deliverInvites(
   supabase: SupabaseClient,
   now: Date
-): Promise<SendResult & { skipped?: string }> {
-  const empty: SendResult = { sent: [], failed: [] };
-  // Preview and local runs still sync the table and the feed; only production
-  // emails invites, so a dry-run or a preview cron cannot hit the inbox.
-  if (process.env.VERCEL_ENV !== "production") {
+): Promise<(SendResult & { recipients: number; skipped?: string })> {
+  const empty: SendResult & { recipients: number } = { sent: [], failed: [], recipients: 0 };
+  if (!canSendLaunchInvites()) {
     return { ...empty, skipped: "invites only send in production" };
   }
-  if (!INVITE_EMAIL) return { ...empty, skipped: "LAUNCH_INVITE_EMAIL not set" };
-  if (!process.env.RESEND_API_KEY) return { ...empty, skipped: "RESEND_API_KEY not set" };
 
   const { data, error } = await supabase.from("launch_schedule").select("*").limit(2000);
   if (error) return { ...empty, skipped: error.message };
 
-  const planned = planLaunchInvites((data ?? []) as InvitableLaunch[], {
-    now,
-    limit: inviteCount(),
-  });
-  if (planned.length === 0) return empty;
+  const subscribers = await listLaunchSubscriberEmails(supabase);
+  if (subscribers.length === 0) return { ...empty, skipped: "no subscribers" };
 
-  return sendLaunchInvites(planned, {
-    to: INVITE_EMAIL,
-    from: EMAIL_FROM_ALERTS,
-    organizer: ORGANIZER,
-    subscribeUrl: `${SITE_URL}/launches`,
-    now,
-    send: async (email: InviteEmail) => {
-      const { error: sendError } = await getResend().emails.send({
-        from: email.from,
-        to: email.to,
-        subject: email.subject,
-        text: email.text,
-        html: email.html,
-        // The SDK's Attachment type has no content_type field; see the note on
-        // InviteEmail for why the snake_case one is the field that works.
-        attachments: email.attachments as unknown as ResendAttachment[],
-      });
-      return { error: sendError ? sendError.message : null };
-    },
-    record: async (launchId, sequence) => {
-      const { error: recordError } = await supabase
-        .from("launch_schedule")
-        .update({ invited_sequence: sequence, invited_at: now.toISOString() })
-        .eq("launch_id", launchId);
-      // Swallowing this would re-send the same invite every hour, so surface it
-      // as a failure even though the mail itself went out.
-      if (recordError) {
-        throw new Error(`sent but not recorded: ${recordError.message}`);
-      }
-    },
-  });
+  const launches = (data ?? []) as InvitableLaunch[];
+  const combined: SendResult & { recipients: number } = {
+    sent: [],
+    failed: [],
+    recipients: subscribers.length,
+  };
+
+  for (const email of subscribers) {
+    const receipts = await loadInviteReceipts(supabase, email);
+    const planned = planInvitesForSubscriber(launches, receipts, {
+      now,
+      limit: inviteCount(),
+    });
+    if (planned.length === 0) continue;
+    const result = await sendPlannedInvitesToEmail(supabase, email, planned, now);
+    combined.sent.push(...result.sent);
+    combined.failed.push(...result.failed);
+  }
+
+  return combined;
 }
 
 export async function GET(request: NextRequest) {
@@ -166,27 +133,37 @@ export async function GET(request: NextRequest) {
     };
 
     if (dryRun) {
-      // Preview the invites this run would send by applying the diffs in
-      // memory, since nothing has been written for deliverInvites to read.
       const projected = new Map<string, InvitableLaunch>(
         stored.map((row) => [row.launch_id, row as InvitableLaunch])
       );
       for (const diff of changed) {
-        const previous = projected.get(diff.launch_id);
-        projected.set(diff.launch_id, {
-          ...diff.row,
-          invited_sequence: previous?.invited_sequence ?? null,
+        projected.set(diff.launch_id, { ...diff.row });
+      }
+      const projectedRows = [...projected.values()];
+      const subscribers = await listLaunchSubscriberEmails(supabase);
+      const wouldInvite = [];
+      for (const email of subscribers) {
+        const receipts = await loadInviteReceipts(supabase, email);
+        const planned = planInvitesForSubscriber(projectedRows, receipts, {
+          now: runAt,
+          limit: inviteCount(),
         });
+        wouldInvite.push(
+          ...planned.map((p) => ({
+            to: email,
+            launch: p.launch.name,
+            reason: p.reason,
+            method: p.method,
+          }))
+        );
       }
 
       return NextResponse.json({
         success: true,
         dryRun: true,
         ...report,
-        wouldInvite: planLaunchInvites([...projected.values()], {
-          now: runAt,
-          limit: inviteCount(),
-        }).map((p) => ({ launch: p.launch.name, reason: p.reason, method: p.method })),
+        recipients: subscribers.length,
+        wouldInvite,
       });
     }
 

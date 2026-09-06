@@ -810,6 +810,28 @@ test("sending paces itself to stay under the mail provider's rate limit", async 
   assert.deepEqual(waits, [600, 600]);
 });
 
+test("normalizeInviteEmail accepts and lowercases a real address", () => {
+  assert.equal(invite.normalizeInviteEmail("  Stephen.P.Newman@Gmail.com  "), "stephen.p.newman@gmail.com");
+});
+
+test("normalizeInviteEmail rejects junk", () => {
+  assert.equal(invite.normalizeInviteEmail(""), null);
+  assert.equal(invite.normalizeInviteEmail("not-an-email"), null);
+  assert.equal(invite.normalizeInviteEmail("a@b"), null);
+});
+
+test("applyInviteReceipts treats a missing receipt as never invited", () => {
+  const rows = upcomingLaunches(2, { invited_sequence: 0 });
+  const overlaid = invite.applyInviteReceipts(rows, { "launch-0": 0 });
+  assert.equal(overlaid[0].invited_sequence, 0);
+  assert.equal(overlaid[1].invited_sequence, null);
+
+  const planned = planFor(overlaid);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].launch.launch_id, "launch-1");
+  assert.equal(planned[0].reason, "new");
+});
+
 // --- runner -----------------------------------------------------------------
 
 (async () => {

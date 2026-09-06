@@ -1,8 +1,5 @@
-import Link from "next/link";
-import { headers } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
-import LaunchFeedActions from "@/components/launch-feed-actions";
-import { getAuthedUser } from "@/utils/auth/api-auth";
+import LaunchSubscribeForm from "@/components/launch-subscribe-form";
 import {
   allDayDateStamp,
   formatLocalTime,
@@ -11,19 +8,12 @@ import {
   type CalendarLaunch,
 } from "@/utils/launches/ics";
 
-/**
- * Subscribe page for the Florida launch calendar.
- *
- * Subscribing is a one-time action, so the page exists mainly to hand over the
- * feed URL in the three forms clients actually accept, and to show what is
- * currently on the manifest as a sanity check that the sync is running.
- */
 export const dynamic = "force-dynamic";
 
 export const metadata = {
   title: "Florida Launch Calendar | Krezzo",
   description:
-    "Subscribe to rocket launches from Cape Canaveral and Kennedy Space Center, kept up to date automatically.",
+    "Email calendar invites for rocket launches from Cape Canaveral and Kennedy Space Center.",
 };
 
 type Row = CalendarLaunch & { last_seen_at: string | null };
@@ -54,26 +44,7 @@ function statusTone(launch: Row): string {
 }
 
 export default async function LaunchesPage() {
-  const [launches, headerList, user] = await Promise.all([
-    loadLaunches(),
-    headers(),
-    getAuthedUser(),
-  ]);
-
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "localhost:3000";
-  const protocol = host.startsWith("localhost") ? "http" : "https";
-  const token = process.env.LAUNCH_FEED_TOKEN;
-
-  // The page itself is public, so printing a configured feed token on it would
-  // hand out the secret it exists to protect. The schedule below is public
-  // information either way; only the subscribe link needs signing in for.
-  const canSubscribe = !token || Boolean(user);
-  const query = token && user ? `?key=${encodeURIComponent(token)}` : "";
-
-  const feedUrl = `${protocol}://${host}/api/calendar/launches.ics${query}`;
-  // webcal:// is what Apple Calendar and Outlook register as "subscribe".
-  const webcalUrl = feedUrl.replace(/^https?:/, "webcal:");
-  const googleUrl = `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`;
+  const launches = await loadLaunches();
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-slate-100">
@@ -84,51 +55,14 @@ export default async function LaunchesPage() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">Florida Launch Calendar</h1>
           <p className="text-sm leading-relaxed text-slate-400">
-            Every launch from a Florida pad lands on your calendar at its scheduled T-0, with
-            reminders an hour and ten minutes before. Slipped launches move themselves, new
-            launches appear on their own, and scrubbed ones drop off.
+            Enter your email and the upcoming Florida launches land on your calendar as invites.
+            When a new one gets a date and time, that invite is emailed too.
           </p>
         </header>
 
         <section className="flex flex-col gap-4 rounded-2xl bg-slate-900/60 p-5 ring-1 ring-slate-800">
           <h2 className="text-lg font-semibold">Subscribe</h2>
-          {canSubscribe ? (
-            <>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <a
-                  href={webcalUrl}
-                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-                >
-                  Apple Calendar / Outlook
-                </a>
-                <a
-                  href={googleUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-slate-800 px-4 text-sm font-semibold text-slate-100 ring-1 ring-slate-700 transition hover:bg-slate-700"
-                >
-                  Google Calendar
-                </a>
-              </div>
-              <LaunchFeedActions feedUrl={feedUrl} />
-              <p className="text-xs leading-relaxed text-slate-500">
-                Subscribe once. Apple Calendar can be set to refresh every 5 minutes under Settings
-                &rarr; Accounts; Google refreshes subscribed URLs on its own slower cadence.
-              </p>
-            </>
-          ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm leading-relaxed text-slate-400">
-                This feed is private. Sign in to get your subscribe link.
-              </p>
-              <Link
-                href="/sign-in"
-                className="inline-flex min-h-11 items-center justify-center rounded-lg bg-sky-500 px-4 text-sm font-semibold text-slate-950 transition hover:bg-sky-400 sm:self-start sm:px-6"
-              >
-                Sign in
-              </Link>
-            </div>
-          )}
+          <LaunchSubscribeForm />
         </section>
 
         <section className="flex flex-col gap-3">
