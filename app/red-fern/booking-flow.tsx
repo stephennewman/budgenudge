@@ -381,6 +381,12 @@ function PlanStep(props: {
 }) {
   const { experience, durationId, partySize, addOnIds } = props;
 
+  // The field holds what's been typed, not the clamped number. Clamping every
+  // keystroke turns "185" into nonsense: the "1" snaps to the 25-guest
+  // minimum, and the next digit lands on the end of that.
+  const [partyText, setPartyText] = useState(String(partySize));
+  useEffect(() => setPartyText(String(partySize)), [partySize]);
+
   return (
     <div className="flex flex-col gap-6 rounded-2xl bg-white p-5 ring-1 ring-[#e2d9c6] sm:p-6">
       <header>
@@ -434,10 +440,23 @@ function PlanStep(props: {
           <input
             type="number"
             inputMode="numeric"
-            value={partySize}
+            value={partyText}
             min={experience.party.min}
             max={experience.party.max}
-            onChange={(event) => props.onParty(Number(event.target.value))}
+            onChange={(event) => {
+              setPartyText(event.target.value);
+              const typed = Number(event.target.value);
+              // Only price a number that's actually offerable; anything else
+              // waits for the field to lose focus.
+              if (
+                Number.isFinite(typed) &&
+                typed >= experience.party.min &&
+                typed <= experience.party.max
+              ) {
+                props.onParty(typed);
+              }
+            }}
+            onBlur={() => props.onParty(Number(partyText) || experience.party.min)}
             className="h-11 w-24 rounded-xl bg-[#faf7f0] text-center font-serif text-xl text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
           />
           <button
