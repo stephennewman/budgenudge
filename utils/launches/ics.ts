@@ -233,12 +233,25 @@ function icsStatus(launch: CalendarLaunch): "CANCELLED" | "CONFIRMED" | "TENTATI
   return "CONFIRMED";
 }
 
+/** An invite needs a scheduling identity on both sides; a published feed does not. */
+export type Party = { email: string; name?: string };
+
+function partyValue(prefix: string, party: Party, extraParams = ""): string {
+  const cn = party.name ? `;CN=${escapeText(party.name)}` : "";
+  return `${prefix}${cn}${extraParams}:mailto:${party.email}`;
+}
+
 /** Build the VEVENT lines for one launch. */
 export function buildLaunchEvent(
   launch: CalendarLaunch,
-  options: { now?: Date; domain?: string } = {}
+  options: {
+    now?: Date;
+    domain?: string;
+    organizer?: Party;
+    attendee?: Party;
+  } = {}
 ): string[] {
-  const { now = new Date(), domain = "krezzo.com" } = options;
+  const { now = new Date(), domain = "krezzo.com", organizer, attendee } = options;
   const timed = isTimedLaunch(launch);
   const start = new Date(launch.net);
 
@@ -264,6 +277,13 @@ export function buildLaunchEvent(
   lines.push(`DESCRIPTION:${escapeText(launchDescription(launch))}`);
   lines.push(`STATUS:${icsStatus(launch)}`);
   lines.push("CATEGORIES:Rocket Launch");
+
+  if (organizer) lines.push(partyValue("ORGANIZER", organizer));
+  if (attendee) {
+    lines.push(
+      partyValue("ATTENDEE", attendee, ";ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE")
+    );
+  }
 
   const url = launch.webcast_url ?? launch.info_url;
   if (url) lines.push(`URL:${url}`);
@@ -319,5 +339,41 @@ export function buildLaunchFeed(
   }
 
   lines.push("END:VCALENDAR");
+  return lines.map(foldLine).join("\r\n") + "\r\n";
+}
+
+/**
+ * Build a single-event calendar for emailing as an invite.
+ *
+ * METHOD:REQUEST is what makes a mail client show an event with RSVP buttons
+ * instead of a file to download; re-sending the same UID with a higher
+ * SEQUENCE updates the recipient's existing event. METHOD:CANCEL withdraws it.
+ */
+export function buildLaunchInvite(
+  launch: CalendarLaunch,
+  options: {
+    organizer: Party;
+    attendee: Party;
+    method?: "REQUEST" | "CANCEL";
+    now?: Date;
+    domain?: string;
+  }
+): string {
+  const { organizer, attendee, method = "REQUEST", now = new Date(), domain = "krezzo.com" } = options;
+
+  // A CANCEL whose event isn't STATUS:CANCELLED is contradictory, so make the
+  // two agree here rather than trusting every caller to line them up.
+  const event = method === "CANCEL" ? { ...launch, cancelled: true } : launch;
+
+  const lines = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    `PRODID:${PRODID}`,
+    "CALSCALE:GREGORIAN",
+    `METHOD:${method}`,
+    ...buildLaunchEvent(event, { now, domain, organizer, attendee }),
+    "END:VCALENDAR",
+  ];
+
   return lines.map(foldLine).join("\r\n") + "\r\n";
 }
