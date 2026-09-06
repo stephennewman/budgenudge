@@ -52,6 +52,11 @@ async function deliverInvites(
   now: Date
 ): Promise<SendResult & { skipped?: string }> {
   const empty: SendResult = { sent: [], failed: [] };
+  // Preview and local runs still sync the table and the feed; only production
+  // emails invites, so a dry-run or a preview cron cannot hit the inbox.
+  if (process.env.VERCEL_ENV !== "production") {
+    return { ...empty, skipped: "invites only send in production" };
+  }
   if (!INVITE_EMAIL) return { ...empty, skipped: "LAUNCH_INVITE_EMAIL not set" };
   if (!process.env.RESEND_API_KEY) return { ...empty, skipped: "RESEND_API_KEY not set" };
 
