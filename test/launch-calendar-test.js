@@ -14,6 +14,7 @@ const BUILD = path.join(__dirname, "..", "node_modules", ".cache", "launch-calen
 const source = require(path.join(BUILD, "source.js"));
 const changes = require(path.join(BUILD, "changes.js"));
 const ics = require(path.join(BUILD, "ics.js"));
+const invite = require(path.join(BUILD, "invite.js"));
 
 const tests = [];
 
@@ -542,6 +543,271 @@ test("the feed advertises its name, zone, and refresh cadence", () => {
   assert.ok(feed.includes("X-WR-TIMEZONE:America/New_York"));
   assert.ok(feed.includes("REFRESH-INTERVAL;VALUE=DURATION:PT1H"));
   assert.ok(feed.includes("X-PUBLISHED-TTL:PT1H"));
+});
+
+// --- emailed invites --------------------------------------------------------
+
+const INVITE_NOW = new Date("2026-09-06T12:00:00Z");
+const ORGANIZER = { email: "alerts@krezzo.com", name: "Krezzo Launch Calendar" };
+const RECIPIENT = "stephen.p.newman@gmail.com";
+
+/** n upcoming launches, one per day starting tomorrow. */
+function upcomingLaunches(n, extra = {}) {
+  return Array.from({ length: n }, (_, i) =>
+    storedFrom(
+      rawLaunch({
+        id: `launch-${i}`,
+        net: new Date(INVITE_NOW.getTime() + (i + 1) * 86_400_000).toISOString(),
+      }),
+      { invited_sequence: null, ...extra }
+    )
+  );
+}
+
+function planFor(rows, limit = 5) {
+  return invite.planLaunchInvites(rows, { now: INVITE_NOW, limit });
+}
+
+test("only the next five launches get a first invite", () => {
+  const planned = planFor(upcomingLaunches(8));
+  assert.equal(planned.length, 5);
+  assert.deepEqual(
+    planned.map((p) => p.launch.launch_id),
+    ["launch-0", "launch-1", "launch-2", "launch-3", "launch-4"]
+  );
+  assert.ok(planned.every((p) => p.reason === "new" && p.method === "REQUEST"));
+});
+
+test("an already-invited launch at the same sequence is left alone", () => {
+  const rows = upcomingLaunches(3, { invited_sequence: 0 });
+  assert.deepEqual(planFor(rows), []);
+});
+
+test("a rescheduled launch gets a fresh invite at the new sequence", () => {
+  const rows = upcomingLaunches(3, { invited_sequence: 0 });
+  rows[1].sequence = 1;
+  rows[1].last_change = "T-0 moved from Tue to Wed";
+
+  const planned = planFor(rows);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].reason, "updated");
+  assert.equal(planned[0].method, "REQUEST");
+  assert.equal(planned[0].launch.launch_id, "launch-1");
+});
+
+test("a launch that slipped past the cutoff is still kept accurate", () => {
+  // Once someone holds an invite, letting it go stale would leave an event at
+  // a time that no longer exists, so updates ignore the five-launch cap.
+  const rows = upcomingLaunches(8);
+  rows[7].invited_sequence = 0;
+  rows[7].sequence = 1;
+
+  const planned = planFor(rows);
+  const updated = planned.filter((p) => p.reason === "updated");
+  assert.equal(updated.length, 1);
+  assert.equal(updated[0].launch.launch_id, "launch-7");
+  // ...and it doesn't consume one of the five new-invite slots.
+  assert.equal(planned.filter((p) => p.reason === "new").length, 5);
+});
+
+test("a scrubbed launch is withdrawn only from someone who was invited", () => {
+  const rows = upcomingLaunches(2);
+  rows[0].cancelled = true;
+  rows[0].sequence = 1;
+  rows[0].invited_sequence = 0;
+  rows[1].cancelled = true;
+  rows[1].sequence = 1;
+
+  const planned = planFor(rows);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].method, "CANCEL");
+  assert.equal(planned[0].reason, "cancelled");
+  assert.equal(planned[0].launch.launch_id, "launch-0");
+});
+
+test("launches that already flew are never invited", () => {
+  const past = storedFrom(
+    rawLaunch({ id: "flown", net: "2026-09-01T12:00:00Z" }),
+    { invited_sequence: null }
+  );
+  assert.deepEqual(planFor([past]), []);
+});
+
+test("a row with no invite column yet counts as never invited", () => {
+  // Rows assembled in memory for the dry-run preview have no invited_sequence.
+  const [row] = upcomingLaunches(1);
+  delete row.invited_sequence;
+  const planned = planFor([row]);
+  assert.equal(planned.length, 1);
+  assert.equal(planned[0].reason, "new");
+});
+
+test("invites are ordered soonest first", () => {
+  const rows = upcomingLaunches(4).reverse();
+  assert.deepEqual(
+    planFor(rows).map((p) => p.launch.launch_id),
+    ["launch-0", "launch-1", "launch-2", "launch-3"]
+  );
+});
+
+function emailFor(planned) {
+  return invite.buildInviteEmail(planned, {
+    to: RECIPIENT,
+    from: "Krezzo <alerts@krezzo.com>",
+    organizer: ORGANIZER,
+    subscribeUrl: "https://get.krezzo.com/launches",
+    now: INVITE_NOW,
+    domain: "krezzo.com",
+  });
+}
+
+test("an invite is attached as a calendar request, not a file download", () => {
+  const [planned] = planFor(upcomingLaunches(1));
+  const email = emailFor(planned);
+  const attachment = email.attachments[0];
+
+  assert.equal(email.attachments.length, 1);
+  // Without the method parameter a mail client offers a download instead of
+  // showing the event with RSVP buttons.
+  assert.equal(attachment.content_type, "text/calendar; charset=utf-8; method=REQUEST");
+  // Resend's REST API reads content_type; the SDK's camelCase contentType was
+  // ignored on the wire until v4.8.0 and this repo is on 4.6.0.
+  assert.equal(attachment.contentType, undefined);
+  assert.equal(attachment.filename, "launch.ics");
+  assert.equal(email.to, RECIPIENT);
+});
+
+test("the attachment is base64 of the calendar body", () => {
+  // A raw string arrives mangled; base64 is the form Resend documents.
+  const [planned] = planFor(upcomingLaunches(1));
+  const email = emailFor(planned);
+  assert.equal(
+    Buffer.from(email.attachments[0].content, "base64").toString("utf-8"),
+    email.calendar
+  );
+  assert.ok(email.calendar.startsWith("BEGIN:VCALENDAR\r\n"));
+});
+
+test("the invite calendar carries an organizer, the attendee, and the event", () => {
+  const [planned] = planFor(upcomingLaunches(1));
+  const cal = emailFor(planned).calendar;
+
+  assert.ok(cal.includes("METHOD:REQUEST"));
+  assert.ok(cal.includes("ORGANIZER;CN=Krezzo Launch Calendar:mailto:alerts@krezzo.com"));
+  assert.ok(
+    cal.replace(/\r\n /g, "").includes(
+      `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE:mailto:${RECIPIENT}`
+    )
+  );
+  assert.ok(cal.includes("UID:launch-launch-0@krezzo.com"));
+  assert.ok(cal.includes("SEQUENCE:0"));
+  assert.ok(cal.includes("TRIGGER:-PT60M"));
+  assert.equal(cal.split("BEGIN:VEVENT").length - 1, 1);
+});
+
+test("an update reuses the UID and raises the sequence so the event moves", () => {
+  const rows = upcomingLaunches(1, { invited_sequence: 0 });
+  rows[0].sequence = 2;
+  rows[0].last_change = "T-0 moved from Mon to Tue";
+
+  const email = emailFor(planFor(rows)[0]);
+  const cal = email.calendar;
+
+  assert.ok(email.subject.startsWith("Updated: "));
+  assert.ok(cal.includes("UID:launch-launch-0@krezzo.com"));
+  assert.ok(cal.includes("SEQUENCE:2"));
+  assert.ok(cal.includes("METHOD:REQUEST"));
+  assert.ok(email.text.includes("T-0 moved from Mon to Tue"));
+});
+
+test("a cancellation is sent as METHOD:CANCEL with a cancelled event", () => {
+  const rows = upcomingLaunches(1, { invited_sequence: 0 });
+  rows[0].cancelled = true;
+  rows[0].sequence = 1;
+
+  const email = emailFor(planFor(rows)[0]);
+  const cal = email.calendar;
+
+  assert.ok(email.subject.startsWith("Scrubbed: "));
+  assert.equal(
+    email.attachments[0].content_type,
+    "text/calendar; charset=utf-8; method=CANCEL"
+  );
+  assert.ok(cal.includes("METHOD:CANCEL"));
+  assert.ok(cal.includes("STATUS:CANCELLED"));
+  assert.equal(cal.includes("BEGIN:VALARM"), false);
+});
+
+test("the subject says what it is and when", () => {
+  const [planned] = planFor(upcomingLaunches(1));
+  const email = emailFor(planned);
+  assert.match(email.subject, /^Launch: Falcon 9 Block 5 — Starlink Group 12-1 — /);
+  assert.match(email.subject, /EDT$/);
+});
+
+test("a day-precision invite says the time is unknown rather than inventing one", () => {
+  const row = storedFrom(
+    rawLaunch({ net: "2026-10-05T00:00:00Z", netPrecision: { abbrev: "DAY", name: "Day" } }),
+    { invited_sequence: null }
+  );
+  const email = emailFor(planFor([row])[0]);
+  assert.ok(email.subject.includes("Mon, Oct 5, 2026, time TBD"));
+  assert.ok(email.calendar.includes("DTSTART;VALUE=DATE:20261005"));
+});
+
+test("the email body escapes HTML from upstream text", () => {
+  const row = storedFrom(
+    rawLaunch({ mission: { name: "Sat <script>alert(1)</script> & co", orbit: null } }),
+    { invited_sequence: null }
+  );
+  const email = emailFor(planFor([row])[0]);
+  assert.equal(email.html.includes("<script>"), false);
+  assert.ok(email.html.includes("&lt;script&gt;"));
+  assert.ok(email.html.includes("&amp; co"));
+});
+
+test("sending records delivery per launch and reports failures separately", async () => {
+  const planned = planFor(upcomingLaunches(3));
+  const recorded = [];
+  let call = 0;
+
+  const result = await invite.sendLaunchInvites(planned, {
+    to: RECIPIENT,
+    from: "Krezzo <alerts@krezzo.com>",
+    organizer: ORGANIZER,
+    now: INVITE_NOW,
+    pauseMs: 0,
+    send: async () => (++call === 2 ? { error: "rate limited" } : { error: null }),
+    record: async (id, sequence) => recorded.push([id, sequence]),
+  });
+
+  assert.equal(result.sent.length, 2);
+  assert.equal(result.failed.length, 1);
+  assert.equal(result.failed[0].error, "rate limited");
+  // The failed launch is not marked as delivered, so the next run retries it.
+  assert.deepEqual(recorded, [
+    ["launch-0", 0],
+    ["launch-2", 0],
+  ]);
+});
+
+test("sending paces itself to stay under the mail provider's rate limit", async () => {
+  const planned = planFor(upcomingLaunches(3));
+  const waits = [];
+
+  await invite.sendLaunchInvites(planned, {
+    to: RECIPIENT,
+    from: "Krezzo <alerts@krezzo.com>",
+    organizer: ORGANIZER,
+    now: INVITE_NOW,
+    pauseMs: 600,
+    sleep: async (ms) => waits.push(ms),
+    send: async () => ({ error: null }),
+    record: async () => {},
+  });
+
+  // Paused between sends, but not before the first one.
+  assert.deepEqual(waits, [600, 600]);
 });
 
 // --- runner -----------------------------------------------------------------
