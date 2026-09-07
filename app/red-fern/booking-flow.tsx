@@ -698,10 +698,10 @@ function DayCell({
         selected
           ? "bg-[#3c4143] font-semibold text-[#f4f2ef] ring-2 ring-[#cf8577]"
           : unavailable
-            ? "cursor-not-allowed bg-[#e9e7e3] text-[#aeb2b3]"
+            ? "cursor-not-allowed bg-[#eceae6] text-[#b4b8b9]"
             : day.status === "limited"
-              ? "bg-[#f6edd2] font-medium text-[#3c4143] ring-1 ring-[#d8c084] hover:ring-[#b0574a]"
-              : "bg-[#dde7da] font-medium text-[#3c4143] ring-1 ring-[#b6c9b3] hover:ring-[#3c4143]"
+              ? "bg-[#f7e7c0] font-medium text-[#3c4143] ring-1 ring-[#d3b263] hover:ring-[#b0574a]"
+              : "bg-[#cfe0ca] font-semibold text-[#2f3536] ring-1 ring-[#9db998] hover:ring-[#3c4143]"
       }`}
     >
       <span>{number}</span>
@@ -726,9 +726,9 @@ function DayCell({
 
 function Legend() {
   const items = [
-    { className: "bg-[#dde7da] ring-1 ring-[#b6c9b3]", label: "Open" },
-    { className: "bg-[#f6edd2] ring-1 ring-[#d8c084]", label: "Some times left" },
-    { className: "bg-[#e9e7e3]", label: "Taken or closed" },
+    { className: "bg-[#cfe0ca] ring-1 ring-[#9db998]", label: "Open" },
+    { className: "bg-[#f7e7c0] ring-1 ring-[#d3b263]", label: "Some times left" },
+    { className: "bg-[#eceae6]", label: "Taken or closed" },
   ];
   return (
     <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-[#7e8385]">
