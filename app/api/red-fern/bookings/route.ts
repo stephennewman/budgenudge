@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     manageUrl: `${origin}/red-fern`,
   });
 
-  const delivery = await deliverEmail(email);
+  const delivery = await deliverEmail(email, { reference: booking.reference });
 
   return NextResponse.json({
     booking,

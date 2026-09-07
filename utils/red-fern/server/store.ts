@@ -14,6 +14,7 @@
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { EMAIL_FROM_ALERTS } from "@/lib/brand";
 import type { Booking } from "../availability";
 import type { BookingEmail } from "../email";
 import { buildSeedBookings } from "../seed";
@@ -147,19 +148,27 @@ export type DeliveryResult = {
  * `content_type` on the calendar attachment survives; without the `method=`
  * parameter a mail client shows a file to download instead of an invitation.
  */
-export async function deliverEmail(email: BookingEmail): Promise<DeliveryResult> {
+export async function deliverEmail(
+  email: BookingEmail,
+  options: { reference?: string } = {}
+): Promise<DeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     return { delivered: false, reason: "RESEND_API_KEY is not set — showing the message instead." };
   }
 
   try {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    };
+    if (options.reference) {
+      headers["Idempotency-Key"] = `red-fern-confirmation/${options.reference}`;
+    }
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         from: email.from,
         to: [email.to],
@@ -183,7 +192,12 @@ export async function deliverEmail(email: BookingEmail): Promise<DeliveryResult>
   }
 }
 
-/** The From: address, which has to be on a domain verified with Resend. */
+/**
+ * Same verified mailbox as launch invites. Display name stays the venue.
+ * Override with RED_FERN_FROM_EMAIL only if that address is also verified.
+ */
 export function senderAddress(): string {
-  return process.env.RED_FERN_FROM_EMAIL ?? "Red Fern Plantation <onboarding@resend.dev>";
+  if (process.env.RED_FERN_FROM_EMAIL) return process.env.RED_FERN_FROM_EMAIL;
+  const mailbox = EMAIL_FROM_ALERTS.match(/<([^>]+)>/)?.[1] ?? "alerts@krezzo.com";
+  return `Red Fern Plantation <${mailbox}>`;
 }
