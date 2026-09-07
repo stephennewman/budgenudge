@@ -146,52 +146,54 @@ export function buildBookingEmail(
   ].join("\n");
 
   const row = (label: string, value: string, bold = false) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#6b6255;white-space:nowrap;font-size:13px">${escapeHtml(
+    `<tr><td style="padding:6px 16px 6px 0;color:#63696b;white-space:nowrap;font-size:13px">${escapeHtml(
       label
     )}</td><td style="padding:6px 0;font-size:13px;text-align:right;${
       bold ? "font-weight:700;" : ""
-    }color:#1c2b21">${escapeHtml(value)}</td></tr>`;
+    }color:#3c4143">${escapeHtml(value)}</td></tr>`;
 
-  const html = `<div style="background:#f6f2e9;padding:24px 12px;font-family:Georgia,'Times New Roman',serif">
-  <div style="max-width:560px;margin:0 auto;background:#fffdf8;border:1px solid #e2d9c6;border-radius:14px;overflow:hidden">
-    <div style="background:#1c2b21;color:#f6f2e9;padding:22px 26px">
-      <p style="margin:0;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:#c9a227">${escapeHtml(
+  const html = `<div style="background:#f4f2ef;padding:24px 12px;font-family:Georgia,'Times New Roman',serif">
+  <div style="max-width:560px;margin:0 auto;background:#fbfaf8;border:1px solid #ddd9d3;border-radius:14px;overflow:hidden">
+    <div style="background:#3c4143;color:#f4f2ef;padding:26px 26px 22px;text-align:center">
+      <p style="margin:0;font-size:22px;letter-spacing:.34em;font-weight:500;padding-left:.34em">REDFERN</p>
+      <div style="width:56px;height:1px;background:#cf8577;margin:10px auto"></div>
+      <p style="margin:0;font-size:10px;letter-spacing:.44em;padding-left:.44em;color:#d6d3ce">PLANTATION</p>
+      <p style="margin:12px 0 0;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:#cf8577">${escapeHtml(
         VENUE.city
       )}, ${escapeHtml(VENUE.state)}</p>
-      <h1 style="margin:6px 0 0;font-size:23px;font-weight:400">${escapeHtml(VENUE.name)}</h1>
     </div>
     <div style="padding:26px">
-      <h2 style="margin:0 0 10px;font-size:19px;color:#1c2b21;font-weight:400">${escapeHtml(
+      <h2 style="margin:0 0 10px;font-size:19px;color:#3c4143;font-weight:400">${escapeHtml(
         experience.name
       )}</h2>
-      <p style="margin:0 0 20px;color:#4a4438;line-height:1.6;font-size:14px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${escapeHtml(
+      <p style="margin:0 0 20px;color:#4f5456;line-height:1.6;font-size:14px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">${escapeHtml(
         lead
       )}</p>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e2d9c6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #ddd9d3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
         ${facts.map(([label, value]) => row(label, value)).join("\n        ")}
       </table>
       ${
         money.length
-          ? `<h3 style="margin:24px 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8a7f6c;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">Your estimate</h3>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e2d9c6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+          ? `<h3 style="margin:24px 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#7e8385;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">Your estimate</h3>
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #ddd9d3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
         ${money
           .map(([label, value], index) => row(label, value, index >= money.length - 3))
           .join("\n        ")}
       </table>`
           : ""
       }
-      <h3 style="margin:24px 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8a7f6c;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">What's included</h3>
-      <ul style="margin:0;padding-left:18px;color:#4a4438;line-height:1.7;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+      <h3 style="margin:24px 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#7e8385;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">What's included</h3>
+      <ul style="margin:0;padding-left:18px;color:#4f5456;line-height:1.7;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
         ${experience.includes.map((item) => `<li>${escapeHtml(item)}</li>`).join("\n        ")}
       </ul>
       ${
         booking.notes
-          ? `<p style="margin:20px 0 0;padding:12px 14px;background:#f1ecdf;border-radius:10px;color:#4a4438;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><strong>Your note:</strong> ${escapeHtml(
+          ? `<p style="margin:20px 0 0;padding:12px 14px;background:#eceae6;border-radius:10px;color:#4f5456;font-size:13px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif"><strong>Your note:</strong> ${escapeHtml(
               booking.notes
             )}</p>`
           : ""
       }
-      <p style="margin:24px 0 0;color:#6b6255;font-size:12px;line-height:1.6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+      <p style="margin:24px 0 0;color:#63696b;font-size:12px;line-height:1.6;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
         The attached invitation adds this to your calendar with a reminder the night before.<br>
         ${escapeHtml(VENUE.phone)} · ${escapeHtml(VENUE.email)}<br>${escapeHtml(VENUE.address)}
       </p>

@@ -173,13 +173,13 @@ export default function BookingFlow({ today }: { today: string }) {
     <div id="plan" className="scroll-mt-4">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mb-8 text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#c9a227]">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8e2b1e]">
             Book the place
           </p>
-          <h2 className="mt-3 font-serif text-3xl leading-tight text-[#16281f] sm:text-4xl">
+          <h2 className="mt-3 rf-display text-3xl leading-tight text-[#3c4143] sm:text-4xl">
             {step === 5 ? "You're on the book" : "What brings you out to Red Fern?"}
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#5b5546]">
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[#5a6062]">
             Pick what you have in mind and we&apos;ll show you the open dates, what it runs, and put
             the invitation straight on your calendar.
           </p>
@@ -248,7 +248,7 @@ export default function BookingFlow({ today }: { today: string }) {
             {step === 5 && result && <Confirmation result={result} onAgain={startOver} />}
 
             {error && (
-              <p className="mt-4 rounded-xl bg-[#fdecea] px-4 py-3 text-sm text-[#8c2f22] ring-1 ring-[#f0c3bc]">
+              <p className="mt-4 rounded-xl bg-[#fbeeec] px-4 py-3 text-sm text-[#8e2b1e] ring-1 ring-[#e8c4bf]">
                 {error}
               </p>
             )}
@@ -286,17 +286,17 @@ function Stepper({ step, onBack }: { step: Step; onBack: (step: Step) => void })
               onClick={() => done && onBack(value)}
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 transition ${
                 active
-                  ? "bg-[#16281f] text-[#f7f3ea] ring-[#16281f]"
+                  ? "bg-[#3c4143] text-[#f4f2ef] ring-[#3c4143]"
                   : done
-                    ? "bg-[#c9a227] text-[#16281f] ring-[#c9a227] hover:brightness-110"
-                    : "bg-transparent text-[#a89e8a] ring-[#ddd3bf]"
+                    ? "bg-[#8e2b1e] text-[#f4f2ef] ring-[#8e2b1e] hover:brightness-110"
+                    : "bg-transparent text-[#9ea3a5] ring-[#ddd3bf]"
               }`}
               aria-label={`Step ${value}: ${STEP_LABELS[value]}`}
             >
               {done ? "✓" : value}
             </button>
             <span
-              className={`hidden truncate sm:block ${active ? "text-[#16281f]" : "text-[#a89e8a]"}`}
+              className={`hidden truncate sm:block ${active ? "text-[#3c4143]" : "text-[#9ea3a5]"}`}
             >
               {STEP_LABELS[value]}
             </span>
@@ -318,7 +318,7 @@ function ExperiencePicker({ onChoose }: { onChoose: (experience: Experience) => 
     <div className="flex flex-col gap-8">
       {groups.map(({ category, items }) => (
         <section key={category}>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7f6c]">
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7e8385]">
             {CATEGORY_LABELS[category]}
           </h3>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -327,9 +327,9 @@ function ExperiencePicker({ onChoose }: { onChoose: (experience: Experience) => 
                 key={experience.id}
                 type="button"
                 onClick={() => onChoose(experience)}
-                className="group flex flex-col overflow-hidden rounded-2xl bg-white text-left ring-1 ring-[#e2d9c6] transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#c9a227] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#16281f]"
+                className="group flex flex-col overflow-hidden rounded-2xl bg-white text-left ring-1 ring-[#ddd9d3] transition hover:-translate-y-0.5 hover:shadow-lg hover:ring-[#b0574a] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3c4143]"
               >
-                <div className="relative h-36 w-full overflow-hidden bg-[#e8e1d2]">
+                <div className="relative h-36 w-full overflow-hidden bg-[#e6e3de]">
                   {/* Static marketing imagery; next/image would add no value here. */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -338,16 +338,16 @@ function ExperiencePicker({ onChoose }: { onChoose: (experience: Experience) => 
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
-                  <span className="absolute left-3 top-3 rounded-full bg-[#16281f]/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#f7f3ea]">
+                  <span className="absolute left-3 top-3 rounded-full bg-[#3c4143]/85 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#f4f2ef]">
                     {experience.baseRate === 0
                       ? "No charge"
                       : `From ${formatMoney(experience.baseRate)}`}
                   </span>
                 </div>
                 <div className="flex flex-1 flex-col gap-2 p-4">
-                  <h4 className="font-serif text-lg leading-snug text-[#16281f]">{experience.name}</h4>
-                  <p className="text-sm leading-relaxed text-[#5b5546]">{experience.tagline}</p>
-                  <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-[11px] uppercase tracking-[0.12em] text-[#8a7f6c]">
+                  <h4 className="rf-display text-lg leading-snug text-[#3c4143]">{experience.name}</h4>
+                  <p className="text-sm leading-relaxed text-[#5a6062]">{experience.tagline}</p>
+                  <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-[11px] uppercase tracking-[0.12em] text-[#7e8385]">
                     <span>{seasonRangeText(experience.seasons)}</span>
                     <span aria-hidden>·</span>
                     <span>
@@ -355,7 +355,7 @@ function ExperiencePicker({ onChoose }: { onChoose: (experience: Experience) => 
                       {experience.party.label.toLowerCase()}
                     </span>
                   </p>
-                  <span className="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#16281f] px-4 text-sm font-semibold text-[#f7f3ea] transition group-hover:bg-[#1f3b2c]">
+                  <span className="mt-2 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#3c4143] px-4 text-sm font-semibold text-[#f4f2ef] transition group-hover:bg-[#4d5355]">
                     Check dates
                   </span>
                 </div>
@@ -388,10 +388,10 @@ function PlanStep(props: {
   useEffect(() => setPartyText(String(partySize)), [partySize]);
 
   return (
-    <div className="flex flex-col gap-6 rounded-2xl bg-white p-5 ring-1 ring-[#e2d9c6] sm:p-6">
+    <div className="flex flex-col gap-6 rounded-2xl bg-white p-5 ring-1 ring-[#ddd9d3] sm:p-6">
       <header>
-        <h3 className="font-serif text-2xl text-[#16281f]">{experience.name}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#5b5546]">{experience.description}</p>
+        <h3 className="rf-display text-2xl text-[#3c4143]">{experience.name}</h3>
+        <p className="mt-2 text-sm leading-relaxed text-[#5a6062]">{experience.description}</p>
       </header>
 
       <Field label={`How long?`}>
@@ -403,14 +403,14 @@ function PlanStep(props: {
               onClick={() => props.onDuration(duration.id)}
               className={`flex min-h-11 flex-col items-start justify-center rounded-xl px-4 py-2.5 text-left ring-1 transition ${
                 duration.id === durationId
-                  ? "bg-[#16281f] text-[#f7f3ea] ring-[#16281f]"
-                  : "bg-[#faf7f0] text-[#16281f] ring-[#e2d9c6] hover:ring-[#c9a227]"
+                  ? "bg-[#3c4143] text-[#f4f2ef] ring-[#3c4143]"
+                  : "bg-[#f6f4f1] text-[#3c4143] ring-[#ddd9d3] hover:ring-[#b0574a]"
               }`}
             >
               <span className="text-sm font-semibold">{duration.label}</span>
               {duration.note && (
                 <span
-                  className={`text-xs ${duration.id === durationId ? "text-[#c9a227]" : "text-[#8a7f6c]"}`}
+                  className={`text-xs ${duration.id === durationId ? "text-[#d99183]" : "text-[#7e8385]"}`}
                 >
                   {duration.note}
                 </span>
@@ -432,7 +432,7 @@ function PlanStep(props: {
           <button
             type="button"
             onClick={() => props.onParty(partySize - (partySize > 20 ? 5 : 1))}
-            className="h-11 w-11 rounded-full text-lg text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+            className="h-11 w-11 rounded-full text-lg text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
             aria-label="Fewer"
           >
             −
@@ -457,12 +457,12 @@ function PlanStep(props: {
               }
             }}
             onBlur={() => props.onParty(Number(partyText) || experience.party.min)}
-            className="h-11 w-24 rounded-xl bg-[#faf7f0] text-center font-serif text-xl text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
+            className="h-11 w-24 rounded-xl bg-[#f6f4f1] text-center rf-display text-xl text-[#3c4143] ring-1 ring-[#ddd9d3] focus:outline-none focus:ring-2 focus:ring-[#3c4143]"
           />
           <button
             type="button"
             onClick={() => props.onParty(partySize + (partySize >= 20 ? 5 : 1))}
-            className="h-11 w-11 rounded-full text-lg text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+            className="h-11 w-11 rounded-full text-lg text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
             aria-label="More"
           >
             +
@@ -481,12 +481,12 @@ function PlanStep(props: {
                   type="button"
                   onClick={() => props.onToggleAddOn(addOn.id)}
                   className={`flex min-h-11 items-start gap-3 rounded-xl px-4 py-3 text-left ring-1 transition ${
-                    on ? "bg-[#f3f6f2] ring-[#16281f]" : "bg-[#faf7f0] ring-[#e2d9c6] hover:ring-[#c9a227]"
+                    on ? "bg-[#f1f4f0] ring-[#3c4143]" : "bg-[#f6f4f1] ring-[#ddd9d3] hover:ring-[#b0574a]"
                   }`}
                 >
                   <span
                     className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[11px] ring-1 ${
-                      on ? "bg-[#16281f] text-[#f7f3ea] ring-[#16281f]" : "bg-white ring-[#ccc2ad]"
+                      on ? "bg-[#3c4143] text-[#f4f2ef] ring-[#3c4143]" : "bg-white ring-[#c6c9ca]"
                     }`}
                     aria-hidden
                   >
@@ -494,10 +494,10 @@ function PlanStep(props: {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                      <span className="text-sm font-semibold text-[#16281f]">{addOn.name}</span>
-                      <span className="text-sm text-[#5b5546]">
+                      <span className="text-sm font-semibold text-[#3c4143]">{addOn.name}</span>
+                      <span className="text-sm text-[#5a6062]">
                         {formatMoney(addOn.price)}
-                        <span className="text-xs text-[#8a7f6c]">
+                        <span className="text-xs text-[#7e8385]">
                           {addOn.unit === "flat"
                             ? ""
                             : addOn.unit === "per_night"
@@ -508,7 +508,7 @@ function PlanStep(props: {
                         </span>
                       </span>
                     </span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-[#6b6255]">
+                    <span className="mt-0.5 block text-xs leading-relaxed text-[#63696b]">
                       {addOn.description}
                     </span>
                   </span>
@@ -548,20 +548,20 @@ function DateStep(props: {
   const atLastMonth = monthStart >= startOfMonth(addMonths(today, 11));
 
   return (
-    <div className="flex flex-col gap-5 rounded-2xl bg-white p-2 ring-1 ring-[#e2d9c6] sm:p-6">
+    <div className="flex flex-col gap-5 rounded-2xl bg-white p-2 ring-1 ring-[#ddd9d3] sm:p-6">
       <div className="flex items-center justify-between gap-2 px-2 sm:px-0">
         <button
           type="button"
           onClick={() => props.onMonth(addMonths(monthStart, -1))}
           disabled={atFirstMonth}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf] disabled:opacity-30"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6] disabled:opacity-30"
           aria-label="Previous month"
         >
           ‹
         </button>
         <div className="text-center">
-          <p className="font-serif text-xl text-[#16281f]">{formatMonthLabel(month.slice(0, 7))}</p>
-          <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a7f6c]">
+          <p className="rf-display text-xl text-[#3c4143]">{formatMonthLabel(month.slice(0, 7))}</p>
+          <p className="text-[11px] uppercase tracking-[0.14em] text-[#7e8385]">
             {seasonRangeText(experience.seasons)}
           </p>
         </div>
@@ -569,7 +569,7 @@ function DateStep(props: {
           type="button"
           onClick={() => props.onMonth(addMonths(monthStart, 1))}
           disabled={atLastMonth}
-          className="flex h-11 w-11 items-center justify-center rounded-full text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf] disabled:opacity-30"
+          className="flex h-11 w-11 items-center justify-center rounded-full text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6] disabled:opacity-30"
           aria-label="Next month"
         >
           ›
@@ -581,7 +581,7 @@ function DateStep(props: {
           {WEEKDAY_INITIALS.map((initial, index) => (
             <div
               key={index}
-              className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-[#a89e8a]"
+              className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-[#9ea3a5]"
             >
               {initial}
             </div>
@@ -599,14 +599,14 @@ function DateStep(props: {
           ))}
         </div>
         {loading && (
-          <p className="mt-3 text-center text-xs text-[#8a7f6c]">Reading the book…</p>
+          <p className="mt-3 text-center text-xs text-[#7e8385]">Reading the book…</p>
         )}
         <Legend />
       </div>
 
       {selectedDay && (
-        <div className="rounded-xl bg-[#faf7f0] p-4 ring-1 ring-[#e2d9c6]">
-          <p className="font-serif text-lg text-[#16281f]">
+        <div className="rounded-xl bg-[#f6f4f1] p-4 ring-1 ring-[#ddd9d3]">
+          <p className="rf-display text-lg text-[#3c4143]">
             {durationDays > 1
               ? formatDateSpan(selectedDay.date, durationDays)
               : formatDateLong(selectedDay.date)}
@@ -614,7 +614,7 @@ function DateStep(props: {
 
           {props.openSlots.length > 0 ? (
             <>
-              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[#8a7f6c]">
+              <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[#7e8385]">
                 Choose a start time
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -627,10 +627,10 @@ function DateStep(props: {
                     title={slot.reason}
                     className={`min-h-11 rounded-xl px-4 text-sm font-semibold ring-1 transition ${
                       slot.slotId === props.slotId && slot.available
-                        ? "bg-[#16281f] text-[#f7f3ea] ring-[#16281f]"
+                        ? "bg-[#3c4143] text-[#f4f2ef] ring-[#3c4143]"
                         : slot.available
-                          ? "bg-white text-[#16281f] ring-[#e2d9c6] hover:ring-[#c9a227]"
-                          : "cursor-not-allowed bg-[#efe9dc] text-[#a89e8a] line-through ring-transparent"
+                          ? "bg-white text-[#3c4143] ring-[#ddd9d3] hover:ring-[#b0574a]"
+                          : "cursor-not-allowed bg-[#efe9dc] text-[#9ea3a5] line-through ring-transparent"
                     }`}
                   >
                     {slot.label}
@@ -639,20 +639,20 @@ function DateStep(props: {
               </div>
             </>
           ) : (
-            <p className="mt-2 text-sm text-[#8c2f22]">
+            <p className="mt-2 text-sm text-[#8e2b1e]">
               {selectedDay.reason ?? "Nothing open that day."} Try another date, or call{" "}
               {VENUE.phone}.
             </p>
           )}
 
           {selectedDay.busy.length > 0 && (
-            <div className="mt-4 border-t border-[#e2d9c6] pt-3">
-              <p className="text-[11px] uppercase tracking-[0.14em] text-[#8a7f6c]">
+            <div className="mt-4 border-t border-[#ddd9d3] pt-3">
+              <p className="text-[11px] uppercase tracking-[0.14em] text-[#7e8385]">
                 Already on the book that day
               </p>
               <ul className="mt-1.5 flex flex-col gap-1">
                 {selectedDay.busy.map((item, index) => (
-                  <li key={index} className="text-xs text-[#6b6255]">
+                  <li key={index} className="text-xs text-[#63696b]">
                     {item.allDay ? "All day" : formatTime(item.startTime)} — {item.label}
                     {item.exclusive && " (property closed)"}
                   </li>
@@ -696,12 +696,12 @@ function DayCell({
       title={unavailable ? day.reason : `${day.slots.filter((s) => s.available).length} times open`}
       className={`relative flex min-h-[46px] flex-col items-center justify-center rounded-lg text-sm transition ${
         selected
-          ? "bg-[#16281f] font-semibold text-[#f7f3ea] ring-2 ring-[#c9a227]"
+          ? "bg-[#3c4143] font-semibold text-[#f4f2ef] ring-2 ring-[#cf8577]"
           : unavailable
-            ? "cursor-not-allowed bg-[#ece6d8] text-[#b3a894]"
+            ? "cursor-not-allowed bg-[#e9e7e3] text-[#aeb2b3]"
             : day.status === "limited"
-              ? "bg-[#fbeec9] font-medium text-[#16281f] ring-1 ring-[#dfc275] hover:ring-[#c9a227]"
-              : "bg-[#dbe8d8] font-medium text-[#16281f] ring-1 ring-[#b3cbb0] hover:ring-[#16281f]"
+              ? "bg-[#f6edd2] font-medium text-[#3c4143] ring-1 ring-[#d8c084] hover:ring-[#b0574a]"
+              : "bg-[#dde7da] font-medium text-[#3c4143] ring-1 ring-[#b6c9b3] hover:ring-[#3c4143]"
       }`}
     >
       <span>{number}</span>
@@ -714,7 +714,7 @@ function DayCell({
             <span
               key={index}
               className={`h-1 w-1 rounded-full ${
-                item.exclusive ? "bg-[#8c2f22]" : selected ? "bg-[#c9a227]" : "bg-[#8a7f6c]"
+                item.exclusive ? "bg-[#8e2b1e]" : selected ? "bg-[#d99183]" : "bg-[#7e8385]"
               }`}
             />
           ))}
@@ -726,12 +726,12 @@ function DayCell({
 
 function Legend() {
   const items = [
-    { className: "bg-[#dbe8d8] ring-1 ring-[#b3cbb0]", label: "Open" },
-    { className: "bg-[#fbeec9] ring-1 ring-[#dfc275]", label: "Some times left" },
-    { className: "bg-[#ece6d8]", label: "Taken or closed" },
+    { className: "bg-[#dde7da] ring-1 ring-[#b6c9b3]", label: "Open" },
+    { className: "bg-[#f6edd2] ring-1 ring-[#d8c084]", label: "Some times left" },
+    { className: "bg-[#e9e7e3]", label: "Taken or closed" },
   ];
   return (
-    <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-[#8a7f6c]">
+    <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-[#7e8385]">
       {items.map((item) => (
         <span key={item.label} className="flex items-center gap-1.5">
           <span className={`h-3 w-3 rounded ${item.className}`} />
@@ -739,7 +739,7 @@ function Legend() {
         </span>
       ))}
       <span className="flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-[#8c2f22]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#8e2b1e]" />
         Private event on the property
       </span>
     </div>
@@ -759,15 +759,15 @@ function DetailsStep(props: {
 
   return (
     <form
-      className="flex flex-col gap-5 rounded-2xl bg-white p-5 ring-1 ring-[#e2d9c6] sm:p-6"
+      className="flex flex-col gap-5 rounded-2xl bg-white p-5 ring-1 ring-[#ddd9d3] sm:p-6"
       onSubmit={(event) => {
         event.preventDefault();
         if (ready) props.onSubmit();
       }}
     >
       <header>
-        <h3 className="font-serif text-2xl text-[#16281f]">Where do we send the confirmation?</h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#5b5546]">
+        <h3 className="rf-display text-2xl text-[#3c4143]">Where do we send the confirmation?</h3>
+        <p className="mt-2 text-sm leading-relaxed text-[#5a6062]">
           The invitation lands on your calendar with a reminder the night before. We&apos;ll follow
           up by phone within one business day.
         </p>
@@ -780,7 +780,7 @@ function DetailsStep(props: {
             value={contact.name}
             onChange={(event) => props.onContact({ name: event.target.value })}
             placeholder="Caroline Hollis"
-            className="h-11 w-full rounded-xl bg-[#faf7f0] px-4 text-sm text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
+            className="h-11 w-full rounded-xl bg-[#f6f4f1] px-4 text-sm text-[#3c4143] ring-1 ring-[#ddd9d3] focus:outline-none focus:ring-2 focus:ring-[#3c4143]"
           />
         </Field>
         <Field label="Email">
@@ -791,7 +791,7 @@ function DetailsStep(props: {
             value={contact.email}
             onChange={(event) => props.onContact({ email: event.target.value })}
             placeholder="you@example.com"
-            className="h-11 w-full rounded-xl bg-[#faf7f0] px-4 text-sm text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
+            className="h-11 w-full rounded-xl bg-[#f6f4f1] px-4 text-sm text-[#3c4143] ring-1 ring-[#ddd9d3] focus:outline-none focus:ring-2 focus:ring-[#3c4143]"
           />
         </Field>
         <Field label="Phone" hint="Optional">
@@ -801,7 +801,7 @@ function DetailsStep(props: {
             value={contact.phone}
             onChange={(event) => props.onContact({ phone: event.target.value })}
             placeholder="(229) 555-0134"
-            className="h-11 w-full rounded-xl bg-[#faf7f0] px-4 text-sm text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
+            className="h-11 w-full rounded-xl bg-[#f6f4f1] px-4 text-sm text-[#3c4143] ring-1 ring-[#ddd9d3] focus:outline-none focus:ring-2 focus:ring-[#3c4143]"
           />
         </Field>
         <Field label="Anything we should know?" hint="Optional">
@@ -810,12 +810,12 @@ function DetailsStep(props: {
             onChange={(event) => props.onContact({ notes: event.target.value })}
             rows={3}
             placeholder="Bringing two dogs, one guest uses a wheelchair, hoping for a sunset ceremony…"
-            className="w-full rounded-xl bg-[#faf7f0] px-4 py-3 text-sm text-[#16281f] ring-1 ring-[#e2d9c6] focus:outline-none focus:ring-2 focus:ring-[#16281f]"
+            className="w-full rounded-xl bg-[#f6f4f1] px-4 py-3 text-sm text-[#3c4143] ring-1 ring-[#ddd9d3] focus:outline-none focus:ring-2 focus:ring-[#3c4143]"
           />
         </Field>
       </div>
 
-      <p className="text-xs leading-relaxed text-[#8a7f6c]">
+      <p className="text-xs leading-relaxed text-[#7e8385]">
         Sending this holds the date. Nothing is charged online — we take the deposit by phone or
         check, and you can move or release the date up to {props.experience.balanceDueDays || 7} days
         out.
@@ -840,14 +840,14 @@ function Confirmation({ result, onAgain }: { result: BookingResponse; onAgain: (
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-2xl bg-[#16281f] p-6 text-[#f7f3ea]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#c9a227]">
+      <div className="rounded-2xl bg-[#3c4143] p-6 text-[#f4f2ef]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#cf8577]">
           Confirmation {booking.reference}
         </p>
-        <h3 className="mt-2 font-serif text-2xl">
+        <h3 className="mt-2 rf-display text-2xl">
           {experience?.name} — {formatDateSpan(booking.start_date, booking.days)}
         </h3>
-        <p className="mt-2 text-sm leading-relaxed text-[#cdd6cd]">
+        <p className="mt-2 text-sm leading-relaxed text-[#d6d3ce]">
           {booking.days > 1 ? "Starting at " : ""}
           {formatTime(booking.start_time)} · {booking.party_size}{" "}
           {experience?.party.label.toLowerCase()}
@@ -858,39 +858,39 @@ function Confirmation({ result, onAgain }: { result: BookingResponse; onAgain: (
         <div className="mt-5 flex flex-col gap-2 sm:flex-row">
           <a
             href={result.inviteUrl}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[#c9a227] px-4 text-sm font-semibold text-[#16281f] transition hover:brightness-110"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[#8e2b1e] px-4 text-sm font-semibold text-[#f4f2ef] transition hover:brightness-110"
           >
             Add to my calendar
           </a>
           <button
             type="button"
             onClick={onAgain}
-            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold text-[#f7f3ea] ring-1 ring-[#3c5245] transition hover:bg-[#1f3b2c]"
+            className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold text-[#f4f2ef] ring-1 ring-[#5b6264] transition hover:bg-[#4d5355]"
           >
             Book something else
           </button>
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white ring-1 ring-[#e2d9c6]">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2d9c6] p-4">
+      <div className="rounded-2xl bg-white ring-1 ring-[#ddd9d3]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#ddd9d3] p-4">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-[#8a7f6c]">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-[#7e8385]">
               {delivery.delivered ? "Sent to" : "Ready to send to"}
             </p>
-            <p className="truncate text-sm font-semibold text-[#16281f]">{email.to}</p>
+            <p className="truncate text-sm font-semibold text-[#3c4143]">{email.to}</p>
           </div>
           <button
             type="button"
             onClick={() => setShowEmail((current) => !current)}
-            className="min-h-11 rounded-lg px-3 text-sm font-semibold text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+            className="min-h-11 rounded-lg px-3 text-sm font-semibold text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
           >
             {showEmail ? "Hide the email" : "Show the email"}
           </button>
         </div>
 
         {!delivery.delivered && delivery.reason && (
-          <p className="border-b border-[#e2d9c6] bg-[#fdf6e3] px-4 py-3 text-xs leading-relaxed text-[#6b5a1f]">
+          <p className="border-b border-[#ddd9d3] bg-[#f7f2e6] px-4 py-3 text-xs leading-relaxed text-[#6f6030]">
             {delivery.reason} The message below, calendar invitation and all, is exactly what goes
             out once a mail key is configured.
           </p>
@@ -898,14 +898,14 @@ function Confirmation({ result, onAgain }: { result: BookingResponse; onAgain: (
 
         {showEmail && (
           <div className="p-3">
-            <p className="px-1 pb-2 text-xs text-[#8a7f6c]">
-              <span className="font-semibold text-[#16281f]">Subject:</span> {email.subject}
+            <p className="px-1 pb-2 text-xs text-[#7e8385]">
+              <span className="font-semibold text-[#3c4143]">Subject:</span> {email.subject}
             </p>
             <iframe
               title="Confirmation email"
               srcDoc={email.html}
               sandbox=""
-              className="h-[520px] w-full rounded-xl bg-white ring-1 ring-[#e2d9c6]"
+              className="h-[520px] w-full rounded-xl bg-white ring-1 ring-[#ddd9d3]"
             />
           </div>
         )}
@@ -926,27 +926,27 @@ function QuoteCard({
   slotLabel: string;
 }) {
   return (
-    <div className="rounded-2xl bg-[#16281f] p-5 text-[#f7f3ea]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#c9a227]">
+    <div className="rounded-2xl bg-[#3c4143] p-5 text-[#f4f2ef]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#cf8577]">
         Your estimate
       </p>
-      <h4 className="mt-2 font-serif text-xl leading-snug">{experience.name}</h4>
-      <p className="mt-1 text-xs text-[#a9b8ac]">
+      <h4 className="mt-2 rf-display text-xl leading-snug">{experience.name}</h4>
+      <p className="mt-1 text-xs text-[#a8adaf]">
         {date ? formatDateSpan(date, quote.days) : "Date not chosen yet"} · {slotLabel}
       </p>
 
-      <dl className="mt-4 flex flex-col gap-2 border-t border-[#2f4438] pt-4 text-sm">
+      <dl className="mt-4 flex flex-col gap-2 border-t border-[#565c5e] pt-4 text-sm">
         {quote.lines
           .filter((line) => line.kind !== "tax")
           .map((line) => (
             <div key={line.id} className="flex items-start justify-between gap-3">
               <dt className="min-w-0">
-                <span className="block text-[#e4e9e3]">{line.label}</span>
-                {line.detail && <span className="block text-[11px] text-[#8fa294]">{line.detail}</span>}
+                <span className="block text-[#e6e4e0]">{line.label}</span>
+                {line.detail && <span className="block text-[11px] text-[#8b9294]">{line.detail}</span>}
               </dt>
               <dd
                 className={`shrink-0 tabular-nums ${
-                  line.amount < 0 ? "text-[#c9a227]" : "text-[#f7f3ea]"
+                  line.amount < 0 ? "text-[#d99183]" : "text-[#f4f2ef]"
                 }`}
               >
                 {formatMoney(line.amount)}
@@ -954,26 +954,26 @@ function QuoteCard({
             </div>
           ))}
         {quote.tax > 0 && (
-          <div className="flex items-center justify-between gap-3 text-[#a9b8ac]">
+          <div className="flex items-center justify-between gap-3 text-[#a8adaf]">
             <dt>Georgia sales tax</dt>
             <dd className="tabular-nums">{formatMoney(quote.tax)}</dd>
           </div>
         )}
       </dl>
 
-      <div className="mt-4 flex items-baseline justify-between border-t border-[#2f4438] pt-4">
-        <span className="text-sm text-[#a9b8ac]">Total</span>
-        <span className="font-serif text-2xl tabular-nums">{formatMoney(quote.total)}</span>
+      <div className="mt-4 flex items-baseline justify-between border-t border-[#565c5e] pt-4">
+        <span className="text-sm text-[#a8adaf]">Total</span>
+        <span className="rf-display text-2xl tabular-nums">{formatMoney(quote.total)}</span>
       </div>
 
       {quote.depositDue > 0 && (
-        <p className="mt-3 rounded-xl bg-[#1f3b2c] px-3 py-2.5 text-xs leading-relaxed text-[#cdd6cd]">
-          <strong className="text-[#f7f3ea]">{formatMoney(quote.depositDue)}</strong> holds the date.
+        <p className="mt-3 rounded-xl bg-[#4d5355] px-3 py-2.5 text-xs leading-relaxed text-[#d6d3ce]">
+          <strong className="text-[#f4f2ef]">{formatMoney(quote.depositDue)}</strong> holds the date.
           Balance of {formatMoney(quote.balanceDue)} due {quote.balanceDueDays} days out.
         </p>
       )}
       {quote.total === 0 && (
-        <p className="mt-3 rounded-xl bg-[#1f3b2c] px-3 py-2.5 text-xs leading-relaxed text-[#cdd6cd]">
+        <p className="mt-3 rounded-xl bg-[#4d5355] px-3 py-2.5 text-xs leading-relaxed text-[#d6d3ce]">
           No charge and no obligation — come walk the place.
         </p>
       )}
@@ -993,10 +993,10 @@ function Field({
   return (
     <label className="flex flex-col gap-2">
       <span className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8a7f6c]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7e8385]">
           {label}
         </span>
-        {hint && <span className="text-[11px] text-[#a89e8a]">{hint}</span>}
+        {hint && <span className="text-[11px] text-[#9ea3a5]">{hint}</span>}
       </span>
       {children}
     </label>
@@ -1016,7 +1016,7 @@ function StepButtons(props: {
       <button
         type="button"
         onClick={props.onBack}
-        className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+        className="inline-flex min-h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
       >
         {props.backLabel}
       </button>
@@ -1024,7 +1024,7 @@ function StepButtons(props: {
         type={props.submit ? "submit" : "button"}
         onClick={props.submit ? undefined : props.onNext}
         disabled={props.nextDisabled}
-        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#16281f] px-6 text-sm font-semibold text-[#f7f3ea] transition hover:bg-[#1f3b2c] disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#3c4143] px-6 text-sm font-semibold text-[#f4f2ef] transition hover:bg-[#4d5355] disabled:cursor-not-allowed disabled:opacity-40"
       >
         {props.nextLabel}
       </button>

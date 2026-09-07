@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { getExperience, VENUE } from "@/utils/red-fern/catalog";
+import RedFernLogo from "../logo";
 import { bookingsOnDate, occupancyOf, type Booking } from "@/utils/red-fern/availability";
 import { balanceDueDate } from "@/utils/red-fern/ics";
 import {
@@ -38,10 +39,10 @@ export const metadata: Metadata = {
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const STATUS_TONE: Record<string, string> = {
-  confirmed: "bg-[#e6f0e6] text-[#2f6b46] ring-[#bcd8c3]",
-  requested: "bg-[#fdf6e3] text-[#8a6d1f] ring-[#e6cf92]",
+  confirmed: "bg-[#e9efe9] text-[#3f6b52] ring-[#c3d6c7]",
+  requested: "bg-[#f7f2e6] text-[#8a7434] ring-[#dfcb96]",
   hold: "bg-[#eef1f6] text-[#4a5a75] ring-[#c9d3e3]",
-  cancelled: "bg-[#fdecea] text-[#8c2f22] ring-[#f0c3bc]",
+  cancelled: "bg-[#fbeeec] text-[#8e2b1e] ring-[#e8c4bf]",
 };
 
 export default async function SchedulePage({
@@ -89,21 +90,22 @@ export default async function SchedulePage({
     `/red-fern/schedule?code=${encodeURIComponent(expected)}&month=${target.slice(0, 7)}`;
 
   return (
-    <main className="min-h-screen bg-[#f7f3ea] px-4 py-8 text-[#16281f] sm:px-6 sm:py-12">
+    <main className="min-h-screen bg-[#f4f2ef] px-4 py-8 text-[#3c4143] sm:px-6 sm:py-12">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#c9a227]">
-              Private · {VENUE.name}
+            <RedFernLogo size="sm" align="start" subtitle={null} />
+            <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#8e2b1e]">
+              Private schedule
             </p>
-            <h1 className="mt-2 font-serif text-3xl sm:text-4xl">The book</h1>
-            <p className="mt-2 text-sm text-[#5b5546]">
+            <h1 className="mt-2 rf-display text-3xl sm:text-4xl">The book</h1>
+            <p className="mt-2 text-sm text-[#5a6062]">
               Every tour, hunt, wedding and stay on the calendar, with the details guests never see.
             </p>
           </div>
           <Link
             href="/red-fern"
-            className="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-[#16281f] ring-1 ring-[#e2d9c6] transition hover:bg-white"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-[#3c4143] ring-1 ring-[#ddd9d3] transition hover:bg-white"
           >
             ← Public page
           </Link>
@@ -115,28 +117,28 @@ export default async function SchedulePage({
             { value: formatMoney(outstanding), label: "Deposits not yet collected" },
             { value: `${daysHeld} of ${monthDays.length}`, label: "Days with something on them" },
           ].map((stat) => (
-            <div key={stat.label} className="rounded-2xl bg-white p-4 ring-1 ring-[#e2d9c6]">
-              <p className="font-serif text-2xl tabular-nums">{stat.value}</p>
-              <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-[#8a7f6c]">
+            <div key={stat.label} className="rounded-2xl bg-white p-4 ring-1 ring-[#ddd9d3]">
+              <p className="rf-display text-2xl tabular-nums">{stat.value}</p>
+              <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-[#7e8385]">
                 {stat.label}
               </p>
             </div>
           ))}
         </section>
 
-        <section className="rounded-2xl bg-white p-4 ring-1 ring-[#e2d9c6] sm:p-6">
+        <section className="rounded-2xl bg-white p-4 ring-1 ring-[#ddd9d3] sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <Link
               href={monthHref(addMonths(month, -1))}
-              className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+              className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
               aria-label="Previous month"
             >
               ‹
             </Link>
-            <h2 className="font-serif text-2xl">{formatMonthLabel(month.slice(0, 7))}</h2>
+            <h2 className="rf-display text-2xl">{formatMonthLabel(month.slice(0, 7))}</h2>
             <Link
               href={monthHref(addMonths(month, 1))}
-              className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-[#e2d9c6] transition hover:bg-[#f1ecdf]"
+              className="flex h-11 w-11 items-center justify-center rounded-full ring-1 ring-[#ddd9d3] transition hover:bg-[#eceae6]"
               aria-label="Next month"
             >
               ›
@@ -149,7 +151,7 @@ export default async function SchedulePage({
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
-                className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-[#a89e8a]"
+                className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-[#9ea3a5]"
               >
                 {day}
               </div>
@@ -164,11 +166,11 @@ export default async function SchedulePage({
                 <div
                   key={date}
                   className={`flex min-h-24 flex-col gap-1 rounded-lg p-1.5 ring-1 ${
-                    isToday ? "bg-[#f3f6f2] ring-[#16281f]" : "bg-[#faf7f0] ring-[#eee7d8]"
+                    isToday ? "bg-[#f1f4f0] ring-[#3c4143]" : "bg-[#f6f4f1] ring-[#e8e5e0]"
                   }`}
                 >
                   <span
-                    className={`text-[11px] ${isToday ? "font-bold text-[#16281f]" : "text-[#a89e8a]"}`}
+                    className={`text-[11px] ${isToday ? "font-bold text-[#3c4143]" : "text-[#9ea3a5]"}`}
                   >
                     {Number(date.slice(8, 10))}
                   </span>
@@ -181,10 +183,10 @@ export default async function SchedulePage({
                         title={`${experience.name} — ${booking.guest_name}`}
                         className={`truncate rounded px-1 py-0.5 text-[10px] leading-tight ${
                           experience.exclusive
-                            ? "bg-[#8c2f22] text-white"
+                            ? "bg-[#8e2b1e] text-white"
                             : experience.category === "hunt"
-                              ? "bg-[#c9a227] text-[#16281f]"
-                              : "bg-[#dce6dc] text-[#16281f]"
+                              ? "bg-[#c07a6c] text-white"
+                              : "bg-[#e0ddd7] text-[#3c4143]"
                         }`}
                       >
                         {booking.guest_name.split(" ").slice(-1)[0]} · {experience.name.split(" ")[0]}
@@ -198,7 +200,7 @@ export default async function SchedulePage({
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#8a7f6c]">
+          <h2 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7e8385]">
             {formatMonthLabel(month.slice(0, 7))} — {inMonth.length} on the book
           </h2>
           {inMonth
@@ -208,22 +210,22 @@ export default async function SchedulePage({
               <BookingRow key={booking.reference} booking={booking} />
             ))}
           {inMonth.length === 0 && (
-            <p className="rounded-2xl bg-white p-6 text-sm text-[#5b5546] ring-1 ring-[#e2d9c6]">
+            <p className="rounded-2xl bg-white p-6 text-sm text-[#5a6062] ring-1 ring-[#ddd9d3]">
               Nothing booked this month.
             </p>
           )}
         </section>
 
-        <section className="rounded-2xl bg-[#16281f] p-5 text-[#f7f3ea] sm:p-6">
-          <h2 className="font-serif text-xl">Put this on your phone</h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#cdd6cd]">
+        <section className="rounded-2xl bg-[#3c4143] p-5 text-[#f4f2ef] sm:p-6">
+          <h2 className="rf-display text-xl">Put this on your phone</h2>
+          <p className="mt-2 text-sm leading-relaxed text-[#d6d3ce]">
             Subscribe once and every booking — including anything taken through the website — shows
             up on your own calendar, names and phone numbers included.
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row">
             <a
               href={feedUrl.replace(/^https?:/, "webcal:")}
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#c9a227] px-4 text-sm font-semibold text-[#16281f] transition hover:brightness-110"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-[#8e2b1e] px-4 text-sm font-semibold text-[#f4f2ef] transition hover:brightness-110"
             >
               Apple Calendar / Outlook
             </a>
@@ -233,15 +235,15 @@ export default async function SchedulePage({
               )}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-4 text-sm font-semibold text-[#f7f3ea] ring-1 ring-[#3c5245] transition hover:bg-[#1f3b2c]"
+              className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl px-4 text-sm font-semibold text-[#f4f2ef] ring-1 ring-[#5b6264] transition hover:bg-[#4d5355]"
             >
               Google Calendar
             </a>
           </div>
-          <p className="mt-3 break-all text-[11px] text-[#8fa294]">{feedUrl}</p>
+          <p className="mt-3 break-all text-[11px] text-[#8b9294]">{feedUrl}</p>
         </section>
 
-        <p className="text-center text-[11px] text-[#a89e8a]">
+        <p className="text-center text-[11px] text-[#9ea3a5]">
           {backend === "supabase"
             ? "Reading from Supabase."
             : "Demo schedule held in memory — bookings taken here last until the server restarts."}
@@ -262,11 +264,11 @@ function BookingRow({ booking }: { booking: Booking }) {
     .filter(Boolean);
 
   return (
-    <article className="rounded-2xl bg-white p-4 ring-1 ring-[#e2d9c6] sm:p-5">
+    <article className="rounded-2xl bg-white p-4 ring-1 ring-[#ddd9d3] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-serif text-lg text-[#16281f]">{experience.name}</h3>
+            <h3 className="rf-display text-lg text-[#3c4143]">{experience.name}</h3>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] ring-1 ${
                 STATUS_TONE[booking.status] ?? STATUS_TONE.hold
@@ -275,23 +277,23 @@ function BookingRow({ booking }: { booking: Booking }) {
               {booking.status}
             </span>
             {experience.exclusive && (
-              <span className="rounded-full bg-[#fdecea] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8c2f22] ring-1 ring-[#f0c3bc]">
+              <span className="rounded-full bg-[#fbeeec] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#8e2b1e] ring-1 ring-[#e8c4bf]">
                 Property closed
               </span>
             )}
           </div>
-          <p className="mt-1 text-sm text-[#5b5546]">
+          <p className="mt-1 text-sm text-[#5a6062]">
             {formatDateSpan(booking.start_date, booking.days)} ·{" "}
             {booking.days > 1 || booking.hours >= 10 ? "all day" : formatTime(booking.start_time)} ·{" "}
             {booking.party_size} {experience.party.label.toLowerCase()}
           </p>
         </div>
         <div className="text-right">
-          <p className="font-serif text-xl tabular-nums text-[#16281f]">
+          <p className="rf-display text-xl tabular-nums text-[#3c4143]">
             {booking.total > 0 ? formatMoney(booking.total) : "No charge"}
           </p>
           {booking.deposit_due > 0 && (
-            <p className="text-[11px] text-[#8a7f6c]">
+            <p className="text-[11px] text-[#7e8385]">
               {formatMoney(booking.deposit_due)} deposit
               {balance > 0 && due ? ` · ${formatMoney(balance)} due ${formatDateFull(due)}` : ""}
             </p>
@@ -299,17 +301,17 @@ function BookingRow({ booking }: { booking: Booking }) {
         </div>
       </div>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-1 border-t border-[#f1ecdf] pt-3 text-sm sm:grid-cols-2">
+      <dl className="mt-3 grid gap-x-6 gap-y-1 border-t border-[#eceae6] pt-3 text-sm sm:grid-cols-2">
         <div className="flex gap-2">
-          <dt className="text-[#8a7f6c]">Guest</dt>
+          <dt className="text-[#7e8385]">Guest</dt>
           <dd className="min-w-0 truncate font-medium">{booking.guest_name}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="text-[#8a7f6c]">Ref</dt>
+          <dt className="text-[#7e8385]">Ref</dt>
           <dd className="font-mono text-xs">{booking.reference}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="text-[#8a7f6c]">Email</dt>
+          <dt className="text-[#7e8385]">Email</dt>
           <dd className="min-w-0 truncate">
             <a className="underline underline-offset-2" href={`mailto:${booking.guest_email}`}>
               {booking.guest_email}
@@ -318,7 +320,7 @@ function BookingRow({ booking }: { booking: Booking }) {
         </div>
         {booking.guest_phone && (
           <div className="flex gap-2">
-            <dt className="text-[#8a7f6c]">Phone</dt>
+            <dt className="text-[#7e8385]">Phone</dt>
             <dd>
               <a className="underline underline-offset-2" href={`tel:${booking.guest_phone}`}>
                 {booking.guest_phone}
@@ -328,14 +330,14 @@ function BookingRow({ booking }: { booking: Booking }) {
         )}
         {addOns.length > 0 && (
           <div className="flex gap-2 sm:col-span-2">
-            <dt className="text-[#8a7f6c]">Added</dt>
+            <dt className="text-[#7e8385]">Added</dt>
             <dd className="min-w-0">{addOns.join(", ")}</dd>
           </div>
         )}
         {booking.notes && (
           <div className="flex gap-2 sm:col-span-2">
-            <dt className="shrink-0 text-[#8a7f6c]">Note</dt>
-            <dd className="min-w-0 text-[#5b5546]">{booking.notes}</dd>
+            <dt className="shrink-0 text-[#7e8385]">Note</dt>
+            <dd className="min-w-0 text-[#5a6062]">{booking.notes}</dd>
           </div>
         )}
       </dl>
@@ -345,16 +347,14 @@ function BookingRow({ booking }: { booking: Booking }) {
 
 function Gate({ wrong }: { wrong: boolean }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#16281f] px-4 py-16 text-[#f7f3ea]">
+    <main className="flex min-h-screen items-center justify-center bg-[#3c4143] px-4 py-16 text-[#f4f2ef]">
       <form
         method="get"
-        className="w-full max-w-sm rounded-2xl bg-[#1f3b2c] p-6 ring-1 ring-[#3c5245]"
+        className="w-full max-w-sm rounded-2xl bg-[#4d5355] p-6 ring-1 ring-[#5b6264]"
       >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#c9a227]">
-          {VENUE.name}
-        </p>
-        <h1 className="mt-2 font-serif text-2xl">The book</h1>
-        <p className="mt-2 text-sm leading-relaxed text-[#cdd6cd]">
+        <RedFernLogo tone="light" size="sm" align="start" />
+        <h1 className="mt-5 rf-display text-2xl">The book</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#d6d3ce]">
           Guest names, phone numbers and balances live behind this. Enter the house code.
         </p>
         <input
@@ -362,24 +362,24 @@ function Gate({ wrong }: { wrong: boolean }) {
           type="password"
           autoFocus
           placeholder="House code"
-          className="mt-5 h-11 w-full rounded-xl bg-[#16281f] px-4 text-sm text-[#f7f3ea] ring-1 ring-[#3c5245] focus:outline-none focus:ring-2 focus:ring-[#c9a227]"
+          className="mt-5 h-11 w-full rounded-xl bg-[#3c4143] px-4 text-sm text-[#f4f2ef] ring-1 ring-[#5b6264] focus:outline-none focus:ring-2 focus:ring-[#cf8577]"
         />
-        {wrong && <p className="mt-2 text-xs text-[#e8a99f]">That&apos;s not it. Try again.</p>}
+        {wrong && <p className="mt-2 text-xs text-[#e5b0a6]">That&apos;s not it. Try again.</p>}
         <button
           type="submit"
-          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#c9a227] px-4 text-sm font-semibold text-[#16281f] transition hover:brightness-110"
+          className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-xl bg-[#8e2b1e] px-4 text-sm font-semibold text-[#f4f2ef] transition hover:brightness-110"
         >
           Open the book
         </button>
         {isDemoCode() && (
-          <p className="mt-4 rounded-xl bg-[#16281f] px-3 py-2.5 text-[11px] leading-relaxed text-[#8fa294]">
-            Demo: the code is <span className="font-mono text-[#c9a227]">redfern</span>. Set
+          <p className="mt-4 rounded-xl bg-[#3c4143] px-3 py-2.5 text-[11px] leading-relaxed text-[#8b9294]">
+            Demo: the code is <span className="font-mono text-[#cf8577]">redfern</span>. Set
             RED_FERN_SCHEDULE_CODE to change it.
           </p>
         )}
         <Link
           href="/red-fern"
-          className="mt-4 block text-center text-xs text-[#8fa294] underline underline-offset-4"
+          className="mt-4 block text-center text-xs text-[#8b9294] underline underline-offset-4"
         >
           Back to the public page
         </Link>

@@ -170,3 +170,15 @@
     transform: scaleX(1);
   }
 }
+/* Red Fern Plantation (/red-fern): the gate sign is set in an inscriptional
+   Roman capital, so the wordmark uses Cinzel and headings use Cormorant
+   Garamond. Both are loaded by app/red-fern/layout.tsx. */
+.rf-wordmark {
+  font-family: var(--font-cinzel), 'Times New Roman', serif;
+  font-weight: 500;
+}
+
+.rf-display {
+  font-family: var(--font-cormorant), Georgia, serif;
+  font-weight: 400;
+}
