@@ -32,6 +32,7 @@ export const metadata: Metadata = {
   title: "Red Fern Plantation — Weddings, Hunts & Events in Valdosta, Georgia",
   description:
     "1,800 acres in South Georgia: weddings under the live oaks, guided duck and quail hunts, corporate retreats, and a lodge that sleeps sixteen. Check open dates and book online.",
+  robots: { index: false, follow: false, nocache: true, noarchive: true, nosnippet: true },
 };
 
 const GALLERY = [

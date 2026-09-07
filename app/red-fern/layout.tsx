@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Cinzel, Cormorant_Garamond } from "next/font/google";
 
 /**
@@ -24,6 +25,14 @@ const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
   display: "swap",
 });
+
+/**
+ * Nothing in this section should turn up in a search result: it's a private
+ * demo behind a house code. Pages inherit this unless they say otherwise.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, nocache: true, noarchive: true, nosnippet: true },
+};
 
 export default function RedFernLayout({ children }: { children: React.ReactNode }) {
   return <div className={`${cinzel.variable} ${cormorant.variable}`}>{children}</div>;
