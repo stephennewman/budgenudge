@@ -62,7 +62,7 @@ const FAQS = [
   {
     question: "What happens if it rains?",
     answer:
-      "The pavilion is 3,000 square feet, heated and cooled, and seats 250 with room for a dance floor. Every ceremony has a covered plan B that doesn't cost extra.",
+      "The pavilion is heated and cooled and seats 250 with room for a dance floor. Every ceremony has a covered plan B that doesn't cost extra.",
   },
   {
     question: "Do we need a hunting license?",
@@ -109,8 +109,8 @@ export default async function RedFernPage() {
             {VENUE.city}, {VENUE.state} · {VENUE.acreage.toLocaleString()} acres
           </p>
           <p className="mt-5 max-w-xl text-base leading-relaxed text-[#e2e0dc] sm:text-lg">
-            Weddings under the live oaks. Ducks at first light. A 3,000 square-foot pavilion, a
-            lodge that sleeps sixteen, and 1,800 acres of South Georgia between them.
+            Weddings under the live oaks. Ducks at first light. A covered pavilion, a lodge that
+            sleeps sixteen, and 1,800 acres of South Georgia between them.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <a
@@ -132,7 +132,7 @@ export default async function RedFernPage() {
       <section className="border-y border-[#ddd9d3] bg-[#fbfaf8]">
         <dl className="mx-auto grid max-w-6xl grid-cols-2 gap-y-6 px-4 py-8 sm:px-6 lg:grid-cols-4">
           {[
-            { value: "3,000 sq ft", label: "Heated & cooled pavilion" },
+            { value: "Year-round", label: "Heated & cooled pavilion" },
             { value: "Sleeps 16", label: "Lodge on the pond" },
             { value: "1,800 acres", label: "Impoundments, longleaf & clays" },
             { value: "250 guests", label: "Seated, with a dance floor" },

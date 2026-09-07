@@ -24,7 +24,7 @@ export const VENUE = {
   latitude: 30.7749,
   longitude: -83.3088,
   acreage: 1_800,
-  pavilionSquareFeet: 3_000,
+  pavilionSeats: 250,
   lodgeSleeps: 16,
   /** Lowndes County, GA combined sales tax. */
   taxRate: 0.08,
@@ -202,7 +202,7 @@ export const EXPERIENCES: Experience[] = [
     depositRate: 0,
     balanceDueDays: 0,
     includes: [
-      "Walk-through of the 3,000 sq ft pavilion and covered porch",
+      "Walk-through of the pavilion and covered porch",
       "Ceremony lawn, bridal suite and lodge",
       "Ride out to the duck impoundments and quail course",
       "Rate sheet and preferred vendor list to take home",
@@ -382,7 +382,7 @@ export const EXPERIENCES: Experience[] = [
     category: "event",
     tagline: "The whole plantation, yours from Friday to Sunday",
     description:
-      "Ceremony under the live oaks, cocktails on the covered porch, dinner and dancing in the 3,000 sq ft pavilion. The rate closes the property — no hunts, no tours, nobody else on the place while you're here.",
+      "Ceremony under the live oaks, cocktails on the covered porch, dinner and dancing in the pavilion. The rate closes the property — no hunts, no tours, nobody else on the place while you're here.",
     image:
       "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=70",
     resource: "property",
@@ -424,7 +424,7 @@ export const EXPERIENCES: Experience[] = [
     depositRate: 0.25,
     balanceDueDays: 30,
     includes: [
-      "3,000 sq ft pavilion with chandeliers, heat and air",
+      "Pavilion with chandeliers, heat and air",
       "Ceremony lawn, arbor and 250 white folding chairs",
       "Farm tables, china and glassware for 150",
       "Bridal suite and grooms' cabin from 10:00 AM",
