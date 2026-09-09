@@ -74,7 +74,6 @@ export interface SparkIdea {
 
 function demoIdea(
   person: Person,
-  categoryName: string,
   level: number,
   tag: string,
   avoid: string[]
@@ -134,7 +133,7 @@ function demoIdea(
   return {
     level,
     tag,
-    title: `${pick.title} · ${categoryName}`,
+    title: pick.title,
     body: pick.body,
   };
 }
@@ -185,7 +184,7 @@ export async function POST(req: Request) {
     // Local/dev without a key: still return a real-shaped idea so the page
     // can be clicked through (spice, category, generate, flip).
     return NextResponse.json({
-      idea: demoIdea(person, category.name, level, tag.id, avoid),
+      idea: demoIdea(person, level, tag.id, avoid),
     });
   }
 

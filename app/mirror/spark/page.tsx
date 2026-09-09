@@ -4,8 +4,8 @@
 //
 // Locked state: a card that looks stuck loading. Tap it to open one sexy
 // challenge for Whitney. Unlocked: that single challenge (spice, category,
-// action tag), a button that steps up a spice level and deals a new
-// category, and a flip to Stephen's challenges.
+// action tag). Generate and refresh step X→XX→XXX→XXXX→X with a new
+// category each time. Flip switches to Stephen's cycle.
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -36,6 +36,38 @@ function pickCategory(excludeId?: string | null): SparkCategory {
     ? CATEGORIES.filter((c) => c.id !== excludeId)
     : CATEGORIES;
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+const nextSpice = (current: number) => (current % 4) + 1;
+
+type CycleState = { level: number; categoryId: string | null };
+
+const cycleKey = (p: Person) => `spark.cycle.v1.${p}`;
+
+function readCycle(p: Person): CycleState {
+  try {
+    const raw = localStorage.getItem(cycleKey(p));
+    if (!raw) return { level: 0, categoryId: null };
+    const parsed = JSON.parse(raw) as CycleState;
+    const level =
+      typeof parsed.level === "number" && parsed.level >= 1 && parsed.level <= 4
+        ? parsed.level
+        : 0;
+    return {
+      level,
+      categoryId: typeof parsed.categoryId === "string" ? parsed.categoryId : null,
+    };
+  } catch {
+    return { level: 0, categoryId: null };
+  }
+}
+
+function writeCycle(p: Person, level: number, categoryId: string | null) {
+  try {
+    localStorage.setItem(cycleKey(p), JSON.stringify({ level, categoryId }));
+  } catch {
+    // Storage full/unavailable: cycle still works in-session.
+  }
 }
 
 const PINK = "#ec4899";
@@ -149,6 +181,7 @@ function Spark() {
           ...recentRef.current,
         ].filter(Boolean).slice(0, 12);
         setIdea(next);
+        writeCycle(forPerson, nextLevel, nextCategory.id);
         touch();
       } catch (err) {
         const aborted =
@@ -165,8 +198,9 @@ function Spark() {
 
   useEffect(() => {
     if (!unlocked) return;
-    void generate(person, 1);
-    // First unlock and each person flip start a Warm challenge.
+    const saved = readCycle(person);
+    void generate(person, nextSpice(saved.level), saved.categoryId);
+    // Unlock, flip, and refresh continue the X→XXXX→X cycle with a new category.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unlocked, person]);
 
@@ -180,14 +214,13 @@ function Spark() {
   };
 
   const generateNext = () => {
-    void generate(person, Math.min(level + 1, 4), category?.id);
+    void generate(person, nextSpice(level), category?.id);
   };
 
   const flipPerson = () => {
     const next: Person = person === "whitney" ? "stephen" : "whitney";
     setIdea(null);
     setCategory(null);
-    setLevel(1);
     setPerson(next);
     router.replace(`/mirror/spark?p=${next}`, { scroll: false });
   };
@@ -262,7 +295,7 @@ function Spark() {
               ) : idea ? (
                 <>
                   {idea.title && (
-                    <h2 className="mb-3 text-2xl font-semibold tracking-tight md:text-3xl" style={{ color: accent }}>
+                    <h2 className="mb-3 text-xl font-semibold tracking-tight text-white md:text-2xl">
                       {idea.title}
                     </h2>
                   )}
@@ -323,25 +356,32 @@ function ChallengeLabels({
 }) {
   const i = Math.min(3, Math.max(0, level - 1));
   return (
-    <div className="mb-5 flex flex-wrap items-center gap-2">
-      <span
-        className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider"
-        style={{ borderColor: `${accent}66`, color: accent }}
-      >
-        <span>{LEVEL_BADGES[i]}</span>
-        <span>
-          {LEVEL_MARKS[i]} · {LEVEL_NAMES[i]}
+    <div className="mb-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider"
+          style={{ borderColor: `${accent}66`, color: accent }}
+        >
+          <span>{LEVEL_BADGES[i]}</span>
+          <span>
+            {LEVEL_MARKS[i]} · {LEVEL_NAMES[i]}
+          </span>
         </span>
-      </span>
+        {tag && (
+          <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
+            {tag}
+          </span>
+        )}
+      </div>
       {category && (
-        <span className="rounded-full border border-white/15 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-300">
-          {category.name}
-        </span>
-      )}
-      {tag && (
-        <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-neutral-500">
-          {tag}
-        </span>
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-neutral-500">
+            Random category
+          </p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl" style={{ color: accent }}>
+            {category.name}
+          </p>
+        </div>
       )}
     </div>
   );
