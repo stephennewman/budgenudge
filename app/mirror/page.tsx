@@ -20,6 +20,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/utils/styles";
 import { createSupabaseClient } from "@/utils/supabase/client";
+import { addressAll } from "@/utils/mirror/address";
 import { CONNECTION_PROMPTS } from "@/utils/mirror/connection-prompts";
 import { FAMILY_PROMPTS } from "@/utils/mirror/family-prompts";
 import { LOVE_QUOTES, MARRIAGE_TIPS } from "@/utils/mirror/love-content";
@@ -408,7 +409,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 // Default how long each channel stays on screen before auto-advancing.
 // Channels that cycle cards (1-up love/family/etc., deals panes) override
 // this with one full inner-cycle duration so the section doesn't swipe
-// away mid-card (e.g. 3 cards × 10s = 30s).
+// away mid-card (e.g. 3 cards × 12s = 36s).
 const ROTATE_MS = 30000;
 
 // Sensible default width for each widget based on how much it shows.
@@ -1827,7 +1828,7 @@ export default function MirrorPage() {
   // reading an article.
   //
   // When the active channel reports an inner card/pane cycle length, dwell
-  // is that full pass (3×10s cards → 30s) instead of the default 30s — so
+  // is that full pass (3×12s cards → 36s) instead of the default 30s — so
   // the section never swipes away mid-card. Taps don't restart that dwell;
   // restarting would desync from the card timer that's already running.
   //
@@ -2725,15 +2726,18 @@ const CARDS_VIEW_PREFIX = "mirror.cards.view.";
 // How long the 1-up view lingers on each card: driven by how long a normal
 // person needs to read it (~200 wpm), plus a beat to settle, clamped so very
 // short cards don't flash by and very long ones don't stall the rotation.
+// Then doubled — the original beat felt rushed on the bathroom iPad.
 const CARD_READ_WPM = 200;
 const CARD_READ_BASE_MS = 3000;
 const CARD_READ_MIN_MS = 6000;
 const CARD_READ_MAX_MS = 30000;
+const CARD_READ_TIME_SCALE = 2;
 
 function cardReadMs(text: string, footnote?: string | null): number {
   const words = `${text} ${footnote ?? ""}`.trim().split(/\s+/).filter(Boolean).length;
   const ms = CARD_READ_BASE_MS + words * (60_000 / CARD_READ_WPM);
-  return Math.min(CARD_READ_MAX_MS, Math.max(CARD_READ_MIN_MS, Math.round(ms)));
+  const linger = Math.min(CARD_READ_MAX_MS, Math.max(CARD_READ_MIN_MS, Math.round(ms)));
+  return linger * CARD_READ_TIME_SCALE;
 }
 
 const VIEW_LABEL: Record<CardView, string> = {
@@ -2833,7 +2837,7 @@ function channelCards(
           chip: "bg-slate-400/25 text-slate-100",
           tint: "rgba(100,116,139,0.18)",
           icon: Mountain,
-          variants: asVariants(STEPHEN_GROWTH),
+          variants: asVariants(addressAll("stephen", STEPHEN_GROWTH)),
         },
         {
           id: "stephen-connect",
@@ -2841,7 +2845,7 @@ function channelCards(
           chip: "bg-rose-400/25 text-rose-200",
           tint: "rgba(244,114,182,0.16)",
           icon: HeartHandshake,
-          variants: asVariants(STEPHEN_CONNECT),
+          variants: asVariants(addressAll("stephen", STEPHEN_CONNECT)),
         },
         sparkCard(channel),
       ];
@@ -2853,7 +2857,7 @@ function channelCards(
           chip: "bg-pink-400/25 text-pink-200",
           tint: "rgba(244,114,182,0.16)",
           icon: Flower2,
-          variants: asVariants(WHITNEY_GROWTH),
+          variants: asVariants(addressAll("whitney", WHITNEY_GROWTH)),
         },
         {
           id: "whitney-connect",
@@ -2861,7 +2865,7 @@ function channelCards(
           chip: "bg-amber-400/25 text-amber-100",
           tint: "rgba(251,191,36,0.16)",
           icon: Heart,
-          variants: asVariants(WHITNEY_CONNECT),
+          variants: asVariants(addressAll("whitney", WHITNEY_CONNECT)),
         },
         sparkCard(channel),
       ];
@@ -2873,7 +2877,7 @@ function channelCards(
           chip: "bg-rose-400/25 text-rose-200",
           tint: "rgba(244,114,182,0.18)",
           icon: Heart,
-          variants: asVariants(CONNECTION_PROMPTS),
+          variants: asVariants(addressAll("both", CONNECTION_PROMPTS)),
         },
         {
           id: "love-marriage",
@@ -2881,7 +2885,7 @@ function channelCards(
           chip: "bg-pink-400/25 text-pink-200",
           tint: "rgba(244,114,182,0.14)",
           icon: HeartHandshake,
-          variants: asVariants(MARRIAGE_TIPS),
+          variants: asVariants(addressAll("both", MARRIAGE_TIPS)),
         },
         {
           id: "love-quote",

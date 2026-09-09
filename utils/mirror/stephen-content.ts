@@ -1,3 +1,5 @@
+import { addressAs } from "./address";
+
 // Daily content for the "For Stephen" channel.
 //
 // Authored, rotating prompts for a 42-year-old husband and father of three
@@ -77,9 +79,9 @@ export const STEPHEN_CONNECT: string[] = [
 ];
 
 export function stephenGrowthForDate(date = new Date()): string {
-  return STEPHEN_GROWTH[dayOfYear(date) % STEPHEN_GROWTH.length];
+  return addressAs("stephen", STEPHEN_GROWTH[dayOfYear(date) % STEPHEN_GROWTH.length]);
 }
 
 export function stephenConnectForDate(date = new Date()): string {
-  return STEPHEN_CONNECT[dayOfYear(date) % STEPHEN_CONNECT.length];
+  return addressAs("stephen", STEPHEN_CONNECT[dayOfYear(date) % STEPHEN_CONNECT.length]);
 }

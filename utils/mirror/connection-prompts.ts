@@ -1,3 +1,5 @@
+import { addressAs } from "./address";
+
 // Daily connection challenges for the shared bathroom dashboard.
 //
 // There's no good free API for couple-connection prompts, so this is authored
@@ -43,5 +45,8 @@ export function challengeForDate(date = new Date()): string {
   const dayOfYear = Math.floor(
     (date.getTime() - start.getTime()) / 86_400_000
   );
-  return CONNECTION_PROMPTS[dayOfYear % CONNECTION_PROMPTS.length];
+  return addressAs(
+    "both",
+    CONNECTION_PROMPTS[dayOfYear % CONNECTION_PROMPTS.length]
+  );
 }

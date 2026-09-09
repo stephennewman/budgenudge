@@ -1,3 +1,5 @@
+import { addressAs } from "./address";
+
 // Daily love / marriage content for the Love channel.
 //
 // Authored, rotating content (same approach as connection-prompts). The daily
@@ -80,5 +82,5 @@ export function loveQuoteForDate(date = new Date()): { text: string; author: str
 }
 
 export function marriageTipForDate(date = new Date()): string {
-  return MARRIAGE_TIPS[dayOfYear(date) % MARRIAGE_TIPS.length];
+  return addressAs("both", MARRIAGE_TIPS[dayOfYear(date) % MARRIAGE_TIPS.length]);
 }

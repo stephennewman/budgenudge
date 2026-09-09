@@ -72,6 +72,73 @@ export interface SparkIdea {
   body: string;
 }
 
+function demoIdea(
+  person: Person,
+  categoryName: string,
+  level: number,
+  tag: string,
+  avoid: string[]
+): SparkIdea {
+  const partner = person === "stephen" ? "Whitney" : "Stephen";
+  const you = person === "stephen" ? "Stephen" : "Whitney";
+  const pool = [
+    {
+      title: "After bedtime",
+      body: `Wait until the house is quiet, then text ${partner} exactly: "Kids are down. Come find me." Don't say anything else.`,
+    },
+    {
+      title: "Hallway pass",
+      body: `Catch ${partner} in the hallway tonight and whisper one filthy sentence about what you want later. Then walk away.`,
+    },
+    {
+      title: "No talking",
+      body: `For ten minutes, ${you} leads and neither of you speaks. Hands only. If they talk, start the clock over.`,
+    },
+    {
+      title: "Stolen minute",
+      body: `Pull ${partner} into the bathroom, lock the door, and kiss like you have sixty seconds before someone knocks.`,
+    },
+    {
+      title: "Voice note",
+      body: `Record a 20-second voice note for ${partner} describing exactly where you want their hands tonight. Send it. No follow-up text.`,
+    },
+    {
+      title: "Lights low",
+      body: `Dim the bedroom, sit ${partner} down, and undress for them slowly. They don't get to touch until you say so.`,
+    },
+    {
+      title: "The dare",
+      body: `Dare ${partner} to start something before the next show of the night ends. If they chicken out, you take over.`,
+    },
+    {
+      title: "Mirror check",
+      body: `Get ${partner} in front of the bathroom mirror. Tell them what you see. Then show them.`,
+    },
+  ];
+  const used = avoid.map((s) => s.toLowerCase());
+  const unused = pool.filter((p) => {
+    const title = p.title.toLowerCase();
+    const body = p.body.toLowerCase();
+    return !used.some(
+      (u) =>
+        title === u ||
+        body.startsWith(u) ||
+        u.startsWith(title) ||
+        body.includes(u) ||
+        u.includes(title)
+    );
+  });
+  const pick =
+    unused[Math.floor(Math.random() * unused.length)] ??
+    pool[(avoid.length + level) % pool.length];
+  return {
+    level,
+    tag,
+    title: `${pick.title} · ${categoryName}`,
+    body: pick.body,
+  };
+}
+
 function parseIdea(raw: string, level: number, tag: string): SparkIdea {
   // Models sometimes wrap JSON in fences or preamble; extract the object.
   const start = raw.indexOf("{");
@@ -111,12 +178,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Bad request" }, { status: 400 });
   }
 
+  const avoid = Array.isArray(body.avoid) ? body.avoid.slice(0, 12).map(String) : [];
+
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "Generator not configured" }, { status: 503 });
+    // Local/dev without a key: still return a real-shaped idea so the page
+    // can be clicked through (spice, category, generate, flip).
+    return NextResponse.json({
+      idea: demoIdea(person, category.name, level, tag.id, avoid),
+    });
   }
-
-  const avoid = Array.isArray(body.avoid) ? body.avoid.slice(0, 12).map(String) : [];
 
   try {
     const client = new OpenAI({ apiKey, baseURL: "https://openrouter.ai/api/v1" });

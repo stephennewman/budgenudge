@@ -1,3 +1,5 @@
+import { addressAs } from "./address";
+
 // Daily content for the "For Whitney" channel.
 //
 // Authored, rotating prompts for a 39-year-old wife and mother of three girls.
@@ -77,9 +79,9 @@ export const WHITNEY_CONNECT: string[] = [
 ];
 
 export function whitneyGrowthForDate(date = new Date()): string {
-  return WHITNEY_GROWTH[dayOfYear(date) % WHITNEY_GROWTH.length];
+  return addressAs("whitney", WHITNEY_GROWTH[dayOfYear(date) % WHITNEY_GROWTH.length]);
 }
 
 export function whitneyConnectForDate(date = new Date()): string {
-  return WHITNEY_CONNECT[dayOfYear(date) % WHITNEY_CONNECT.length];
+  return addressAs("whitney", WHITNEY_CONNECT[dayOfYear(date) % WHITNEY_CONNECT.length]);
 }
