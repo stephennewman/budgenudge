@@ -152,6 +152,7 @@ function Spark() {
       abortRef.current = ctrl;
       const nextCategory = pickCategory(excludeCategoryId);
       const tag = ACTION_TAGS[Math.floor(Math.random() * ACTION_TAGS.length)];
+      setIdea(null);
       setLevel(nextLevel);
       setCategory(nextCategory);
       setLoading(true);
@@ -284,16 +285,16 @@ function Spark() {
                 boxShadow: `0 0 48px ${accent}18`,
               }}
             >
-              <ChallengeLabels
-                level={level}
-                category={category}
-                tag={idea?.tag}
-                accent={accent}
-              />
-              {loading && !idea ? (
+              {loading ? (
                 <LoadingState line={LOADING_LINES[loadingLine]} accent={accent} />
               ) : idea ? (
                 <>
+                  <ChallengeLabels
+                    level={level}
+                    category={category}
+                    tag={idea.tag}
+                    accent={accent}
+                  />
                   {idea.title && (
                     <h2 className="mb-3 text-xl font-semibold tracking-tight text-white md:text-2xl">
                       {idea.title}
@@ -302,9 +303,6 @@ function Spark() {
                   <p className="text-lg font-light leading-relaxed text-neutral-200 md:text-xl">
                     {idea.body}
                   </p>
-                  {loading && (
-                    <p className="mt-6 text-sm text-neutral-500">{LOADING_LINES[loadingLine]}</p>
-                  )}
                 </>
               ) : (
                 <LoadingState line={error ?? LOADING_LINES[loadingLine]} accent={accent} />
@@ -389,9 +387,21 @@ function ChallengeLabels({
 
 function LoadingState({ line, accent }: { line: string; accent: string }) {
   return (
-    <div className="flex flex-col items-center py-8 text-center">
-      <Flame className="mb-5 h-10 w-10 animate-pulse" style={{ color: accent }} />
-      <p className="text-lg font-light text-neutral-300">{line}</p>
+    <div className="flex min-h-[220px] flex-col items-center justify-center py-10 text-center md:min-h-[280px]">
+      <Flame className="mb-6 h-16 w-16 animate-pulse md:h-20 md:w-20" style={{ color: accent }} />
+      <p className="max-w-md text-2xl font-light leading-snug text-white md:text-3xl">{line}</p>
+      <div className="mt-8 h-1.5 w-48 overflow-hidden rounded-full bg-white/10 md:w-64">
+        <div
+          className="h-full w-1/3 animate-[spark-load_1.1s_ease-in-out_infinite] rounded-full"
+          style={{ background: accent }}
+        />
+      </div>
+      <style jsx global>{`
+        @keyframes spark-load {
+          0% { transform: translateX(-120%); }
+          100% { transform: translateX(360%); }
+        }
+      `}</style>
     </div>
   );
 }
