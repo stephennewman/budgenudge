@@ -3222,7 +3222,7 @@ function ChecklistChannel({
   const hiddenCount = items.length - visibleItems.length;
   const canRegenerate = items.some((it) => it.variants.length > 1);
 
-  // The personal channels carry a quiet doorway to /mirror/extra-fun.
+  // The personal channels carry a doorway to /mirror/extra-fun in their menu.
   const hasExtraFun = channel === "stephen" || channel === "whitney";
 
   // Section menu: restore hidden cards / refresh every card's content.
@@ -3404,15 +3404,6 @@ function ChecklistChannel({
           renderCard(item, { height: "calc(50% - 6px)" }, "shrink-0 snap-start")
         )}
       </div>
-    )}
-    {hasExtraFun && (
-      <a
-        href="/mirror/extra-fun"
-        aria-label="Unlock today's challenge"
-        className="absolute bottom-2 right-2 z-10 flex h-10 w-10 items-center justify-center rounded-full text-orange-300/80 transition hover:bg-white/10 hover:text-orange-300"
-      >
-        <Flame className="h-5 w-5" />
-      </a>
     )}
     </div>
   );
