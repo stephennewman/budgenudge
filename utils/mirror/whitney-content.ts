@@ -5,7 +5,8 @@ import { addressAs } from "./address";
 // Authored, rotating prompts for a 39-year-old wife and mother of three girls.
 // GROWTH items focus on rest, warmth, play, and caring for herself; CONNECT
 // items focus on inviting and appreciating her husband's steadiness so they
-// work as a team. Tone is warm and practical — no jargon.
+// work as a team; MOM items focus on how she shows up for her daughters.
+// Tone is warm and practical — no jargon.
 
 function dayOfYear(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 0);
@@ -76,6 +77,39 @@ export const WHITNEY_CONNECT: string[] = [
   "Let him take care of you today and resist the urge to manage it.",
   "Reconnect at the end of the day — eyes up, phones down, just you two.",
   "Remind him you're in his corner. Steady support brings out his best.",
+];
+
+export const WHITNEY_MOM: string[] = [
+  "Let them see you rest. Girls learn from their mom that worth isn't measured in busyness.",
+  "Say one kind thing about your own body out loud today. They're listening.",
+  "Pick one daughter for a few minutes of undivided attention. Small and specific beats big and rare.",
+  "Let the mess wait and join the play. They'll remember the laugh, not the counter.",
+  "Praise her courage, curiosity, or kindness — not just her sweetness or looks.",
+  "Apologize when you snap. You're teaching them repair, which matters more than never slipping.",
+  "Ask 'What do you think?' and let her answer stand. Her voice grows when it's welcomed.",
+  "Let a small imperfection go — the hair, the outfit, the wobbly craft. Good enough is a gift.",
+  "Tell a story about a time you were scared and did it anyway.",
+  "Let Stephen handle the bath or bedtime his way. They gain a confident dad; you gain a breath.",
+  "Name a feeling for her when she's flooded: 'You're frustrated.' Words shrink big waves.",
+  "Dance in the kitchen. Silliness from Mom tells them joy is allowed at home.",
+  "Say no to one extra so there's room for the ordinary moments — those are the ones that stick.",
+  "Show them a friendship in action — call a friend where they can hear the warmth.",
+  "Let her struggle with the zipper, the puzzle, the problem. Capable girls are made by patient moms.",
+  "Tell each girl one thing you love about who she is, not what she does.",
+  "Take the photo, then put the phone away. Be in the moment more than you capture it.",
+  "Watch the way you talk about other women. They're learning what's normal.",
+  "When she's rude, get curious before you get stern. Behavior is usually a signal.",
+  "Make one everyday moment cozy — a candle at dinner, a blanket fort, music while cleaning up.",
+  "Read something together, even for five minutes. Shared stories build shared language.",
+  "Let them see you receive help and say thank you. Strong women accept support too.",
+  "Ask her what she's proud of this week. Self-recognition is a muscle.",
+  "Hold the boundary with a soft voice. Kind and firm can happen at the same time.",
+  "Give an extra-long hug at the door. They carry that steadiness into their day.",
+  "Skip the comparison scroll today. Your girls need you, not a curated version of you.",
+  "Teach one kitchen or life skill together. Competence is confidence, for both of you.",
+  "Speak up when you hear 'I'm bad at this.' Replace it with 'I'm still learning.'",
+  "Let them see you and Stephen make up after a disagreement. Repair is the lesson.",
+  "You don't have to be everything to them. Be present, be warm, be you — that's enough.",
 ];
 
 export function whitneyGrowthForDate(date = new Date()): string {

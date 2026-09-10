@@ -37,8 +37,16 @@ import {
 import { HoneyDoCard } from "./honeydo-card";
 import { SparkTeaser } from "./spark/teaser";
 import { TodayChannel } from "./today-channel";
-import { STEPHEN_GROWTH, STEPHEN_CONNECT } from "@/utils/mirror/stephen-content";
-import { WHITNEY_GROWTH, WHITNEY_CONNECT } from "@/utils/mirror/whitney-content";
+import {
+  STEPHEN_GROWTH,
+  STEPHEN_CONNECT,
+  STEPHEN_DAD,
+} from "@/utils/mirror/stephen-content";
+import {
+  WHITNEY_GROWTH,
+  WHITNEY_CONNECT,
+  WHITNEY_MOM,
+} from "@/utils/mirror/whitney-content";
 import {
   Baby,
   BookOpen,
@@ -57,6 +65,7 @@ import {
   CloudSnow,
   CloudSun,
   Cloudy,
+  Crown,
   Droplets,
   Eye,
   EyeOff,
@@ -73,6 +82,7 @@ import {
   LayoutGrid,
   Lightbulb,
   ListChecks,
+  Loader2,
   Maximize,
   Minimize,
   MapPin,
@@ -96,6 +106,7 @@ import {
   TrendingDown,
   TrendingUp,
   Search,
+  Shield,
   Film,
   Snowflake,
   Sun,
@@ -321,6 +332,18 @@ function clampRailWidth(w: number): number {
   return Math.min(max, Math.max(RAIL_MIN_WIDTH, Math.round(w)));
 }
 
+// Dragging the divider scales the main column and the rail with their width
+// (CSS `zoom`), so text and spacing shrink or grow instead of just being
+// cropped. Both columns are at zoom 1 when the rail sits at its default
+// width, so the default layout is unchanged.
+const COLUMN_ZOOM_MIN = 0.5;
+const COLUMN_ZOOM_MAX = 2;
+
+function clampZoom(z: number): number {
+  if (!Number.isFinite(z) || z <= 0) return 1;
+  return Math.min(COLUMN_ZOOM_MAX, Math.max(COLUMN_ZOOM_MIN, z));
+}
+
 // Sidebar display mode: full labels, icon-only rail, or fully hidden.
 type NavMode = "full" | "icons" | "hidden";
 const NAV_MODE_KEY = "mirror.nav.mode";
@@ -363,6 +386,10 @@ const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
     label: "For Stephen",
     ids: ["stephengrowth", "stephenconnect"],
   },
+  // Spark's doorway: a channel that looks stuck loading, sitting between the
+  // two personal channels. It has no widgets; `sections` keeps it anyway,
+  // and the sidebar nav skips it.
+  { id: "spark", label: "Loading", ids: [] },
   {
     id: "whitney",
     label: "For Whitney",
@@ -404,6 +431,7 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   faith: Church,
   stephen: Mountain,
   whitney: Flower2,
+  spark: Loader2,
 };
 
 // Default how long each channel stays on screen before auto-advancing.
@@ -702,6 +730,38 @@ export default function MirrorPage() {
     setRailWidth(w);
     writeJSON(RAIL_WIDTH_KEY, w);
   }, []);
+
+  // Column zoom (see COLUMN_ZOOM_*). The main column is measured unzoomed
+  // (zoom is applied to a wrapper inside it) so the observer doesn't feed
+  // back on itself. Below the `sm` breakpoint the rail and divider are
+  // hidden, so neither column scales there.
+  const mainRef = useRef<HTMLElement>(null);
+  const [mainWidth, setMainWidth] = useState<number | null>(null);
+  const [railVisible, setRailVisible] = useState(false);
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      setMainWidth(entry.contentRect.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 640px)");
+    const update = () => setRailVisible(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const railZoom = railVisible ? clampZoom(railWidth / RAIL_DEFAULT_WIDTH) : 1;
+  // Main width if the rail were at its default: that's the zoom-1 baseline.
+  const mainBaseline =
+    mainWidth !== null ? mainWidth + railWidth - RAIL_DEFAULT_WIDTH : null;
+  const mainZoom =
+    railVisible && mainWidth !== null && mainBaseline !== null && mainBaseline > 0
+      ? clampZoom(mainWidth / mainBaseline)
+      : 1;
 
   // Load saved customization once on mount.
   useEffect(() => {
@@ -1780,7 +1840,8 @@ export default function MirrorPage() {
 
   // Group visible widgets into channels. Empty channels are dropped, except
   // Money — it stays in the nav even before finance data loads (or if this
-  // display isn't connected), so it doesn't vanish from the lineup.
+  // display isn't connected), so it doesn't vanish from the lineup — and
+  // Spark, which has no widgets by design.
   const sections = useMemo(() => {
     return [
       { id: "today", label: "News", widgets: [] as WidgetDef[] },
@@ -1788,7 +1849,9 @@ export default function MirrorPage() {
         id: c.id,
         label: c.label,
         widgets: visibleWidgets.filter((w) => c.ids.includes(w.id)),
-      })).filter((s) => s.widgets.length > 0 || s.id === "money"),
+      })).filter(
+        (s) => s.widgets.length > 0 || s.id === "money" || s.id === "spark"
+      ),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedWidgets, hidden]);
@@ -1940,6 +2003,9 @@ export default function MirrorPage() {
             )}
           >
             {sections.map((s, i) => {
+              // Spark stays in the rotation but not in the nav; the index
+              // still comes from the full `sections` array so goTo lines up.
+              if (s.id === "spark") return null;
               const Icon = NAV_ICONS[s.id] ?? LayoutGrid;
               return (
                 <button
@@ -2097,8 +2163,16 @@ export default function MirrorPage() {
         </aside>
         )}
 
-        {/* Main content area */}
-        <main className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* Main content area. The inner wrapper carries the width-driven zoom
+            (padding and gaps included) so <main> itself can be measured. */}
+        <main
+          ref={mainRef}
+          className="flex min-w-0 flex-1 flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-3 p-3"
+          style={{ zoom: mainZoom }}
+        >
         {/* Location search panel */}
         {showSearch && (
           <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
@@ -2249,6 +2323,12 @@ export default function MirrorPage() {
               headerExtra={fullscreenControl}
               onDwellMs={handleChannelDwell}
             />
+          ) : activeSection.id === "spark" ? (
+            <SparkChannel
+              key="spark"
+              headerExtra={fullscreenControl}
+              onDwellMs={handleChannelDwell}
+            />
           ) : activeSection.id === "money" && activeSection.widgets.length === 0 ? (
             <section key="money" className="flex min-h-0 flex-1 flex-col gap-2">
               <SectionHeader
@@ -2349,6 +2429,7 @@ export default function MirrorPage() {
               </DndContext>
             </section>
           ))}
+        </div>
         </main>
 
         {/* Draggable divider: resize the right rail (double-tap to reset). */}
@@ -2368,6 +2449,7 @@ export default function MirrorPage() {
             narrow screens so it never crowds the main content. */}
         <RightRail
           width={railWidth}
+          zoom={railZoom}
           current={current}
           currentInfo={currentInfo}
           data={data}
@@ -2396,6 +2478,7 @@ export default function MirrorPage() {
 
 function RightRail({
   width,
+  zoom,
   current,
   currentInfo,
   data,
@@ -2408,7 +2491,9 @@ function RightRail({
   dayPct,
   onClockClick,
 }: {
+  // Physical (unzoomed) width in px, and the zoom to render at.
   width: number;
+  zoom: number;
   current: NonNullable<WeatherData["current"]> | undefined;
   currentInfo: { label: string; Icon: LucideIcon } | null;
   data: WeatherData | null;
@@ -2489,7 +2574,9 @@ function RightRail({
   return (
     <aside
       className="hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      style={{ width }}
+      // Zoomed lengths are multiplied by `zoom`, so divide the width out to
+      // keep the rail's on-screen footprint equal to the dragged width.
+      style={{ width: width / zoom, zoom }}
     >
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
@@ -2812,18 +2899,6 @@ const asVariants = (pool: string[]): CardVariant[] =>
 // Card definitions per channel. Pool-backed cards rotate daily through the
 // same authored lists the `together` API uses; API-backed cards (verse, joke,
 // fun fact) show whatever today's fetch returned.
-// Spark's doorway, present in the couple/personal channels as a card that
-// looks stuck loading. renderCard special-cases "*-spark" ids to render
-// <SparkTeaser /> (see spark/teaser.tsx).
-const sparkCard = (channel: string): ChecklistItem => ({
-  id: `${channel}-spark`,
-  title: "Loading",
-  chip: "bg-white/15 text-white/70",
-  tint: "rgba(255,255,255,0.10)",
-  icon: Sparkles,
-  variants: [{ text: "Loading ;)" }],
-});
-
 function channelCards(
   channel: string,
   together: Together | null
@@ -2847,7 +2922,14 @@ function channelCards(
           icon: HeartHandshake,
           variants: asVariants(addressAll("stephen", STEPHEN_CONNECT)),
         },
-        sparkCard(channel),
+        {
+          id: "stephen-dad",
+          title: "For the girls",
+          chip: "bg-teal-400/25 text-teal-100",
+          tint: "rgba(45,212,191,0.16)",
+          icon: Shield,
+          variants: asVariants(addressAll("stephen", STEPHEN_DAD)),
+        },
       ];
     case "whitney":
       return [
@@ -2867,7 +2949,14 @@ function channelCards(
           icon: Heart,
           variants: asVariants(addressAll("whitney", WHITNEY_CONNECT)),
         },
-        sparkCard(channel),
+        {
+          id: "whitney-mom",
+          title: "For the girls",
+          chip: "bg-violet-400/25 text-violet-200",
+          tint: "rgba(167,139,250,0.16)",
+          icon: Crown,
+          variants: asVariants(addressAll("whitney", WHITNEY_MOM)),
+        },
       ];
     case "love":
       return [
@@ -2898,7 +2987,6 @@ function channelCards(
             footnote: `— ${q.author}`,
           })),
         },
-        sparkCard(channel),
       ];
     case "family":
       return [
@@ -3169,14 +3257,6 @@ function ChecklistChannel({
     style?: React.CSSProperties,
     extraClass?: string
   ) => {
-    // Spark's doorway renders its own card chrome (fake loading widget).
-    if (item.id.endsWith("-spark")) {
-      return (
-        <div key={item.id} className={cn("relative", extraClass)} style={style}>
-          <SparkTeaser />
-        </div>
-      );
-    }
     const Icon = item.icon;
     const variant = variantFor(item);
     const menuOpen = openMenu === item.id;
@@ -3334,6 +3414,42 @@ function ChecklistChannel({
         <Flame className="h-5 w-5" />
       </a>
     )}
+    </div>
+  );
+}
+
+// --- Spark channel ---------------------------------------------------------
+//
+// Spark's doorway, disguised as a channel stuck loading. Sits between For
+// Stephen and For Whitney in the rotation and shows one full-screen
+// <SparkTeaser /> (see spark/teaser.tsx). Dwell is short — it's a beat
+// between the personal channels, not something to read.
+
+const SPARK_DWELL_MS = 12000;
+
+function SparkChannel({
+  headerExtra,
+  onDwellMs,
+}: {
+  headerExtra?: React.ReactNode;
+  onDwellMs?: (ms: number | null) => void;
+}) {
+  useEffect(() => {
+    onDwellMs?.(SPARK_DWELL_MS);
+    return () => onDwellMs?.(null);
+  }, [onDwellMs]);
+
+  return (
+    <div className="relative flex flex-1 flex-col gap-2">
+      <SectionHeader
+        title="Loading"
+        icon={Loader2}
+        items={[]}
+        controls={headerExtra}
+      />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <SparkTeaser />
+      </div>
     </div>
   );
 }

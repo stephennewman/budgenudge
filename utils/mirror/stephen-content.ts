@@ -5,7 +5,8 @@ import { addressAs } from "./address";
 // Authored, rotating prompts for a 42-year-old husband and father of three
 // girls. GROWTH items focus on his own strength, presence, and purpose;
 // CONNECT items focus on how to show up for his wife in a way that lets her
-// soften and feel cared for. Tone is grounded and practical — no jargon.
+// soften and feel cared for; DAD items focus on how he shows up for his
+// daughters. Tone is grounded and practical — no jargon.
 
 function dayOfYear(date: Date): number {
   const start = new Date(date.getFullYear(), 0, 0);
@@ -76,6 +77,39 @@ export const STEPHEN_CONNECT: string[] = [
   "End the day connected: ask about her, share about you, then put the day down.",
   "Be consistent. Dependable warmth is more romantic than the occasional grand move.",
   "Let her be soft by being strong — steady, patient, and unshaken.",
+];
+
+export const STEPHEN_DAD: string[] = [
+  "Get on the floor and play for ten minutes. Your attention is the gift they'll remember.",
+  "Tell each girl one specific thing you're proud of her for — not 'good job,' the real thing.",
+  "Let them see you treat their mom with tenderness. That's the bar you're setting for them.",
+  "Ask about her day and wait through the silence. The good stuff comes after the shrug.",
+  "Keep your promise about the little thing. Daughters learn to trust men from these deposits.",
+  "Show them how you handle frustration. They're learning what a safe man looks like.",
+  "Teach one practical skill this week — a knot, a tire, a recipe. Competence is confidence.",
+  "Say 'I was wrong, I'm sorry' to one of the girls when you owe it. It teaches more than being right.",
+  "Take one daughter out alone. One-on-one time says 'you, specifically, matter to me.'",
+  "Put the phone in another room during dinner. Presence is the whole point.",
+  "Notice effort over outcome. 'You kept going' builds grit; 'you won' builds fear of losing.",
+  "Let them be loud, messy, and big. Confidence grows where it isn't shushed.",
+  "Read to the youngest, even when she's 'too old.' Nobody outgrows being read to.",
+  "Compliment their character, not just their looks. Brave, kind, and curious last longer than cute.",
+  "When she's upset, kneel to eye level and lower your voice. Calm is contagious.",
+  "Ask her opinion on something real and take it seriously. She'll learn her voice matters.",
+  "Be steady when they test you. Boundaries held with warmth feel like safety, not control.",
+  "Tell a story from when you were their age. They need to know you were a kid once too.",
+  "Catch one of them doing something right and say it out loud in front of the others.",
+  "Wrestle, race, or dance in the kitchen. Fun with Dad is a memory they'll carry.",
+  "Ask 'What was the best part of your day?' at bedtime and actually listen to the answer.",
+  "Model rest. Girls who watch Dad recover without guilt learn they can too.",
+  "Speak up when they put themselves down. Your voice becomes their inner voice.",
+  "Show up for the small thing — the recital, the drawing, the made-up game. It's never small to her.",
+  "Let her fail at something safe and resist rescuing. Confidence is built on the other side.",
+  "Give a hug that lasts a beat longer than usual. Affection from Dad is grounding.",
+  "Say 'I love you' first and often. Don't make them wonder.",
+  "Handle bedtime start to finish tonight. It gives Whitney a break and gives you the stories.",
+  "Be curious about what she loves, even if it's not your thing. Interest is love in action.",
+  "Remember: they're watching how you live more than listening to what you say.",
 ];
 
 export function stephenGrowthForDate(date = new Date()): string {
