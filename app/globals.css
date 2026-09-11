@@ -160,6 +160,30 @@
   font-family: var(--font-outfit);
 }
 
+/* Mirror: a column whose type and spacing scale with its width. Set
+   --mirror-scale on the element. Tailwind v4 utilities read font sizes via
+   var(--text-*) and spacing via var(--spacing), so redefining those here
+   scales every utility inside without per-element changes. Values mirror
+   Tailwind's default scale; line heights are ratios and need no override.
+   (Declared on the column, not in @theme, because var() in a custom
+   property resolves where it's declared — :root wouldn't see the scale.) */
+.mirror-scaled {
+  --spacing: calc(0.25rem * var(--mirror-scale, 1));
+  --text-xs: calc(0.75rem * var(--mirror-scale, 1));
+  --text-sm: calc(0.875rem * var(--mirror-scale, 1));
+  --text-base: calc(1rem * var(--mirror-scale, 1));
+  --text-lg: calc(1.125rem * var(--mirror-scale, 1));
+  --text-xl: calc(1.25rem * var(--mirror-scale, 1));
+  --text-2xl: calc(1.5rem * var(--mirror-scale, 1));
+  --text-3xl: calc(1.875rem * var(--mirror-scale, 1));
+  --text-4xl: calc(2.25rem * var(--mirror-scale, 1));
+  --text-5xl: calc(3rem * var(--mirror-scale, 1));
+  --text-6xl: calc(3.75rem * var(--mirror-scale, 1));
+  --text-7xl: calc(4.5rem * var(--mirror-scale, 1));
+  --text-8xl: calc(6rem * var(--mirror-scale, 1));
+  --text-9xl: calc(8rem * var(--mirror-scale, 1));
+}
+
 /* Mirror: card progress bar fills left-to-right over the card's reading
    time (story-style); when it's full, the next card is shown. */
 @keyframes mirror-card-fill {

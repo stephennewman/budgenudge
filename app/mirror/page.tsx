@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   DndContext,
@@ -333,15 +340,22 @@ function clampRailWidth(w: number): number {
 }
 
 // Dragging the divider scales the main column and the rail with their width
-// (CSS `zoom`), so text and spacing shrink or grow instead of just being
-// cropped. Both columns are at zoom 1 when the rail sits at its default
-// width, so the default layout is unchanged.
-const COLUMN_ZOOM_MIN = 0.5;
-const COLUMN_ZOOM_MAX = 2;
+// (via the `.mirror-scaled` variables in globals.css, not CSS `zoom`, which
+// Safari mishandles inside flex/overflow containers), so text and spacing
+// shrink or grow instead of just being cropped. Both columns are at scale 1
+// when the rail sits at its default width, so the default layout is
+// unchanged.
+const COLUMN_SCALE_MIN = 0.5;
+const COLUMN_SCALE_MAX = 2;
 
-function clampZoom(z: number): number {
-  if (!Number.isFinite(z) || z <= 0) return 1;
-  return Math.min(COLUMN_ZOOM_MAX, Math.max(COLUMN_ZOOM_MIN, z));
+function clampScale(s: number): number {
+  if (!Number.isFinite(s) || s <= 0) return 1;
+  return Math.min(COLUMN_SCALE_MAX, Math.max(COLUMN_SCALE_MIN, s));
+}
+
+// Inline style carrying the column's scale for `.mirror-scaled`.
+function scaleStyle(scale: number): React.CSSProperties {
+  return { "--mirror-scale": scale } as React.CSSProperties;
 }
 
 // Sidebar display mode: full labels, icon-only rail, or fully hidden.
@@ -731,22 +745,25 @@ export default function MirrorPage() {
     writeJSON(RAIL_WIDTH_KEY, w);
   }, []);
 
-  // Column zoom (see COLUMN_ZOOM_*). The main column is measured unzoomed
-  // (zoom is applied to a wrapper inside it) so the observer doesn't feed
-  // back on itself. Below the `sm` breakpoint the rail and divider are
-  // hidden, so neither column scales there.
+  // Column scale (see COLUMN_SCALE_*). Scaling only changes type and
+  // spacing, never the column's box, so measuring <main> directly is safe.
+  // Below the `sm` breakpoint the rail and divider are hidden, so neither
+  // column scales there.
   const mainRef = useRef<HTMLElement>(null);
   const [mainWidth, setMainWidth] = useState<number | null>(null);
   const [railVisible, setRailVisible] = useState(false);
-  useEffect(() => {
-    const el = mainRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setMainWidth(entry.contentRect.width);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  // Measure synchronously whenever something that moves the column edges
+  // changes (rail drag, nav collapse, window resize) rather than through a
+  // ResizeObserver, whose callbacks only arrive with rendered frames.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = mainRef.current;
+      if (el) setMainWidth(el.clientWidth);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [railWidth, navMode]);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
     const update = () => setRailVisible(mq.matches);
@@ -754,13 +771,13 @@ export default function MirrorPage() {
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
   }, []);
-  const railZoom = railVisible ? clampZoom(railWidth / RAIL_DEFAULT_WIDTH) : 1;
-  // Main width if the rail were at its default: that's the zoom-1 baseline.
+  const railScale = railVisible ? clampScale(railWidth / RAIL_DEFAULT_WIDTH) : 1;
+  // Main width if the rail were at its default: that's the scale-1 baseline.
   const mainBaseline =
     mainWidth !== null ? mainWidth + railWidth - RAIL_DEFAULT_WIDTH : null;
-  const mainZoom =
+  const mainScale =
     railVisible && mainWidth !== null && mainBaseline !== null && mainBaseline > 0
-      ? clampZoom(mainWidth / mainBaseline)
+      ? clampScale(mainWidth / mainBaseline)
       : 1;
 
   // Load saved customization once on mount.
@@ -2163,15 +2180,11 @@ export default function MirrorPage() {
         </aside>
         )}
 
-        {/* Main content area. The inner wrapper carries the width-driven zoom
-            (padding and gaps included) so <main> itself can be measured. */}
+        {/* Main content area; type and spacing scale with its width. */}
         <main
           ref={mainRef}
-          className="flex min-w-0 flex-1 flex-col overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-        <div
-          className="flex min-h-0 flex-1 flex-col gap-3 p-3"
-          style={{ zoom: mainZoom }}
+          className="mirror-scaled flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={scaleStyle(mainScale)}
         >
         {/* Location search panel */}
         {showSearch && (
@@ -2429,7 +2442,6 @@ export default function MirrorPage() {
               </DndContext>
             </section>
           ))}
-        </div>
         </main>
 
         {/* Draggable divider: resize the right rail (double-tap to reset). */}
@@ -2449,7 +2461,7 @@ export default function MirrorPage() {
             narrow screens so it never crowds the main content. */}
         <RightRail
           width={railWidth}
-          zoom={railZoom}
+          scale={railScale}
           current={current}
           currentInfo={currentInfo}
           data={data}
@@ -2478,7 +2490,7 @@ export default function MirrorPage() {
 
 function RightRail({
   width,
-  zoom,
+  scale,
   current,
   currentInfo,
   data,
@@ -2491,9 +2503,9 @@ function RightRail({
   dayPct,
   onClockClick,
 }: {
-  // Physical (unzoomed) width in px, and the zoom to render at.
+  // Width in px, and the type/spacing scale to render at.
   width: number;
-  zoom: number;
+  scale: number;
   current: NonNullable<WeatherData["current"]> | undefined;
   currentInfo: { label: string; Icon: LucideIcon } | null;
   data: WeatherData | null;
@@ -2573,10 +2585,8 @@ function RightRail({
 
   return (
     <aside
-      className="hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      // Zoomed lengths are multiplied by `zoom`, so divide the width out to
-      // keep the rail's on-screen footprint equal to the dragged width.
-      style={{ width: width / zoom, zoom }}
+      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{ width, ...scaleStyle(scale) }}
     >
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
