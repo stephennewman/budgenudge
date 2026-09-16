@@ -110,6 +110,7 @@ export async function GET(request: Request) {
               items!inner(plaid_item_id)
             `)
             .in('item_id', chunk)
+            .is('deleted_at', null)
         );
 
         const accountResults = await Promise.all(accountPromises);
@@ -136,7 +137,8 @@ export async function GET(request: Request) {
             *,
             items!inner(plaid_item_id)
           `)
-          .in('item_id', itemDbIds);
+          .in('item_id', itemDbIds)
+          .is('deleted_at', null);
 
         if (accError) throw accError;
         
