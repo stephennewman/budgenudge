@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:launch-calendar": "tsc utils/launches/*.ts --outDir node_modules/.cache/launch-calendar --module commonjs --moduleResolution node --target es2022 --lib es2022,dom --skipLibCheck && node test/launch-calendar-test.js"
+    "test:launch-calendar": "tsc utils/launches/*.ts --outDir node_modules/.cache/launch-calendar --module commonjs --moduleResolution node --target es2022 --lib es2022,dom --skipLibCheck && node test/launch-calendar-test.js",
+    "test:red-fern": "tsc utils/red-fern/*.ts --outDir node_modules/.cache/red-fern --module commonjs --moduleResolution node --target es2022 --lib es2022,dom --skipLibCheck && node test/red-fern-test.js"
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.844.0",
