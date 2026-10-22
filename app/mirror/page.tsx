@@ -742,6 +742,7 @@ function writeJSON(key: string, value: unknown) {
 }
 
 export default function MirrorPage() {
+  const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
   const [location, setLocation] = useState<Location | null>(null);
   const [data, setData] = useState<WeatherData | null>(null);
@@ -946,6 +947,15 @@ export default function MirrorPage() {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  // Nothing on this page can be server-rendered to match: the clock, the
+  // day-part background, the rail width and everything read from localStorage
+  // all differ between the server and the browser. Hydration was failing on
+  // every single load, and React's recovery is to discard the server markup
+  // and redraw the whole tree — a blank frame on a display that Safari
+  // reloads whenever it reclaims the tab. Serve the backdrop, and render the
+  // dashboard once mounted, so the first paint is the one that stays.
+  useEffect(() => setMounted(true), []);
 
   const saveLocation = useCallback((loc: Location) => {
     setLocation(loc);
@@ -2066,6 +2076,14 @@ export default function MirrorPage() {
       {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
     </button>
   ) : null;
+
+  // Deliberately carries no inline colour: the day part it would come from
+  // differs between the server and the browser, and the layout already paints
+  // the page dark behind it. Server and first client render match exactly, so
+  // hydration is a no-op.
+  if (!mounted) {
+    return <div className="h-screen w-full" />;
+  }
 
   return (
     <div
