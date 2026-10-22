@@ -21,6 +21,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  // The app is dark edge to edge; without this the UA paints the area outside
+  // the viewport (safe-area insets, rubber-band overscroll) white.
+  colorScheme: "dark",
 };
 
 export default function MirrorLayout({

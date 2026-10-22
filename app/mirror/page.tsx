@@ -578,31 +578,109 @@ function dayPart(hour: number): DayPart {
   return "night";
 }
 
-// Background gradient that shifts through the day.
-// Every stop keeps >=4.5:1 contrast for white text, even under the
-// rgba(255,255,255,0.12) card overlays, while preserving each day part's hue.
-const GRADIENTS: Record<DayPart, string> = {
-  dawn: "linear-gradient(160deg, #1c0a3e 0%, #31417f 70%, #8a4a2e 100%)",
-  morning: "linear-gradient(160deg, #16305e 0%, #20416f 55%, #2f5f95 100%)",
-  midday: "linear-gradient(160deg, #02485e 0%, #005b7a 60%, #0f7396 100%)",
-  afternoon: "linear-gradient(160deg, #0f3e70 0%, #1b4f82 55%, #7e5420 100%)",
-  evening: "linear-gradient(160deg, #20002c 0%, #8c2449 60%, #a34a1e 100%)",
-  night: "linear-gradient(160deg, #020111 0%, #0a1a3f 55%, #20305f 100%)",
+// The mirror background is built from two independent parts so that rotating
+// between channels never changes how bright the screen is — only its hue.
+// Brightness comes from the time of day (TONE_RAMPS); hue comes from the
+// channel (CHANNEL_TONES), or from the day part for channels without one.
+// Mixing a per-channel brightness in here is what made the wall display look
+// like it was flashing light/dark every time the channel advanced.
+
+// Perceived lightness (OKLCH L) of the gradient's three stops, per day part.
+// Mid-day is the brightest; night is dimmest. The top stop stays at or below
+// 0.41 so white text clears 4.5:1 even through the cards' white/12 overlay.
+const TONE_RAMPS: Record<DayPart, [number, number, number]> = {
+  dawn: [0.18, 0.28, 0.37],
+  morning: [0.2, 0.3, 0.39],
+  midday: [0.22, 0.32, 0.41],
+  afternoon: [0.21, 0.31, 0.4],
+  evening: [0.18, 0.28, 0.37],
+  night: [0.14, 0.24, 0.32],
 };
 
-// Channel-specific backgrounds so the people channels read differently at a
-// glance (masculine steel for Stephen, rose for Whitney, etc.). Channels not
-// listed here keep the time-of-day gradient. All stops stay dark enough for
-// white text at >=4.5:1 contrast.
-const CHANNEL_GRADIENTS: Record<string, string> = {
-  stephen: "linear-gradient(160deg, #0a1c29 0%, #14384b 55%, #1f566b 100%)",
-  whitney: "linear-gradient(160deg, #2b0a22 0%, #571c40 55%, #7c2f57 100%)",
-  love: "linear-gradient(160deg, #290713 0%, #55132c 60%, #75253c 100%)",
-  family: "linear-gradient(160deg, #04231c 0%, #0d4234 60%, #175442 100%)",
-  friends: "linear-gradient(160deg, #291402 0%, #4f320d 60%, #6e4513 100%)",
-  faith: "linear-gradient(160deg, #140b33 0%, #2a1d59 60%, #3d2c6e 100%)",
-  money: "linear-gradient(160deg, #04221a 0%, #0b3d2e 55%, #145c44 100%)",
+// Colour is pushed toward the brighter end of the gradient, which reads as
+// depth without changing the lightness ramp.
+const CHROMA_RAMP = [0.7, 0.9, 1];
+
+// A hue per gradient stop plus the chroma of its brightest stop. Hues drift
+// across the stops for the day parts that turn warm at the horizon.
+type Tone = { hues: [number, number, number]; chroma: number };
+
+const DAY_TONES: Record<DayPart, Tone> = {
+  dawn: { hues: [293, 285, 44], chroma: 0.1 },
+  morning: { hues: [261, 257, 253], chroma: 0.1 },
+  midday: { hues: [227, 230, 229], chroma: 0.1 },
+  afternoon: { hues: [254, 251, 69], chroma: 0.1 },
+  evening: { hues: [315, 345, 44], chroma: 0.13 },
+  night: { hues: [279, 264, 267], chroma: 0.09 },
 };
+
+// Channel hues so the people channels read differently at a glance (steel for
+// Stephen, rose for Whitney, etc.). Channels not listed here take the day
+// part's own hue.
+const CHANNEL_TONES: Record<string, Tone> = {
+  stephen: { hues: [242, 235, 227], chroma: 0.07 },
+  whitney: { hues: [340, 346, 351], chroma: 0.12 },
+  love: { hues: [2, 2, 6], chroma: 0.11 },
+  family: { hues: [175, 171, 169], chroma: 0.07 },
+  friends: { hues: [61, 68, 67], chroma: 0.08 },
+  faith: { hues: [288, 288, 292], chroma: 0.11 },
+  money: { hues: [172, 168, 166], chroma: 0.08 },
+};
+
+// OKLCH -> linear sRGB. Kept as hand-rolled maths (rather than CSS `oklch()`)
+// so the gradients stay plain hex: an iPad too old for the colour function
+// would otherwise drop the background and expose the white page behind it.
+function oklchToLinearRgb(L: number, C: number, hDeg: number): [number, number, number] {
+  const h = (hDeg * Math.PI) / 180;
+  const a = C * Math.cos(h);
+  const b = C * Math.sin(h);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.29148555 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+}
+
+// Highly saturated hues leave sRGB at these low lightnesses. Clipping the
+// channels instead would shift the stop's brightness, so back the chroma off
+// until the colour fits and the lightness ramp survives intact.
+function fitChroma(L: number, C: number, hDeg: number): number {
+  const fits = (c: number) =>
+    oklchToLinearRgb(L, c, hDeg).every((v) => v >= -0.0005 && v <= 1.0005);
+  if (fits(C)) return C;
+  let lo = 0;
+  let hi = C;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function oklchToHex(L: number, C: number, hDeg: number): string {
+  const hex = oklchToLinearRgb(L, fitChroma(L, C, hDeg), hDeg)
+    .map((v) => {
+      const srgb =
+        v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055;
+      return Math.round(Math.min(1, Math.max(0, srgb)) * 255)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("");
+  return `#${hex}`;
+}
+
+function toneStops(part: DayPart, channelId?: string): [string, string, string] {
+  const ramp = TONE_RAMPS[part];
+  const tone = (channelId && CHANNEL_TONES[channelId]) || DAY_TONES[part];
+  return tone.hues.map((hue, i) =>
+    oklchToHex(ramp[i], tone.chroma * CHROMA_RAMP[i], hue)
+  ) as [string, string, string];
+}
 
 function aqiInfo(aqi: number): { label: string; color: string } {
   if (aqi <= 50) return { label: "Good", color: "#9be89b" };
@@ -1946,10 +2024,13 @@ export default function MirrorPage() {
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
-  // Channel-tinted background where defined; otherwise shift with the time of
-  // day. The 1s background transition on the wrapper smooths channel changes.
-  const gradient =
-    (activeSection && CHANNEL_GRADIENTS[activeSection.id]) || GRADIENTS[part];
+  // Channel-tinted background, at the brightness this time of day calls for.
+  // The 1s background transition on the wrapper smooths channel changes.
+  const [gradientFrom, gradientMid, gradientTo] = useMemo(
+    () => toneStops(part, activeSection?.id),
+    [part, activeSection?.id]
+  );
+  const gradient = `linear-gradient(160deg, ${gradientFrom} 0%, ${gradientMid} 55%, ${gradientTo} 100%)`;
 
   // Seconds until the next channel, driven by the 1s clock tick.
   const rotateSecondsLeft =
@@ -1989,7 +2070,10 @@ export default function MirrorPage() {
   return (
     <div
       className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
-      style={{ background: gradient }}
+      // The colour is a floor under the gradient: `background` on its own
+      // leaves the box transparent, so any moment the gradient isn't painted
+      // (older Safari, a dropped frame mid-transition) shows the white page.
+      style={{ backgroundColor: gradientFrom, backgroundImage: gradient }}
     >
       <div className="flex h-full">
         {/* Left rail: persistent clock + channel nav + controls. Collapsible:
