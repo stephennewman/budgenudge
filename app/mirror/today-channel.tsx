@@ -84,7 +84,7 @@ export function TodayChannel({
   }, [todayIso]);
 
   const cardShell =
-    "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-8 backdrop-blur-md";
+    "flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-white/15 p-8";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">

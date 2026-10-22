@@ -455,7 +455,7 @@ export default function MirrorEventsPage() {
           </div>
           <Link
             href="/mirror"
-            className="flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md transition hover:bg-white/20"
+            className="flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/80 transition hover:bg-white/20"
           >
             <ArrowLeft className="h-4 w-4" />
             Mirror
@@ -467,7 +467,7 @@ export default function MirrorEventsPage() {
               so it scrolls internally when taller than the viewport —
               otherwise the specials card below the calendar is unreachable. */}
           <div className="space-y-5 md:sticky md:top-4 md:max-h-[calc(100vh-2rem)] md:self-start md:overflow-y-auto md:pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+            <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <button
                   onClick={() => setMonthOffset((m) => Math.max(0, m - 1))}
@@ -557,7 +557,7 @@ export default function MirrorEventsPage() {
             </div>
 
             {specials.length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+              <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
                 <div className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-amber-200/85">
                   Weekly specials
                 </div>
@@ -580,7 +580,7 @@ export default function MirrorEventsPage() {
             )}
 
             {movies.length > 0 && (
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
+              <div className="rounded-3xl border border-white/10 bg-white/10 p-4">
                 <div className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-fuchsia-200/85">
                   In theaters
                 </div>
@@ -824,7 +824,7 @@ function EventRow({
   return (
     <li
       className={cn(
-        "rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md",
+        "rounded-2xl border border-white/10 bg-white/10 p-4",
         hiddenView && "opacity-70"
       )}
     >
