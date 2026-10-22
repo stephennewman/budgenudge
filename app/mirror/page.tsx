@@ -2069,10 +2069,14 @@ export default function MirrorPage() {
 
   return (
     <div
-      className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
+      // Only the colour transitions. Safari can't interpolate a gradient
+      // anyway, and putting a full-viewport background-image under a 1s
+      // transition promotes it to a layer that has to be re-rasterised behind
+      // every backdrop-filter panel on each channel change.
+      className="h-screen w-full overflow-hidden text-white antialiased transition-[background-color] duration-1000"
       // The colour is a floor under the gradient: `background` on its own
       // leaves the box transparent, so any moment the gradient isn't painted
-      // (older Safari, a dropped frame mid-transition) shows the white page.
+      // shows whatever is behind the page instead.
       style={{ backgroundColor: gradientFrom, backgroundImage: gradient }}
     >
       <div className="flex h-full">
