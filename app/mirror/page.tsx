@@ -2086,7 +2086,7 @@ export default function MirrorPage() {
           <button
             onClick={cycleNavMode}
             aria-label="Show menu"
-            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white"
+            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 transition hover:bg-black/60 hover:text-white"
           >
             <PanelLeftOpen className="h-5 w-5" />
           </button>
@@ -2094,7 +2094,7 @@ export default function MirrorPage() {
         {navMode !== "hidden" && (
         <aside
           className={cn(
-            "flex shrink-0 flex-col border-r border-white/10 bg-black/25 backdrop-blur-md",
+            "flex shrink-0 flex-col border-r border-white/10 bg-black/25",
             navMode === "full" ? "w-44 p-3 md:w-52" : "w-16 p-2"
           )}
         >
@@ -2276,7 +2276,7 @@ export default function MirrorPage() {
         >
         {/* Location search panel */}
         {showSearch && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="flex items-center gap-2 rounded-xl bg-white/20 px-3 py-2">
               <Search className="h-4 w-4 text-white/70" />
               <input
@@ -2315,7 +2315,7 @@ export default function MirrorPage() {
 
         {/* Widget visibility panel */}
         {showWidgets && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-white/85">Show / hide widgets</span>
               <div className="flex items-center gap-2">
@@ -2377,7 +2377,7 @@ export default function MirrorPage() {
         )}
 
         {needsLocation && !location && (
-          <div className="rounded-2xl bg-white/15 p-6 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-6 text-center">
             <p className="text-lg">Set a location to see the weather.</p>
             <button
               onClick={() => setShowSearch(true)}
@@ -2389,13 +2389,13 @@ export default function MirrorPage() {
         )}
 
         {error && (
-          <div className="rounded-2xl bg-white/15 p-4 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4 text-center">
             {error}
           </div>
         )}
 
         {editMode && (
-          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70 backdrop-blur-md">
+          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70">
             Drag the title bar to move · use S / M / L to resize · tap the eye to hide ·
             auto-rotate is paused while editing
           </div>
@@ -2438,7 +2438,7 @@ export default function MirrorPage() {
                 items={[]}
                 controls={fullscreenControl}
               />
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center backdrop-blur-md">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
                   <Wallet className="h-6 w-6" />
                 </span>
@@ -2662,7 +2662,7 @@ function RightRail({
     "bg-emerald-400/25 text-emerald-100",
   ];
   const miniShell =
-    "rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md";
+    "rounded-2xl border border-white/10 bg-white/10 p-4";
 
   const forecastDays = data?.daily.time.slice(0, 7) ?? [];
   const lows = data?.daily.temperature_2m_min ?? [];
@@ -2673,14 +2673,14 @@ function RightRail({
 
   return (
     <aside
-      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ width, ...scaleStyle(scale) }}
     >
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
       <button
         onClick={onClockClick}
-        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30"
+        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left transition hover:from-sky-400/30 hover:to-violet-400/30"
       >
         <div className="flex items-stretch gap-3">
           {/* Digits scale with the card width (cqw units) but keep the
@@ -3362,7 +3362,7 @@ function ChecklistChannel({
       <div
         key={item.id}
         className={cn(
-          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md md:p-8",
+          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 md:p-8",
           extraClass
         )}
         style={{
@@ -3737,7 +3737,7 @@ function CurrentWeatherCard({
   unitLabel: string;
 }) {
   return (
-    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6">
       <currentInfo.Icon
         className={cn(
           "h-20 w-20 shrink-0 drop-shadow-[0_0_25px_rgba(255,255,255,0.25)] md:h-24 md:w-24",
@@ -3774,7 +3774,7 @@ function GlanceCard({
   data: WeatherData | null;
 }) {
   return (
-    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6">
       <Detail
         icon={Droplets}
         label="Humidity"
@@ -3820,7 +3820,7 @@ function HourlyCard({
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
 }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/60">
         Next hours
       </h2>
@@ -3870,7 +3870,7 @@ function ForecastCard({ data }: { data: WeatherData }) {
   const weekMax = Math.max(...highs);
   const span = Math.max(1, weekMax - weekMin);
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/60">
         7-day forecast
       </h2>
@@ -3928,7 +3928,7 @@ function SunCard({ sun }: { sun: { sunrise: string; sunset: string } }) {
     new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return (
     <div
-      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6"
       style={{
         background:
           "linear-gradient(160deg, rgba(251,191,36,0.20) 0%, rgba(249,115,22,0.16) 100%)",
@@ -3980,7 +3980,7 @@ function SpendCard({
       })
     : null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-400/25 text-emerald-200">
@@ -4106,7 +4106,7 @@ function SpendCard({
 
 function BillsCard({ spend }: { spend: SpendData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-400/25 text-orange-200">
           <CalendarClock className="h-4 w-4" />
@@ -4437,7 +4437,7 @@ function WeekCalendarCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Category filter pills. (The section header above the card carries
           the title; the expand button there opens the full events page.) */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -4624,7 +4624,7 @@ function MoviesCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; the card starts with the tabs. */}
       <div className="mb-3 flex flex-wrap gap-1.5">
         {sections.map((s, i) => (
@@ -4789,7 +4789,7 @@ function BogosCard({
   }, [bogos.deals]);
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; keep only the week label. */}
       {bogos.weekLabel && (
         <div className="mb-3 flex justify-end text-xs text-white/50">
@@ -4830,7 +4830,7 @@ function BogosCard({
 // This week's dinner ideas built from the BOGO deals, as a simple numbered list.
 function MealsCard({ dinner }: { dinner: DinnerData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-400/25 text-amber-200">
           <UtensilsCrossed className="h-4 w-4" />
@@ -5254,7 +5254,7 @@ function PacingCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/25 text-cyan-200">
           <Gauge className="h-4 w-4" />
@@ -5408,7 +5408,7 @@ function BudgetCard({ week, month }: { week?: Breakdown; month?: Breakdown }) {
   );
   if (sections.length === 0) return null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-400/25 text-fuchsia-200">
           <PieChart className="h-4 w-4" />
@@ -5466,7 +5466,7 @@ function PromptCard({
 }) {
   return (
     <div
-      className="flex h-full flex-col rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col rounded-3xl border border-white/10 p-6"
       style={{
         background: tint
           ? `linear-gradient(135deg, ${tint} 0%, rgba(255,255,255,0.08) 70%)`
@@ -5650,7 +5650,7 @@ function ScoreCard({
   const color = scoreColor(score);
   return (
     <div
-      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6"
       style={{
         background: `linear-gradient(135deg, ${color}26 0%, rgba(255,255,255,0.10) 60%)`,
       }}
