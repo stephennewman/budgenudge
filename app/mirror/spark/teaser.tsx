@@ -16,7 +16,7 @@ export function SparkTeaser() {
       type="button"
       aria-label="Open a challenge for Whitney"
       onPointerDown={() => router.push("/mirror/spark?p=whitney")}
-      className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 p-6 text-left backdrop-blur-md md:p-8"
+      className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 p-6 text-left md:p-8"
       style={{
         background:
           "linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.08) 70%)",

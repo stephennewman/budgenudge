@@ -248,7 +248,7 @@ function Spark() {
             type="button"
             aria-label="Open a challenge for Whitney"
             onClick={unlock}
-            className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-8 backdrop-blur-md"
+            className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 p-8"
           >
             <div className="flex animate-pulse items-center justify-center text-3xl font-light tracking-wide text-neutral-400">
               <span className="py-4">Loading</span>

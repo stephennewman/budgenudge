@@ -137,7 +137,7 @@ export default function ExtraFunPage() {
           </div>
           <Link
             href="/mirror"
-            className="flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur-md transition hover:bg-white/20"
+            className="flex shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm text-white/80 transition hover:bg-white/20"
           >
             <ArrowLeft className="h-4 w-4" />
             Mirror
@@ -267,7 +267,7 @@ function DigitButton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="h-16 w-16 rounded-full border border-white/15 bg-white/10 text-xl font-light backdrop-blur-md transition hover:bg-white/20 active:bg-white/30 disabled:opacity-40"
+      className="h-16 w-16 rounded-full border border-white/15 bg-white/10 text-xl font-light transition hover:bg-white/20 active:bg-white/30 disabled:opacity-40"
     >
       {label}
     </button>
@@ -276,7 +276,7 @@ function DigitButton({
 
 function LoadingCard({ line }: { line: string }) {
   return (
-    <div className="flex w-full flex-col items-center rounded-3xl border border-white/10 bg-white/10 p-10 text-center backdrop-blur-md">
+    <div className="flex w-full flex-col items-center rounded-3xl border border-white/10 bg-white/10 p-10 text-center">
       <Flame className="mb-5 h-10 w-10 animate-pulse text-rose-300" />
       <p className="text-lg font-light text-white/90">{line}</p>
       <div className="mt-6 h-1.5 w-48 overflow-hidden rounded-full bg-white/15">
@@ -317,7 +317,7 @@ function GenerateCard({
 }) {
   const name = person === "stephen" ? "Stephen" : "Whitney";
   return (
-    <div className="flex w-full flex-col items-center rounded-3xl border border-white/10 bg-white/10 p-10 text-center backdrop-blur-md">
+    <div className="flex w-full flex-col items-center rounded-3xl border border-white/10 bg-white/10 p-10 text-center">
       <p className="mb-1 text-sm uppercase tracking-wider text-white/50">Hey {name}</p>
       <p className="mb-8 text-lg font-light text-white/85">Feeling brave today?</p>
       {regensLeft > 0 ? (
@@ -353,7 +353,7 @@ function OfferCard({
   onRegenerate: () => void;
 }) {
   return (
-    <div className="w-full rounded-3xl border border-white/10 bg-white/10 p-8 backdrop-blur-md">
+    <div className="w-full rounded-3xl border border-white/10 bg-white/10 p-8">
       <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-white/50">
         Your challenge
       </p>
@@ -392,7 +392,7 @@ function OfferCard({
 
 function AcceptedCard({ challenge }: { challenge: Challenge }) {
   return (
-    <div className="w-full rounded-3xl border border-rose-300/25 bg-white/10 p-8 backdrop-blur-md">
+    <div className="w-full rounded-3xl border border-rose-300/25 bg-white/10 p-8">
       <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-rose-200">
         Challenge accepted — good luck
       </p>
@@ -414,7 +414,7 @@ function CheckInCard({
   onAnswer: (completed: boolean) => void;
 }) {
   return (
-    <div className="w-full rounded-3xl border border-white/10 bg-white/10 p-8 backdrop-blur-md">
+    <div className="w-full rounded-3xl border border-white/10 bg-white/10 p-8">
       <p className="mb-4 text-xs font-semibold uppercase tracking-wider text-white/50">
         First things first… did you complete your last challenge?
       </p>
