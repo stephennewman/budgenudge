@@ -253,7 +253,7 @@ export function HoneyDoCard({ token }: { token: string | null }) {
   const done = list?.done ?? [];
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* No card title — the section header above the card already shows it. */}
 
       {/* Task list */}

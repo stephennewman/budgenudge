@@ -578,31 +578,109 @@ function dayPart(hour: number): DayPart {
   return "night";
 }
 
-// Background gradient that shifts through the day.
-// Every stop keeps >=4.5:1 contrast for white text, even under the
-// rgba(255,255,255,0.12) card overlays, while preserving each day part's hue.
-const GRADIENTS: Record<DayPart, string> = {
-  dawn: "linear-gradient(160deg, #1c0a3e 0%, #31417f 70%, #8a4a2e 100%)",
-  morning: "linear-gradient(160deg, #16305e 0%, #20416f 55%, #2f5f95 100%)",
-  midday: "linear-gradient(160deg, #02485e 0%, #005b7a 60%, #0f7396 100%)",
-  afternoon: "linear-gradient(160deg, #0f3e70 0%, #1b4f82 55%, #7e5420 100%)",
-  evening: "linear-gradient(160deg, #20002c 0%, #8c2449 60%, #a34a1e 100%)",
-  night: "linear-gradient(160deg, #020111 0%, #0a1a3f 55%, #20305f 100%)",
+// The mirror background is built from two independent parts so that rotating
+// between channels never changes how bright the screen is — only its hue.
+// Brightness comes from the time of day (TONE_RAMPS); hue comes from the
+// channel (CHANNEL_TONES), or from the day part for channels without one.
+// Mixing a per-channel brightness in here is what made the wall display look
+// like it was flashing light/dark every time the channel advanced.
+
+// Perceived lightness (OKLCH L) of the gradient's three stops, per day part.
+// Mid-day is the brightest; night is dimmest. The top stop stays at or below
+// 0.41 so white text clears 4.5:1 even through the cards' white/12 overlay.
+const TONE_RAMPS: Record<DayPart, [number, number, number]> = {
+  dawn: [0.18, 0.28, 0.37],
+  morning: [0.2, 0.3, 0.39],
+  midday: [0.22, 0.32, 0.41],
+  afternoon: [0.21, 0.31, 0.4],
+  evening: [0.18, 0.28, 0.37],
+  night: [0.14, 0.24, 0.32],
 };
 
-// Channel-specific backgrounds so the people channels read differently at a
-// glance (masculine steel for Stephen, rose for Whitney, etc.). Channels not
-// listed here keep the time-of-day gradient. All stops stay dark enough for
-// white text at >=4.5:1 contrast.
-const CHANNEL_GRADIENTS: Record<string, string> = {
-  stephen: "linear-gradient(160deg, #0a1c29 0%, #14384b 55%, #1f566b 100%)",
-  whitney: "linear-gradient(160deg, #2b0a22 0%, #571c40 55%, #7c2f57 100%)",
-  love: "linear-gradient(160deg, #290713 0%, #55132c 60%, #75253c 100%)",
-  family: "linear-gradient(160deg, #04231c 0%, #0d4234 60%, #175442 100%)",
-  friends: "linear-gradient(160deg, #291402 0%, #4f320d 60%, #6e4513 100%)",
-  faith: "linear-gradient(160deg, #140b33 0%, #2a1d59 60%, #3d2c6e 100%)",
-  money: "linear-gradient(160deg, #04221a 0%, #0b3d2e 55%, #145c44 100%)",
+// Colour is pushed toward the brighter end of the gradient, which reads as
+// depth without changing the lightness ramp.
+const CHROMA_RAMP = [0.7, 0.9, 1];
+
+// A hue per gradient stop plus the chroma of its brightest stop. Hues drift
+// across the stops for the day parts that turn warm at the horizon.
+type Tone = { hues: [number, number, number]; chroma: number };
+
+const DAY_TONES: Record<DayPart, Tone> = {
+  dawn: { hues: [293, 285, 44], chroma: 0.1 },
+  morning: { hues: [261, 257, 253], chroma: 0.1 },
+  midday: { hues: [227, 230, 229], chroma: 0.1 },
+  afternoon: { hues: [254, 251, 69], chroma: 0.1 },
+  evening: { hues: [315, 345, 44], chroma: 0.13 },
+  night: { hues: [279, 264, 267], chroma: 0.09 },
 };
+
+// Channel hues so the people channels read differently at a glance (steel for
+// Stephen, rose for Whitney, etc.). Channels not listed here take the day
+// part's own hue.
+const CHANNEL_TONES: Record<string, Tone> = {
+  stephen: { hues: [242, 235, 227], chroma: 0.07 },
+  whitney: { hues: [340, 346, 351], chroma: 0.12 },
+  love: { hues: [2, 2, 6], chroma: 0.11 },
+  family: { hues: [175, 171, 169], chroma: 0.07 },
+  friends: { hues: [61, 68, 67], chroma: 0.08 },
+  faith: { hues: [288, 288, 292], chroma: 0.11 },
+  money: { hues: [172, 168, 166], chroma: 0.08 },
+};
+
+// OKLCH -> linear sRGB. Kept as hand-rolled maths (rather than CSS `oklch()`)
+// so the gradients stay plain hex: an iPad too old for the colour function
+// would otherwise drop the background and expose the white page behind it.
+function oklchToLinearRgb(L: number, C: number, hDeg: number): [number, number, number] {
+  const h = (hDeg * Math.PI) / 180;
+  const a = C * Math.cos(h);
+  const b = C * Math.sin(h);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.29148555 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+}
+
+// Highly saturated hues leave sRGB at these low lightnesses. Clipping the
+// channels instead would shift the stop's brightness, so back the chroma off
+// until the colour fits and the lightness ramp survives intact.
+function fitChroma(L: number, C: number, hDeg: number): number {
+  const fits = (c: number) =>
+    oklchToLinearRgb(L, c, hDeg).every((v) => v >= -0.0005 && v <= 1.0005);
+  if (fits(C)) return C;
+  let lo = 0;
+  let hi = C;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
+function oklchToHex(L: number, C: number, hDeg: number): string {
+  const hex = oklchToLinearRgb(L, fitChroma(L, C, hDeg), hDeg)
+    .map((v) => {
+      const srgb =
+        v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(Math.max(v, 0), 1 / 2.4) - 0.055;
+      return Math.round(Math.min(1, Math.max(0, srgb)) * 255)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("");
+  return `#${hex}`;
+}
+
+function toneStops(part: DayPart, channelId?: string): [string, string, string] {
+  const ramp = TONE_RAMPS[part];
+  const tone = (channelId && CHANNEL_TONES[channelId]) || DAY_TONES[part];
+  return tone.hues.map((hue, i) =>
+    oklchToHex(ramp[i], tone.chroma * CHROMA_RAMP[i], hue)
+  ) as [string, string, string];
+}
 
 function aqiInfo(aqi: number): { label: string; color: string } {
   if (aqi <= 50) return { label: "Good", color: "#9be89b" };
@@ -663,7 +741,79 @@ function writeJSON(key: string, value: unknown) {
   }
 }
 
+function removeJSON(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Finance token + last-good Money payloads. Cookie backup survives iOS
+// localStorage wipes better than storage alone on a long-running PWA.
+const TOKEN_STORAGE_KEY = "mirror.token";
+const SPEND_CACHE_KEY = "mirror.spend.cache";
+const PACING_CACHE_KEY = "mirror.pacing.cache";
+const TOKEN_COOKIE = "mirror_token";
+const TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 400; // ~13 months
+
+function readTokenCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${TOKEN_COOKIE}=`));
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match.slice(TOKEN_COOKIE.length + 1)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTokenCookie(value: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=${TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearTokenCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+function persistFinanceToken(value: string) {
+  try {
+    localStorage.setItem(TOKEN_STORAGE_KEY, value);
+  } catch {
+    /* ignore */
+  }
+  writeTokenCookie(value);
+}
+
+function readPersistedFinanceToken(): string | null {
+  try {
+    const fromStorage = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (fromStorage) {
+      writeTokenCookie(fromStorage);
+      return fromStorage;
+    }
+  } catch {
+    /* ignore */
+  }
+  const fromCookie = readTokenCookie();
+  if (fromCookie) {
+    try {
+      localStorage.setItem(TOKEN_STORAGE_KEY, fromCookie);
+    } catch {
+      /* ignore */
+    }
+    return fromCookie;
+  }
+  return null;
+}
+
 export default function MirrorPage() {
+  const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
   const [location, setLocation] = useState<Location | null>(null);
   const [data, setData] = useState<WeatherData | null>(null);
@@ -692,6 +842,10 @@ export default function MirrorPage() {
   // True after we've read the saved/URL finance token so Money doesn't 401
   // once with no token, then flash back in once localStorage loads.
   const [tokenReady, setTokenReady] = useState(false);
+  // True after the first Supabase session check finishes. Without this the
+  // spend fetch races ahead of auth, 401s, and blanks Money until login
+  // resolves — which on a rotating wall display looks like finance is gone.
+  const [authReady, setAuthReady] = useState(false);
   const [moneyReady, setMoneyReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasInit = useRef(false);
@@ -756,6 +910,7 @@ export default function MirrorPage() {
   // changes (rail drag, nav collapse, window resize) rather than through a
   // ResizeObserver, whose callbacks only arrive with rendered frames.
   useLayoutEffect(() => {
+    if (!mounted) return;
     const measure = () => {
       const el = mainRef.current;
       if (el) setMainWidth(el.clientWidth);
@@ -763,7 +918,7 @@ export default function MirrorPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [railWidth, navMode]);
+  }, [mounted, railWidth, navMode]);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
     const update = () => setRailVisible(mq.matches);
@@ -863,11 +1018,32 @@ export default function MirrorPage() {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
-  // Ticking clock.
+  // Day-part / date only need minute resolution. A 1s tick re-rendered this
+  // ~5.6k-line tree continuously and was a remaining flicker source after the
+  // hydration fix; the live clock and auto-advance countdown tick locally.
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(new Date());
+    tick();
+    const msToNextMinute = 60_000 - (Date.now() % 60_000);
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(() => {
+      tick();
+      interval = setInterval(tick, 60_000);
+    }, msToNextMinute);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, []);
+
+  // Nothing on this page can be server-rendered to match: the clock, the
+  // day-part background, the rail width and everything read from localStorage
+  // all differ between the server and the browser. Hydration was failing on
+  // every single load, and React's recovery is to discard the server markup
+  // and redraw the whole tree — a blank frame on a display that Safari
+  // reloads whenever it reclaims the tab. Serve the backdrop, and render the
+  // dashboard once mounted, so the first paint is the one that stays.
+  useEffect(() => setMounted(true), []);
 
   const saveLocation = useCallback((loc: Location) => {
     setLocation(loc);
@@ -888,21 +1064,20 @@ export default function MirrorPage() {
     const params = new URLSearchParams(window.location.search);
 
     // Finance access token: from URL (then persisted) or previously saved.
+    // Restore last-good Money payloads so a wall display that briefly 401s
+    // (auth race, network blip) doesn't blank the channel.
+    const cachedSpend = readJSON<SpendData>(SPEND_CACHE_KEY);
+    if (cachedSpend) setSpend(cachedSpend);
+    const cachedPacing = readJSON<PacingData>(PACING_CACHE_KEY);
+    if (cachedPacing) setPacing(cachedPacing);
+
     const urlToken = params.get("token");
     if (urlToken) {
       setToken(urlToken);
-      try {
-        localStorage.setItem("mirror.token", urlToken);
-      } catch {
-        /* ignore */
-      }
+      persistFinanceToken(urlToken);
     } else {
-      try {
-        const savedToken = localStorage.getItem("mirror.token");
-        if (savedToken) setToken(savedToken);
-      } catch {
-        /* ignore */
-      }
+      const savedToken = readPersistedFinanceToken();
+      if (savedToken) setToken(savedToken);
     }
     setTokenReady(true);
 
@@ -1199,9 +1374,13 @@ export default function MirrorPage() {
       })
       .catch(() => {
         if (active) setAuthed(false);
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
       });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthed(!!session?.user);
+      setAuthReady(true);
     });
     return () => {
       active = false;
@@ -1211,10 +1390,11 @@ export default function MirrorPage() {
 
   // Yesterday's spend. The server authorizes via the logged-in session (the
   // user's own data) or the shared finance token. Wait until the token has
-  // been read from localStorage so a first unauthenticated 401 doesn't make
-  // Money look empty. Refetches on login and every 30 min.
+  // been read AND the first auth check has finished so a logged-in session
+  // isn't beaten by an unauthenticated 401 that blanks Money. Refetches on
+  // login and every 30 min. Transient errors keep the last good payload.
   useEffect(() => {
-    if (!tokenReady) return;
+    if (!tokenReady || !authReady) return;
     let active = true;
     const tz = data?.timezone;
     const load = async () => {
@@ -1232,23 +1412,29 @@ export default function MirrorPage() {
           fetch(`/api/mirror/spend${suffix}`),
           fetch(`/api/mirror/pacing${paceSuffix}`),
         ]);
-        if (!res.ok) {
-          if (active) setSpend(null);
-        } else {
-          const json = await res.json();
-          if (active) setSpend(json);
+        if (!active) return;
+        if (res.ok) {
+          const json = (await res.json()) as SpendData;
+          setSpend(json);
+          writeJSON(SPEND_CACHE_KEY, json);
+        } else if (res.status === 401) {
+          // Real unauthorized — clear cached finance so we don't show someone
+          // else's stale numbers after the token/session goes away.
+          setSpend(null);
+          removeJSON(SPEND_CACHE_KEY);
+          if (!token) clearTokenCookie();
         }
+        // Non-401 failures: keep whatever we already have on screen.
         if (paceRes.ok) {
-          const json = await paceRes.json();
-          if (active) setPacing(json);
-        } else if (active) {
+          const json = (await paceRes.json()) as PacingData;
+          setPacing(json);
+          writeJSON(PACING_CACHE_KEY, json);
+        } else if (paceRes.status === 401) {
           setPacing(null);
+          removeJSON(PACING_CACHE_KEY);
         }
       } catch {
-        if (active) {
-          setSpend(null);
-          setPacing(null);
-        }
+        // Network blip — keep last-good spend/pacing.
       } finally {
         if (active) setMoneyReady(true);
       }
@@ -1259,7 +1445,7 @@ export default function MirrorPage() {
       active = false;
       clearInterval(id);
     };
-  }, [tokenReady, token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
+  }, [tokenReady, authReady, token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
 
   // Tag a burn transaction's merchant as a recurring bill, then refresh the
   // money widgets so it moves from burn/pacing into the bills group.
@@ -1330,27 +1516,6 @@ export default function MirrorPage() {
   );
 
   const part = dayPart(now.getHours());
-
-  const timeStr = now.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-  // "09:55 AM" -> digits for the big flip-style clock + meridiem shown small.
-  // Some browsers use a narrow no-break space before AM/PM, hence \s.
-  const [clockDigits, meridiem] = timeStr.split(/\s+/);
-  const dateStr = now.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-  // "Monday, July 6" -> weekday on the left, "July 6" on the right.
-  const [dateWeekday, dateRest = ""] = dateStr.split(/,\s*/);
-
-  // How much of the current day has elapsed (0–100), for the clock card bar.
-  const dayPct =
-    ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) *
-    100;
 
   const unitLabel = data?.tempUnit === "celsius" ? "°C" : "°F";
 
@@ -1879,11 +2044,6 @@ export default function MirrorPage() {
     setActiveIndex(index);
   }, []);
 
-  // Keep the active index valid as channels appear/disappear.
-  useEffect(() => {
-    if (activeIndex > sectionCount - 1) setActiveIndex(Math.max(0, sectionCount - 1));
-  }, [sectionCount, activeIndex]);
-
   // Any tap/click anywhere means the viewer is engaged — restart the rotation
   // countdown so the channel doesn't swipe away mid-interaction.
   const [interactionTick, setInteractionTick] = useState(0);
@@ -1912,12 +2072,34 @@ export default function MirrorPage() {
   // the section never swipes away mid-card. Taps don't restart that dwell;
   // restarting would desync from the card timer that's already running.
   //
-  // `sections` gets a fresh identity on most renders (and the clock re-renders
-  // every second), so the effect keys off a stable id string and reads the
-  // live array through a ref — depending on the array itself would loop.
+  // `sections` gets a fresh identity on most renders, so the effect keys off
+  // a stable id string and reads the live array through a ref — depending on
+  // the array itself would loop.
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
   const sectionIdsKey = sections.map((s) => s.id).join(",");
+
+  // Preserve the active channel by id when other channels appear/disappear as
+  // their data loads. Index-only clamping made Money (and everything after a
+  // late-loading channel) jump around every few seconds.
+  const activeSectionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = sections[activeIndex]?.id ?? null;
+    if (currentId) activeSectionIdRef.current = currentId;
+  }, [sections, activeIndex]);
+  useEffect(() => {
+    const want = activeSectionIdRef.current;
+    if (!want || sections.length === 0) return;
+    const next = sections.findIndex((s) => s.id === want);
+    if (next >= 0) {
+      if (next !== activeIndex) setActiveIndex(next);
+      return;
+    }
+    if (activeIndex > sectionCount - 1) {
+      setActiveIndex(Math.max(0, sectionCount - 1));
+    }
+  }, [sectionIdsKey, sectionCount, sections, activeIndex]);
+
   const rotateMs = channelDwellMs ?? ROTATE_MS;
   const rotateResetKey = channelDwellMs == null ? interactionTick : 0;
   useEffect(() => {
@@ -1946,16 +2128,13 @@ export default function MirrorPage() {
 
   const activeSection = sections[activeIndex] ?? sections[0] ?? null;
 
-  // Channel-tinted background where defined; otherwise shift with the time of
-  // day. The 1s background transition on the wrapper smooths channel changes.
-  const gradient =
-    (activeSection && CHANNEL_GRADIENTS[activeSection.id]) || GRADIENTS[part];
-
-  // Seconds until the next channel, driven by the 1s clock tick.
-  const rotateSecondsLeft =
-    autoRotate && rotateAt !== null
-      ? Math.max(0, Math.ceil((rotateAt - now.getTime()) / 1000))
-      : null;
+  // Channel-tinted background, at the brightness this time of day calls for.
+  // The 1s background transition on the wrapper smooths channel changes.
+  const [gradientFrom, gradientMid, gradientTo] = useMemo(
+    () => toneStops(part, activeSection?.id),
+    [part, activeSection?.id]
+  );
+  const gradient = `linear-gradient(160deg, ${gradientFrom} 0%, ${gradientMid} 55%, ${gradientTo} 100%)`;
 
   const goPrev = useCallback(() => {
     setActiveIndex((i) => (i - 1 + sectionCount) % sectionCount);
@@ -1986,10 +2165,25 @@ export default function MirrorPage() {
     </button>
   ) : null;
 
+  // Deliberately carries no inline colour: the day part it would come from
+  // differs between the server and the browser, and the layout already paints
+  // the page dark behind it. Server and first client render match exactly, so
+  // hydration is a no-op.
+  if (!mounted) {
+    return <div className="h-screen w-full" />;
+  }
+
   return (
     <div
-      className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
-      style={{ background: gradient }}
+      // Only the colour transitions. Safari can't interpolate a gradient
+      // anyway, and putting a full-viewport background-image under a 1s
+      // transition promotes it to a layer that has to be re-rasterised behind
+      // every backdrop-filter panel on each channel change.
+      className="h-screen w-full overflow-hidden text-white antialiased transition-[background-color] duration-1000"
+      // The colour is a floor under the gradient: `background` on its own
+      // leaves the box transparent, so any moment the gradient isn't painted
+      // shows whatever is behind the page instead.
+      style={{ backgroundColor: gradientFrom, backgroundImage: gradient }}
     >
       <div className="flex h-full">
         {/* Left rail: persistent clock + channel nav + controls. Collapsible:
@@ -1998,7 +2192,7 @@ export default function MirrorPage() {
           <button
             onClick={cycleNavMode}
             aria-label="Show menu"
-            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white"
+            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 transition hover:bg-black/60 hover:text-white"
           >
             <PanelLeftOpen className="h-5 w-5" />
           </button>
@@ -2006,7 +2200,7 @@ export default function MirrorPage() {
         {navMode !== "hidden" && (
         <aside
           className={cn(
-            "flex shrink-0 flex-col border-r border-white/10 bg-black/25 backdrop-blur-md",
+            "flex shrink-0 flex-col border-r border-white/10 bg-black/25",
             navMode === "full" ? "w-44 p-3 md:w-52" : "w-16 p-2"
           )}
         >
@@ -2083,13 +2277,11 @@ export default function MirrorPage() {
                 ) : (
                   <Play className="h-3.5 w-3.5" />
                 )}
-                {autoRotate
-                  ? rotateSecondsLeft !== null
-                    ? `${rotateSecondsLeft}s`
-                    : "Auto"
-                  : navMode === "full"
-                    ? "Paused"
-                    : null}
+                {autoRotate ? (
+                  <RotateCountdown rotateAt={rotateAt} />
+                ) : navMode === "full" ? (
+                  "Paused"
+                ) : null}
               </button>
             </div>
             <div className={cn("relative flex gap-1.5", navMode === "icons" && "flex-col")}>
@@ -2188,7 +2380,7 @@ export default function MirrorPage() {
         >
         {/* Location search panel */}
         {showSearch && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="flex items-center gap-2 rounded-xl bg-white/20 px-3 py-2">
               <Search className="h-4 w-4 text-white/70" />
               <input
@@ -2227,7 +2419,7 @@ export default function MirrorPage() {
 
         {/* Widget visibility panel */}
         {showWidgets && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-white/85">Show / hide widgets</span>
               <div className="flex items-center gap-2">
@@ -2289,7 +2481,7 @@ export default function MirrorPage() {
         )}
 
         {needsLocation && !location && (
-          <div className="rounded-2xl bg-white/15 p-6 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-6 text-center">
             <p className="text-lg">Set a location to see the weather.</p>
             <button
               onClick={() => setShowSearch(true)}
@@ -2301,13 +2493,13 @@ export default function MirrorPage() {
         )}
 
         {error && (
-          <div className="rounded-2xl bg-white/15 p-4 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4 text-center">
             {error}
           </div>
         )}
 
         {editMode && (
-          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70 backdrop-blur-md">
+          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70">
             Drag the title bar to move · use S / M / L to resize · tap the eye to hide ·
             auto-rotate is paused while editing
           </div>
@@ -2350,7 +2542,7 @@ export default function MirrorPage() {
                 items={[]}
                 controls={fullscreenControl}
               />
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center backdrop-blur-md">
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
                   <Wallet className="h-6 w-6" />
                 </span>
@@ -2467,11 +2659,6 @@ export default function MirrorPage() {
           data={data}
           unitLabel={unitLabel}
           hours={hours}
-          clockDigits={clockDigits}
-          meridiem={meridiem}
-          dateWeekday={dateWeekday}
-          dateRest={dateRest}
-          dayPct={dayPct}
           onClockClick={() => {
             const i = sections.findIndex((s) => s.id === "today");
             if (i >= 0) goTo(i);
@@ -2488,6 +2675,24 @@ export default function MirrorPage() {
 // are in the year (with the day's national days) and a compact weather
 // snapshot — so they're always visible regardless of the active channel.
 
+// Live auto-advance countdown. Owns its 1s tick so the rest of the mirror
+// page doesn't re-render every second.
+function RotateCountdown({ rotateAt }: { rotateAt: number | null }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (rotateAt === null) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () =>
+      setSecondsLeft(Math.max(0, Math.ceil((rotateAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [rotateAt]);
+  return <>{secondsLeft !== null ? `${secondsLeft}s` : "Auto"}</>;
+}
+
 function RightRail({
   width,
   scale,
@@ -2496,11 +2701,6 @@ function RightRail({
   data,
   unitLabel,
   hours,
-  clockDigits,
-  meridiem,
-  dateWeekday,
-  dateRest,
-  dayPct,
   onClockClick,
 }: {
   // Width in px, and the type/spacing scale to render at.
@@ -2511,13 +2711,36 @@ function RightRail({
   data: WeatherData | null;
   unitLabel: string;
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
-  clockDigits: string;
-  meridiem: string | undefined;
-  dateWeekday: string;
-  dateRest: string;
-  dayPct: number;
   onClockClick: () => void;
 }) {
+  // Live clock + day-progress bar. Ticking here (instead of the parent) keeps
+  // the rest of the dashboard from re-rendering every second.
+  const [now, setNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const timeStr = now.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  // "09:55 AM" -> digits for the big flip-style clock + meridiem shown small.
+  // Some browsers use a narrow no-break space before AM/PM, hence \s.
+  const [clockDigits, meridiem] = timeStr.split(/\s+/);
+  const dateStr = now.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  // "Monday, July 6" -> weekday on the left, "July 6" on the right.
+  const [dateWeekday, dateRest = ""] = dateStr.split(/,\s*/);
+  const dayPct =
+    ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) /
+      86400) *
+    100;
+
   // The rail never unmounts, so a mount-only date would go stale on a display
   // left running for days. Roll `today` over at the day boundary (checked each
   // minute and whenever the tab wakes) so the day count and national days stay
@@ -2574,7 +2797,7 @@ function RightRail({
     "bg-emerald-400/25 text-emerald-100",
   ];
   const miniShell =
-    "rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md";
+    "rounded-2xl border border-white/10 bg-white/10 p-4";
 
   const forecastDays = data?.daily.time.slice(0, 7) ?? [];
   const lows = data?.daily.temperature_2m_min ?? [];
@@ -2585,14 +2808,14 @@ function RightRail({
 
   return (
     <aside
-      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       style={{ width, ...scaleStyle(scale) }}
     >
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
       <button
         onClick={onClockClick}
-        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30"
+        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left transition hover:from-sky-400/30 hover:to-violet-400/30"
       >
         <div className="flex items-stretch gap-3">
           {/* Digits scale with the card width (cqw units) but keep the
@@ -3274,7 +3497,7 @@ function ChecklistChannel({
       <div
         key={item.id}
         className={cn(
-          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md md:p-8",
+          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 md:p-8",
           extraClass
         )}
         style={{
@@ -3649,7 +3872,7 @@ function CurrentWeatherCard({
   unitLabel: string;
 }) {
   return (
-    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6">
       <currentInfo.Icon
         className={cn(
           "h-20 w-20 shrink-0 drop-shadow-[0_0_25px_rgba(255,255,255,0.25)] md:h-24 md:w-24",
@@ -3686,7 +3909,7 @@ function GlanceCard({
   data: WeatherData | null;
 }) {
   return (
-    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6">
       <Detail
         icon={Droplets}
         label="Humidity"
@@ -3732,7 +3955,7 @@ function HourlyCard({
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
 }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/60">
         Next hours
       </h2>
@@ -3782,7 +4005,7 @@ function ForecastCard({ data }: { data: WeatherData }) {
   const weekMax = Math.max(...highs);
   const span = Math.max(1, weekMax - weekMin);
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/60">
         7-day forecast
       </h2>
@@ -3840,7 +4063,7 @@ function SunCard({ sun }: { sun: { sunrise: string; sunset: string } }) {
     new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return (
     <div
-      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6"
       style={{
         background:
           "linear-gradient(160deg, rgba(251,191,36,0.20) 0%, rgba(249,115,22,0.16) 100%)",
@@ -3892,7 +4115,7 @@ function SpendCard({
       })
     : null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-400/25 text-emerald-200">
@@ -4018,7 +4241,7 @@ function SpendCard({
 
 function BillsCard({ spend }: { spend: SpendData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-400/25 text-orange-200">
           <CalendarClock className="h-4 w-4" />
@@ -4349,7 +4572,7 @@ function WeekCalendarCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Category filter pills. (The section header above the card carries
           the title; the expand button there opens the full events page.) */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -4536,7 +4759,7 @@ function MoviesCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; the card starts with the tabs. */}
       <div className="mb-3 flex flex-wrap gap-1.5">
         {sections.map((s, i) => (
@@ -4701,7 +4924,7 @@ function BogosCard({
   }, [bogos.deals]);
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; keep only the week label. */}
       {bogos.weekLabel && (
         <div className="mb-3 flex justify-end text-xs text-white/50">
@@ -4742,7 +4965,7 @@ function BogosCard({
 // This week's dinner ideas built from the BOGO deals, as a simple numbered list.
 function MealsCard({ dinner }: { dinner: DinnerData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-400/25 text-amber-200">
           <UtensilsCrossed className="h-4 w-4" />
@@ -5166,7 +5389,7 @@ function PacingCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/25 text-cyan-200">
           <Gauge className="h-4 w-4" />
@@ -5320,7 +5543,7 @@ function BudgetCard({ week, month }: { week?: Breakdown; month?: Breakdown }) {
   );
   if (sections.length === 0) return null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-400/25 text-fuchsia-200">
           <PieChart className="h-4 w-4" />
@@ -5378,7 +5601,7 @@ function PromptCard({
 }) {
   return (
     <div
-      className="flex h-full flex-col rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col rounded-3xl border border-white/10 p-6"
       style={{
         background: tint
           ? `linear-gradient(135deg, ${tint} 0%, rgba(255,255,255,0.08) 70%)`
@@ -5562,7 +5785,7 @@ function ScoreCard({
   const color = scoreColor(score);
   return (
     <div
-      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6"
       style={{
         background: `linear-gradient(135deg, ${color}26 0%, rgba(255,255,255,0.10) 60%)`,
       }}
