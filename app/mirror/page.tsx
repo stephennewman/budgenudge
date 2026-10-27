@@ -741,6 +741,77 @@ function writeJSON(key: string, value: unknown) {
   }
 }
 
+function removeJSON(key: string) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Finance token + last-good Money payloads. Cookie backup survives iOS
+// localStorage wipes better than storage alone on a long-running PWA.
+const TOKEN_STORAGE_KEY = "mirror.token";
+const SPEND_CACHE_KEY = "mirror.spend.cache";
+const PACING_CACHE_KEY = "mirror.pacing.cache";
+const TOKEN_COOKIE = "mirror_token";
+const TOKEN_COOKIE_MAX_AGE = 60 * 60 * 24 * 400; // ~13 months
+
+function readTokenCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${TOKEN_COOKIE}=`));
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match.slice(TOKEN_COOKIE.length + 1)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTokenCookie(value: string) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(value)}; path=/; max-age=${TOKEN_COOKIE_MAX_AGE}; SameSite=Lax`;
+}
+
+function clearTokenCookie() {
+  if (typeof document === "undefined") return;
+  document.cookie = `${TOKEN_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+function persistFinanceToken(value: string) {
+  try {
+    localStorage.setItem(TOKEN_STORAGE_KEY, value);
+  } catch {
+    /* ignore */
+  }
+  writeTokenCookie(value);
+}
+
+function readPersistedFinanceToken(): string | null {
+  try {
+    const fromStorage = localStorage.getItem(TOKEN_STORAGE_KEY);
+    if (fromStorage) {
+      writeTokenCookie(fromStorage);
+      return fromStorage;
+    }
+  } catch {
+    /* ignore */
+  }
+  const fromCookie = readTokenCookie();
+  if (fromCookie) {
+    try {
+      localStorage.setItem(TOKEN_STORAGE_KEY, fromCookie);
+    } catch {
+      /* ignore */
+    }
+    return fromCookie;
+  }
+  return null;
+}
+
 export default function MirrorPage() {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState<Date>(new Date());
@@ -771,6 +842,10 @@ export default function MirrorPage() {
   // True after we've read the saved/URL finance token so Money doesn't 401
   // once with no token, then flash back in once localStorage loads.
   const [tokenReady, setTokenReady] = useState(false);
+  // True after the first Supabase session check finishes. Without this the
+  // spend fetch races ahead of auth, 401s, and blanks Money until login
+  // resolves — which on a rotating wall display looks like finance is gone.
+  const [authReady, setAuthReady] = useState(false);
   const [moneyReady, setMoneyReady] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const hasInit = useRef(false);
@@ -835,6 +910,7 @@ export default function MirrorPage() {
   // changes (rail drag, nav collapse, window resize) rather than through a
   // ResizeObserver, whose callbacks only arrive with rendered frames.
   useLayoutEffect(() => {
+    if (!mounted) return;
     const measure = () => {
       const el = mainRef.current;
       if (el) setMainWidth(el.clientWidth);
@@ -842,7 +918,7 @@ export default function MirrorPage() {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [railWidth, navMode]);
+  }, [mounted, railWidth, navMode]);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 640px)");
     const update = () => setRailVisible(mq.matches);
@@ -942,10 +1018,22 @@ export default function MirrorPage() {
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } })
   );
 
-  // Ticking clock.
+  // Day-part / date only need minute resolution. A 1s tick re-rendered this
+  // ~5.6k-line tree continuously and was a remaining flicker source after the
+  // hydration fix; the live clock and auto-advance countdown tick locally.
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
+    const tick = () => setNow(new Date());
+    tick();
+    const msToNextMinute = 60_000 - (Date.now() % 60_000);
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const timeout = setTimeout(() => {
+      tick();
+      interval = setInterval(tick, 60_000);
+    }, msToNextMinute);
+    return () => {
+      clearTimeout(timeout);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   // Nothing on this page can be server-rendered to match: the clock, the
@@ -976,21 +1064,20 @@ export default function MirrorPage() {
     const params = new URLSearchParams(window.location.search);
 
     // Finance access token: from URL (then persisted) or previously saved.
+    // Restore last-good Money payloads so a wall display that briefly 401s
+    // (auth race, network blip) doesn't blank the channel.
+    const cachedSpend = readJSON<SpendData>(SPEND_CACHE_KEY);
+    if (cachedSpend) setSpend(cachedSpend);
+    const cachedPacing = readJSON<PacingData>(PACING_CACHE_KEY);
+    if (cachedPacing) setPacing(cachedPacing);
+
     const urlToken = params.get("token");
     if (urlToken) {
       setToken(urlToken);
-      try {
-        localStorage.setItem("mirror.token", urlToken);
-      } catch {
-        /* ignore */
-      }
+      persistFinanceToken(urlToken);
     } else {
-      try {
-        const savedToken = localStorage.getItem("mirror.token");
-        if (savedToken) setToken(savedToken);
-      } catch {
-        /* ignore */
-      }
+      const savedToken = readPersistedFinanceToken();
+      if (savedToken) setToken(savedToken);
     }
     setTokenReady(true);
 
@@ -1287,9 +1374,13 @@ export default function MirrorPage() {
       })
       .catch(() => {
         if (active) setAuthed(false);
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
       });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthed(!!session?.user);
+      setAuthReady(true);
     });
     return () => {
       active = false;
@@ -1299,10 +1390,11 @@ export default function MirrorPage() {
 
   // Yesterday's spend. The server authorizes via the logged-in session (the
   // user's own data) or the shared finance token. Wait until the token has
-  // been read from localStorage so a first unauthenticated 401 doesn't make
-  // Money look empty. Refetches on login and every 30 min.
+  // been read AND the first auth check has finished so a logged-in session
+  // isn't beaten by an unauthenticated 401 that blanks Money. Refetches on
+  // login and every 30 min. Transient errors keep the last good payload.
   useEffect(() => {
-    if (!tokenReady) return;
+    if (!tokenReady || !authReady) return;
     let active = true;
     const tz = data?.timezone;
     const load = async () => {
@@ -1320,23 +1412,29 @@ export default function MirrorPage() {
           fetch(`/api/mirror/spend${suffix}`),
           fetch(`/api/mirror/pacing${paceSuffix}`),
         ]);
-        if (!res.ok) {
-          if (active) setSpend(null);
-        } else {
-          const json = await res.json();
-          if (active) setSpend(json);
+        if (!active) return;
+        if (res.ok) {
+          const json = (await res.json()) as SpendData;
+          setSpend(json);
+          writeJSON(SPEND_CACHE_KEY, json);
+        } else if (res.status === 401) {
+          // Real unauthorized — clear cached finance so we don't show someone
+          // else's stale numbers after the token/session goes away.
+          setSpend(null);
+          removeJSON(SPEND_CACHE_KEY);
+          if (!token) clearTokenCookie();
         }
+        // Non-401 failures: keep whatever we already have on screen.
         if (paceRes.ok) {
-          const json = await paceRes.json();
-          if (active) setPacing(json);
-        } else if (active) {
+          const json = (await paceRes.json()) as PacingData;
+          setPacing(json);
+          writeJSON(PACING_CACHE_KEY, json);
+        } else if (paceRes.status === 401) {
           setPacing(null);
+          removeJSON(PACING_CACHE_KEY);
         }
       } catch {
-        if (active) {
-          setSpend(null);
-          setPacing(null);
-        }
+        // Network blip — keep last-good spend/pacing.
       } finally {
         if (active) setMoneyReady(true);
       }
@@ -1347,7 +1445,7 @@ export default function MirrorPage() {
       active = false;
       clearInterval(id);
     };
-  }, [tokenReady, token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
+  }, [tokenReady, authReady, token, authed, data?.timezone, moneyRefresh, pacingMonthsBack]);
 
   // Tag a burn transaction's merchant as a recurring bill, then refresh the
   // money widgets so it moves from burn/pacing into the bills group.
@@ -1418,27 +1516,6 @@ export default function MirrorPage() {
   );
 
   const part = dayPart(now.getHours());
-
-  const timeStr = now.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
-  // "09:55 AM" -> digits for the big flip-style clock + meridiem shown small.
-  // Some browsers use a narrow no-break space before AM/PM, hence \s.
-  const [clockDigits, meridiem] = timeStr.split(/\s+/);
-  const dateStr = now.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-  // "Monday, July 6" -> weekday on the left, "July 6" on the right.
-  const [dateWeekday, dateRest = ""] = dateStr.split(/,\s*/);
-
-  // How much of the current day has elapsed (0–100), for the clock card bar.
-  const dayPct =
-    ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / 86400) *
-    100;
 
   const unitLabel = data?.tempUnit === "celsius" ? "°C" : "°F";
 
@@ -1967,11 +2044,6 @@ export default function MirrorPage() {
     setActiveIndex(index);
   }, []);
 
-  // Keep the active index valid as channels appear/disappear.
-  useEffect(() => {
-    if (activeIndex > sectionCount - 1) setActiveIndex(Math.max(0, sectionCount - 1));
-  }, [sectionCount, activeIndex]);
-
   // Any tap/click anywhere means the viewer is engaged — restart the rotation
   // countdown so the channel doesn't swipe away mid-interaction.
   const [interactionTick, setInteractionTick] = useState(0);
@@ -2000,12 +2072,34 @@ export default function MirrorPage() {
   // the section never swipes away mid-card. Taps don't restart that dwell;
   // restarting would desync from the card timer that's already running.
   //
-  // `sections` gets a fresh identity on most renders (and the clock re-renders
-  // every second), so the effect keys off a stable id string and reads the
-  // live array through a ref — depending on the array itself would loop.
+  // `sections` gets a fresh identity on most renders, so the effect keys off
+  // a stable id string and reads the live array through a ref — depending on
+  // the array itself would loop.
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
   const sectionIdsKey = sections.map((s) => s.id).join(",");
+
+  // Preserve the active channel by id when other channels appear/disappear as
+  // their data loads. Index-only clamping made Money (and everything after a
+  // late-loading channel) jump around every few seconds.
+  const activeSectionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const currentId = sections[activeIndex]?.id ?? null;
+    if (currentId) activeSectionIdRef.current = currentId;
+  }, [sections, activeIndex]);
+  useEffect(() => {
+    const want = activeSectionIdRef.current;
+    if (!want || sections.length === 0) return;
+    const next = sections.findIndex((s) => s.id === want);
+    if (next >= 0) {
+      if (next !== activeIndex) setActiveIndex(next);
+      return;
+    }
+    if (activeIndex > sectionCount - 1) {
+      setActiveIndex(Math.max(0, sectionCount - 1));
+    }
+  }, [sectionIdsKey, sectionCount, sections, activeIndex]);
+
   const rotateMs = channelDwellMs ?? ROTATE_MS;
   const rotateResetKey = channelDwellMs == null ? interactionTick : 0;
   useEffect(() => {
@@ -2041,12 +2135,6 @@ export default function MirrorPage() {
     [part, activeSection?.id]
   );
   const gradient = `linear-gradient(160deg, ${gradientFrom} 0%, ${gradientMid} 55%, ${gradientTo} 100%)`;
-
-  // Seconds until the next channel, driven by the 1s clock tick.
-  const rotateSecondsLeft =
-    autoRotate && rotateAt !== null
-      ? Math.max(0, Math.ceil((rotateAt - now.getTime()) / 1000))
-      : null;
 
   const goPrev = useCallback(() => {
     setActiveIndex((i) => (i - 1 + sectionCount) % sectionCount);
@@ -2189,13 +2277,11 @@ export default function MirrorPage() {
                 ) : (
                   <Play className="h-3.5 w-3.5" />
                 )}
-                {autoRotate
-                  ? rotateSecondsLeft !== null
-                    ? `${rotateSecondsLeft}s`
-                    : "Auto"
-                  : navMode === "full"
-                    ? "Paused"
-                    : null}
+                {autoRotate ? (
+                  <RotateCountdown rotateAt={rotateAt} />
+                ) : navMode === "full" ? (
+                  "Paused"
+                ) : null}
               </button>
             </div>
             <div className={cn("relative flex gap-1.5", navMode === "icons" && "flex-col")}>
@@ -2573,11 +2659,6 @@ export default function MirrorPage() {
           data={data}
           unitLabel={unitLabel}
           hours={hours}
-          clockDigits={clockDigits}
-          meridiem={meridiem}
-          dateWeekday={dateWeekday}
-          dateRest={dateRest}
-          dayPct={dayPct}
           onClockClick={() => {
             const i = sections.findIndex((s) => s.id === "today");
             if (i >= 0) goTo(i);
@@ -2594,6 +2675,24 @@ export default function MirrorPage() {
 // are in the year (with the day's national days) and a compact weather
 // snapshot — so they're always visible regardless of the active channel.
 
+// Live auto-advance countdown. Owns its 1s tick so the rest of the mirror
+// page doesn't re-render every second.
+function RotateCountdown({ rotateAt }: { rotateAt: number | null }) {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  useEffect(() => {
+    if (rotateAt === null) {
+      setSecondsLeft(null);
+      return;
+    }
+    const tick = () =>
+      setSecondsLeft(Math.max(0, Math.ceil((rotateAt - Date.now()) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [rotateAt]);
+  return <>{secondsLeft !== null ? `${secondsLeft}s` : "Auto"}</>;
+}
+
 function RightRail({
   width,
   scale,
@@ -2602,11 +2701,6 @@ function RightRail({
   data,
   unitLabel,
   hours,
-  clockDigits,
-  meridiem,
-  dateWeekday,
-  dateRest,
-  dayPct,
   onClockClick,
 }: {
   // Width in px, and the type/spacing scale to render at.
@@ -2617,13 +2711,36 @@ function RightRail({
   data: WeatherData | null;
   unitLabel: string;
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
-  clockDigits: string;
-  meridiem: string | undefined;
-  dateWeekday: string;
-  dateRest: string;
-  dayPct: number;
   onClockClick: () => void;
 }) {
+  // Live clock + day-progress bar. Ticking here (instead of the parent) keeps
+  // the rest of the dashboard from re-rendering every second.
+  const [now, setNow] = useState<Date>(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const timeStr = now.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  // "09:55 AM" -> digits for the big flip-style clock + meridiem shown small.
+  // Some browsers use a narrow no-break space before AM/PM, hence \s.
+  const [clockDigits, meridiem] = timeStr.split(/\s+/);
+  const dateStr = now.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  // "Monday, July 6" -> weekday on the left, "July 6" on the right.
+  const [dateWeekday, dateRest = ""] = dateStr.split(/,\s*/);
+  const dayPct =
+    ((now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) /
+      86400) *
+    100;
+
   // The rail never unmounts, so a mount-only date would go stale on a display
   // left running for days. Roll `today` over at the day boundary (checked each
   // minute and whenever the tab wakes) so the day count and national days stay
