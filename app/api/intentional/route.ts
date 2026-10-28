@@ -532,6 +532,27 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Voice: multipart audio → Whisper transcript (the client adds it to the text box).
+  if ((request.headers.get("content-type") || "").includes("multipart/form-data")) {
+    try {
+      const audio = (await request.formData()).get("audio");
+      if (!(audio instanceof File) || audio.size === 0) {
+        return NextResponse.json({ error: "No audio received" }, { status: 400 });
+      }
+      if (audio.size > 24 * 1024 * 1024) {
+        return NextResponse.json({ error: "Recording too long" }, { status: 413 });
+      }
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+      const { text } = await openai.audio.transcriptions.create({ file: audio, model: "whisper-1" });
+      const transcript = (text || "").trim();
+      if (!transcript) return NextResponse.json({ error: "Couldn't hear anything — try again" }, { status: 422 });
+      return NextResponse.json({ transcript });
+    } catch (err) {
+      console.error("[intentional] transcribe", err);
+      return NextResponse.json({ error: "Couldn't transcribe that" }, { status: 500 });
+    }
+  }
+
   try {
     const body = (await request.json()) as {
       action?: string;

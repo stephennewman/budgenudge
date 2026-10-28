@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { SlidersHorizontal } from "lucide-react";
+import { Mic, SlidersHorizontal } from "lucide-react";
 import { cn } from "@/utils/styles";
 import { intentionScore } from "@/utils/intentional/score";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -1032,6 +1032,70 @@ function CaptureSheet({ onClose, onSubmit }: {
     try { await onSubmit(text.trim()); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
+  // Tap to start, tap to stop. The transcript is appended to the text box.
+  const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [recStart, setRecStart] = useState(0);
+  const [recNow, setRecNow] = useState(0);
+  const [recError, setRecError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+
+  useEffect(() => {
+    if (rec !== "recording") return;
+    const t = setInterval(() => setRecNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [rec]);
+
+  useEffect(() => () => recorderRef.current?.stream.getTracks().forEach((t) => t.stop()), []);
+
+  const transcribe = async (blob: Blob) => {
+    setRec("transcribing");
+    try {
+      const form = new FormData();
+      form.append("audio", new File([blob], `memo.${blob.type.includes("mp4") ? "mp4" : "webm"}`, { type: blob.type }));
+      const res = await fetch("/api/intentional", { method: "POST", body: form });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Couldn't transcribe that");
+      setText((t) => (t.trim() ? `${t.trim()}\n${json.transcript}` : json.transcript));
+    } catch (err) {
+      setRecError((err as Error).message);
+    } finally {
+      setRec("idle");
+    }
+  };
+
+  const toggleRecording = async () => {
+    if (rec === "recording") {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (rec !== "idle") return;
+    setRecError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
+      const r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      r.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      r.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: r.mimeType || "audio/webm" });
+        if (blob.size > 0) transcribe(blob);
+        else setRec("idle");
+      };
+      recorderRef.current = r;
+      r.start(1000);
+      setRecStart(Date.now());
+      setRecNow(Date.now());
+      setRec("recording");
+    } catch {
+      setRecError("Microphone blocked — allow it in your browser settings");
+    }
+  };
+  const recSecs = Math.max(0, Math.floor((recNow - recStart) / 1000));
+
   // Track the visible viewport so the bottom button sits above the on-screen keyboard.
   const [vp, setVp] = useState<{ h: number; top: number } | null>(null);
   useEffect(() => {
@@ -1077,13 +1141,38 @@ function CaptureSheet({ onClose, onSubmit }: {
       </div>
       <div className="border-t border-stone-100 px-4 pt-3 max-w-xl w-full mx-auto"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-        <button
-          disabled={busy || !text.trim()}
-          onClick={submit}
-          className="w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
-        >
-          {busy ? "Saving…" : "Add"}
-        </button>
+        {recError && <p className="mb-2 text-sm text-rose-600">{recError}</p>}
+        <div className="flex gap-2">
+          <button
+            onClick={toggleRecording}
+            disabled={rec === "transcribing"}
+            aria-label={rec === "recording" ? "Stop recording" : "Record voice"}
+            className={cn(
+              "min-h-12 shrink-0 rounded-full font-semibold flex items-center justify-center gap-2 transition-colors",
+              rec === "recording" ? "bg-rose-600 text-white px-5" : "bg-stone-100 text-stone-800 w-12",
+              rec === "transcribing" && "px-5 w-auto"
+            )}
+          >
+            {rec === "recording" ? (
+              <>
+                <span className="size-2.5 rounded-full bg-white animate-pulse" />
+                <span className="tabular-nums">{Math.floor(recSecs / 60)}:{String(recSecs % 60).padStart(2, "0")}</span>
+                <span aria-hidden>■</span>
+              </>
+            ) : rec === "transcribing" ? (
+              <span className="text-sm">Transcribing…</span>
+            ) : (
+              <Mic className="size-5" />
+            )}
+          </button>
+          <button
+            disabled={busy || !text.trim() || rec !== "idle"}
+            onClick={submit}
+            className="flex-1 min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
+          >
+            {busy ? "Saving…" : "Add"}
+          </button>
+        </div>
       </div>
     </div>
   );
