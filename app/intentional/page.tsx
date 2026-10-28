@@ -606,18 +606,8 @@ function CardRow({
             </div>
           )}
         </div>
-        {playable && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onPlay(card); }}
-            aria-label="Be intentional — start timer"
-            title="Start timer"
-            className="-my-1 -mr-1 size-11 shrink-0 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-50"
-          >
-            <span className="size-8 rounded-full bg-emerald-50 flex items-center justify-center text-sm pl-0.5">▶</span>
-          </button>
-        )}
         {!card.id.startsWith("tmp-") && (
-          <div className="hidden pointer-fine:flex -my-1 -mr-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="hidden pointer-fine:flex -my-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onRight(card); }}
               aria-label={card.prioritized ? "Unprioritize" : "Prioritize"}
@@ -635,6 +625,16 @@ function CardRow({
               🗑
             </button>
           </div>
+        )}
+        {playable && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPlay(card); }}
+            aria-label="Be intentional — start timer"
+            title="Start timer"
+            className="-my-1 -mr-2 size-11 shrink-0 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-50"
+          >
+            <span className="size-8 rounded-full bg-emerald-50 flex items-center justify-center text-sm pl-0.5">▶</span>
+          </button>
         )}
       </div>
     </div>
