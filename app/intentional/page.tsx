@@ -22,7 +22,8 @@ type Card = {
 };
 
 type State = { cards: Card[]; today: string; minutesToday: number };
-type Tab = "today" | "board" | "all" | "mindset";
+type Tab = "today" | "all";
+type Filter = "all" | "prioritized" | Kind;
 type Timer = { id: string; startedAt: string };
 
 const KIND_META: Record<Kind, { label: string; emoji: string; tone: string }> = {
@@ -82,7 +83,7 @@ export default function IntentionalPage() {
   const [state, setState] = useState<State | null>(null);
   const [authError, setAuthError] = useState(false);
   const [tab, setTab] = useState<Tab>("today");
-  const [kindFilter, setKindFilter] = useState<Kind | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
   const [now, setNow] = useState(() => new Date());
   const [captureOpen, setCaptureOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -118,6 +119,12 @@ export default function IntentionalPage() {
   }, [timer]);
 
   useEffect(() => {
+    if (!since) return;
+    const t = setTimeout(() => setSince(null), 60000);
+    return () => clearTimeout(t);
+  }, [since]);
+
+  useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
@@ -133,10 +140,14 @@ export default function IntentionalPage() {
   const upNext = tasks.filter(
     (c) => c.prioritized || c.stars >= 5 || (c.due_date && c.due_date <= addDays(today, 1))
   );
-  const board = tasks.filter((c) => c.prioritized);
-  const allList = (kindFilter ? cards.filter((c) => c.kind === kindFilter) : cards).filter(
-    (c) => c.kind !== "principle" || kindFilter === "principle"
+  const allList = cards.filter((c) =>
+    filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
   );
+  const stats = [
+    habitsLeft.length && `${habitsLeft.length} daily left`,
+    upNext.length && `${upNext.length} up next`,
+    state?.minutesToday && `${state.minutesToday} min intentional today`,
+  ].filter(Boolean);
   const mindset = principles.length ? principles[mindsetIdx % principles.length] : null;
   const fresh = [
     ...pending,
@@ -168,7 +179,7 @@ export default function IntentionalPage() {
     if (card.id.startsWith("tmp-")) return;
     patchLocal(card.id, { prioritized: !card.prioritized });
     run({ action: "update", id: card.id, fields: { prioritized: !card.prioritized } }).catch(() => {});
-    setToast({ text: card.prioritized ? "Removed from board" : "Added to your board ⭐" });
+    setToast({ text: card.prioritized ? "Unprioritized" : "Prioritized ★" });
   };
 
   const complete = (card: Card, startedAt?: string) => {
@@ -201,9 +212,7 @@ export default function IntentionalPage() {
           {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
         </p>
         <h1 className="text-2xl font-semibold mt-1">{greeting(now.getHours())}.</h1>
-        <p className="text-sm text-stone-600 mt-1">
-          {habitsLeft.length} daily left · {upNext.length} up next · {state?.minutesToday ?? 0} min intentional today
-        </p>
+        {stats.length > 0 && <p className="text-sm text-stone-600 mt-1">{stats.join(" · ")}</p>}
       </header>
 
       {mindset && (
@@ -217,7 +226,7 @@ export default function IntentionalPage() {
       )}
 
       <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 flex gap-1 border-b border-stone-200">
-        {(["today", "board", "all", "mindset"] as Tab[]).map((t) => (
+        {(["today", "all"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -234,19 +243,21 @@ export default function IntentionalPage() {
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
 
-        {fresh.length > 0 && (
-          <div className="rounded-3xl bg-emerald-50 p-2 space-y-2">
-            <div className="flex items-center justify-between pl-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Just added</h2>
-              <button onClick={() => setSince(null)} className="min-h-11 px-3 text-sm text-emerald-700">
-                Dismiss
-              </button>
-            </div>
-            {fresh.map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
+        {state && tab === "all" && (
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3">
+            <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
+            <Chip active={filter === "prioritized"} onClick={() => setFilter("prioritized")}>★ Prioritized</Chip>
+            {KINDS.map((k) => (
+              <Chip key={k} active={filter === k} onClick={() => setFilter(k)}>
+                {KIND_META[k].emoji} {KIND_META[k].label}
+              </Chip>
             ))}
           </div>
         )}
+
+        {fresh.map((c) => (
+          <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
+        ))}
 
         {state && tab === "today" && (
           <>
@@ -257,7 +268,7 @@ export default function IntentionalPage() {
             ))}
             <SectionTitle>Up next</SectionTitle>
             {upNext.length === 0 && (
-              <Empty>Nothing pressing. Swipe right on cards in “All” to put them on your board.</Empty>
+              <Empty>Nothing pressing. Prioritize cards in “All” (swipe right or ★) to see them here.</Empty>
             )}
             {show(upNext).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
@@ -265,36 +276,18 @@ export default function IntentionalPage() {
           </>
         )}
 
-        {state && tab === "board" && (
-          <>
-            {board.length === 0 && <Empty>Swipe right on a card to add it to your board.</Empty>}
-            {show(board).map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
-            ))}
-          </>
-        )}
-
         {state && tab === "all" && (
           <>
-            <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3">
-              <Chip active={!kindFilter} onClick={() => setKindFilter(null)}>All</Chip>
-              {KINDS.map((k) => (
-                <Chip key={k} active={kindFilter === k} onClick={() => setKindFilter(k)}>
-                  {KIND_META[k].emoji} {KIND_META[k].label}
-                </Chip>
-              ))}
-            </div>
-            {allList.length === 0 && <Empty>No cards yet. Tap + to dump a transcript.</Empty>}
+            {allList.length === 0 && fresh.length === 0 && (
+              <Empty>
+                {filter === "prioritized"
+                  ? "Swipe right (or tap ★) on a card to prioritize it."
+                  : filter === "principle"
+                    ? "Add reminders like “Lead without permission” or “Be concise.”"
+                    : "No cards yet. Tap + to add one."}
+              </Empty>
+            )}
             {show(allList).map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
-            ))}
-          </>
-        )}
-
-        {state && tab === "mindset" && (
-          <>
-            {principles.length === 0 && <Empty>Add reminders like “Lead without permission” or “Be concise.”</Empty>}
-            {show(principles).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
             ))}
           </>
@@ -426,10 +419,11 @@ function Stars({ value, onChange, size = "text-sm" }: { value: number; onChange?
 const SWIPE_AT = 90;
 
 function CardRow({
-  card, today, onOpen, onLeft, onRight, done, onCheck,
+  card, today, onOpen, onLeft, onRight, done, onCheck, isNew,
 }: {
   card: Card;
   today: string;
+  isNew?: boolean;
   onOpen: (id: string) => void;
   onLeft: (c: Card) => void;
   onRight: (c: Card) => void;
@@ -441,6 +435,9 @@ function CardRow({
   const axis = useRef<"x" | "y" | null>(null);
   const moved = useRef(false);
   const meta = KIND_META[card.kind];
+  const important = card.kind !== "principle" && card.stars >= 4;
+  const hasMeta = isNew || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
+    || card.related_ids.length > 0;
 
   const end = () => {
     if (dx <= -SWIPE_AT) onLeft(card);
@@ -457,7 +454,8 @@ function CardRow({
         {dx > 0 ? (card.prioritized ? "Unprioritize" : "★ Prioritize") : "Delete"}
       </div>
       <div
-        className={cn("relative bg-white border border-stone-200 rounded-2xl px-4 py-3 flex items-start gap-3 select-none",
+        className={cn("group relative bg-white border rounded-2xl px-4 py-3 flex items-start gap-3 select-none cursor-pointer",
+          isNew ? "border-emerald-300" : "border-stone-200",
           dx === 0 && "transition-transform", done && "opacity-50")}
         style={{ transform: `translateX(${dx}px)`, touchAction: "pan-y" }}
         onPointerDown={(e) => { start.current = { x: e.clientX, y: e.clientY }; moved.current = false; }}
@@ -495,18 +493,42 @@ function CardRow({
             {card.prioritized && <span className="text-amber-500 mr-1">★</span>}
             {card.title}
           </p>
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
-            <span className={cn("rounded-full px-2 py-0.5", meta.tone)}>{meta.label}</span>
-            {card.kind !== "principle" && <Stars value={card.stars} size="text-xs" />}
-            {card.est_minutes && <span>~{card.est_minutes} min</span>}
-            {card.due_date && (
-              <span className={card.due_date < today ? "text-rose-600 font-medium" : ""}>
-                {dueLabel(card.due_date, today)}
-              </span>
-            )}
-            {card.related_ids.length > 0 && <span>🔗 {card.related_ids.length}</span>}
-          </div>
+          {hasMeta && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
+              {isNew && <span className="rounded-full bg-emerald-500 px-2 py-0.5 font-semibold text-white">New</span>}
+              {card.kind !== "action" && <span className={cn("rounded-full px-2 py-0.5", meta.tone)}>{meta.label}</span>}
+              {card.due_date && (
+                <span className={cn("font-medium",
+                  card.due_date <= today ? "text-rose-600" : card.due_date === addDays(today, 1) ? "text-amber-600" : "")}>
+                  {dueLabel(card.due_date, today)}
+                </span>
+              )}
+              {card.est_minutes && <span>~{card.est_minutes} min</span>}
+              {important && <Stars value={card.stars} size="text-xs" />}
+              {card.related_ids.length > 0 && <span>🔗 {card.related_ids.length}</span>}
+            </div>
+          )}
         </div>
+        {!card.id.startsWith("tmp-") && (
+          <div className="hidden pointer-fine:flex -my-1 -mr-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={(e) => { e.stopPropagation(); onRight(card); }}
+              aria-label={card.prioritized ? "Unprioritize" : "Prioritize"}
+              title={card.prioritized ? "Unprioritize" : "Prioritize"}
+              className={cn("size-11 rounded-full hover:bg-stone-100", card.prioritized ? "text-amber-500" : "text-stone-400")}
+            >
+              ★
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onLeft(card); }}
+              aria-label="Delete"
+              title="Delete"
+              className="size-11 rounded-full text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+            >
+              🗑
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
