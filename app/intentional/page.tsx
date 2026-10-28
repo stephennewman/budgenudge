@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/utils/styles";
 import { intentionScore } from "@/utils/intentional/score";
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Kind = "action" | "thought" | "idea" | "reminder" | "note" | "habit" | "principle";
 
@@ -20,9 +23,11 @@ type Card = {
   related_ids: string[];
   last_done_on: string | null;
   created_at: string;
+  boost: number;
 };
 
-type State = { cards: Card[]; today: string; minutesToday: number };
+type Job = { id: string; status: "processing" | "done" | "failed"; progress: number; log: string[]; created_at: string };
+type State = { cards: Card[]; jobs: Job[]; today: string; minutesToday: number };
 type Filter = "all" | "prioritized" | Kind;
 type Timer = { id: string; startedAt: string };
 
@@ -70,7 +75,7 @@ function fmtClock(totalSec: number) {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-async function api(body?: object): Promise<State & { addedId?: string; addedSince?: string; error?: string }> {
+async function api(body?: object): Promise<State & { addedId?: string; addedSince?: string; transcriptId?: string | null; error?: string }> {
   const res = await fetch("/api/intentional", body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { cache: "no-store" });
@@ -91,6 +96,8 @@ export default function IntentionalPage() {
   const [mindsetIdx, setMindsetIdx] = useState(0);
   const [pending, setPending] = useState<Card[]>([]);
   const [since, setSince] = useState<string | null>(null);
+  const [dismissedJobs, setDismissedJobs] = useState<string[]>([]);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const run = useCallback(async (body?: object) => {
     try {
@@ -117,11 +124,19 @@ export default function IntentionalPage() {
     else localStorage.removeItem(TIMER_KEY);
   }, [timer]);
 
+  const processing = !!state?.jobs.some((j) => j.status === "processing");
+
   useEffect(() => {
-    if (!since) return;
+    if (!since || processing) return;
     const t = setTimeout(() => setSince(null), 60000);
     return () => clearTimeout(t);
-  }, [since]);
+  }, [since, processing]);
+
+  useEffect(() => {
+    if (!processing) return;
+    const t = setInterval(() => run().catch(() => {}), 1200);
+    return () => clearInterval(t);
+  }, [processing, run]);
 
   useEffect(() => {
     if (!toast) return;
@@ -141,6 +156,7 @@ export default function IntentionalPage() {
     // re-rank on the hour, not every tick
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cards, today, hourKey]);
+  const total = (c: Card) => (scores.get(c.id)?.score ?? 0) + (c.boost ?? 0);
   const counts = new Map<Filter, number>();
   for (const c of cards) {
     counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
@@ -154,7 +170,7 @@ export default function IntentionalPage() {
     .filter((c) =>
       filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
     )
-    .sort((x, y) => (scores.get(y.id)?.score ?? 0) - (scores.get(x.id)?.score ?? 0));
+    .sort((x, y) => total(y) - total(x));
   const stats = [
     habitsLeft.length && `${habitsLeft.length} daily left`,
     state?.minutesToday && `${state.minutesToday} min intentional today`,
@@ -193,6 +209,28 @@ export default function IntentionalPage() {
     setToast({ text: card.prioritized ? "Unprioritized" : "Prioritized ★" });
   };
 
+  const play = (card: Card) => {
+    if (card.id.startsWith("tmp-")) return;
+    setTimer({ id: card.id, startedAt: new Date().toISOString() });
+  };
+
+  const shown = show(list);
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over || active.id === over.id) return;
+    const from = shown.findIndex((c) => c.id === active.id);
+    const to = shown.findIndex((c) => c.id === over.id);
+    if (from < 0 || to < 0) return;
+    const rest = shown.filter((c) => c.id !== active.id);
+    const above = rest[to - 1];
+    const below = rest[to];
+    const target =
+      above && below ? (total(above) + total(below)) / 2 : above ? total(above) - 5 : total(below) + 5;
+    const card = shown[from];
+    const boost = target - (scores.get(card.id)?.score ?? 0);
+    patchLocal(card.id, { boost });
+    run({ action: "update", id: card.id, fields: { boost } }).catch(() => {});
+  };
+
   const complete = (card: Card, startedAt?: string) => {
     if (card.kind === "habit") patchLocal(card.id, { last_done_on: today });
     else patchLocal(card.id, null);
@@ -212,6 +250,7 @@ export default function IntentionalPage() {
     );
   }
 
+  const job = state?.jobs.find((j) => !dismissedJobs.includes(j.id)) ?? null;
   const openCard = openId ? byId.get(openId) ?? null : null;
   const timerCard = timer ? byId.get(timer.id) ?? null : null;
 
@@ -256,8 +295,11 @@ export default function IntentionalPage() {
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
 
+        {job && <JobPanel job={job} onDismiss={() => setDismissedJobs((d) => [...d, job.id])} />}
+
         {fresh.map((c) => (
-          <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
+          <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
+            onPlay={play} />
         ))}
 
         {state && list.length === 0 && fresh.length === 0 && (
@@ -268,11 +310,17 @@ export default function IntentionalPage() {
           </Empty>
         )}
 
-        {show(list).map((c) => (
-          <CardRow key={c.id} card={c} today={today} reason={scores.get(c.id)?.reason}
-            onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
-            {...(c.kind === "habit" ? { done: c.last_done_on === today, onCheck: () => complete(c) } : {})} />
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+          <SortableContext items={shown.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {shown.map((c) => (
+                <SortableCardRow key={c.id} card={c} today={today} reason={scores.get(c.id)?.reason}
+                  onOpen={setOpenId} onLeft={archive} onRight={togglePriority} onPlay={play}
+                  {...(c.kind === "habit" ? { done: c.last_done_on === today, onCheck: () => complete(c) } : {})} />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </section>
 
       <button
@@ -313,6 +361,7 @@ export default function IntentionalPage() {
               related_ids: [],
               last_done_on: null,
               created_at: new Date().toISOString(),
+              boost: 0,
             };
             setPending((p) => [temp, ...p]);
             setCaptureOpen(false);
@@ -321,8 +370,8 @@ export default function IntentionalPage() {
               const res = await run({ action: "capture", text, single });
               const at = res.addedSince!;
               setSince((s) => (s && s < at ? s : at));
-              // pick up the background AI sorting
-              [4000, 10000, 20000].forEach((ms) => setTimeout(() => run().catch(() => {}), ms));
+              // single cards: pick up the background AI sorting (transcripts poll their job)
+              if (single) [4000, 10000].forEach((ms) => setTimeout(() => run().catch(() => {}), ms));
             } catch {
               /* toast shown */
             } finally {
@@ -423,9 +472,7 @@ function Stars({ value, onChange, size = "text-sm" }: { value: number; onChange?
 
 const SWIPE_AT = 90;
 
-function CardRow({
-  card, today, onOpen, onLeft, onRight, done, onCheck, isNew, reason,
-}: {
+type CardRowProps = {
   card: Card;
   today: string;
   isNew?: boolean;
@@ -433,15 +480,42 @@ function CardRow({
   onOpen: (id: string) => void;
   onLeft: (c: Card) => void;
   onRight: (c: Card) => void;
+  onPlay: (c: Card) => void;
   done?: boolean;
   onCheck?: () => void;
-}) {
+};
+
+function SortableCardRow(props: CardRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: props.card.id });
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn("relative", isDragging && "z-20 opacity-90 shadow-xl rounded-2xl")}>
+      <CardRow {...props} handle={
+        <span
+          {...attributes}
+          {...listeners}
+          onPointerDown={(e) => { listeners?.onPointerDown?.(e); e.stopPropagation(); }}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Drag to reorder"
+          className="-ml-3 -my-1 w-8 h-11 shrink-0 flex items-center justify-center text-stone-300 cursor-grab active:cursor-grabbing touch-none"
+        >
+          ⋮⋮
+        </span>
+      } />
+    </div>
+  );
+}
+
+function CardRow({
+  card, today, onOpen, onLeft, onRight, onPlay, done, onCheck, isNew, reason, handle,
+}: CardRowProps & { handle?: React.ReactNode }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<"x" | "y" | null>(null);
   const moved = useRef(false);
   const meta = KIND_META[card.kind];
   const important = card.kind !== "principle" && card.stars >= 4;
+  const playable = !done && !card.id.startsWith("tmp-") && ["action", "habit", "reminder"].includes(card.kind);
   const hasMeta = isNew || !!reason || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
     || card.related_ids.length > 0;
 
@@ -480,6 +554,7 @@ function CardRow({
         onPointerCancel={() => { setDx(0); start.current = null; axis.current = null; }}
         onClick={() => { if (!moved.current) onOpen(card.id); }}
       >
+        {handle}
         {onCheck ? (
           <button
             onClick={(e) => { e.stopPropagation(); if (!done) onCheck(); }}
@@ -516,6 +591,16 @@ function CardRow({
             </div>
           )}
         </div>
+        {playable && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onPlay(card); }}
+            aria-label="Be intentional — start timer"
+            title="Start timer"
+            className="-my-1 -mr-1 size-11 shrink-0 rounded-full flex items-center justify-center text-emerald-600 hover:bg-emerald-50"
+          >
+            <span className="size-8 rounded-full bg-emerald-50 flex items-center justify-center text-sm pl-0.5">▶</span>
+          </button>
+        )}
         {!card.id.startsWith("tmp-") && (
           <div className="hidden pointer-fine:flex -my-1 -mr-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
@@ -536,6 +621,43 @@ function CardRow({
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function JobPanel({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
+  const logRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [job.log.length]);
+  const running = job.status === "processing";
+
+  return (
+    <div className="rounded-2xl bg-stone-900 text-stone-100 p-3 font-mono text-xs shadow-lg">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className={cn("font-semibold", job.status === "failed" ? "text-rose-300" : "text-emerald-300")}>
+          {running ? "Processing transcript…" : job.status === "failed" ? "Stopped" : "Complete"} · {job.progress}%
+        </span>
+        {!running && (
+          <button onClick={onDismiss} aria-label="Dismiss" className="min-w-11 min-h-11 -my-3 -mr-2 text-stone-400">✕</button>
+        )}
+      </div>
+      <div className="h-1.5 rounded-full bg-stone-700 overflow-hidden mb-2">
+        <div
+          className={cn("h-full transition-all duration-500", job.status === "failed" ? "bg-rose-400" : "bg-emerald-400")}
+          style={{ width: `${job.progress}%` }}
+        />
+      </div>
+      <div ref={logRef} className="max-h-40 overflow-y-auto space-y-0.5 leading-relaxed">
+        {job.log.map((line, i) => (
+          <p key={i} className={cn("whitespace-pre-wrap break-words",
+            line.startsWith("+") ? "text-emerald-300" : line.startsWith("↺") ? "text-amber-300"
+              : line.startsWith("✗") ? "text-rose-300" : line.startsWith("✓") ? "text-emerald-200 font-semibold" : "text-stone-400")}>
+            {line}
+          </p>
+        ))}
+        {running && <p className="text-stone-500 animate-pulse">▌</p>}
       </div>
     </div>
   );
