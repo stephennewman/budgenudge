@@ -478,13 +478,19 @@ function Sheet({ onClose, children }: { onClose: () => void; children: React.Rea
 
 function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (text: string, single: boolean) => Promise<void> }) {
   const [text, setText] = useState("");
-  const [single, setSingle] = useState(false);
+  const [single, setSingle] = useState(true);
   const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (busy || !text.trim()) return;
+    setBusy(true);
+    try { await onSubmit(text, single); } catch { /* toast shown */ } finally { setBusy(false); }
+  };
 
   return (
     <Sheet onClose={onClose}>
       <div className="flex gap-1 rounded-full bg-stone-100 p-1 mb-3">
-        {[{ v: false, l: "Dump transcript" }, { v: true, l: "One card" }].map((o) => (
+        {[{ v: true, l: "One card" }, { v: false, l: "Dump transcript" }].map((o) => (
           <button key={o.l} onClick={() => setSingle(o.v)}
             className={cn("flex-1 min-h-11 rounded-full text-sm font-medium", single === o.v ? "bg-white shadow" : "text-stone-600")}>
             {o.l}
@@ -495,16 +501,19 @@ function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (t
         autoFocus
         value={text}
         onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            submit();
+          }
+        }}
         rows={single ? 3 : 10}
         placeholder={single ? "Get Whitney to do her insurance…" : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."}
         className="w-full rounded-2xl border border-stone-200 p-3 text-base outline-none focus:border-stone-400"
       />
       <button
         disabled={busy || !text.trim()}
-        onClick={async () => {
-          setBusy(true);
-          try { await onSubmit(text, single); } catch { /* toast shown */ } finally { setBusy(false); }
-        }}
+        onClick={submit}
         className="mt-3 w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
       >
         {busy ? "Making cards…" : single ? "Add card" : "Make cards"}
