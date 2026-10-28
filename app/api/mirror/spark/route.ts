@@ -26,16 +26,50 @@ const LEVEL_SPECS: Record<number, string> = {
   4: "Level 4 of 4 (XXXX): raunchy and filthy — anything goes. The most graphic language and the most intense scenario in this category. Nothing is too much as long as it stays between the two spouses.",
 };
 
+// Light per-person themes. About half the time one is offered as a gentle
+// lean, never a requirement, so ideas stay varied across categories.
+const PERSON_THEMES: Record<Person, string[]> = {
+  whitney: [
+    "blowjob tips and technique",
+    "sending him a sexy pic",
+    "wearing an erotic outfit for him",
+    "surprising him",
+    "a sex position to try",
+    "tips for better sex",
+    "slowing down and savoring it — it's not a race to the finish",
+    "unleashing her inner freak",
+  ],
+  stephen: [
+    "how to dominate her",
+    "being more assertive",
+    "building stamina",
+    "being a better lover",
+    "being fully present with her",
+    "being more unpredictable",
+    "confidence in the bedroom",
+  ],
+};
+const THEME_CHANCE = 0.5;
+
 function buildPrompt(
   person: Person,
   categoryName: string,
   categoryHint: string,
   level: number,
-  tag: SparkTag,
+  tag: SparkTag | null,
   avoid: string[]
 ): string {
   const reader = person === "stephen" ? "Stephen (the husband)" : "Whitney (the wife)";
   const partner = person === "stephen" ? "Whitney, his wife" : "Stephen, her husband";
+
+  const themes = PERSON_THEMES[person];
+  const theme =
+    Math.random() < THEME_CHANCE
+      ? themes[Math.floor(Math.random() * themes.length)]
+      : null;
+  const themeLine = theme
+    ? `\nOptional inspiration (use only if it fits the category naturally): ${theme}.`
+    : "";
 
   const avoidBlock =
     avoid.length > 0
@@ -44,12 +78,18 @@ function buildPrompt(
           .join("\n")}`
       : "";
 
-  return `Generate ONE sexy idea for ${reader} in the category "${categoryName}" — ${categoryHint}. The other partner is ${partner}. They are a married couple with 3 kids, adventurous and very much in love.
+  return `Generate ONE sexy idea for ${reader} in the category "${categoryName}" — ${categoryHint}. The other partner is ${partner}. They are a married couple, adventurous and very much in love.${themeLine}
 
 This idea is one step on a 4-level heat ladder. Write it at exactly this level:
 ${LEVEL_SPECS[level]}
 
-The idea's action type is "${tag.id.toUpperCase()}" — it must be ${tag.gloss}. Stay true to both the category and this action type.
+${
+    tag
+      ? `The idea's action type is "${tag.id.toUpperCase()}" — it must be ${tag.gloss}. `
+      : ""
+  }The category comes first: the idea must unmistakably be a "${categoryName}" idea (a ritual must recur, a tip must teach a technique, a date idea must be a date).${
+    tag ? " Use the action type only as a flavor within that." : ""
+  }
 
 Rules:
 - Perspective: speak directly TO ${reader.split(" ")[0]} as "you", and refer to ${partner} by name in the third person (e.g. ${person === "stephen" ? '"tell Whitney...", "watch her..."' : '"tell Stephen...", "watch him..."'}). Never call ${partner.split(",")[0]} "you".
@@ -59,7 +99,8 @@ Rules:
 - The ONE hard boundary: everything they DO stays between these two spouses — no other people, real or roleplayed, involved in anything happening now. Solo ideas are about themselves or fantasizing about their spouse. Telling each other true stories or confessions about their own pasts (including past partners) is fine when the category calls for it. Anything else goes.
 - Everything consensual between the two of them.
 - NO pregnancy, breeding, impregnation, or "give me a baby" themes of any kind — not even as dirty talk. This topic is permanently off the table.
-- Realistic for busy parents: discreet, after bedtime, stolen moments.
+- NEVER mention kids, children, bedtime, "once the house is quiet", babysitters, or sneaking around anyone. Assume they simply have privacy.
+- Make it a fresh, concrete idea someone could actually use — a challenge, a game, a technique, a plan — not a generic "tonight, do X" line. Don't default to mirrors or texting unless the category or action type calls for it.
 - A punchy 2-4 word title and a SHORT body: 1-2 sentences, 30 words max. Every word earns its place. No emojis, no hashtags.${avoidBlock}
 
 Return ONLY a valid JSON object, no markdown fences: {"title":"","body":""}`;
@@ -82,8 +123,8 @@ function demoIdea(
   const you = person === "stephen" ? "Stephen" : "Whitney";
   const pool = [
     {
-      title: "After bedtime",
-      body: `Wait until the house is quiet, then text ${partner} exactly: "Kids are down. Come find me." Don't say anything else.`,
+      title: "Come find me",
+      body: `Text ${partner} exactly: "Bedroom. Five minutes. Come find me." Don't say anything else.`,
     },
     {
       title: "Hallway pass",
@@ -202,7 +243,14 @@ export async function POST(req: Request) {
         },
         {
           role: "user",
-          content: buildPrompt(person, category.name, category.hint, level, tag, avoid),
+          content: buildPrompt(
+            person,
+            category.name,
+            category.hint,
+            level,
+            category.ownsFormat ? null : tag,
+            avoid
+          ),
         },
       ],
       // OpenRouter extension: skip the reasoning/thinking pass. Grok otherwise

@@ -6,6 +6,9 @@ export interface SparkCategory {
   id: string;
   name: string;
   hint: string;
+  // The category already defines the idea's shape (a tip, a ritual, a
+  // multi-day challenge), so no random action tag is layered on top.
+  ownsFormat?: boolean;
 }
 
 // Action tags: each generated idea is steered toward one verb so a batch of
@@ -35,6 +38,8 @@ export const ACTION_TAGS: SparkTag[] = [
   { id: "dare", gloss: "a dare to issue to their spouse" },
   { id: "show", gloss: "something to show or reveal to their spouse" },
   { id: "act", gloss: "a small scene or role to act out, just the two of them" },
+  { id: "learn", gloss: "a technique, tip, or trick to learn and use on their spouse" },
+  { id: "challenge", gloss: "a challenge with a clear goal, rule, and reward" },
 ];
 
 export const CATEGORIES: SparkCategory[] = [
@@ -94,11 +99,6 @@ export const CATEGORIES: SparkCategory[] = [
     hint: "blindfolds, ice, wax, feathers, breath, temperature, deprivation of one sense to heighten the rest",
   },
   {
-    id: "stolen-moments",
-    name: "Stolen Moments",
-    hint: "quick, discreet moments stolen around a busy family day with kids in the house",
-  },
-  {
     id: "around-the-house",
     name: "Around the House",
     hint: "new spots, rooms, and surfaces at home to put to unexpected use",
@@ -126,7 +126,7 @@ export const CATEGORIES: SparkCategory[] = [
   {
     id: "morning",
     name: "Morning Heat",
-    hint: "before-the-alarm and before-the-kids-wake wake-up moves",
+    hint: "before-the-alarm wake-up moves and ways to start the day hot",
   },
   {
     id: "kink-sampler",
@@ -136,7 +136,7 @@ export const CATEGORIES: SparkCategory[] = [
   {
     id: "date-finale",
     name: "Date Night Finale",
-    hint: "how tonight's date should end once they're back home and the sitter leaves",
+    hint: "how tonight's date should end once they're back home and the door closes",
   },
   {
     id: "mirror",
@@ -157,6 +157,7 @@ export const CATEGORIES: SparkCategory[] = [
     id: "challenges",
     name: "Challenges",
     hint: "timed challenges with concrete numbers — sprints, marathons, quickies, speed rounds, endurance tests, beat-the-clock, number of positions before the timer, hold-out-as-long-as-you-can. Every idea includes a specific time limit, duration, or count",
+    ownsFormat: true,
   },
   {
     id: "confessions",
@@ -167,26 +168,76 @@ export const CATEGORIES: SparkCategory[] = [
     id: "truth-or-dare",
     name: "Truth or Dare",
     hint: "classic truth-or-dare between the two of them — each idea is one truth question or one dare, clearly labeled, ready to fire at their spouse",
+    ownsFormat: true,
   },
   {
     id: "would-you-rather",
     name: "Would You Rather",
     hint: "dirty either/or questions to ask their spouse — two tempting options, spouse must pick one and explain why",
+    ownsFormat: true,
   },
   {
     id: "bucket-list",
     name: "Bucket List",
     hint: "a sexual bucket-list item to propose adding to their shared list — something they've never done together, pitched with when and how to make it happen",
+    ownsFormat: true,
   },
   {
     id: "know-me",
     name: "How Well You Know Me",
     hint: "sexy quiz questions to ask their spouse about themselves — what gets me going, my favorite spot, what I think about — with stakes for right and wrong answers",
+    ownsFormat: true,
   },
   {
     id: "firsts",
     name: "New Firsts",
     hint: "a brand-new first for the two of them to have together — something neither has ever done with anyone, claimed as theirs alone",
+  },
+  {
+    id: "tips",
+    name: "Tips & Tricks",
+    hint: "one practical, specific technique tip or trick that makes something noticeably better — the how-to detail most couples never learn, explained clearly enough to use tonight",
+    ownsFormat: true,
+  },
+  {
+    id: "skill",
+    name: "Skill Builder",
+    hint: "one skill to practice and get better at — kissing, pacing, edging, hands, reading their spouse's reactions — with a concrete drill to run together",
+    ownsFormat: true,
+  },
+  {
+    id: "week-challenge",
+    name: "7-Day Challenge",
+    hint: "a challenge that runs across the next several days, with a daily rule or escalation and a clear payoff at the end",
+    ownsFormat: true,
+  },
+  {
+    id: "date-ideas",
+    name: "Sexy Date Ideas",
+    hint: "an out-of-the-ordinary date idea, at home or out, with a sexy thread running through it from start to finish",
+    ownsFormat: true,
+  },
+  {
+    id: "quickies",
+    name: "Quickies",
+    hint: "fast, high-impact ideas that take ten minutes or less from start to finish",
+  },
+  {
+    id: "flirt",
+    name: "Flirt All Day",
+    hint: "small flirty moves across an ordinary day — notes, glances, touches, messages — that keep the spark lit until later",
+  },
+  {
+    id: "getaway",
+    name: "Hotel & Getaway",
+    hint: "ideas for a hotel night or trip away — what to pack, what to plan, and what to do once the door closes",
+    ownsFormat: true,
+  },
+  {
+    id: "rituals",
+    name: "Rituals",
+    hint: "a recurring ritual to adopt as a couple — weekly, monthly, or every time a certain thing happens — that keeps desire on the calendar",
+    ownsFormat: true,
   },
   {
     id: "oral",

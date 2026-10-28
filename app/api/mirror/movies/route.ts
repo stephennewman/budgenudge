@@ -11,6 +11,9 @@ export const revalidate = 21600; // 6 hours
 const TMDB = "https://api.themoviedb.org/3";
 const IMG = "https://image.tmdb.org/t/p/w342";
 const PER_TYPE = 12;
+// Only English-language originals. TMDB popularity is global, so without this
+// the streaming tabs fill up with K-dramas, anime, and C-dramas.
+const ORIGINAL_LANGUAGE = "en";
 
 // Default TMDB watch-provider IDs (US region). Extra providers can be added
 // per-device via the `extra` query param (comma-separated TMDB provider IDs);
@@ -74,6 +77,7 @@ type TmdbResult = {
   first_air_date?: string;
   poster_path?: string | null;
   vote_average?: number;
+  original_language?: string;
 };
 
 async function fetchRtScore(
@@ -114,7 +118,10 @@ async function buildList(
   type: "movie" | "tv",
   omdbKey: string | undefined
 ): Promise<MediaItem[]> {
-  const picks = results.filter((r) => r.poster_path).slice(0, PER_TYPE);
+  // now_playing has no language param, so filter here for both list types.
+  const picks = results
+    .filter((r) => r.poster_path && r.original_language === ORIGINAL_LANGUAGE)
+    .slice(0, PER_TYPE);
 
   const items = await Promise.all(
     picks.map(async (r) => {
@@ -207,6 +214,7 @@ export async function GET(req: NextRequest) {
           `${TMDB}/discover/tv?api_key=${tmdbKey}&language=en-US&watch_region=US` +
             `&with_watch_providers=${p.tmdbId}&with_watch_monetization_types=flatrate` +
             `&first_air_date.gte=${cutoff}&first_air_date.lte=${today}` +
+            `&with_original_language=${ORIGINAL_LANGUAGE}` +
             `&sort_by=popularity.desc&vote_count.gte=5`
         )
       ),

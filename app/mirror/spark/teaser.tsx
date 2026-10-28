@@ -6,17 +6,18 @@ import { Loader2 } from "lucide-react";
 // Spark's doorway, disguised as a channel card stuck loading. Mirrors the
 // exact chrome of the other ChecklistChannel cards (watermark icon, chip +
 // title header, big light body text) so it blends into the rotation.
-// Tap anywhere to open a single sexy challenge for Whitney.
+// Tap anywhere to open a single sexy challenge for that person.
 
-export function SparkTeaser() {
+export function SparkTeaser({ person }: { person: "stephen" | "whitney" }) {
   const router = useRouter();
+  const name = person === "stephen" ? "Stephen" : "Whitney";
 
   return (
     <button
       type="button"
-      aria-label="Open a challenge for Whitney"
-      onPointerDown={() => router.push("/mirror/spark?p=whitney")}
-      className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 p-6 text-left backdrop-blur-md md:p-8"
+      aria-label={`Open a challenge for ${name}`}
+      onPointerDown={() => router.push(`/mirror/spark?p=${person}`)}
+      className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 p-6 text-left md:p-8"
       style={{
         background:
           "linear-gradient(135deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.08) 70%)",
@@ -42,8 +43,8 @@ export function SparkTeaser() {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="my-auto py-2">
-          <p className="flex items-center text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl">
-            <span className="py-4">Loading</span>
+          <p className="flex flex-wrap items-center text-2xl font-light leading-relaxed text-white md:text-3xl lg:text-4xl">
+            <span className="py-4">Loading for {name}</span>
             <span className="py-4 pl-2 pr-3">;)</span>
           </p>
         </div>

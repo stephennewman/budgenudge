@@ -76,7 +76,7 @@ const TEAL = "#14b8a6";
 const LOADING_LINES = [
   "Warming things up…",
   "Consulting the naughty archives…",
-  "Checking the kids are asleep…",
+  "Locking the door…",
   "Dimming the lights…",
   "Finding just the right amount of trouble…",
   "Almost there… don't finish without it…",

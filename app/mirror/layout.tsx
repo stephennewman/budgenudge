@@ -28,5 +28,12 @@ export default function MirrorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      {/* The app's body is white; in fullscreen/standalone any area outside
+          the dashboard (safe areas, overscroll) would flash it. */}
+      <style>{`html,body{background:#020111;overscroll-behavior:none}`}</style>
+      {children}
+    </>
+  );
 }

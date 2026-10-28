@@ -49,6 +49,26 @@ export type PaceRow = {
 
 const PCT_FLOOR = 12;
 
+// The mirror's Money channel paces just these, by week and by month.
+// `ven` is the lowercased AI vendor (or raw merchant); `cat` the lowercased
+// AI category. Amazon Prime / Prime Video are subscriptions, not shopping.
+const FOCUS: { id: string; name: string; match: (cat: string, ven: string) => boolean }[] = [
+  { id: "publix", name: "Publix", match: (_c, v) => v.includes("publix") },
+  {
+    id: "amazon",
+    name: "Amazon",
+    match: (_c, v) => v.includes("amazon") && !v.includes("prime"),
+  },
+  {
+    id: "restaurants",
+    name: "Restaurants",
+    match: (c) => c === "restaurant" || c === "restaurants" || c === "food and drink",
+  },
+];
+
+export type FocusPace = { actual: number; expected: number; target: number };
+export type FocusRow = { id: string; name: string; week: FocusPace; month: FocusPace };
+
 async function resolveUserId(searchParams: URLSearchParams): Promise<string | null> {
   try {
     const authClient = await createSupabaseClient();
@@ -163,6 +183,11 @@ export async function GET(request: NextRequest) {
     const vens = new Map<string, Agg>();
     const bills = new Map<string, Agg>();
     let earliest: string | null = null;
+    // Week runs Monday through today (it may start in the previous month).
+    const weekStartIso = today.startOf("week").toISODate()!;
+    const focusAgg = new Map(
+      FOCUS.map((f) => [f.id, { baseline: 0, month: 0, week: 0 }])
+    );
 
     for (const t of txns) {
       const rawMerchant = (t.merchant_name || t.name || "").trim();
@@ -221,6 +246,14 @@ export async function GET(request: NextRequest) {
         continue;
       }
       if (isBaseline && (!earliest || date < earliest)) earliest = date;
+
+      for (const f of FOCUS) {
+        if (!f.match(cat, venLower)) continue;
+        const agg = focusAgg.get(f.id)!;
+        if (isBaseline) agg.baseline += amt;
+        if (isMonth) agg.month += amt;
+        if (isCurrentMonth && date >= weekStartIso) agg.week += amt;
+      }
 
       if (t.ai_category_tag) bump(cats, t.ai_category_tag);
       bump(vens, t.ai_merchant_name || t.merchant_name || t.name || "Unknown");
@@ -291,7 +324,30 @@ export async function GET(request: NextRequest) {
         })
         .sort((a, b) => b.avgMonthly - a.avgMonthly);
 
+    // Usual spend scaled to the elapsed part of the week/month, plus the
+    // full-period usual as the target.
+    const focus: FocusRow[] = FOCUS.map((f) => {
+      const a = focusAgg.get(f.id)!;
+      const dailyAvg = a.baseline / baselineDays;
+      const monthTarget = dailyAvg * (365 / 12);
+      return {
+        id: f.id,
+        name: f.name,
+        week: {
+          actual: Math.round(a.week),
+          expected: Math.round(dailyAvg * today.weekday),
+          target: Math.round(dailyAvg * 7),
+        },
+        month: {
+          actual: Math.round(a.month),
+          expected: Math.round(monthTarget * (daysElapsedMonth / daysInMonth)),
+          target: Math.round(monthTarget),
+        },
+      };
+    }).filter((r) => r.month.target > 0);
+
     return NextResponse.json({
+      focus,
       month: monthStart.toFormat("LLLL"),
       monthKey: monthStart.toFormat("yyyy-LL"),
       isCurrentMonth,

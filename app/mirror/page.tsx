@@ -41,9 +41,14 @@ import {
   friendsHelloForDate,
   friendsKeepForDate,
 } from "@/utils/mirror/friends-content";
+import {
+  OUTINGS_FREE,
+  OUTINGS_OUTSIDE,
+  OUTINGS_CHEAP,
+} from "@/utils/mirror/outings-content";
 import { HoneyDoCard } from "./honeydo-card";
 import { SparkTeaser } from "./spark/teaser";
-import { TodayChannel } from "./today-channel";
+import { TodayFactsChannel } from "./today-facts-channel";
 import {
   STEPHEN_GROWTH,
   STEPHEN_CONNECT,
@@ -59,8 +64,6 @@ import {
   BookOpen,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Church,
   Cloud,
@@ -76,7 +79,6 @@ import {
   Droplets,
   Eye,
   EyeOff,
-  Flame,
   Flower2,
   Gauge,
   GripVertical,
@@ -98,7 +100,6 @@ import {
   CalendarClock,
   PanelLeftClose,
   PanelLeftOpen,
-  PartyPopper,
   Pause,
   Pencil,
   Play,
@@ -120,6 +121,8 @@ import {
   Tag,
   Ticket,
   UtensilsCrossed,
+  ShoppingCart,
+  Package,
   Sunrise,
   Sunset,
   Umbrella,
@@ -276,7 +279,10 @@ type PacingData = {
   categories: PaceRow[];
   vendors: PaceRow[];
   bills?: PaceRow[];
+  focus?: FocusRow[];
 };
+type FocusPace = { actual: number; expected: number; target: number };
+type FocusRow = { id: string; name: string; week: FocusPace; month: FocusPace };
 type Breakdown = {
   label: string;
   total: number;
@@ -329,6 +335,10 @@ const RAIL_WIDTH_KEY = "mirror.rail.width";
 const RAIL_DEFAULT_WIDTH = 480;
 const RAIL_MIN_WIDTH = 280;
 const RAIL_MAX_WIDTH = 800;
+// Right rail card heights (clock, weather, forecast) as flex weights.
+const RAIL_WEIGHTS_KEY = "mirror.rail.weights.v1";
+const RAIL_DEFAULT_WEIGHTS = [1, 1, 1];
+const RAIL_PANEL_MIN_PX = 90;
 
 // Keep the rail within bounds and leave the main column at least 400px.
 function clampRailWidth(w: number): number {
@@ -400,10 +410,6 @@ const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
     label: "For Stephen",
     ids: ["stephengrowth", "stephenconnect"],
   },
-  // Spark's doorway: a channel that looks stuck loading, sitting between the
-  // two personal channels. It has no widgets; `sections` keeps it anyway,
-  // and the sidebar nav skips it.
-  { id: "spark", label: "Loading", ids: [] },
   {
     id: "whitney",
     label: "For Whitney",
@@ -416,15 +422,10 @@ const CATEGORIES: { id: string; label: string; ids: string[] }[] = [
     ids: ["friendsreach", "friendshello", "friendskeep"],
   },
   // HoneyDo is hidden from the mirror: it's not actionable on a wall display.
-  { id: "money", label: "Money", ids: ["pacing", "spend", "bills", "budget"] },
-  { id: "deals", label: "BOGO Deals", ids: ["bogos", "dinner"] },
-  { id: "movies", label: "Now Showing", ids: ["movies"] },
-  {
-    id: "weather",
-    label: "Weather",
-    ids: ["current", "forecast", "hourly", "glance", "beach", "boat", "sun"],
-  },
-  { id: "events", label: "Out & About", ids: ["events"] },
+  // Money renders its own focused pacing view (see FocusPacing), no widgets.
+  { id: "money", label: "Money", ids: [] },
+  // Out & About shows authored outing ideas as cards (see channelCards).
+  { id: "events", label: "Out & About", ids: [] },
 ];
 
 // Flattened default widget order, derived from the channel layout above.
@@ -673,16 +674,20 @@ export default function MirrorPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [conditions, setConditions] = useState<Conditions | null>(null);
-  const [events, setEvents] = useState<MirrorEvent[] | null>(null);
-  const [localItems, setLocalItems] = useState<LocalItem[] | null>(null);
-  const [movies, setMovies] = useState<MediaSection[] | null>(null);
+  // Beach/Boat scores belonged to the hidden Weather channel; not fetched.
+  const [conditions] = useState<Conditions | null>(null);
+  // Events, Now Showing, and BOGO/meals channels are hidden, so their data
+  // isn't fetched; the widgets stay registered but unavailable.
+  const [events] = useState<MirrorEvent[] | null>(null);
+  const [localItems] = useState<LocalItem[] | null>(null);
+  const [movies] = useState<MediaSection[] | null>(null);
   // Extra streaming-service tabs (TMDB provider IDs) added on this device.
   const [extraProviders, setExtraProviders] = useState<number[]>([]);
   const [bogos, setBogos] = useState<BogoData | null>(null);
-  const [dinner, setDinner] = useState<DinnerData | null>(null);
+  const [dinner] = useState<DinnerData | null>(null);
   const [together, setTogether] = useState<Together | null>(null);
-  const [spend, setSpend] = useState<SpendData | null>(null);
+  // The old spend widgets are hidden; Money only uses pacing.
+  const [spend] = useState<SpendData | null>(null);
   const [pacing, setPacing] = useState<PacingData | null>(null);
   // How many months back the pacing card is showing (0 = current month).
   const [pacingMonthsBack, setPacingMonthsBack] = useState(0);
@@ -997,128 +1002,6 @@ export default function MirrorPage() {
     };
   }, [query, showSearch]);
 
-  // Beach Day / Boat Day scores (Palm Harbor). Refresh every 30 minutes.
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/mirror/conditions");
-        if (!res.ok) return;
-        const json = await res.json();
-        if (active && json.beach && json.boat) setConditions(json);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 30 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  // Nearby events (Ticketmaster). Server falls back to Palm Harbor when no
-  // location is set. Refresh hourly.
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        // 28 days so the Out & About card can cycle through future weeks.
-        let qs = "?days=28";
-        if (location) qs += `&lat=${location.lat}&lon=${location.lon}`;
-        const res = await fetch(`/api/mirror/events${qs}`);
-        if (!res.ok) return;
-        const json = await res.json();
-        if (active) setEvents(json.items ?? []);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 60 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [location]);
-
-  // "Around Town" hyperlocal happenings (weekly cron snapshot). Refresh hourly.
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/mirror/local");
-        if (!res.ok) return;
-        const json = await res.json();
-        if (active) setLocalItems(json.items ?? []);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 60 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
-
-  // Now Showing channel. Refetches when extra provider tabs change; server
-  // caches heavily, so refresh every 6 hours on the client.
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const qs =
-          extraProviders.length > 0 ? `?extra=${extraProviders.join(",")}` : "";
-        const res = await fetch(`/api/mirror/movies${qs}`);
-        if (!active || !res.ok) return;
-        const json = await res.json();
-        setMovies((json.sections ?? []) as MediaSection[]);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 6 * 60 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, [extraProviders]);
-
-  // BOGO Deals channel. Server routes cache heavily; refresh every 6 hours.
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const [bogoRes, dinRes] = await Promise.all([
-          fetch("/api/mirror/bogos"),
-          fetch("/api/mirror/dinner"),
-        ]);
-        if (!active) return;
-        if (bogoRes.ok) {
-          const json = await bogoRes.json();
-          setBogos(Array.isArray(json?.deals) ? json : null);
-        }
-        if (dinRes.ok) {
-          const json = await dinRes.json();
-          // Empty weeks used to return `{dinner:null}` (no `meals`), which
-          // crashed the widgets useMemo on `dinner.meals.length`.
-          setDinner(Array.isArray(json?.meals) ? json : null);
-        }
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const id = setInterval(load, 6 * 60 * 60 * 1000);
-    return () => {
-      active = false;
-      clearInterval(id);
-    };
-  }, []);
 
   // "For us" widgets: verse, fun fact, daily connection challenge. Refresh hourly.
   useEffect(() => {
@@ -1209,7 +1092,7 @@ export default function MirrorPage() {
     };
   }, []);
 
-  // Yesterday's spend. The server authorizes via the logged-in session (the
+  // Money pacing. The server authorizes via the logged-in session (the
   // user's own data) or the shared finance token. Wait until the token has
   // been read from localStorage so a first unauthenticated 401 doesn't make
   // Money look empty. Refetches on login and every 30 min.
@@ -1219,25 +1102,14 @@ export default function MirrorPage() {
     const tz = data?.timezone;
     const load = async () => {
       try {
-        const qs = new URLSearchParams();
-        if (token) qs.set("token", token);
-        if (tz) qs.set("tz", tz);
-        const suffix = qs.toString() ? `?${qs}` : "";
-        const paceQs = new URLSearchParams(qs);
+        const paceQs = new URLSearchParams();
+        if (token) paceQs.set("token", token);
+        if (tz) paceQs.set("tz", tz);
         if (pacingMonthsBack > 0) {
           paceQs.set("month", monthKeyFromOffset(pacingMonthsBack));
         }
         const paceSuffix = paceQs.toString() ? `?${paceQs}` : "";
-        const [res, paceRes] = await Promise.all([
-          fetch(`/api/mirror/spend${suffix}`),
-          fetch(`/api/mirror/pacing${paceSuffix}`),
-        ]);
-        if (!res.ok) {
-          if (active) setSpend(null);
-        } else {
-          const json = await res.json();
-          if (active) setSpend(json);
-        }
+        const paceRes = await fetch(`/api/mirror/pacing${paceSuffix}`);
         if (paceRes.ok) {
           const json = await paceRes.json();
           if (active) setPacing(json);
@@ -1245,10 +1117,7 @@ export default function MirrorPage() {
           setPacing(null);
         }
       } catch {
-        if (active) {
-          setSpend(null);
-          setPacing(null);
-        }
+        if (active) setPacing(null);
       } finally {
         if (active) setMoneyReady(true);
       }
@@ -1857,17 +1726,16 @@ export default function MirrorPage() {
 
   // Group visible widgets into channels. Empty channels are dropped, except
   // Money — it stays in the nav even before finance data loads (or if this
-  // display isn't connected), so it doesn't vanish from the lineup — and
-  // Spark, which has no widgets by design.
+  // display isn't connected), so it doesn't vanish from the lineup.
   const sections = useMemo(() => {
     return [
-      { id: "today", label: "News", widgets: [] as WidgetDef[] },
+      { id: "today", label: "Today", widgets: [] as WidgetDef[] },
       ...CATEGORIES.map((c) => ({
         id: c.id,
         label: c.label,
         widgets: visibleWidgets.filter((w) => c.ids.includes(w.id)),
       })).filter(
-        (s) => s.widgets.length > 0 || s.id === "money" || s.id === "spark"
+        (s) => s.widgets.length > 0 || s.id === "money" || s.id === "events"
       ),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1893,8 +1761,6 @@ export default function MirrorPage() {
     return () => window.removeEventListener("pointerdown", bump);
   }, []);
 
-  // The Today channel holds rotation while its article reader is open.
-  const [holdRotation, setHoldRotation] = useState(false);
   // Inner card/pane cycle length for the active channel. When set, section
   // dwell matches one full pass so auto-advance doesn't cut a card short.
   const [channelDwellMs, setChannelDwellMs] = useState<number | null>(null);
@@ -1902,10 +1768,9 @@ export default function MirrorPage() {
     setChannelDwellMs(ms);
   }, []);
 
-  // Auto-advance walks the left nav in order (News → Faith → … → Out & About
-  // → News). Resets whenever the index changes (so a manual selection gives
-  // you a fresh dwell) or the screen is touched, and pauses while editing or
-  // reading an article.
+  // Auto-advance walks the left nav in order (Today → Faith → … → Out & About
+  // → Today). Resets whenever the index changes (so a manual selection gives
+  // you a fresh dwell) or the screen is touched, and pauses while editing.
   //
   // When the active channel reports an inner card/pane cycle length, dwell
   // is that full pass (3×12s cards → 36s) instead of the default 30s — so
@@ -1918,10 +1783,28 @@ export default function MirrorPage() {
   const sectionsRef = useRef(sections);
   sectionsRef.current = sections;
   const sectionIdsKey = sections.map((s) => s.id).join(",");
+
+  // Channels appear as their data loads; keep the same channel on screen
+  // when one is inserted or removed ahead of it, instead of jumping.
+  const activeIdRef = useRef<string | null>(null);
+  const prevIdsKeyRef = useRef(sectionIdsKey);
+  useLayoutEffect(() => {
+    const ids = sectionIdsKey.split(",");
+    if (prevIdsKeyRef.current !== sectionIdsKey) {
+      prevIdsKeyRef.current = sectionIdsKey;
+      const i = activeIdRef.current ? ids.indexOf(activeIdRef.current) : -1;
+      if (i >= 0 && i !== activeIndex) {
+        setActiveIndex(i);
+        return;
+      }
+    }
+    activeIdRef.current = ids[activeIndex] ?? null;
+  }, [sectionIdsKey, activeIndex]);
+
   const rotateMs = channelDwellMs ?? ROTATE_MS;
   const rotateResetKey = channelDwellMs == null ? interactionTick : 0;
   useEffect(() => {
-    if (!autoRotate || editMode || holdRotation || sectionCount <= 1) {
+    if (!autoRotate || editMode || sectionCount <= 1) {
       setRotateAt(null);
       return;
     }
@@ -1936,7 +1819,6 @@ export default function MirrorPage() {
   }, [
     autoRotate,
     editMode,
-    holdRotation,
     sectionCount,
     activeIndex,
     rotateResetKey,
@@ -1988,7 +1870,7 @@ export default function MirrorPage() {
 
   return (
     <div
-      className="h-screen w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
+      className="h-dvh w-full overflow-hidden text-white antialiased transition-[background] duration-1000"
       style={{ background: gradient }}
     >
       <div className="flex h-full">
@@ -1998,7 +1880,7 @@ export default function MirrorPage() {
           <button
             onClick={cycleNavMode}
             aria-label="Show menu"
-            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 backdrop-blur-md transition hover:bg-black/60 hover:text-white"
+            className="fixed bottom-3 left-3 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/40 text-white/70 transition hover:bg-black/60 hover:text-white"
           >
             <PanelLeftOpen className="h-5 w-5" />
           </button>
@@ -2006,7 +1888,7 @@ export default function MirrorPage() {
         {navMode !== "hidden" && (
         <aside
           className={cn(
-            "flex shrink-0 flex-col border-r border-white/10 bg-black/25 backdrop-blur-md",
+            "flex shrink-0 flex-col border-r border-white/10 bg-black/25",
             navMode === "full" ? "w-44 p-3 md:w-52" : "w-16 p-2"
           )}
         >
@@ -2020,9 +1902,6 @@ export default function MirrorPage() {
             )}
           >
             {sections.map((s, i) => {
-              // Spark stays in the rotation but not in the nav; the index
-              // still comes from the full `sections` array so goTo lines up.
-              if (s.id === "spark") return null;
               const Icon = NAV_ICONS[s.id] ?? LayoutGrid;
               return (
                 <button
@@ -2132,7 +2011,7 @@ export default function MirrorPage() {
                 />
                 <div
                   className={cn(
-                    "absolute z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl",
+                    "absolute z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl",
                     navMode === "icons" ? "bottom-0 left-14" : "bottom-12 left-0"
                   )}
                 >
@@ -2188,7 +2067,7 @@ export default function MirrorPage() {
         >
         {/* Location search panel */}
         {showSearch && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="flex items-center gap-2 rounded-xl bg-white/20 px-3 py-2">
               <Search className="h-4 w-4 text-white/70" />
               <input
@@ -2227,7 +2106,7 @@ export default function MirrorPage() {
 
         {/* Widget visibility panel */}
         {showWidgets && (
-          <div className="rounded-2xl bg-white/15 p-4 backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4">
             <div className="mb-3 flex items-center justify-between">
               <span className="text-sm font-semibold text-white/85">Show / hide widgets</span>
               <div className="flex items-center gap-2">
@@ -2289,7 +2168,7 @@ export default function MirrorPage() {
         )}
 
         {needsLocation && !location && (
-          <div className="rounded-2xl bg-white/15 p-6 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-6 text-center">
             <p className="text-lg">Set a location to see the weather.</p>
             <button
               onClick={() => setShowSearch(true)}
@@ -2301,13 +2180,13 @@ export default function MirrorPage() {
         )}
 
         {error && (
-          <div className="rounded-2xl bg-white/15 p-4 text-center backdrop-blur-md">
+          <div className="rounded-2xl bg-white/15 p-4 text-center">
             {error}
           </div>
         )}
 
         {editMode && (
-          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70 backdrop-blur-md">
+          <div className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-center text-xs text-white/70">
             Drag the title bar to move · use S / M / L to resize · tap the eye to hide ·
             auto-rotate is paused while editing
           </div>
@@ -2317,40 +2196,23 @@ export default function MirrorPage() {
         {activeSection &&
           (activeSection.id === "today" ? (
             <section key="today" className="flex min-h-0 flex-1 flex-col gap-2">
-              <SectionHeader
-                title="News"
-                icon={CalendarClock}
-                items={[]}
-                controls={fullscreenControl}
-              />
-              <TodayChannel onHoldRotation={setHoldRotation} />
+              <TodayFactsChannel />
             </section>
-          ) : ["love", "family", "friends", "faith", "stephen", "whitney"].includes(
+          ) : ["love", "family", "friends", "faith", "stephen", "whitney", "events"].includes(
             activeSection.id
           ) ? (
             <ChecklistChannel
               key={activeSection.id}
               channel={activeSection.id}
-              label={activeSection.label}
               together={together}
-              headerExtra={fullscreenControl}
               onDwellMs={handleChannelDwell}
             />
-          ) : activeSection.id === "spark" ? (
-            <SparkChannel
-              key="spark"
-              headerExtra={fullscreenControl}
-              onDwellMs={handleChannelDwell}
-            />
-          ) : activeSection.id === "money" && activeSection.widgets.length === 0 ? (
+          ) : activeSection.id === "money" ? (
             <section key="money" className="flex min-h-0 flex-1 flex-col gap-2">
-              <SectionHeader
-                title="Money"
-                icon={Wallet}
-                items={[]}
-                controls={fullscreenControl}
-              />
-              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center backdrop-blur-md">
+              {pacing?.focus && pacing.focus.length > 0 ? (
+                <FocusPacing rows={pacing.focus} month={pacing.month} />
+              ) : (
+              <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-8 text-center">
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-emerald-200">
                   <Wallet className="h-6 w-6" />
                 </span>
@@ -2366,6 +2228,7 @@ export default function MirrorPage() {
                   </p>
                 )}
               </div>
+              )}
             </section>
           ) : activeSection.id === "deals" &&
             ((bogos?.deals?.length ?? 0) > 0 || (dinner?.meals?.length ?? 0) > 0) ? (
@@ -2484,9 +2347,9 @@ export default function MirrorPage() {
 
 // --- Persistent right rail --------------------------------------------------
 //
-// A static third column that mirrors the two most-glanced things — where we
-// are in the year (with the day's national days) and a compact weather
-// snapshot — so they're always visible regardless of the active channel.
+// A static third column with the two most-glanced things — the time and
+// today's weather — so they're always visible regardless of the active
+// channel.
 
 function RightRail({
   width,
@@ -2518,81 +2381,82 @@ function RightRail({
   dayPct: number;
   onClockClick: () => void;
 }) {
-  // The rail never unmounts, so a mount-only date would go stale on a display
-  // left running for days. Roll `today` over at the day boundary (checked each
-  // minute and whenever the tab wakes) so the day count and national days stay
-  // in sync with the calendar.
-  const [today, setToday] = useState<Date>(() => new Date());
-  useEffect(() => {
-    const sameDay = (a: Date, b: Date) =>
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate();
-    const check = () =>
-      setToday((prev) => {
-        const nowDate = new Date();
-        return sameDay(prev, nowDate) ? prev : nowDate;
-      });
-    const id = setInterval(check, 60_000);
-    document.addEventListener("visibilitychange", check);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener("visibilitychange", check);
-    };
-  }, []);
-
-  const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(today.getDate()).padStart(2, "0")}`;
-
-  const [nationalDays, setNationalDays] = useState<{ name: string }[]>([]);
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/mirror/today?date=${todayIso}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((d) => {
-        if (active && d) setNationalDays((d.nationalDays ?? []).slice(0, 4));
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, [todayIso]);
-
-  const startOfYear = new Date(today.getFullYear(), 0, 1);
-  const dayOfYear =
-    Math.floor((today.getTime() - startOfYear.getTime()) / 86_400_000) + 1;
-  const isLeap = new Date(today.getFullYear(), 1, 29).getDate() === 29;
-  const daysInYear = isLeap ? 366 : 365;
-  const yearPct = Math.round((dayOfYear / daysInYear) * 100);
-
-  const chipStyles = [
-    "bg-amber-400/25 text-amber-100",
-    "bg-rose-400/25 text-rose-100",
-    "bg-sky-400/25 text-sky-100",
-    "bg-emerald-400/25 text-emerald-100",
-  ];
   const miniShell =
-    "rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md";
+    "flex h-full flex-col justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4";
+  const rainChance = data?.daily.precipitation_probability_max?.[0];
 
-  const forecastDays = data?.daily.time.slice(0, 7) ?? [];
-  const lows = data?.daily.temperature_2m_min ?? [];
-  const highs = data?.daily.temperature_2m_max ?? [];
-  const weekMin = lows.length ? Math.min(...lows.slice(0, 7)) : 0;
-  const weekMax = highs.length ? Math.max(...highs.slice(0, 7)) : 1;
-  const span = Math.max(1, weekMax - weekMin);
+  // The three cards always fill the rail; dragging a handle between two
+  // cards moves height from one to the other. Weights persist per device.
+  const [weights, setWeights] = useState<number[]>(RAIL_DEFAULT_WEIGHTS);
+  useEffect(() => {
+    const saved = readJSON<number[]>(RAIL_WEIGHTS_KEY);
+    if (
+      Array.isArray(saved) &&
+      saved.length === RAIL_DEFAULT_WEIGHTS.length &&
+      saved.every((w) => typeof w === "number" && w > 0)
+    ) {
+      setWeights(saved);
+    }
+  }, []);
+  const panelsRef = useRef<HTMLDivElement>(null);
+
+  const startPanelDrag = (i: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    const el = panelsRef.current;
+    if (!el) return;
+    const startY = e.clientY;
+    const start = weights;
+    const sum = start.reduce((a, b) => a + b, 0);
+    const px = el.clientHeight || 1;
+    const minW = (RAIL_PANEL_MIN_PX / px) * sum;
+    let latest = start;
+    const move = (ev: PointerEvent) => {
+      const pair = start[i] + start[i + 1];
+      const dw = ((ev.clientY - startY) / px) * sum;
+      const a = Math.min(pair - minW, Math.max(minW, start[i] + dw));
+      latest = start.map((w, k) => (k === i ? a : k === i + 1 ? pair - a : w));
+      setWeights(latest);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      writeJSON(RAIL_WEIGHTS_KEY, latest);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  };
+  const resetWeights = () => {
+    setWeights(RAIL_DEFAULT_WEIGHTS);
+    writeJSON(RAIL_WEIGHTS_KEY, RAIL_DEFAULT_WEIGHTS);
+  };
+  const panel = (i: number) => ({ flex: `${weights[i]} 1 0px` });
+  const handle = (i: number) => (
+    <div
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize cards"
+      onPointerDown={startPanelDrag(i)}
+      onDoubleClick={resetWeights}
+      className="group flex h-4 shrink-0 cursor-row-resize touch-none items-center justify-center"
+    >
+      <div className="h-1 w-12 rounded-full bg-white/20 transition group-hover:bg-white/50 group-active:bg-white/60" />
+    </div>
+  );
 
   return (
     <aside
-      className="mirror-scaled hidden shrink-0 flex-col gap-3 overflow-y-auto border-l border-white/10 bg-black/15 p-3 backdrop-blur-md sm:flex [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="mirror-scaled hidden shrink-0 flex-col overflow-hidden border-l border-white/10 bg-black/15 p-3 sm:flex"
       style={{ width, ...scaleStyle(scale) }}
     >
+      <div ref={panelsRef} className="flex min-h-0 flex-1 flex-col">
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
+      <div className="min-h-0" style={panel(0)}>
       <button
         onClick={onClockClick}
-        className="block w-full shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left backdrop-blur-md transition hover:from-sky-400/30 hover:to-violet-400/30"
+        className="flex h-full w-full flex-col justify-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left transition hover:from-sky-400/30 hover:to-violet-400/30"
       >
         <div className="flex items-stretch gap-3">
           {/* Digits scale with the card width (cqw units) but keep the
@@ -2632,101 +2496,79 @@ function RightRail({
           </span>
         </div>
       </button>
-
-      {/* Day of year + national days */}
-      <div className={miniShell}>
-        <div className="flex items-baseline justify-between gap-2">
-          <span className="text-lg font-semibold text-white/90">
-            Day {dayOfYear}
-          </span>
-          <span className="text-xs text-white/55">of {daysInYear}</span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-sky-400/80 to-violet-400/80"
-            style={{ width: `${yearPct}%` }}
-          />
-        </div>
-        <div className="mt-1.5 text-[11px] text-white/50">
-          {daysInYear - dayOfYear} days left in {today.getFullYear()}
-        </div>
-        {nationalDays.length > 0 && (
-          <>
-            <div className="mt-4 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/55">
-              <PartyPopper className="h-3.5 w-3.5 text-amber-300/90" />
-              Today is
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {nationalDays.map((d, i) => (
-                <span
-                  key={d.name}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium leading-tight",
-                    chipStyles[i % chipStyles.length]
-                  )}
-                >
-                  {d.name}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
       </div>
 
+      {handle(0)}
+
       {/* Current weather */}
+      <div className="min-h-0" style={panel(1)}>
       {current && currentInfo ? (
         <div className={miniShell}>
           <div className="flex items-center gap-3">
             <currentInfo.Icon
               className={cn(
-                "h-12 w-12 shrink-0",
+                "h-14 w-14 shrink-0",
                 weatherColor(current.weather_code, current.is_day === 1)
               )}
               strokeWidth={1.3}
             />
             <div className="min-w-0">
-              <div className="text-3xl font-light leading-none">
+              <div className="text-5xl font-light leading-none">
                 {Math.round(current.temperature_2m)}
                 {unitLabel}
               </div>
-              <div className="mt-1 truncate text-xs text-white/75">
+              <div className="mt-1.5 truncate text-sm text-white/75">
                 {currentInfo.label}
               </div>
             </div>
           </div>
-          <div className="mt-3 text-[11px] text-white/60">
-            Feels {Math.round(current.apparent_temperature)}
-            {unitLabel}
-            {data && (
-              <>
-                {" · H "}
-                {Math.round(data.daily.temperature_2m_max[0])}° L{" "}
-                {Math.round(data.daily.temperature_2m_min[0])}°
-              </>
-            )}
-          </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-white/60">
-            <span className="flex items-center gap-1">
-              <Droplets className="h-3 w-3 text-sky-300" />
-              {current.relative_humidity_2m}%
-            </span>
-            <span className="flex items-center gap-1">
-              <Wind className="h-3 w-3 text-teal-300" />
-              {Math.round(current.wind_speed_10m)} {data?.windUnit ?? ""}
-            </span>
-          </div>
+          {data && (
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-white/55">
+                  High
+                </div>
+                <div className="text-3xl font-semibold leading-tight">
+                  {Math.round(data.daily.temperature_2m_max[0])}°
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-white/55">
+                  Low
+                </div>
+                <div className="text-3xl font-semibold leading-tight text-white/80">
+                  {Math.round(data.daily.temperature_2m_min[0])}°
+                </div>
+              </div>
+              {typeof rainChance === "number" && (
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-white/55">
+                    Rain
+                  </div>
+                  <div className="flex items-center gap-1 text-3xl font-semibold leading-tight text-sky-200">
+                    <Droplets className="h-5 w-5 shrink-0 text-sky-300" />
+                    {rainChance}%
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         <div className={cn(miniShell, "text-xs text-white/50")}>
           Set a location to see the weather.
         </div>
       )}
+      </div>
 
-      {/* Next hours */}
-      {hours.length > 0 && (
+      {handle(1)}
+
+      {/* Today's forecast */}
+      <div className="min-h-0" style={panel(2)}>
+      {hours.length > 0 ? (
         <div className={miniShell}>
           <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-white/55">
-            Next hours
+            Today&apos;s forecast
           </h3>
           <div className="flex justify-between gap-1">
             {hours.slice(0, 6).map((h, i) => {
@@ -2752,53 +2594,11 @@ function RightRail({
             })}
           </div>
         </div>
+      ) : (
+        <div className={cn(miniShell, "text-xs text-white/50")}>Loading forecast…</div>
       )}
-
-      {/* 7-day forecast */}
-      {forecastDays.length > 0 && (
-        <div className={miniShell}>
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-white/55">
-            7-day forecast
-          </h3>
-          <div className="space-y-1">
-            {forecastDays.map((day, i) => {
-              const info = weatherInfo(data!.daily.weather_code[i], true);
-              const left = ((lows[i] - weekMin) / span) * 100;
-              const width = ((highs[i] - lows[i]) / span) * 100;
-              return (
-                <div key={day} className="flex items-center gap-2">
-                  <span className="w-8 text-[11px] text-white/80">
-                    {i === 0
-                      ? "Today"
-                      : new Date(day).toLocaleDateString(undefined, {
-                          weekday: "short",
-                        })}
-                  </span>
-                  <info.Icon
-                    className={cn(
-                      "h-4 w-4 shrink-0",
-                      weatherColor(data!.daily.weather_code[i], true)
-                    )}
-                    strokeWidth={1.6}
-                  />
-                  <span className="w-6 text-right text-[11px] text-white/55">
-                    {Math.round(lows[i])}°
-                  </span>
-                  <div className="relative h-1.5 flex-1 rounded-full bg-white/10">
-                    <div
-                      className="absolute h-full rounded-full bg-gradient-to-r from-sky-300 via-amber-200 to-orange-300"
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                    />
-                  </div>
-                  <span className="w-6 text-[11px] font-semibold">
-                    {Math.round(highs[i])}°
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      </div>
+      </div>
     </aside>
   );
 }
@@ -2815,10 +2615,9 @@ function RightRail({
 const CARDS_HIDDEN_PREFIX = "mirror.cards.hidden.";
 const CARDS_OFFSET_PREFIX = "mirror.cards.offsets.";
 
-// Per-channel card layout: 1 = one big card that auto-cycles through the
-// channel's items, 2 = two stacked. Persisted per channel (not per day).
+// Card layout: 1 = one big card that auto-cycles through the channel's
+// items, 2 = two stacked.
 type CardView = 1 | 2;
-const CARDS_VIEW_PREFIX = "mirror.cards.view.";
 
 // How long the 1-up view lingers on each card: driven by how long a normal
 // person needs to read it (~200 wpm), plus a beat to settle, clamped so very
@@ -2835,44 +2634,6 @@ function cardReadMs(text: string, footnote?: string | null): number {
   const ms = CARD_READ_BASE_MS + words * (60_000 / CARD_READ_WPM);
   const linger = Math.min(CARD_READ_MAX_MS, Math.max(CARD_READ_MIN_MS, Math.round(ms)));
   return linger * CARD_READ_TIME_SCALE;
-}
-
-const VIEW_LABEL: Record<CardView, string> = {
-  1: "1 card",
-  2: "2 stacked",
-};
-
-// Left/right arrows that cycle a channel's card layout. Lives in the section
-// header, next to the three-dot menu.
-function ViewToggle({
-  view,
-  onChange,
-}: {
-  view: CardView;
-  onChange: (v: CardView) => void;
-}) {
-  const cycle = () => onChange(view === 1 ? 2 : 1);
-  return (
-    <div className="flex items-center gap-0.5 rounded-full bg-white/10 px-1 py-0.5">
-      <button
-        onClick={cycle}
-        aria-label="Previous layout"
-        className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
-      >
-        <ChevronLeft className="h-3.5 w-3.5" />
-      </button>
-      <span className="w-16 text-center text-[11px] font-medium text-white/65">
-        {VIEW_LABEL[view]}
-      </span>
-      <button
-        onClick={cycle}
-        aria-label="Next layout"
-        className="flex h-6 w-6 items-center justify-center rounded-full text-white/60 transition hover:bg-white/15 hover:text-white"
-      >
-        <ChevronRight className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
 }
 
 // Body type size steps down as the text gets longer so every card stays
@@ -3032,6 +2793,33 @@ function channelCards(
             }
           : null,
       ];
+    case "events":
+      return [
+        {
+          id: "outing-free",
+          title: "Free & easy",
+          chip: "bg-sky-400/25 text-sky-200",
+          tint: "rgba(56,189,248,0.16)",
+          icon: Ticket,
+          variants: asVariants(OUTINGS_FREE),
+        },
+        {
+          id: "outing-outside",
+          title: "Get outside",
+          chip: "bg-emerald-400/25 text-emerald-200",
+          tint: "rgba(52,211,153,0.16)",
+          icon: Sun,
+          variants: asVariants(OUTINGS_OUTSIDE),
+        },
+        {
+          id: "outing-cheap",
+          title: "Under $20",
+          chip: "bg-amber-400/25 text-amber-200",
+          tint: "rgba(251,191,36,0.16)",
+          icon: Wallet,
+          variants: asVariants(OUTINGS_CHEAP),
+        },
+      ];
     case "friends":
       return [
         {
@@ -3100,16 +2888,11 @@ function channelCards(
 
 function ChecklistChannel({
   channel,
-  label,
   together,
-  headerExtra,
   onDwellMs,
 }: {
   channel: string;
-  label: string;
   together: Together | null;
-  // Extra header controls (e.g. the fullscreen toggle) from the page.
-  headerExtra?: React.ReactNode;
   // One full 1-up card pass, so the parent section timer can match it.
   onDwellMs?: (ms: number | null) => void;
 }) {
@@ -3121,9 +2904,15 @@ function ChecklistChannel({
   // Which card's menu is open, or null. The section-level menu lives in
   // SectionHeader and manages its own state.
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [view, setView] = useState<CardView>(1);
+  // Always one big card; the 2-stacked layout is kept but no longer offered.
+  const view = 1 as CardView;
   // Which card the 1-up view is currently showing (mod visible count).
   const [cycleIdx, setCycleIdx] = useState(0);
+  // Spark's doorway: first in For Stephen and For Whitney. In 1-up it opens
+  // the channel before the cards (and via its dot); in 2-up it's the first card.
+  const sparkPerson =
+    channel === "stephen" || channel === "whitney" ? channel : null;
+  const [showSpark, setShowSpark] = useState(sparkPerson !== null);
 
   useEffect(() => {
     setHidden(new Set(readJSON<string[]>(hiddenKey) ?? []));
@@ -3132,21 +2921,12 @@ function ChecklistChannel({
 
   useEffect(() => {
     setOpenMenu(null);
-    // Older saved layouts could be 3 (columns); that view is gone, so fall
-    // back to the 1-up default.
-    const saved = readJSON<number>(`${CARDS_VIEW_PREFIX}${channel}`);
-    setView(saved === 1 || saved === 2 ? (saved as CardView) : 1);
   }, [channel]);
-
-  const changeView = (next: CardView) => {
-    setView(next);
-    writeJSON(`${CARDS_VIEW_PREFIX}${channel}`, next);
-  };
 
   const items: ChecklistItem[] = useMemo(() => {
     // Friends cards come from authored pools with no API dependency, so that
     // channel renders even before `together` loads; the rest wait for data.
-    if (!together && channel !== "friends") return [];
+    if (!together && channel !== "friends" && channel !== "events") return [];
     return channelCards(channel, together).filter(
       (d): d is ChecklistItem => d !== null
     );
@@ -3169,25 +2949,14 @@ function ChecklistChannel({
     saveOffsets({ ...offsets, [id]: (offsets[id] ?? 0) + 1 });
     setOpenMenu(null);
   };
-  const showHiddenCards = () => {
-    const next = new Set(hidden);
-    for (const it of items) next.delete(it.id);
-    saveHidden(next);
-    setOpenMenu(null);
-  };
-  const regenerateAll = () => {
-    const next = { ...offsets };
-    for (const it of items) {
-      if (it.variants.length > 1) next[it.id] = (next[it.id] ?? 0) + 1;
-    }
-    saveOffsets(next);
-    setOpenMenu(null);
-  };
-
-  const dayIdx = cardDayIndex();
+  // Out & About shuffles on every visit (the channel remounts each time it
+  // rotates in); the rest rotate once a day.
+  const [visitSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
+  const dayIdx = channel === "events" ? visitSeed : cardDayIndex();
   const variantFor = (item: ChecklistItem): CardVariant => {
     const len = item.variants.length;
-    return item.variants[((dayIdx % len) + (offsets[item.id] ?? 0)) % len];
+    const itemSalt = channel === "events" ? items.indexOf(item) * 7919 : 0;
+    return item.variants[((dayIdx + itemSalt) % len + (offsets[item.id] ?? 0)) % len];
   };
 
   const visibleItems = items.filter((it) => !hidden.has(it.id));
@@ -3210,7 +2979,7 @@ function ChecklistChannel({
       ? visibleItems.reduce((sum, it) => {
           const v = variantFor(it);
           return sum + cardReadMs(v.text, v.footnote);
-        }, 0)
+        }, sparkPerson ? SPARK_DWELL_MS : 0)
       : null;
   useEffect(() => {
     onDwellMs?.(cycleTotalMs);
@@ -3220,47 +2989,21 @@ function ChecklistChannel({
   }, [onDwellMs]);
   useEffect(() => {
     setCycleIdx(0);
-  }, [channel, view]);
+    setShowSpark(view === 1 && sparkPerson !== null);
+  }, [channel, view, sparkPerson]);
   useEffect(() => {
-    if (view !== 1 || visibleCount < 2 || openMenu !== null) return;
+    if (view !== 1 || visibleCount < 2 || openMenu !== null || showSpark) return;
     const id = setTimeout(() => setCycleIdx((i) => i + 1), cycleMs);
     return () => clearTimeout(id);
-  }, [view, visibleCount, openMenu, cycleIdx, cycleMs]);
+  }, [view, visibleCount, openMenu, cycleIdx, cycleMs, showSpark]);
+  // The teaser is a beat, not something to read; drop back to the cards.
+  useEffect(() => {
+    if (!showSpark) return;
+    const id = setTimeout(() => setShowSpark(false), SPARK_DWELL_MS);
+    return () => clearTimeout(id);
+  }, [showSpark]);
 
   if (items.length === 0) return null;
-
-  const hiddenCount = items.length - visibleItems.length;
-  const canRegenerate = items.some((it) => it.variants.length > 1);
-
-  // The personal channels carry a doorway to /mirror/extra-fun in their menu.
-  const hasExtraFun = channel === "stephen" || channel === "whitney";
-
-  // Section menu: restore hidden cards / refresh every card's content.
-  const menuItems: SectionMenuItem[] = [
-    ...(hiddenCount > 0
-      ? [
-          {
-            icon: Eye,
-            label: `Show ${hiddenCount} hidden card${hiddenCount === 1 ? "" : "s"}`,
-            onClick: showHiddenCards,
-          },
-        ]
-      : []),
-    ...(canRegenerate
-      ? [{ icon: RotateCcw, label: "Regenerate new cards", onClick: regenerateAll }]
-      : []),
-    ...(hasExtraFun
-      ? [
-          {
-            icon: Flame,
-            label: "Today's challenge",
-            onClick: () => {
-              window.location.href = "/mirror/extra-fun";
-            },
-          },
-        ]
-      : []),
-  ];
 
   const renderCard = (
     item: ChecklistItem,
@@ -3274,7 +3017,7 @@ function ChecklistChannel({
       <div
         key={item.id}
         className={cn(
-          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md md:p-8",
+          "relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-6 md:p-8",
           extraClass
         )}
         style={{
@@ -3310,7 +3053,7 @@ function ChecklistChannel({
                 className="fixed inset-0 z-30"
                 onClick={() => setOpenMenu(null)}
               />
-              <div className="absolute left-0 top-11 z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl">
+              <div className="absolute left-0 top-11 z-40 w-56 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl">
                 <MenuItem
                   icon={EyeOff}
                   label="Hide card"
@@ -3344,42 +3087,63 @@ function ChecklistChannel({
     );
   };
 
+  const sparkName = sparkPerson === "stephen" ? "Stephen" : "Whitney";
+  const sparkDot = sparkPerson ? (
+    <button
+      onClick={() => setShowSpark(true)}
+      aria-label={`Loading for ${sparkName}`}
+      title={`Loading for ${sparkName}`}
+      className={cn(
+        "flex h-7 w-7 items-center justify-center rounded-full transition-colors duration-500",
+        showSpark
+          ? "bg-white/25 text-white"
+          : "bg-white/5 text-white/30 hover:bg-white/15 hover:text-white/60"
+      )}
+    >
+      <Loader2 className="h-3.5 w-3.5" strokeWidth={2} />
+    </button>
+  ) : null;
+  const sparkCard = sparkPerson ? (
+    <div className="shrink-0 snap-start" style={{ height: "calc(50% - 6px)" }}>
+      <SparkTeaser person={sparkPerson} />
+    </div>
+  ) : null;
+
   return (
     <div className="relative flex flex-1 flex-col gap-2">
-    <SectionHeader
-      title={label}
-      icon={NAV_ICONS[channel] ?? LayoutGrid}
-      items={menuItems}
-      controls={
-        <>
-          <ViewToggle view={view} onChange={changeView} />
-          {headerExtra}
-        </>
-      }
-    />
     {visibleItems.length === 0 ? (
       <div className="flex flex-1 items-center justify-center">
         <p className="text-white/50">
-          All cards hidden — use the menu to bring them back.
+          All cards hidden — they come back tomorrow.
         </p>
       </div>
     ) : view === 1 && cycleItem ? (
       // 1-up: one big card at a time. A progress bar fills story-style
       // over the card's reading time; when it empties, the next card shows.
       <div className="flex min-h-0 flex-1 flex-col gap-2">
-        {renderCard(cycleItem, undefined, "min-h-0 flex-1")}
-        {visibleCount > 1 && (
+        {showSpark && sparkPerson ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <SparkTeaser person={sparkPerson} />
+          </div>
+        ) : (
+          renderCard(cycleItem, undefined, "min-h-0 flex-1")
+        )}
+        {(visibleCount > 1 || sparkPerson) && (
           <div className="flex shrink-0 items-center gap-3">
             {/* Which cards are in today's cycle; the current one is lit.
                 Tapping an icon jumps straight to that card. */}
             <div className="flex items-center gap-1.5">
+              {sparkDot}
               {visibleItems.map((it, idx) => {
                 const DotIcon = it.icon;
-                const active = idx === cycleIdx % visibleCount;
+                const active = !showSpark && idx === cycleIdx % visibleCount;
                 return (
                   <button
                     key={it.id}
-                    onClick={() => setCycleIdx(idx)}
+                    onClick={() => {
+                      setShowSpark(false);
+                      setCycleIdx(idx);
+                    }}
                     aria-label={`Show ${it.title}`}
                     title={it.title}
                     className={cn(
@@ -3395,14 +3159,16 @@ function ChecklistChannel({
               })}
             </div>
             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/10">
-              <div
-                key={`${cycleItem.id}-${cycleIdx}-${openMenu ? "paused" : "run"}`}
-                className="h-full origin-left rounded-full bg-gradient-to-r from-white/75 to-white/45"
-                style={{
-                  animation: `mirror-card-fill ${cycleMs}ms linear forwards`,
-                  animationPlayState: openMenu !== null ? "paused" : "running",
-                }}
-              />
+              {visibleCount > 1 && !showSpark && (
+                <div
+                  key={`${cycleItem.id}-${cycleIdx}-${openMenu ? "paused" : "run"}`}
+                  className="h-full origin-left rounded-full bg-gradient-to-r from-white/75 to-white/45"
+                  style={{
+                    animation: `mirror-card-fill ${cycleMs}ms linear forwards`,
+                    animationPlayState: openMenu !== null ? "paused" : "running",
+                  }}
+                />
+              )}
             </div>
           </div>
         )}
@@ -3410,6 +3176,7 @@ function ChecklistChannel({
     ) : (
       // 2-up: big cards that snap-scroll vertically through the set.
       <div className="flex min-h-0 flex-1 snap-y snap-mandatory flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {sparkCard}
         {visibleItems.map((item) =>
           renderCard(item, { height: "calc(50% - 6px)" }, "shrink-0 snap-start")
         )}
@@ -3419,41 +3186,8 @@ function ChecklistChannel({
   );
 }
 
-// --- Spark channel ---------------------------------------------------------
-//
-// Spark's doorway, disguised as a channel stuck loading. Sits between For
-// Stephen and For Whitney in the rotation and shows one full-screen
-// <SparkTeaser /> (see spark/teaser.tsx). Dwell is short — it's a beat
-// between the personal channels, not something to read.
-
+// How long Spark's "Loading" teaser stays up before the cards resume.
 const SPARK_DWELL_MS = 12000;
-
-function SparkChannel({
-  headerExtra,
-  onDwellMs,
-}: {
-  headerExtra?: React.ReactNode;
-  onDwellMs?: (ms: number | null) => void;
-}) {
-  useEffect(() => {
-    onDwellMs?.(SPARK_DWELL_MS);
-    return () => onDwellMs?.(null);
-  }, [onDwellMs]);
-
-  return (
-    <div className="relative flex flex-1 flex-col gap-2">
-      <SectionHeader
-        title="Loading"
-        icon={Loader2}
-        items={[]}
-        controls={headerExtra}
-      />
-      <div className="flex min-h-0 flex-1 flex-col">
-        <SparkTeaser />
-      </div>
-    </div>
-  );
-}
 
 // Consistent section header: title on the left, a three-dot menu on the
 // right with whatever options apply to that section. Hides the menu button
@@ -3496,7 +3230,7 @@ function SectionHeader({
           {open && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 top-10 z-40 w-60 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl backdrop-blur-xl">
+              <div className="absolute right-0 top-10 z-40 w-60 overflow-hidden rounded-2xl border border-white/15 bg-slate-900/90 py-1.5 shadow-2xl">
                 {items.map((it) => (
                   <MenuItem
                     key={it.label}
@@ -3584,7 +3318,7 @@ function SortableWidget({
         )}
       >
         {editMode && (
-          <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 rounded-t-3xl bg-black/55 px-2 py-1.5 backdrop-blur-md">
+          <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-2 rounded-t-3xl bg-black/55 px-2 py-1.5">
             <button
               type="button"
               className="flex min-w-0 cursor-grab touch-none items-center gap-1 text-white/90 active:cursor-grabbing"
@@ -3649,7 +3383,7 @@ function CurrentWeatherCard({
   unitLabel: string;
 }) {
   return (
-    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full items-center gap-5 rounded-3xl border border-white/10 bg-white/15 p-6">
       <currentInfo.Icon
         className={cn(
           "h-20 w-20 shrink-0 drop-shadow-[0_0_25px_rgba(255,255,255,0.25)] md:h-24 md:w-24",
@@ -3686,7 +3420,7 @@ function GlanceCard({
   data: WeatherData | null;
 }) {
   return (
-    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="grid h-full grid-cols-2 content-center gap-4 rounded-3xl border border-white/10 bg-white/15 p-6">
       <Detail
         icon={Droplets}
         label="Humidity"
@@ -3732,7 +3466,7 @@ function HourlyCard({
   hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
 }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/60">
         Next hours
       </h2>
@@ -3782,7 +3516,7 @@ function ForecastCard({ data }: { data: WeatherData }) {
   const weekMax = Math.max(...highs);
   const span = Math.max(1, weekMax - weekMin);
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-5">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/60">
         7-day forecast
       </h2>
@@ -3840,7 +3574,7 @@ function SunCard({ sun }: { sun: { sunrise: string; sunset: string } }) {
     new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return (
     <div
-      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col justify-center gap-5 rounded-3xl border border-white/10 p-6"
       style={{
         background:
           "linear-gradient(160deg, rgba(251,191,36,0.20) 0%, rgba(249,115,22,0.16) 100%)",
@@ -3892,7 +3626,7 @@ function SpendCard({
       })
     : null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-400/25 text-emerald-200">
@@ -4018,7 +3752,7 @@ function SpendCard({
 
 function BillsCard({ spend }: { spend: SpendData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-400/25 text-orange-200">
           <CalendarClock className="h-4 w-4" />
@@ -4349,7 +4083,7 @@ function WeekCalendarCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Category filter pills. (The section header above the card carries
           the title; the expand button there opens the full events page.) */}
       <div className="mb-3 flex flex-wrap items-center gap-1.5">
@@ -4536,7 +4270,7 @@ function MoviesCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; the card starts with the tabs. */}
       <div className="mb-3 flex flex-wrap gap-1.5">
         {sections.map((s, i) => (
@@ -4701,7 +4435,7 @@ function BogosCard({
   }, [bogos.deals]);
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       {/* Section header carries the title; keep only the week label. */}
       {bogos.weekLabel && (
         <div className="mb-3 flex justify-end text-xs text-white/50">
@@ -4742,7 +4476,7 @@ function BogosCard({
 // This week's dinner ideas built from the BOGO deals, as a simple numbered list.
 function MealsCard({ dinner }: { dinner: DinnerData }) {
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-400/25 text-amber-200">
           <UtensilsCrossed className="h-4 w-4" />
@@ -4846,6 +4580,82 @@ type PaceDetail = {
   transactions?: { date: string; name: string; amount: number }[];
   error?: boolean;
 };
+
+// Money channel: Publix / Amazon / Restaurants, each paced this week and
+// this month against their usual spend.
+const FOCUS_STYLE: Record<string, { icon: LucideIcon; chip: string }> = {
+  publix: { icon: ShoppingCart, chip: "bg-emerald-400/25 text-emerald-200" },
+  amazon: { icon: Package, chip: "bg-amber-400/25 text-amber-200" },
+  restaurants: { icon: UtensilsCrossed, chip: "bg-rose-400/25 text-rose-200" },
+};
+
+function FocusPacing({ rows, month }: { rows: FocusRow[]; month?: string }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {rows.map((r) => {
+        const style = FOCUS_STYLE[r.id] ?? { icon: Wallet, chip: "bg-white/15 text-white" };
+        const Icon = style.icon;
+        return (
+          <div
+            key={r.id}
+            className="flex flex-1 flex-col justify-center gap-3 rounded-3xl border border-white/10 bg-white/10 p-5"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className={cn("flex h-9 w-9 items-center justify-center rounded-xl", style.chip)}>
+                <Icon className="h-4.5 w-4.5" />
+              </span>
+              <span className="text-lg font-semibold">{r.name}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <FocusPaceBar label="This week" pace={r.week} />
+              <FocusPaceBar label={month ?? "This month"} pace={r.month} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FocusPaceBar({ label, pace }: { label: string; pace: FocusPace }) {
+  const { actual, expected, target } = pace;
+  const scale = Math.max(target, actual, 1);
+  const diff = actual - expected;
+  const onPace = Math.abs(diff) <= Math.max(10, target * 0.05);
+  const status = onPace
+    ? { text: "On pace", color: "text-white/70" }
+    : diff < 0
+      ? { text: `$${Math.abs(diff).toLocaleString()} under pace`, color: "text-emerald-300" }
+      : { text: `$${diff.toLocaleString()} over pace`, color: "text-rose-300" };
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/55">
+          {label}
+        </span>
+        <span className={cn("text-xs font-medium", status.color)}>{status.text}</span>
+      </div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-3xl font-light tabular-nums">${actual.toLocaleString()}</span>
+        <span className="text-sm text-white/50">of ${target.toLocaleString()} usual</span>
+      </div>
+      {/* Fill = spent so far; tick = where the usual pace would be today. */}
+      <div className="relative mt-2 h-2 rounded-full bg-white/10">
+        <div
+          className={cn(
+            "h-full rounded-full",
+            onPace || diff < 0 ? "bg-emerald-400/70" : "bg-rose-400/70"
+          )}
+          style={{ width: `${Math.min(100, (actual / scale) * 100)}%` }}
+        />
+        <div
+          className="absolute -top-1 h-4 w-0.5 rounded-full bg-white/80"
+          style={{ left: `${Math.min(100, (expected / scale) * 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function PacingCard({
   pacing,
@@ -5166,7 +4976,7 @@ function PacingCard({
   };
 
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-3 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-400/25 text-cyan-200">
           <Gauge className="h-4 w-4" />
@@ -5249,7 +5059,7 @@ function PaceDetailDrawer({
     <div className="fixed inset-0 z-50" onClick={onClose}>
       <div
         className={cn(
-          "absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-300",
+          "absolute inset-0 bg-black/50 transition-opacity duration-300",
           open ? "opacity-100" : "opacity-0"
         )}
       />
@@ -5320,7 +5130,7 @@ function BudgetCard({ week, month }: { week?: Breakdown; month?: Breakdown }) {
   );
   if (sections.length === 0) return null;
   return (
-    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6 backdrop-blur-md">
+    <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
       <div className="mb-4 flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-400/25 text-fuchsia-200">
           <PieChart className="h-4 w-4" />
@@ -5378,7 +5188,7 @@ function PromptCard({
 }) {
   return (
     <div
-      className="flex h-full flex-col rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="flex h-full flex-col rounded-3xl border border-white/10 p-6"
       style={{
         background: tint
           ? `linear-gradient(135deg, ${tint} 0%, rgba(255,255,255,0.08) 70%)`
@@ -5562,7 +5372,7 @@ function ScoreCard({
   const color = scoreColor(score);
   return (
     <div
-      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6 backdrop-blur-md"
+      className="relative flex h-full flex-col justify-center overflow-hidden rounded-3xl border border-white/10 p-6"
       style={{
         background: `linear-gradient(135deg, ${color}26 0%, rgba(255,255,255,0.10) 60%)`,
       }}
