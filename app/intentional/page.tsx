@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/utils/styles";
+import { intentionScore } from "@/utils/intentional/score";
 
 type Kind = "action" | "thought" | "idea" | "reminder" | "note" | "habit" | "principle";
 
@@ -22,7 +23,6 @@ type Card = {
 };
 
 type State = { cards: Card[]; today: string; minutesToday: number };
-type Tab = "today" | "all";
 type Filter = "all" | "prioritized" | Kind;
 type Timer = { id: string; startedAt: string };
 
@@ -82,7 +82,6 @@ async function api(body?: object): Promise<State & { addedId?: string; addedSinc
 export default function IntentionalPage() {
   const [state, setState] = useState<State | null>(null);
   const [authError, setAuthError] = useState(false);
-  const [tab, setTab] = useState<Tab>("today");
   const [filter, setFilter] = useState<Filter>("all");
   const [now, setNow] = useState(() => new Date());
   const [captureOpen, setCaptureOpen] = useState(false);
@@ -134,18 +133,30 @@ export default function IntentionalPage() {
   const today = state?.today ?? now.toISOString().slice(0, 10);
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const principles = cards.filter((c) => c.kind === "principle");
-  const habits = cards.filter((c) => c.kind === "habit");
-  const habitsLeft = habits.filter((c) => c.last_done_on !== today);
-  const tasks = cards.filter((c) => c.kind !== "habit" && c.kind !== "principle");
-  const upNext = tasks.filter(
-    (c) => c.prioritized || c.stars >= 5 || (c.due_date && c.due_date <= addDays(today, 1))
-  );
-  const allList = cards.filter((c) =>
-    filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
-  );
+  const habitsLeft = cards.filter((c) => c.kind === "habit" && c.last_done_on !== today);
+  const hourKey = `${today}-${now.getHours()}`;
+  const scores = useMemo(() => {
+    const at = new Date();
+    return new Map(cards.map((c) => [c.id, intentionScore(c, at, today)]));
+    // re-rank on the hour, not every tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, today, hourKey]);
+  const counts = new Map<Filter, number>();
+  for (const c of cards) {
+    counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
+    if (c.prioritized) counts.set("prioritized", (counts.get("prioritized") ?? 0) + 1);
+  }
+  const filterOptions = (["prioritized", ...KINDS] as Filter[])
+    .filter((f) => counts.get(f))
+    .sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0));
+  const kindOrder = [...KINDS].sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0));
+  const list = cards
+    .filter((c) =>
+      filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
+    )
+    .sort((x, y) => (scores.get(y.id)?.score ?? 0) - (scores.get(x.id)?.score ?? 0));
   const stats = [
     habitsLeft.length && `${habitsLeft.length} daily left`,
-    upNext.length && `${upNext.length} up next`,
     state?.minutesToday && `${state.minutesToday} min intentional today`,
   ].filter(Boolean);
   const mindset = principles.length ? principles[mindsetIdx % principles.length] : null;
@@ -225,73 +236,43 @@ export default function IntentionalPage() {
         </button>
       )}
 
-      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 flex gap-1 border-b border-stone-200">
-        {(["today", "all"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn(
-              "flex-1 min-h-11 rounded-full text-sm font-medium capitalize",
-              tab === t ? "bg-stone-900 text-white" : "text-stone-600"
-            )}
-          >
-            {t}
-          </button>
-        ))}
+      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 border-b border-stone-200">
+        <ChipRow
+          max={5}
+          active={filter}
+          onSelect={setFilter}
+          items={[
+            { id: "all" as Filter, label: "All" },
+            ...filterOptions.map((f) => ({
+              id: f,
+              label: f === "prioritized"
+                ? `★ Prioritized ${counts.get(f)}`
+                : `${KIND_META[f as Kind].emoji} ${KIND_META[f as Kind].label} ${counts.get(f)}`,
+            })),
+          ]}
+        />
       </nav>
 
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
 
-        {state && tab === "all" && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-3 px-3">
-            <Chip active={filter === "all"} onClick={() => setFilter("all")}>All</Chip>
-            <Chip active={filter === "prioritized"} onClick={() => setFilter("prioritized")}>★ Prioritized</Chip>
-            {KINDS.map((k) => (
-              <Chip key={k} active={filter === k} onClick={() => setFilter(k)}>
-                {KIND_META[k].emoji} {KIND_META[k].label}
-              </Chip>
-            ))}
-          </div>
-        )}
-
         {fresh.map((c) => (
           <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
         ))}
 
-        {state && tab === "today" && (
-          <>
-            {habits.length > 0 && <SectionTitle>Daily</SectionTitle>}
-            {show([...habitsLeft, ...habits.filter((h) => h.last_done_on === today)]).map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
-                done={c.last_done_on === today} onCheck={() => complete(c)} />
-            ))}
-            <SectionTitle>Up next</SectionTitle>
-            {upNext.length === 0 && (
-              <Empty>Nothing pressing. Prioritize cards in “All” (swipe right or ★) to see them here.</Empty>
-            )}
-            {show(upNext).map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
-            ))}
-          </>
+        {state && list.length === 0 && fresh.length === 0 && (
+          <Empty>
+            {filter === "principle"
+              ? "Add reminders like “Lead without permission” or “Be concise.”"
+              : "No cards yet. Tap + to add one."}
+          </Empty>
         )}
 
-        {state && tab === "all" && (
-          <>
-            {allList.length === 0 && fresh.length === 0 && (
-              <Empty>
-                {filter === "prioritized"
-                  ? "Swipe right (or tap ★) on a card to prioritize it."
-                  : filter === "principle"
-                    ? "Add reminders like “Lead without permission” or “Be concise.”"
-                    : "No cards yet. Tap + to add one."}
-              </Empty>
-            )}
-            {show(allList).map((c) => (
-              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
-            ))}
-          </>
-        )}
+        {show(list).map((c) => (
+          <CardRow key={c.id} card={c} today={today} reason={scores.get(c.id)?.reason}
+            onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
+            {...(c.kind === "habit" ? { done: c.last_done_on === today, onCheck: () => complete(c) } : {})} />
+        ))}
       </section>
 
       <button
@@ -356,6 +337,7 @@ export default function IntentionalPage() {
           card={openCard}
           today={today}
           related={openCard.related_ids.map((id) => byId.get(id)).filter((c): c is Card => !!c)}
+          kindOrder={kindOrder}
           onClose={() => setOpenId(null)}
           onOpenRelated={setOpenId}
           onSave={(fields) => {
@@ -381,8 +363,31 @@ export default function IntentionalPage() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="px-2 pt-3 text-xs font-semibold uppercase tracking-wide text-stone-500">{children}</h2>;
+function ChipRow<T extends string>({
+  items, active, onSelect, max = 4,
+}: {
+  items: { id: T; label: React.ReactNode }[];
+  active: T;
+  onSelect: (id: T) => void;
+  max?: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  let visible = expanded ? items : items.slice(0, max);
+  if (!expanded && !visible.some((i) => i.id === active)) {
+    const current = items.find((i) => i.id === active);
+    if (current) visible = [...visible.slice(0, max - 1), current];
+  }
+  const hidden = items.length - visible.length;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {visible.map((i) => (
+        <Chip key={i.id} active={i.id === active} onClick={() => onSelect(i.id)}>{i.label}</Chip>
+      ))}
+      {hidden > 0 && <Chip active={false} onClick={() => setExpanded(true)}>+{hidden}</Chip>}
+      {expanded && items.length > max && <Chip active={false} onClick={() => setExpanded(false)}>Less</Chip>}
+    </div>
+  );
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
@@ -419,11 +424,12 @@ function Stars({ value, onChange, size = "text-sm" }: { value: number; onChange?
 const SWIPE_AT = 90;
 
 function CardRow({
-  card, today, onOpen, onLeft, onRight, done, onCheck, isNew,
+  card, today, onOpen, onLeft, onRight, done, onCheck, isNew, reason,
 }: {
   card: Card;
   today: string;
   isNew?: boolean;
+  reason?: string | null;
   onOpen: (id: string) => void;
   onLeft: (c: Card) => void;
   onRight: (c: Card) => void;
@@ -436,7 +442,7 @@ function CardRow({
   const moved = useRef(false);
   const meta = KIND_META[card.kind];
   const important = card.kind !== "principle" && card.stars >= 4;
-  const hasMeta = isNew || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
+  const hasMeta = isNew || !!reason || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
     || card.related_ids.length > 0;
 
   const end = () => {
@@ -496,6 +502,7 @@ function CardRow({
           {hasMeta && (
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
               {isNew && <span className="rounded-full bg-emerald-500 px-2 py-0.5 font-semibold text-white">New</span>}
+              {reason && <span className="font-medium text-indigo-600">{reason}</span>}
               {card.kind !== "action" && <span className={cn("rounded-full px-2 py-0.5", meta.tone)}>{meta.label}</span>}
               {card.due_date && (
                 <span className={cn("font-medium",
@@ -594,11 +601,12 @@ function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (t
 }
 
 function CardSheet({
-  card, today, related, onClose, onOpenRelated, onSave, onStart, onDone, onDelete,
+  card, today, related, kindOrder, onClose, onOpenRelated, onSave, onStart, onDone, onDelete,
 }: {
   card: Card;
   today: string;
   related: Card[];
+  kindOrder: Kind[];
   onClose: () => void;
   onOpenRelated: (id: string) => void;
   onSave: (fields: Partial<Card>) => void;
@@ -622,13 +630,11 @@ function CardSheet({
         onBlur={() => title.trim() && title !== card.title && onSave({ title: title.trim() })}
         className="w-full text-xl font-semibold resize-none outline-none"
       />
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-5 px-5">
-        {KINDS.map((k) => (
-          <Chip key={k} active={card.kind === k} onClick={() => onSave({ kind: k })}>
-            {KIND_META[k].emoji} {KIND_META[k].label}
-          </Chip>
-        ))}
-      </div>
+      <ChipRow
+        active={card.kind}
+        onSelect={(k) => onSave({ kind: k })}
+        items={kindOrder.map((k) => ({ id: k, label: `${KIND_META[k].emoji} ${KIND_META[k].label}` }))}
+      />
 
       {card.kind !== "principle" && (
         <div className="mt-2">

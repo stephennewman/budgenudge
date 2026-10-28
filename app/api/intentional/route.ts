@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createSupabaseClient } from "@/utils/supabase/server";
+import { guessDueDate } from "@/utils/intentional/dates";
 
 // Intentional — everything is a card.
 //
@@ -166,7 +167,7 @@ async function enrich(
           ...(text.length > 120 ? { title: c.title, body: text } : {}),
           est_minutes: c.est_minutes,
           stars: c.stars,
-          due_date: c.due_date,
+          ...(c.due_date ? { due_date: c.due_date } : {}),
           related_ids: c.related_ids,
         })
         .eq("id", rawId)
@@ -245,6 +246,7 @@ export async function POST(request: NextRequest) {
             kind: single ? "action" : "note",
             title: (text.split("\n")[0] || text).slice(0, 120),
             body: single && text.length <= 120 ? null : text,
+            due_date: single ? guessDueDate(text, todayLocal()) : null,
             transcript_id: transcriptId,
           })
           .select("id, created_at")
