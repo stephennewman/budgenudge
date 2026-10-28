@@ -8,7 +8,7 @@ import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type D
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-type Kind = "action" | "thought" | "idea" | "reminder" | "note" | "habit" | "principle";
+type Kind = "action" | "thought" | "idea" | "reminder" | "note" | "habit" | "principle" | "lesson";
 
 type Card = {
   id: string;
@@ -25,7 +25,11 @@ type Card = {
   created_at: string;
   boost: number;
   area_id: string | null;
+  completed_at?: string | null;
 };
+
+type Log = { card_id: string | null; area_id: string | null; seconds: number; ended_at: string };
+type CaptureMode = "single" | "dump" | "reflect";
 
 type Area = {
   id: string;
@@ -39,7 +43,15 @@ type Area = {
 };
 
 type Job = { id: string; status: "processing" | "done" | "failed"; progress: number; log: string[]; created_at: string };
-type State = { cards: Card[]; jobs: Job[]; areas: Area[]; today: string; minutesToday: number };
+type State = {
+  cards: Card[];
+  done: Card[];
+  history: Log[];
+  jobs: Job[];
+  areas: Area[];
+  today: string;
+  minutesToday: number;
+};
 type Filter = "all" | "prioritized" | Kind;
 type Timer = { id: string; startedAt: string };
 
@@ -51,6 +63,7 @@ const KIND_META: Record<Kind, { label: string; emoji: string; tone: string }> = 
   note: { label: "Note", emoji: "📝", tone: "bg-stone-100 text-stone-700" },
   habit: { label: "Daily", emoji: "🔁", tone: "bg-emerald-50 text-emerald-700" },
   principle: { label: "Mindset", emoji: "🧭", tone: "bg-indigo-50 text-indigo-700" },
+  lesson: { label: "Lesson", emoji: "⚠️", tone: "bg-amber-50 text-amber-800" },
 };
 const KINDS = Object.keys(KIND_META) as Kind[];
 const TIMER_KEY = "intentional.timer";
@@ -103,6 +116,7 @@ export default function IntentionalPage() {
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [showTypes, setShowTypes] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
+  const [view, setView] = useState<"plan" | "reflect">("plan");
   const [now, setNow] = useState(() => new Date());
   const [captureOpen, setCaptureOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -294,7 +308,17 @@ export default function IntentionalPage() {
         {stats.length > 0 && <p className="text-sm text-stone-600 mt-1">{stats.join(" · ")}</p>}
       </header>
 
-      {mindset && (
+      <div className="mx-5 mb-3 flex gap-1 rounded-full bg-stone-200/70 p-1">
+        {(["plan", "reflect"] as const).map((v) => (
+          <button key={v} onClick={() => setView(v)}
+            className={cn("flex-1 min-h-11 rounded-full text-sm font-semibold capitalize",
+              view === v ? "bg-white shadow text-stone-900" : "text-stone-600")}>
+            {v}
+          </button>
+        ))}
+      </div>
+
+      {mindset && view === "plan" && (
         <button
           onClick={() => setMindsetIdx((i) => i + 1)}
           className="mx-5 mb-3 w-[calc(100%-2.5rem)] text-left rounded-2xl bg-indigo-600 text-white px-4 py-3 min-h-11"
@@ -318,14 +342,14 @@ export default function IntentionalPage() {
           ]}
           extra={
             <>
-              <Chip active={showTypes || filter !== "all"} onClick={() => setShowTypes((v) => !v)}>
+              {view === "plan" && <Chip active={showTypes || filter !== "all"} onClick={() => setShowTypes((v) => !v)}>
                 {filter === "all" ? "Type ▾" : filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`}
-              </Chip>
+              </Chip>}
               <Chip active={false} onClick={() => setAreasOpen(true)}>⚙︎</Chip>
             </>
           }
         />
-        {showTypes && (
+        {showTypes && view === "plan" && (
           <ChipRow
             max={5}
             active={filter}
@@ -359,6 +383,18 @@ export default function IntentionalPage() {
           />
         )}
 
+        {view === "reflect" && state && (
+          <ReflectView
+            done={state.done}
+            history={state.history}
+            cardsById={byId}
+            areaById={areaById}
+            activeArea={activeArea}
+            today={today}
+          />
+        )}
+
+        {view === "plan" && <>
         {fresh.map((c) => (
           <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
             onPlay={play} area={activeArea ? null : areaOf(c)} />
@@ -384,6 +420,7 @@ export default function IntentionalPage() {
             </div>
           </SortableContext>
         </DndContext>
+        </>}
       </section>
 
       <button
@@ -411,8 +448,17 @@ export default function IntentionalPage() {
         <CaptureSheet
           areas={areaOrder}
           defaultArea={activeArea?.id ?? null}
+          defaultMode={view === "reflect" ? "reflect" : "single"}
           onClose={() => setCaptureOpen(false)}
-          onSubmit={async (text, single, areaId) => {
+          onSubmit={async (text, mode, areaId) => {
+            const single = mode === "single";
+            if (mode === "reflect") {
+              setCaptureOpen(false);
+              setView("reflect");
+              window.scrollTo({ top: 0, behavior: "smooth" });
+              await run({ action: "capture", text, mode, area_id: areaId }).catch(() => {});
+              return;
+            }
             const temp: Card = {
               id: `tmp-${Date.now()}`,
               kind: single ? "action" : "note",
@@ -433,7 +479,7 @@ export default function IntentionalPage() {
             setCaptureOpen(false);
             window.scrollTo({ top: 0, behavior: "smooth" });
             try {
-              const res = await run({ action: "capture", text, single, area_id: areaId });
+              const res = await run({ action: "capture", text, single, mode, area_id: areaId });
               const at = res.addedSince!;
               setSince((s) => (s && s < at ? s : at));
               // single cards: pick up the background AI sorting (transcripts poll their job)
@@ -709,6 +755,103 @@ function CardRow({
   );
 }
 
+function localDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-CA");
+}
+
+function dayLabel(d: string, today: string): string {
+  if (d === today) return "Today";
+  if (d === addDays(today, -1)) return "Yesterday";
+  return new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+}
+
+function ReflectView({ done, history, cardsById, areaById, activeArea, today }: {
+  done: Card[];
+  history: Log[];
+  cardsById: Map<string, Card>;
+  areaById: Map<string, Area>;
+  activeArea: Area | null;
+  today: string;
+}) {
+  const inArea = (areaId: string | null) => !activeArea || areaId === activeArea.id;
+  const doneIds = new Set(done.map((c) => c.id));
+  const minsByCard = new Map<string, number>();
+  type Item = { key: string; card: Card; minutes: number; habit?: boolean };
+  const days = new Map<string, { items: Item[]; seconds: number }>();
+  const day = (d: string) => days.get(d) ?? days.set(d, { items: [], seconds: 0 }).get(d)!;
+
+  for (const l of history) {
+    if (l.card_id) minsByCard.set(l.card_id, (minsByCard.get(l.card_id) ?? 0) + l.seconds / 60);
+    if (inArea(l.area_id)) day(localDate(l.ended_at)).seconds += l.seconds;
+  }
+  for (const c of done) {
+    if (!c.completed_at || !inArea(c.area_id)) continue;
+    day(localDate(c.completed_at)).items.push({ key: c.id, card: c, minutes: Math.round(minsByCard.get(c.id) ?? 0) });
+  }
+  // habit check-offs live only in the time log
+  const seen = new Set<string>();
+  for (const l of history) {
+    const c = l.card_id ? cardsById.get(l.card_id) : null;
+    if (!c || c.kind !== "habit" || doneIds.has(c.id) || !inArea(c.area_id)) continue;
+    const d = localDate(l.ended_at);
+    const k = `${d}:${c.id}`;
+    const entry = day(d);
+    const existing = entry.items.find((i) => i.key === k);
+    if (existing) existing.minutes += Math.round(l.seconds / 60);
+    else if (!seen.has(k)) {
+      seen.add(k);
+      entry.items.push({ key: k, card: c, minutes: Math.round(l.seconds / 60), habit: true });
+    }
+  }
+
+  const ordered = [...days.entries()].filter(([, v]) => v.items.length || v.seconds).sort((a, b) => b[0].localeCompare(a[0]));
+  if (!ordered.length) {
+    return <Empty>Nothing to look back on yet. Tap + → Reflect and talk through your day: wins, progress, mistakes.</Empty>;
+  }
+
+  return (
+    <div className="space-y-5">
+      {ordered.map(([d, { items, seconds }]) => {
+        const lessons = items.filter((i) => i.card.kind === "lesson");
+        const rest = items.filter((i) => i.card.kind !== "lesson");
+        const mins = Math.round(seconds / 60);
+        return (
+          <section key={d}>
+            <div className="flex items-baseline justify-between px-2 mb-2">
+              <h2 className="font-semibold">{dayLabel(d, today)}</h2>
+              <span className="text-xs text-stone-500">
+                {[rest.length && `${rest.length} done`, lessons.length && `${lessons.length} lesson${lessons.length === 1 ? "" : "s"}`, mins && `${mins} min`].filter(Boolean).join(" · ")}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {[...rest, ...lessons].map(({ key, card, minutes, habit }) => {
+                const area = !activeArea && card.area_id ? areaById.get(card.area_id) : null;
+                const lesson = card.kind === "lesson";
+                return (
+                  <div key={key} className={cn("rounded-2xl border px-4 py-3 flex items-start gap-3",
+                    lesson ? "bg-amber-50 border-amber-200" : "bg-white border-stone-200")}>
+                    <span className="text-lg leading-6" aria-hidden>{habit ? "🔁" : lesson ? "⚠️" : card.kind === "action" ? "✓" : KIND_META[card.kind].emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium leading-snug break-words">{card.title}</p>
+                      {card.body && lesson && <p className="text-sm text-stone-600 mt-0.5">{card.body}</p>}
+                      {(area || minutes > 0) && (
+                        <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-stone-500">
+                          {area && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-stone-700">{area.emoji} {area.name}</span>}
+                          {minutes > 0 && <span>{minutes} min</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function AreaHeader({ area, onEdit }: { area: Area; onEdit: () => void }) {
   const target = area.weekly_minutes;
   const pct = target ? Math.min(100, (area.minutes_week / target) * 100) : 0;
@@ -860,29 +1003,31 @@ function Sheet({ onClose, children }: { onClose: () => void; children: React.Rea
   );
 }
 
-function CaptureSheet({ areas, defaultArea, onClose, onSubmit }: {
+function CaptureSheet({ areas, defaultArea, defaultMode, onClose, onSubmit }: {
   areas: Area[];
   defaultArea: string | null;
   onClose: () => void;
-  onSubmit: (text: string, single: boolean, areaId: string | null) => Promise<void>;
+  onSubmit: (text: string, mode: CaptureMode, areaId: string | null) => Promise<void>;
+  defaultMode: CaptureMode;
 }) {
   const [text, setText] = useState("");
   const [areaId, setAreaId] = useState<string>(defaultArea ?? "auto");
-  const [single, setSingle] = useState(true);
+  const [mode, setMode] = useState<CaptureMode>(defaultMode);
+  const single = mode === "single";
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
-    try { await onSubmit(text, single, areaId === "auto" ? null : areaId); } catch { /* toast shown */ } finally { setBusy(false); }
+    try { await onSubmit(text, mode, areaId === "auto" ? null : areaId); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
   return (
     <Sheet onClose={onClose}>
       <div className="flex gap-1 rounded-full bg-stone-100 p-1 mb-3">
-        {[{ v: true, l: "One card" }, { v: false, l: "Dump transcript" }].map((o) => (
-          <button key={o.l} onClick={() => setSingle(o.v)}
-            className={cn("flex-1 min-h-11 rounded-full text-sm font-medium", single === o.v ? "bg-white shadow" : "text-stone-600")}>
+        {([{ v: "single", l: "One card" }, { v: "dump", l: "Brain dump" }, { v: "reflect", l: "Reflect" }] as const).map((o) => (
+          <button key={o.l} onClick={() => setMode(o.v)}
+            className={cn("flex-1 min-h-11 rounded-full text-sm font-medium", mode === o.v ? "bg-white shadow" : "text-stone-600")}>
             {o.l}
           </button>
         ))}
@@ -898,7 +1043,13 @@ function CaptureSheet({ areas, defaultArea, onClose, onSubmit }: {
           }
         }}
         rows={single ? 3 : 10}
-        placeholder={single ? "Get Whitney to do her insurance…" : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."}
+        placeholder={
+          single
+            ? "Get Whitney to do her insurance…"
+            : mode === "reflect"
+              ? "Look back: what did you do, work on, or get wrong? “Took the kids to the park, finally called Prudential, spent an hour on Context Memo, snapped at Whitney — should’ve planned the night before.”"
+              : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."
+        }
         className="w-full rounded-2xl border border-stone-200 p-3 text-base outline-none focus:border-stone-400"
       />
       {areas.length > 0 && (
@@ -916,7 +1067,7 @@ function CaptureSheet({ areas, defaultArea, onClose, onSubmit }: {
         onClick={submit}
         className="mt-3 w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
       >
-        {busy ? "Making cards…" : single ? "Add card" : "Make cards"}
+        {busy ? "Saving…" : single ? "Add card" : mode === "reflect" ? "Log reflection" : "Make cards"}
       </button>
     </Sheet>
   );

@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const TZ = "America/New_York";
-const KINDS = ["action", "thought", "idea", "reminder", "note", "habit", "principle"] as const;
+const KINDS = ["action", "thought", "idea", "reminder", "note", "habit", "principle", "lesson"] as const;
 type Kind = (typeof KINDS)[number];
 
 const CARD_COLUMNS =
@@ -69,7 +69,8 @@ async function buildState(supabase: Supabase) {
   const recent = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const todayStart = startOfTodayIso();
-  const [{ data: cards, error }, { data: logs }, { data: jobs }, { data: areas }] = await Promise.all([
+  const historyStart = new Date(Date.now() - 60 * 86400000).toISOString();
+  const [{ data: cards, error }, { data: logs }, { data: jobs }, { data: areas }, { data: done }, { data: history }] = await Promise.all([
     supabase
       .from("intentional_cards")
       .select(CARD_COLUMNS)
@@ -93,6 +94,19 @@ async function buildState(supabase: Supabase) {
       .select(AREA_COLUMNS)
       .eq("archived", false)
       .order("sort", { ascending: true }),
+    supabase
+      .from("intentional_cards")
+      .select(`${CARD_COLUMNS}, completed_at`)
+      .eq("status", "done")
+      .gte("completed_at", historyStart)
+      .order("completed_at", { ascending: false })
+      .limit(300),
+    supabase
+      .from("intentional_time_logs")
+      .select("card_id, area_id, seconds, ended_at")
+      .gte("ended_at", historyStart)
+      .order("ended_at", { ascending: false })
+      .limit(1000),
   ]);
   if (error) throw error;
   const weekSecs = new Map<string, number>();
@@ -103,6 +117,8 @@ async function buildState(supabase: Supabase) {
   }
   return {
     cards: cards ?? [],
+    done: done ?? [],
+    history: history ?? [],
     jobs: jobs ?? [],
     areas: (areas ?? []).map((a) => ({ ...a, minutes_week: Math.round((weekSecs.get(a.id) ?? 0) / 60) })),
     today: todayLocal(),
@@ -134,7 +150,7 @@ Existing open cards (id | kind | title):
 ${existing.map((c) => `${c.id} | ${c.kind} | ${c.title}`).join("\n") || "(none)"}
 
 Card fields:
-- "kind": one of action (a to-do), thought, idea, reminder (time-bound nudge), note (reference info), habit (something to do every day, e.g. exercise, read, time with kids), principle (a mindset/character reminder, e.g. "be concise", "don't seek validation").
+- "kind": one of action (a to-do), thought, idea, reminder (time-bound nudge), note (reference info), habit (something to do every day, e.g. exercise, read, time with kids), principle (a mindset/character reminder, e.g. "be concise", "don't seek validation"), lesson (a mistake made and what to do differently).
 - "title": short (max ~8 words). Imperative for actions/habits.
 - "body": extra context worth keeping, or null.
 - "est_minutes": realistic minutes to do it for action/habit/reminder, else null.
@@ -191,9 +207,26 @@ async function processTranscript(
   transcriptId: string,
   existing: Existing[],
   areas: Area[],
-  forcedArea: string | null
+  forcedArea: string | null,
+  reflect: boolean
 ) {
   const log: string[] = [];
+  const today = todayLocal();
+  // a past local date → roughly noon that day; today → now
+  const whenIso = (d: string | null | undefined) =>
+    d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today ? new Date(`${d}T16:00:00Z`).toISOString() : new Date().toISOString();
+  const logTime = async (cardId: string, areaId: string | null, minutes: unknown, endedAt: string) => {
+    if (typeof minutes !== "number" || minutes <= 0 || minutes > 24 * 60) return;
+    const secs = Math.round(minutes * 60);
+    await admin.from("intentional_time_logs").insert({
+      user_id: userId,
+      card_id: cardId,
+      area_id: areaId,
+      started_at: new Date(Date.parse(endedAt) - secs * 1000).toISOString(),
+      ended_at: endedAt,
+      seconds: secs,
+    });
+  };
   const step = async (line: string, progress: number, status = "processing") => {
     log.push(line);
     await admin
@@ -207,7 +240,7 @@ async function processTranscript(
   const areaById = new Map(areas.map((a) => [a.id, a]));
 
   try {
-    await step(`▸ Reading transcript · ${text.split(/\s+/).length} words`, 5);
+    await step(`▸ Reading ${reflect ? "reflection" : "transcript"} · ${text.split(/\s+/).length} words`, 5);
     await step(`▸ Comparing against ${existing.length} existing cards`, 10);
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -219,7 +252,9 @@ async function processTranscript(
         { role: "system", content: "You convert voice memos into structured cards. Output NDJSON only: one compact JSON object per line, no prose, no code fences." },
         {
           role: "user",
-          content: `Split this voice-memo transcript into every distinct card for an intentional-living app.\n\nTranscript: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
+          content: reflect
+            ? `This is a RETROSPECTIVE: the user reflecting on what already happened (things done, worked on, mistakes made). Split it into every distinct card, all in the past.\n\nReflection: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nFor reflections also:\n- Use kind "action" for things done or worked on (title in past tense, e.g. "Took kids to the park"), "lesson" for mistakes and what to do differently, "thought" for other reflections.\n- "occurred_on": YYYY-MM-DD when it happened (resolve "yesterday", "Monday" etc. from today; default today).\n- "minutes_spent": minutes spent if stated or clearly implied, else null.\n- "duplicate_of": id of an existing OPEN card this completes (e.g. reflection "called Prudential" completes card "Call Prudential"), else null.\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"stars":3,"related_ids":[],"area_id":null,"duplicate_of":null,"occurred_on":"${today}","minutes_spent":null}`
+            : `Split this voice-memo transcript into every distinct card for an intentional-living app.\n\nTranscript: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
         },
       ],
     });
@@ -231,7 +266,12 @@ async function processTranscript(
     const handle = async (line: string) => {
       const trimmed = line.trim().replace(/^```\w*|```$/g, "");
       if (!trimmed.startsWith("{")) return;
-      let obj: Partial<ParsedCard> & { count?: number; duplicate_of?: string | null };
+      let obj: Partial<ParsedCard> & {
+        count?: number;
+        duplicate_of?: string | null;
+        occurred_on?: string | null;
+        minutes_spent?: number | null;
+      };
       try { obj = JSON.parse(trimmed); } catch { return; }
       if (typeof obj.count === "number") {
         total = obj.count;
@@ -241,6 +281,20 @@ async function processTranscript(
       const done = added + dupes + 1;
       const pct = 15 + 80 * Math.min(1, done / Math.max(total, done));
       const dup = obj.duplicate_of && byId.get(obj.duplicate_of);
+      if (dup && reflect) {
+        dupes++;
+        const at = whenIso(obj.occurred_on);
+        const { data: updated } = await admin
+          .from("intentional_cards")
+          .update(dup.kind === "habit" ? { last_done_on: (obj.occurred_on ?? today) } : { status: "done", completed_at: at })
+          .eq("id", dup.id)
+          .eq("user_id", userId)
+          .select("area_id")
+          .maybeSingle();
+        await logTime(dup.id, updated?.area_id ?? null, obj.minutes_spent, at);
+        await step(`✓ Marked done: “${dup.title}”`, pct);
+        return;
+      }
       if (dup) {
         dupes++;
         await step(`↺ Duplicate of “${dup.title}” — skipped`, pct);
@@ -249,16 +303,27 @@ async function processTranscript(
       const card = cleanCard(obj, validIds, areaIds);
       if (!card) return;
       if (forcedArea) card.area_id = forcedArea;
-      const { error } = await admin
+      const at = whenIso(obj.occurred_on);
+      const { data: inserted, error } = await admin
         .from("intentional_cards")
-        .insert({ ...card, user_id: userId, transcript_id: transcriptId });
+        .insert({
+          ...card,
+          user_id: userId,
+          transcript_id: transcriptId,
+          ...(reflect ? { status: "done", completed_at: at, due_date: null, est_minutes: null } : {}),
+        })
+        .select("id")
+        .single();
       if (error) throw error;
+      if (reflect) await logTime(inserted.id, card.area_id, obj.minutes_spent, at);
       added++;
       const links = card.related_ids.map((id) => byId.get(id)?.title).filter(Boolean);
       const area = card.area_id ? areaById.get(card.area_id) : null;
       const extras = [
         area && `${area.emoji} ${area.name}`,
-        card.est_minutes && `~${card.est_minutes}m`,
+        !reflect && card.est_minutes && `~${card.est_minutes}m`,
+        reflect && typeof obj.minutes_spent === "number" && obj.minutes_spent > 0 && `${obj.minutes_spent}m logged`,
+        reflect && obj.occurred_on && obj.occurred_on !== today && obj.occurred_on,
         card.stars >= 4 && "★".repeat(card.stars),
         card.due_date && `due ${card.due_date}`,
       ].filter(Boolean).join(" · ");
@@ -277,12 +342,18 @@ async function processTranscript(
     }
     await handle(buffer);
 
-    if (added === 0) {
+    if (added === 0 && !(reflect && dupes)) {
       await step("✗ No new cards found — kept your transcript as a note", 100, "done");
       return;
     }
     await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
-    await step(`✓ Done · ${added} card${added === 1 ? "" : "s"} added${dupes ? ` · ${dupes} duplicate${dupes === 1 ? "" : "s"} skipped` : ""}`, 100, "done");
+    await step(
+      reflect
+        ? `✓ Done · ${added} reflection${added === 1 ? "" : "s"} logged${dupes ? ` · ${dupes} open card${dupes === 1 ? "" : "s"} marked done` : ""}`
+        : `✓ Done · ${added} card${added === 1 ? "" : "s"} added${dupes ? ` · ${dupes} duplicate${dupes === 1 ? "" : "s"} skipped` : ""}`,
+      100,
+      "done"
+    );
   } catch (err) {
     console.error("[intentional] transcript failed; raw card kept", err);
     await step("✗ AI unavailable — kept your transcript as a note", 100, "failed");
@@ -296,7 +367,8 @@ async function enrich(
   text: string,
   single: boolean,
   transcriptId: string | null,
-  forcedArea: string | null
+  forcedArea: string | null,
+  reflect = false
 ) {
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -317,7 +389,7 @@ async function enrich(
     .eq("archived", false);
 
   if (!single && transcriptId) {
-    await processTranscript(admin, userId, rawId, text, transcriptId, (existing ?? []) as Existing[], (areas ?? []) as Area[], forcedArea);
+    await processTranscript(admin, userId, rawId, text, transcriptId, (existing ?? []) as Existing[], (areas ?? []) as Area[], forcedArea, reflect);
     return;
   }
 
@@ -415,6 +487,7 @@ export async function POST(request: NextRequest) {
       single?: boolean;
       started_at?: string;
       area_id?: string | null;
+      mode?: string;
       fields?: Partial<{
         kind: string;
         title: string;
@@ -439,13 +512,19 @@ export async function POST(request: NextRequest) {
         if (!text) return NextResponse.json({ error: "Nothing to add" }, { status: 400 });
         if (text.length > 30000) return NextResponse.json({ error: "Transcript too long" }, { status: 413 });
 
-        const single = !!body.single;
+        const reflect = body.mode === "reflect";
+        const single = !reflect && !!body.single;
         const forcedArea = await validArea(supabase, body.area_id);
         let transcriptId: string | null = null;
         if (!single) {
           const { data: t, error } = await supabase
             .from("intentional_transcripts")
-            .insert({ text, log: ["▸ Saved transcript as a card"], progress: 2 })
+            .insert({
+              text,
+              mode: reflect ? "reflect" : "dump",
+              log: [reflect ? "▸ Saved reflection" : "▸ Saved transcript as a card"],
+              progress: 2,
+            })
             .select("id")
             .single();
           if (error) throw error;
@@ -462,12 +541,13 @@ export async function POST(request: NextRequest) {
             due_date: single ? guessDueDate(text, todayLocal()) : null,
             transcript_id: transcriptId,
             area_id: forcedArea,
+            ...(reflect ? { status: "done", completed_at: new Date().toISOString() } : {}),
           })
           .select("id, created_at")
           .single();
         if (error) throw error;
 
-        after(() => enrich(user.id, raw.id, text, single, transcriptId, forcedArea));
+        after(() => enrich(user.id, raw.id, text, single, transcriptId, forcedArea, reflect));
 
         return NextResponse.json({
           addedId: raw.id,
@@ -480,7 +560,7 @@ export async function POST(request: NextRequest) {
       case "reprocess": {
         const { data: t } = await supabase
           .from("intentional_transcripts")
-          .select("id, text")
+          .select("id, text, mode")
           .eq("id", body.id ?? "")
           .maybeSingle();
         if (!t) return NextResponse.json({ error: "Transcript not found" }, { status: 404 });
@@ -490,14 +570,20 @@ export async function POST(request: NextRequest) {
           .select("id")
           .eq("transcript_id", t.id)
           .eq("kind", "note")
-          .eq("status", "open")
+          .neq("status", "archived")
           .order("created_at", { ascending: true })
           .limit(1)
           .maybeSingle();
         if (!raw) {
           const { data: created, error } = await supabase
             .from("intentional_cards")
-            .insert({ kind: "note", title: (t.text.split("\n")[0] || t.text).slice(0, 120), body: t.text, transcript_id: t.id })
+            .insert({
+              kind: "note",
+              title: (t.text.split("\n")[0] || t.text).slice(0, 120),
+              body: t.text,
+              transcript_id: t.id,
+              ...(t.mode === "reflect" ? { status: "done", completed_at: new Date().toISOString() } : {}),
+            })
             .select("id")
             .single();
           if (error) throw error;
@@ -508,7 +594,7 @@ export async function POST(request: NextRequest) {
           .from("intentional_transcripts")
           .update({ status: "processing", progress: 2, log: ["▸ Retrying"] })
           .eq("id", t.id);
-        after(() => enrich(user.id, raw!.id, t.text, false, t.id, null));
+        after(() => enrich(user.id, raw!.id, t.text, false, t.id, null, t.mode === "reflect"));
         return NextResponse.json(await buildState(supabase));
       }
 
@@ -584,7 +670,15 @@ export async function POST(request: NextRequest) {
         if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
 
         const startedMs = body.started_at ? Date.parse(body.started_at) : NaN;
-        if (!Number.isNaN(startedMs) && startedMs < Date.now()) {
+        if (Number.isNaN(startedMs) && card.kind === "habit") {
+          // no timer: still record the check-off for Reflect history
+          await supabase.from("intentional_time_logs").insert({
+            card_id: card.id,
+            area_id: card.area_id,
+            started_at: new Date().toISOString(),
+            seconds: 0,
+          });
+        } else if (!Number.isNaN(startedMs) && startedMs < Date.now()) {
           await supabase.from("intentional_time_logs").insert({
             card_id: card.id,
             area_id: card.area_id,
