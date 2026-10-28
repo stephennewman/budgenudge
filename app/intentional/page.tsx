@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/utils/styles";
 import { intentionScore } from "@/utils/intentional/score";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -68,13 +69,6 @@ const KIND_META: Record<Kind, { label: string; emoji: string; tone: string }> = 
 const KINDS = Object.keys(KIND_META) as Kind[];
 const TIMER_KEY = "intentional.timer";
 
-function greeting(h: number) {
-  if (h < 5) return "Still up";
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
 function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T12:00:00`);
   d.setDate(d.getDate() + n);
@@ -114,9 +108,12 @@ export default function IntentionalPage() {
   const [authError, setAuthError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
-  const [showTypes, setShowTypes] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
   const [view, setView] = useState<"plan" | "reflect">("plan");
+  const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = (c: Card) => !q || `${c.title} ${c.body ?? ""}`.toLowerCase().includes(q);
   const [now, setNow] = useState(() => new Date());
   const [captureOpen, setCaptureOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -186,7 +183,6 @@ export default function IntentionalPage() {
   const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
   const areaOf = (c: Card) => (c.area_id ? areaById.get(c.area_id) ?? null : null);
   const principles = cards.filter((c) => c.kind === "principle");
-  const habitsLeft = cards.filter((c) => c.kind === "habit" && c.last_done_on !== today);
   const hourKey = `${today}-${now.getHours()}`;
   const scores = useMemo(() => {
     const at = new Date();
@@ -210,14 +206,11 @@ export default function IntentionalPage() {
   const activeArea = areaFilter !== "all" ? areaById.get(areaFilter) ?? null : null;
   const list = cards
     .filter((c) => !activeArea || c.area_id === activeArea.id)
+    .filter(matches)
     .filter((c) =>
       filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
     )
     .sort((x, y) => total(y) - total(x));
-  const stats = [
-    habitsLeft.length && `${habitsLeft.length} daily left`,
-    state?.minutesToday && `${state.minutesToday} min intentional today`,
-  ].filter(Boolean);
   const mindset = principles.length ? principles[mindsetIdx % principles.length] : null;
   const fresh = [
     ...pending,
@@ -298,37 +291,63 @@ export default function IntentionalPage() {
   const timerCard = timer ? byId.get(timer.id) ?? null : null;
 
   return (
-    <main className="min-h-dvh max-w-xl mx-auto pb-32 text-stone-900" style={{ paddingTop: "env(safe-area-inset-top)" }}>
-      <header className="px-5 pt-6 pb-3">
-        <p className="text-sm text-stone-500">
-          {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })} ·{" "}
-          {now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-        </p>
-        <h1 className="text-2xl font-semibold mt-1">{greeting(now.getHours())}.</h1>
-        {stats.length > 0 && <p className="text-sm text-stone-600 mt-1">{stats.join(" · ")}</p>}
-      </header>
-
-      <div className="mx-5 mb-3 flex gap-1 rounded-full bg-stone-200/70 p-1">
-        {(["plan", "reflect"] as const).map((v) => (
-          <button key={v} onClick={() => setView(v)}
-            className={cn("flex-1 min-h-11 rounded-full text-sm font-semibold capitalize",
-              view === v ? "bg-white shadow text-stone-900" : "text-stone-600")}>
-            {v}
+    <main className="min-h-dvh max-w-xl mx-auto pb-32 text-stone-900">
+      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 pb-2 border-b border-stone-200 space-y-2"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
+        <div className="relative">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={view === "reflect" ? "Search what you’ve done" : "Search cards"}
+            className="w-full min-h-11 rounded-full bg-white border border-stone-200 pl-4 pr-12 text-base outline-none focus:border-stone-400"
+          />
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="Filters and settings"
+            aria-expanded={menuOpen}
+            className={cn("absolute right-0 top-0 size-11 flex items-center justify-center rounded-full",
+              menuOpen || view === "reflect" || filter !== "all" ? "text-stone-900" : "text-stone-400")}
+          >
+            <SlidersHorizontal className="size-5" />
           </button>
-        ))}
-      </div>
+        </div>
 
-      {mindset && view === "plan" && (
-        <button
-          onClick={() => setMindsetIdx((i) => i + 1)}
-          className="mx-5 mb-3 w-[calc(100%-2.5rem)] text-left rounded-2xl bg-indigo-600 text-white px-4 py-3 min-h-11"
-        >
-          <span className="text-xs uppercase tracking-wide text-indigo-200">Remember</span>
-          <span className="block font-medium">{mindset.title}</span>
-        </button>
-      )}
+        {menuOpen && (
+          <div className="rounded-2xl bg-white border border-stone-200 p-3 space-y-3">
+            <div>
+              <Label>Show</Label>
+              <div className="flex gap-2">
+                <Chip active={view === "plan"} onClick={() => { setView("plan"); setMenuOpen(false); }}>Upcoming</Chip>
+                <Chip active={view === "reflect"} onClick={() => { setView("reflect"); setMenuOpen(false); }}>✓ Done & reflections</Chip>
+              </div>
+            </div>
+            {view === "plan" && (
+              <div>
+                <Label>Type</Label>
+                <ChipRow
+                  max={5}
+                  active={filter}
+                  onSelect={(f) => { setFilter(f); setMenuOpen(false); }}
+                  items={[
+                    { id: "all" as Filter, label: "Any type" },
+                    ...filterOptions.map((f) => ({
+                      id: f,
+                      label: f === "prioritized"
+                        ? `★ Prioritized ${counts.get(f)}`
+                        : `${KIND_META[f as Kind].emoji} ${KIND_META[f as Kind].label} ${counts.get(f)}`,
+                    })),
+                  ]}
+                />
+              </div>
+            )}
+            <button onClick={() => { setAreasOpen(true); setMenuOpen(false); }}
+              className="min-h-11 text-sm font-medium text-stone-700">
+              Edit intentions →
+            </button>
+          </div>
+        )}
 
-      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 border-b border-stone-200 space-y-2">
         <ChipRow
           max={5}
           active={areaFilter}
@@ -342,29 +361,15 @@ export default function IntentionalPage() {
           ]}
           extra={
             <>
-              {view === "plan" && <Chip active={showTypes || filter !== "all"} onClick={() => setShowTypes((v) => !v)}>
-                {filter === "all" ? "Type ▾" : filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`}
-              </Chip>}
-              <Chip active={false} onClick={() => setAreasOpen(true)}>⚙︎</Chip>
+              {view === "reflect" && <Chip active onClick={() => setView("plan")}>✓ Done ✕</Chip>}
+              {view === "plan" && filter !== "all" && (
+                <Chip active onClick={() => setFilter("all")}>
+                  {filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`} ✕
+                </Chip>
+              )}
             </>
           }
         />
-        {showTypes && view === "plan" && (
-          <ChipRow
-            max={5}
-            active={filter}
-            onSelect={(f) => { setFilter(f); setShowTypes(false); }}
-            items={[
-              { id: "all" as Filter, label: "Any type" },
-              ...filterOptions.map((f) => ({
-                id: f,
-                label: f === "prioritized"
-                  ? `★ Prioritized ${counts.get(f)}`
-                  : `${KIND_META[f as Kind].emoji} ${KIND_META[f as Kind].label} ${counts.get(f)}`,
-              })),
-            ]}
-          />
-        )}
       </nav>
 
       <section className="px-3 pt-3 space-y-2">
@@ -391,10 +396,20 @@ export default function IntentionalPage() {
             areaById={areaById}
             activeArea={activeArea}
             today={today}
+            matches={matches}
           />
         )}
 
         {view === "plan" && <>
+        {mindset && !q && (
+          <button
+            onClick={() => setMindsetIdx((i) => i + 1)}
+            className="w-full text-left rounded-2xl bg-indigo-50 text-indigo-900 px-4 py-3 min-h-11"
+          >
+            <span className="text-xs font-semibold uppercase tracking-wide text-indigo-500">Remember</span>
+            <span className="block font-medium">{mindset.title}</span>
+          </button>
+        )}
         {fresh.map((c) => (
           <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
             onPlay={play} area={activeArea ? null : areaOf(c)} />
@@ -765,7 +780,8 @@ function dayLabel(d: string, today: string): string {
   return new Date(`${d}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 }
 
-function ReflectView({ done, history, cardsById, areaById, activeArea, today }: {
+function ReflectView({ done, history, cardsById, areaById, activeArea, today, matches }: {
+  matches: (c: Card) => boolean;
   done: Card[];
   history: Log[];
   cardsById: Map<string, Card>;
@@ -785,14 +801,14 @@ function ReflectView({ done, history, cardsById, areaById, activeArea, today }: 
     if (inArea(l.area_id)) day(localDate(l.ended_at)).seconds += l.seconds;
   }
   for (const c of done) {
-    if (!c.completed_at || !inArea(c.area_id)) continue;
+    if (!c.completed_at || !inArea(c.area_id) || !matches(c)) continue;
     day(localDate(c.completed_at)).items.push({ key: c.id, card: c, minutes: Math.round(minsByCard.get(c.id) ?? 0) });
   }
   // habit check-offs live only in the time log
   const seen = new Set<string>();
   for (const l of history) {
     const c = l.card_id ? cardsById.get(l.card_id) : null;
-    if (!c || c.kind !== "habit" || doneIds.has(c.id) || !inArea(c.area_id)) continue;
+    if (!c || c.kind !== "habit" || doneIds.has(c.id) || !inArea(c.area_id) || !matches(c)) continue;
     const d = localDate(l.ended_at);
     const k = `${d}:${c.id}`;
     const entry = day(d);
@@ -1022,54 +1038,83 @@ function CaptureSheet({ areas, defaultArea, defaultMode, onClose, onSubmit }: {
     try { await onSubmit(text, mode, areaId === "auto" ? null : areaId); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
+  // Track the visible viewport so the bottom button sits above the on-screen keyboard.
+  const [vp, setVp] = useState<{ h: number; top: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setVp({ h: vv.height, top: vv.offsetTop });
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, []);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
   return (
-    <Sheet onClose={onClose}>
-      <div className="flex gap-1 rounded-full bg-stone-100 p-1 mb-3">
-        {([{ v: "single", l: "One card" }, { v: "dump", l: "Brain dump" }, { v: "reflect", l: "Reflect" }] as const).map((o) => (
-          <button key={o.l} onClick={() => setMode(o.v)}
-            className={cn("flex-1 min-h-11 rounded-full text-sm font-medium", mode === o.v ? "bg-white shadow" : "text-stone-600")}>
-            {o.l}
-          </button>
-        ))}
-      </div>
-      <textarea
-        autoFocus
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            submit();
-          }
-        }}
-        rows={single ? 3 : 10}
-        placeholder={
-          single
-            ? "Get Whitney to do her insurance…"
-            : mode === "reflect"
-              ? "Look back: what did you do, work on, or get wrong? “Took the kids to the park, finally called Prudential, spent an hour on Context Memo, snapped at Whitney — should’ve planned the night before.”"
-              : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."
-        }
-        className="w-full rounded-2xl border border-stone-200 p-3 text-base outline-none focus:border-stone-400"
-      />
-      {areas.length > 0 && (
-        <div className="mt-3">
-          <Label>Intention</Label>
-          <ChipRow
-            active={areaId}
-            onSelect={setAreaId}
-            items={[{ id: "auto", label: "✨ Auto" }, ...areas.map((a) => ({ id: a.id, label: `${a.emoji} ${a.name}` }))]}
-          />
+    <div
+      className="fixed inset-x-0 z-40 flex flex-col bg-white"
+      style={{ top: vp?.top ?? 0, height: vp ? `${vp.h}px` : "100dvh", paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <div className="flex items-center gap-2 px-3 pt-2">
+        <button onClick={onClose} aria-label="Close" className="size-11 shrink-0 rounded-full text-xl text-stone-500">✕</button>
+        <div className="flex-1 flex gap-1 rounded-full bg-stone-100 p-1">
+          {([{ v: "single", l: "One card" }, { v: "dump", l: "Brain dump" }, { v: "reflect", l: "Reflect" }] as const).map((o) => (
+            <button key={o.l} onClick={() => setMode(o.v)}
+              className={cn("flex-1 min-h-10 rounded-full text-sm font-medium", mode === o.v ? "bg-white shadow" : "text-stone-600")}>
+              {o.l}
+            </button>
+          ))}
         </div>
-      )}
-      <button
-        disabled={busy || !text.trim()}
-        onClick={submit}
-        className="mt-3 w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
-      >
-        {busy ? "Saving…" : single ? "Add card" : mode === "reflect" ? "Log reflection" : "Make cards"}
-      </button>
-    </Sheet>
+      </div>
+      <div className="flex-1 min-h-0 flex flex-col px-4 pt-3 max-w-xl w-full mx-auto">
+        <textarea
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder={
+            single
+              ? "Get Whitney to do her insurance…"
+              : mode === "reflect"
+                ? "Look back: what did you do, work on, or get wrong? “Took the kids to the park, finally called Prudential, spent an hour on Context Memo, snapped at Whitney — should’ve planned the night before.”"
+                : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."
+          }
+          className="flex-1 min-h-0 w-full resize-none text-lg leading-relaxed outline-none placeholder:text-stone-400"
+        />
+      </div>
+      <div className="border-t border-stone-100 px-4 pt-3 max-w-xl w-full mx-auto"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+        {areas.length > 0 && (
+          <div className="mb-3 max-h-28 overflow-y-auto">
+            <ChipRow
+              active={areaId}
+              onSelect={setAreaId}
+              items={[{ id: "auto", label: "✨ Auto" }, ...areas.map((a) => ({ id: a.id, label: `${a.emoji} ${a.name}` }))]}
+            />
+          </div>
+        )}
+        <button
+          disabled={busy || !text.trim()}
+          onClick={submit}
+          className="w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
+        >
+          {busy ? "Saving…" : single ? "Add card" : mode === "reflect" ? "Log reflection" : "Make cards"}
+        </button>
+      </div>
+    </div>
   );
 }
 
