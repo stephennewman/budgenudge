@@ -6,7 +6,8 @@ import { guessDueDate } from "@/utils/intentional/dates";
 
 // Intentional — everything is a card.
 //
-// GET  → open cards + minutes logged today.
+// GET  → open cards, intentions (life areas) with minutes this week, minutes
+//        logged today. Seeds default intentions on first use.
 // POST json { action, ... }:
 //   "capture"  { text, single? } → saves the raw text as a card immediately,
 //              then (after responding) GPT types/estimates it, or splits a
@@ -15,6 +16,7 @@ import { guessDueDate } from "@/utils/intentional/dates";
 //   "archive" | "restore" { id }
 //   "complete" { id, started_at? } → done (habits: done for today); logs time
 //              when started_at is given.
+//   "area_save" { id?, fields } | "area_archive" { id } → manage intentions.
 //
 // AUTH: Supabase session; tables are RLS-scoped to auth.uid().
 export const dynamic = "force-dynamic";
@@ -25,7 +27,23 @@ const KINDS = ["action", "thought", "idea", "reminder", "note", "habit", "princi
 type Kind = (typeof KINDS)[number];
 
 const CARD_COLUMNS =
-  "id, kind, title, body, est_minutes, stars, prioritized, status, due_date, related_ids, last_done_on, created_at, boost";
+  "id, kind, title, body, est_minutes, stars, prioritized, status, due_date, related_ids, last_done_on, created_at, boost, area_id";
+
+const AREA_COLUMNS = "id, name, emoji, statement, weekly_minutes, focus, sort";
+
+const DEFAULT_AREAS = [
+  { name: "Me", emoji: "🧭", focus: "any", weekly_minutes: 210, statement: "Become the man I want to be: lead without permission, be clear and assertive, take care of my body." },
+  { name: "Marriage", emoji: "💍", focus: "personal", weekly_minutes: 300, statement: "Pursue Whitney. Be present, plan time together, carry the load." },
+  { name: "Family", emoji: "👨‍👧", focus: "personal", weekly_minutes: 420, statement: "Be a present, intentional dad." },
+  { name: "Faith", emoji: "🙏", focus: "any", weekly_minutes: 105, statement: "Stay rooted: Bible, prayer, church." },
+  { name: "Checkit", emoji: "💼", focus: "work", weekly_minutes: null, statement: "Do excellent, focused work at my day job." },
+  { name: "Context Memo", emoji: "🚀", focus: "any", weekly_minutes: 300, statement: "Build and grow my side business." },
+  { name: "Home & admin", emoji: "🏠", focus: "any", weekly_minutes: 120, statement: "Keep the house, money, and paperwork handled." },
+];
+const FOCUSES = ["work", "personal", "any"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type Area = { id: string; name: string; emoji: string; statement: string | null };
 
 type Supabase = Awaited<ReturnType<typeof createSupabaseClient>>;
 
@@ -41,10 +59,17 @@ function startOfTodayIso(): string {
   return new Date(local.getTime() + offsetMs).toISOString();
 }
 
+function startOfWeekIso(): string {
+  const today = new Date(startOfTodayIso());
+  const weekday = new Date(`${todayLocal()}T12:00:00`).getDay();
+  return new Date(today.getTime() - ((weekday + 6) % 7) * 86400000).toISOString();
+}
+
 async function buildState(supabase: Supabase) {
   const recent = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const [{ data: cards, error }, { data: logs }, { data: jobs }] = await Promise.all([
+  const todayStart = startOfTodayIso();
+  const [{ data: cards, error }, { data: logs }, { data: jobs }, { data: areas }] = await Promise.all([
     supabase
       .from("intentional_cards")
       .select(CARD_COLUMNS)
@@ -55,18 +80,34 @@ async function buildState(supabase: Supabase) {
       .order("created_at", { ascending: false }),
     supabase
       .from("intentional_time_logs")
-      .select("seconds")
-      .gte("ended_at", startOfTodayIso()),
+      .select("seconds, ended_at, area_id")
+      .gte("ended_at", startOfWeekIso()),
     supabase
       .from("intentional_transcripts")
       .select("id, status, progress, log, created_at")
       .or(`status.eq.processing,created_at.gte.${recent},and(status.eq.failed,created_at.gte.${dayAgo})`)
       .order("created_at", { ascending: false })
       .limit(3),
+    supabase
+      .from("intentional_areas")
+      .select(AREA_COLUMNS)
+      .eq("archived", false)
+      .order("sort", { ascending: true }),
   ]);
   if (error) throw error;
-  const seconds = (logs ?? []).reduce((sum, l) => sum + (l.seconds ?? 0), 0);
-  return { cards: cards ?? [], jobs: jobs ?? [], today: todayLocal(), minutesToday: Math.round(seconds / 60) };
+  const weekSecs = new Map<string, number>();
+  let todaySecs = 0;
+  for (const l of logs ?? []) {
+    if (l.ended_at >= todayStart) todaySecs += l.seconds ?? 0;
+    if (l.area_id) weekSecs.set(l.area_id, (weekSecs.get(l.area_id) ?? 0) + (l.seconds ?? 0));
+  }
+  return {
+    cards: cards ?? [],
+    jobs: jobs ?? [],
+    areas: (areas ?? []).map((a) => ({ ...a, minutes_week: Math.round((weekSecs.get(a.id) ?? 0) / 60) })),
+    today: todayLocal(),
+    minutesToday: Math.round(todaySecs / 60),
+  };
 }
 
 type ParsedCard = {
@@ -77,13 +118,17 @@ type ParsedCard = {
   stars: number;
   due_date: string | null;
   related_ids: string[];
+  area_id: string | null;
 };
 
 type Existing = { id: string; kind: string; title: string };
 
-function cardSpec(existing: Existing[]): string {
+function cardSpec(existing: Existing[], areas: Area[]): string {
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: TZ, weekday: "long" }).format(new Date());
   return `Today is ${weekday}, ${todayLocal()}.
+
+The user's intentions (life areas), id | name | why:
+${areas.map((a) => `${a.id} | ${a.emoji} ${a.name} | ${a.statement ?? ""}`).join("\n") || "(none)"}
 
 Existing open cards (id | kind | title):
 ${existing.map((c) => `${c.id} | ${c.kind} | ${c.title}`).join("\n") || "(none)"}
@@ -96,11 +141,12 @@ Card fields:
 - "stars": importance 1-5 (5 = critical, e.g. insurance deadlines; 3 = normal).
 - "due_date": YYYY-MM-DD if stated or clearly implied, resolved from today, else null.
 - "related_ids": ids of existing cards that are clearly the same topic, else [].
+- "area_id": id of the ONE intention this card best serves, or null if none fit.
 - "duplicate_of": id of an existing card that this is essentially the same as, else null.
 Ignore filler and greetings.`;
 }
 
-function cleanCard(c: Partial<ParsedCard>, validIds: Set<string>): ParsedCard | null {
+function cleanCard(c: Partial<ParsedCard>, validIds: Set<string>, areaIds: Set<string>): ParsedCard | null {
   if (!(c.title ?? "").trim()) return null;
   return {
     kind: KINDS.includes(c.kind as Kind) ? (c.kind as Kind) : "action",
@@ -110,10 +156,11 @@ function cleanCard(c: Partial<ParsedCard>, validIds: Set<string>): ParsedCard | 
     stars: typeof c.stars === "number" ? Math.min(5, Math.max(1, Math.round(c.stars))) : 3,
     due_date: /^\d{4}-\d{2}-\d{2}$/.test(c.due_date ?? "") ? c.due_date! : null,
     related_ids: (c.related_ids ?? []).filter((id) => validIds.has(id)),
+    area_id: c.area_id && areaIds.has(c.area_id) ? c.area_id : null,
   };
 }
 
-async function parseSingle(text: string, existing: Existing[]): Promise<ParsedCard | null> {
+async function parseSingle(text: string, existing: Existing[], areas: Area[]): Promise<ParsedCard | null> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -121,14 +168,14 @@ async function parseSingle(text: string, existing: Existing[]): Promise<ParsedCa
       { role: "system", content: "You convert notes into structured cards. Always return valid JSON." },
       {
         role: "user",
-        content: `Turn this ONE quick note into exactly one card for an intentional-living app.\n\nNote: """${text}"""\n\n${cardSpec(existing)}\n\nReturn ONLY JSON: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"duplicate_of":null}`,
+        content: `Turn this ONE quick note into exactly one card for an intentional-living app.\n\nNote: """${text}"""\n\n${cardSpec(existing, areas)}\n\nReturn ONLY JSON: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
       },
     ],
     temperature: 0.2,
     response_format: { type: "json_object" },
   });
   const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as Partial<ParsedCard>;
-  return cleanCard(parsed, new Set(existing.map((c) => c.id)));
+  return cleanCard(parsed, new Set(existing.map((c) => c.id)), new Set(areas.map((a) => a.id)));
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -142,7 +189,9 @@ async function processTranscript(
   rawId: string,
   text: string,
   transcriptId: string,
-  existing: Existing[]
+  existing: Existing[],
+  areas: Area[],
+  forcedArea: string | null
 ) {
   const log: string[] = [];
   const step = async (line: string, progress: number, status = "processing") => {
@@ -154,6 +203,8 @@ async function processTranscript(
   };
   const byId = new Map(existing.map((c) => [c.id, c]));
   const validIds = new Set(byId.keys());
+  const areaIds = new Set(areas.map((a) => a.id));
+  const areaById = new Map(areas.map((a) => [a.id, a]));
 
   try {
     await step(`▸ Reading transcript · ${text.split(/\s+/).length} words`, 5);
@@ -168,7 +219,7 @@ async function processTranscript(
         { role: "system", content: "You convert voice memos into structured cards. Output NDJSON only: one compact JSON object per line, no prose, no code fences." },
         {
           role: "user",
-          content: `Split this voice-memo transcript into every distinct card for an intentional-living app.\n\nTranscript: """${text}"""\n\n${cardSpec(existing)}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"duplicate_of":null}`,
+          content: `Split this voice-memo transcript into every distinct card for an intentional-living app.\n\nTranscript: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
         },
       ],
     });
@@ -195,15 +246,18 @@ async function processTranscript(
         await step(`↺ Duplicate of “${dup.title}” — skipped`, pct);
         return;
       }
-      const card = cleanCard(obj, validIds);
+      const card = cleanCard(obj, validIds, areaIds);
       if (!card) return;
+      if (forcedArea) card.area_id = forcedArea;
       const { error } = await admin
         .from("intentional_cards")
         .insert({ ...card, user_id: userId, transcript_id: transcriptId });
       if (error) throw error;
       added++;
       const links = card.related_ids.map((id) => byId.get(id)?.title).filter(Boolean);
+      const area = card.area_id ? areaById.get(card.area_id) : null;
       const extras = [
+        area && `${area.emoji} ${area.name}`,
         card.est_minutes && `~${card.est_minutes}m`,
         card.stars >= 4 && "★".repeat(card.stars),
         card.due_date && `due ${card.due_date}`,
@@ -241,7 +295,8 @@ async function enrich(
   rawId: string,
   text: string,
   single: boolean,
-  transcriptId: string | null
+  transcriptId: string | null,
+  forcedArea: string | null
 ) {
   const admin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -255,14 +310,19 @@ async function enrich(
     .neq("id", rawId)
     .order("created_at", { ascending: false })
     .limit(150);
+  const { data: areas } = await admin
+    .from("intentional_areas")
+    .select("id, name, emoji, statement")
+    .eq("user_id", userId)
+    .eq("archived", false);
 
   if (!single && transcriptId) {
-    await processTranscript(admin, userId, rawId, text, transcriptId, (existing ?? []) as Existing[]);
+    await processTranscript(admin, userId, rawId, text, transcriptId, (existing ?? []) as Existing[], (areas ?? []) as Area[], forcedArea);
     return;
   }
 
   try {
-    const c = await parseSingle(text, (existing ?? []) as Existing[]);
+    const c = await parseSingle(text, (existing ?? []) as Existing[], (areas ?? []) as Area[]);
     if (!c) return;
     await admin
       .from("intentional_cards")
@@ -274,6 +334,7 @@ async function enrich(
         stars: c.stars,
         ...(c.due_date ? { due_date: c.due_date } : {}),
         related_ids: c.related_ids,
+        ...(!forcedArea && c.area_id ? { area_id: c.area_id } : {}),
       })
       .eq("id", rawId)
       .eq("user_id", userId)
@@ -283,11 +344,57 @@ async function enrich(
   }
 }
 
+// One-time: sort existing cards into the freshly seeded intentions.
+async function classifyExisting(userId: string) {
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  try {
+    const [{ data: cards }, { data: areas }] = await Promise.all([
+      admin.from("intentional_cards").select("id, kind, title").eq("user_id", userId).eq("status", "open").is("area_id", null).limit(200),
+      admin.from("intentional_areas").select("id, name, emoji, statement").eq("user_id", userId).eq("archived", false),
+    ]);
+    if (!cards?.length || !areas?.length) return;
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      temperature: 0.1,
+      response_format: { type: "json_object" },
+      messages: [{
+        role: "user",
+        content: `Assign each card to the ONE intention (life area) it best serves, or null.\n\nIntentions (id | name | why):\n${areas.map((a) => `${a.id} | ${a.name} | ${a.statement ?? ""}`).join("\n")}\n\nCards (id | kind | title):\n${cards.map((c) => `${c.id} | ${c.kind} | ${c.title}`).join("\n")}\n\nReturn ONLY JSON: {"assignments":[{"id":"","area_id":null}]}`,
+      }],
+    });
+    const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as { assignments?: { id: string; area_id: string | null }[] };
+    const areaIds = new Set(areas.map((a) => a.id));
+    const cardIds = new Set(cards.map((c) => c.id));
+    await Promise.all(
+      (parsed.assignments ?? [])
+        .filter((a) => cardIds.has(a.id) && a.area_id && areaIds.has(a.area_id))
+        .map((a) => admin.from("intentional_cards").update({ area_id: a.area_id }).eq("id", a.id).eq("user_id", userId).is("area_id", null))
+    );
+  } catch (err) {
+    console.error("[intentional] classify existing failed", err);
+  }
+}
+
+async function validArea(supabase: Supabase, id: unknown): Promise<string | null> {
+  if (typeof id !== "string" || !UUID.test(id)) return null;
+  const { data } = await supabase.from("intentional_areas").select("id").eq("id", id).maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function GET() {
   const supabase = await createSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
+    const { count } = await supabase.from("intentional_areas").select("id", { count: "exact", head: true });
+    if (count === 0) {
+      const { error } = await supabase
+        .from("intentional_areas")
+        .insert(DEFAULT_AREAS.map((a, i) => ({ ...a, sort: i })));
+      if (error) throw error;
+      after(() => classifyExisting(user.id));
+    }
     return NextResponse.json(await buildState(supabase));
   } catch (err) {
     console.error("[intentional] list", err);
@@ -307,6 +414,7 @@ export async function POST(request: NextRequest) {
       text?: string;
       single?: boolean;
       started_at?: string;
+      area_id?: string | null;
       fields?: Partial<{
         kind: string;
         title: string;
@@ -316,6 +424,12 @@ export async function POST(request: NextRequest) {
         prioritized: boolean;
         due_date: string | null;
         boost: number;
+        area_id: string | null;
+        name: string;
+        emoji: string;
+        statement: string | null;
+        weekly_minutes: number | null;
+        focus: string;
       }>;
     };
 
@@ -326,6 +440,7 @@ export async function POST(request: NextRequest) {
         if (text.length > 30000) return NextResponse.json({ error: "Transcript too long" }, { status: 413 });
 
         const single = !!body.single;
+        const forcedArea = await validArea(supabase, body.area_id);
         let transcriptId: string | null = null;
         if (!single) {
           const { data: t, error } = await supabase
@@ -346,12 +461,13 @@ export async function POST(request: NextRequest) {
             body: single && text.length <= 120 ? null : text,
             due_date: single ? guessDueDate(text, todayLocal()) : null,
             transcript_id: transcriptId,
+            area_id: forcedArea,
           })
           .select("id, created_at")
           .single();
         if (error) throw error;
 
-        after(() => enrich(user.id, raw.id, text, single, transcriptId));
+        after(() => enrich(user.id, raw.id, text, single, transcriptId, forcedArea));
 
         return NextResponse.json({
           addedId: raw.id,
@@ -392,7 +508,33 @@ export async function POST(request: NextRequest) {
           .from("intentional_transcripts")
           .update({ status: "processing", progress: 2, log: ["▸ Retrying"] })
           .eq("id", t.id);
-        after(() => enrich(user.id, raw!.id, t.text, false, t.id));
+        after(() => enrich(user.id, raw!.id, t.text, false, t.id, null));
+        return NextResponse.json(await buildState(supabase));
+      }
+
+      case "area_save": {
+        const f = body.fields ?? {};
+        const patch: Record<string, unknown> = {};
+        if (typeof f.name === "string" && f.name.trim()) patch.name = f.name.trim().slice(0, 40);
+        if (typeof f.emoji === "string" && f.emoji.trim()) patch.emoji = f.emoji.trim().slice(0, 8);
+        if (f.statement === null || typeof f.statement === "string") patch.statement = f.statement?.trim().slice(0, 300) || null;
+        if (f.weekly_minutes === null) patch.weekly_minutes = null;
+        else if (typeof f.weekly_minutes === "number" && f.weekly_minutes > 0) patch.weekly_minutes = Math.round(f.weekly_minutes);
+        if (typeof f.focus === "string" && FOCUSES.includes(f.focus)) patch.focus = f.focus;
+        if (body.id) {
+          await supabase.from("intentional_areas").update(patch).eq("id", body.id);
+        } else {
+          if (!patch.name) return NextResponse.json({ error: "Name required" }, { status: 400 });
+          const { count } = await supabase.from("intentional_areas").select("id", { count: "exact", head: true });
+          await supabase.from("intentional_areas").insert({ ...patch, sort: count ?? 0 });
+        }
+        return NextResponse.json(await buildState(supabase));
+      }
+
+      case "area_archive": {
+        if (!body.id) return NextResponse.json({ error: "Bad request" }, { status: 400 });
+        await supabase.from("intentional_areas").update({ archived: true }).eq("id", body.id);
+        await supabase.from("intentional_cards").update({ area_id: null }).eq("area_id", body.id);
         return NextResponse.json(await buildState(supabase));
       }
 
@@ -407,6 +549,11 @@ export async function POST(request: NextRequest) {
         else if (typeof f.est_minutes === "number" && f.est_minutes > 0) patch.est_minutes = Math.round(f.est_minutes);
         if (typeof f.stars === "number") patch.stars = Math.min(5, Math.max(1, Math.round(f.stars)));
         if (typeof f.prioritized === "boolean") patch.prioritized = f.prioritized;
+        if (f.area_id === null) patch.area_id = null;
+        else if (f.area_id !== undefined) {
+          const area = await validArea(supabase, f.area_id);
+          if (area) patch.area_id = area;
+        }
         if (typeof f.boost === "number" && Number.isFinite(f.boost)) patch.boost = Math.max(-1000, Math.min(1000, f.boost));
         if (f.due_date === null) patch.due_date = null;
         else if (typeof f.due_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.due_date)) patch.due_date = f.due_date;
@@ -431,7 +578,7 @@ export async function POST(request: NextRequest) {
         if (!body.id) return NextResponse.json({ error: "Bad request" }, { status: 400 });
         const { data: card } = await supabase
           .from("intentional_cards")
-          .select("id, kind")
+          .select("id, kind, area_id")
           .eq("id", body.id)
           .maybeSingle();
         if (!card) return NextResponse.json({ error: "Card not found" }, { status: 404 });
@@ -440,6 +587,7 @@ export async function POST(request: NextRequest) {
         if (!Number.isNaN(startedMs) && startedMs < Date.now()) {
           await supabase.from("intentional_time_logs").insert({
             card_id: card.id,
+            area_id: card.area_id,
             started_at: new Date(startedMs).toISOString(),
             seconds: Math.round((Date.now() - startedMs) / 1000),
           });

@@ -24,10 +24,22 @@ type Card = {
   last_done_on: string | null;
   created_at: string;
   boost: number;
+  area_id: string | null;
+};
+
+type Area = {
+  id: string;
+  name: string;
+  emoji: string;
+  statement: string | null;
+  weekly_minutes: number | null;
+  focus: "work" | "personal" | "any";
+  sort: number;
+  minutes_week: number;
 };
 
 type Job = { id: string; status: "processing" | "done" | "failed"; progress: number; log: string[]; created_at: string };
-type State = { cards: Card[]; jobs: Job[]; today: string; minutesToday: number };
+type State = { cards: Card[]; jobs: Job[]; areas: Area[]; today: string; minutesToday: number };
 type Filter = "all" | "prioritized" | Kind;
 type Timer = { id: string; startedAt: string };
 
@@ -88,6 +100,9 @@ export default function IntentionalPage() {
   const [state, setState] = useState<State | null>(null);
   const [authError, setAuthError] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [areaFilter, setAreaFilter] = useState<string>("all");
+  const [showTypes, setShowTypes] = useState(false);
+  const [areasOpen, setAreasOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [captureOpen, setCaptureOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -153,18 +168,23 @@ export default function IntentionalPage() {
   const cards = useMemo(() => state?.cards ?? [], [state]);
   const today = state?.today ?? now.toISOString().slice(0, 10);
   const byId = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
+  const areas = useMemo(() => state?.areas ?? [], [state]);
+  const areaById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+  const areaOf = (c: Card) => (c.area_id ? areaById.get(c.area_id) ?? null : null);
   const principles = cards.filter((c) => c.kind === "principle");
   const habitsLeft = cards.filter((c) => c.kind === "habit" && c.last_done_on !== today);
   const hourKey = `${today}-${now.getHours()}`;
   const scores = useMemo(() => {
     const at = new Date();
-    return new Map(cards.map((c) => [c.id, intentionScore(c, at, today)]));
+    return new Map(cards.map((c) => [c.id, intentionScore(c, at, today, c.area_id ? areaById.get(c.area_id) : null)]));
     // re-rank on the hour, not every tick
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, today, hourKey]);
+  }, [cards, today, hourKey, areaById]);
   const total = (c: Card) => (scores.get(c.id)?.score ?? 0) + (c.boost ?? 0);
   const counts = new Map<Filter, number>();
+  const areaCounts = new Map<string, number>();
   for (const c of cards) {
+    if (c.area_id) areaCounts.set(c.area_id, (areaCounts.get(c.area_id) ?? 0) + 1);
     counts.set(c.kind, (counts.get(c.kind) ?? 0) + 1);
     if (c.prioritized) counts.set("prioritized", (counts.get("prioritized") ?? 0) + 1);
   }
@@ -172,7 +192,10 @@ export default function IntentionalPage() {
     .filter((f) => counts.get(f))
     .sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0));
   const kindOrder = [...KINDS].sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0));
+  const areaOrder = [...areas].sort((x, y) => (areaCounts.get(y.id) ?? 0) - (areaCounts.get(x.id) ?? 0) || x.sort - y.sort);
+  const activeArea = areaFilter !== "all" ? areaById.get(areaFilter) ?? null : null;
   const list = cards
+    .filter((c) => !activeArea || c.area_id === activeArea.id)
     .filter((c) =>
       filter === "all" ? c.kind !== "principle" : filter === "prioritized" ? c.prioritized : c.kind === filter
     )
@@ -281,25 +304,49 @@ export default function IntentionalPage() {
         </button>
       )}
 
-      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 border-b border-stone-200">
+      <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 py-2 border-b border-stone-200 space-y-2">
         <ChipRow
           max={5}
-          active={filter}
-          onSelect={setFilter}
+          active={areaFilter}
+          onSelect={setAreaFilter}
           items={[
-            { id: "all" as Filter, label: "All" },
-            ...filterOptions.map((f) => ({
-              id: f,
-              label: f === "prioritized"
-                ? `★ Prioritized ${counts.get(f)}`
-                : `${KIND_META[f as Kind].emoji} ${KIND_META[f as Kind].label} ${counts.get(f)}`,
+            { id: "all", label: "All" },
+            ...areaOrder.map((a) => ({
+              id: a.id,
+              label: `${a.emoji} ${a.name}${areaCounts.get(a.id) ? ` ${areaCounts.get(a.id)}` : ""}`,
             })),
           ]}
+          extra={
+            <>
+              <Chip active={showTypes || filter !== "all"} onClick={() => setShowTypes((v) => !v)}>
+                {filter === "all" ? "Type ▾" : filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`}
+              </Chip>
+              <Chip active={false} onClick={() => setAreasOpen(true)}>⚙︎</Chip>
+            </>
+          }
         />
+        {showTypes && (
+          <ChipRow
+            max={5}
+            active={filter}
+            onSelect={(f) => { setFilter(f); setShowTypes(false); }}
+            items={[
+              { id: "all" as Filter, label: "Any type" },
+              ...filterOptions.map((f) => ({
+                id: f,
+                label: f === "prioritized"
+                  ? `★ Prioritized ${counts.get(f)}`
+                  : `${KIND_META[f as Kind].emoji} ${KIND_META[f as Kind].label} ${counts.get(f)}`,
+              })),
+            ]}
+          />
+        )}
       </nav>
 
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
+
+        {activeArea && <AreaHeader area={activeArea} onEdit={() => setAreasOpen(true)} />}
 
         {job && (
           <JobPanel
@@ -314,7 +361,7 @@ export default function IntentionalPage() {
 
         {fresh.map((c) => (
           <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
-            onPlay={play} />
+            onPlay={play} area={activeArea ? null : areaOf(c)} />
         ))}
 
         {state && list.length === 0 && fresh.length === 0 && (
@@ -330,6 +377,7 @@ export default function IntentionalPage() {
             <div className="space-y-2">
               {shown.map((c) => (
                 <SortableCardRow key={c.id} card={c} today={today} reason={scores.get(c.id)?.reason}
+                  area={activeArea ? null : areaOf(c)}
                   onOpen={setOpenId} onLeft={archive} onRight={togglePriority} onPlay={play}
                   {...(c.kind === "habit" ? { done: c.last_done_on === today, onCheck: () => complete(c) } : {})} />
               ))}
@@ -361,8 +409,10 @@ export default function IntentionalPage() {
 
       {captureOpen && (
         <CaptureSheet
+          areas={areaOrder}
+          defaultArea={activeArea?.id ?? null}
           onClose={() => setCaptureOpen(false)}
-          onSubmit={async (text, single) => {
+          onSubmit={async (text, single, areaId) => {
             const temp: Card = {
               id: `tmp-${Date.now()}`,
               kind: single ? "action" : "note",
@@ -377,12 +427,13 @@ export default function IntentionalPage() {
               last_done_on: null,
               created_at: new Date().toISOString(),
               boost: 0,
+              area_id: areaId,
             };
             setPending((p) => [temp, ...p]);
             setCaptureOpen(false);
             window.scrollTo({ top: 0, behavior: "smooth" });
             try {
-              const res = await run({ action: "capture", text, single });
+              const res = await run({ action: "capture", text, single, area_id: areaId });
               const at = res.addedSince!;
               setSince((s) => (s && s < at ? s : at));
               // single cards: pick up the background AI sorting (transcripts poll their job)
@@ -402,6 +453,7 @@ export default function IntentionalPage() {
           today={today}
           related={openCard.related_ids.map((id) => byId.get(id)).filter((c): c is Card => !!c)}
           kindOrder={kindOrder}
+          areas={areaOrder}
           onClose={() => setOpenId(null)}
           onOpenRelated={setOpenId}
           onSave={(fields) => {
@@ -411,6 +463,18 @@ export default function IntentionalPage() {
           onStart={() => { setTimer({ id: openCard.id, startedAt: new Date().toISOString() }); setOpenId(null); }}
           onDone={() => { complete(openCard); setOpenId(null); }}
           onDelete={() => { archive(openCard); setOpenId(null); }}
+        />
+      )}
+
+      {areasOpen && (
+        <AreasSheet
+          areas={areas}
+          onClose={() => setAreasOpen(false)}
+          onSave={(id, fields) => run({ action: "area_save", id, fields }).catch(() => {})}
+          onArchive={(id) => {
+            if (areaFilter === id) setAreaFilter("all");
+            run({ action: "area_archive", id }).catch(() => {});
+          }}
         />
       )}
 
@@ -428,12 +492,13 @@ export default function IntentionalPage() {
 }
 
 function ChipRow<T extends string>({
-  items, active, onSelect, max = 4,
+  items, active, onSelect, max = 4, extra,
 }: {
   items: { id: T; label: React.ReactNode }[];
   active: T;
   onSelect: (id: T) => void;
   max?: number;
+  extra?: React.ReactNode;
 }) {
   const [expanded, setExpanded] = useState(false);
   let visible = expanded ? items : items.slice(0, max);
@@ -450,6 +515,7 @@ function ChipRow<T extends string>({
       ))}
       {hidden > 0 && <Chip active={false} onClick={() => setExpanded(true)}>+{hidden}</Chip>}
       {expanded && items.length > max && <Chip active={false} onClick={() => setExpanded(false)}>Less</Chip>}
+      {extra}
     </div>
   );
 }
@@ -492,6 +558,7 @@ type CardRowProps = {
   today: string;
   isNew?: boolean;
   reason?: string | null;
+  area?: Area | null;
   onOpen: (id: string) => void;
   onLeft: (c: Card) => void;
   onRight: (c: Card) => void;
@@ -522,7 +589,7 @@ function SortableCardRow(props: CardRowProps) {
 }
 
 function CardRow({
-  card, today, onOpen, onLeft, onRight, onPlay, done, onCheck, isNew, reason, handle,
+  card, today, onOpen, onLeft, onRight, onPlay, done, onCheck, isNew, reason, area, handle,
 }: CardRowProps & { handle?: React.ReactNode }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number } | null>(null);
@@ -531,7 +598,7 @@ function CardRow({
   const meta = KIND_META[card.kind];
   const important = card.kind !== "principle" && card.stars >= 4;
   const playable = !done && !card.id.startsWith("tmp-") && ["action", "habit", "reminder"].includes(card.kind);
-  const hasMeta = isNew || !!reason || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
+  const hasMeta = isNew || !!reason || !!area || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
     || card.related_ids.length > 0;
 
   const end = () => {
@@ -593,6 +660,7 @@ function CardRow({
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
               {isNew && <span className="rounded-full bg-emerald-500 px-2 py-0.5 font-semibold text-white">New</span>}
               {reason && <span className="font-medium text-indigo-600">{reason}</span>}
+              {area && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-stone-700">{area.emoji} {area.name}</span>}
               {card.kind !== "action" && <span className={cn("rounded-full px-2 py-0.5", meta.tone)}>{meta.label}</span>}
               {card.due_date && (
                 <span className={cn("font-medium",
@@ -638,6 +706,102 @@ function CardRow({
         )}
       </div>
     </div>
+  );
+}
+
+function AreaHeader({ area, onEdit }: { area: Area; onEdit: () => void }) {
+  const target = area.weekly_minutes;
+  const pct = target ? Math.min(100, (area.minutes_week / target) * 100) : 0;
+  const fmt = (m: number) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10} h` : `${m} min`);
+
+  return (
+    <div className="rounded-2xl bg-white border border-stone-200 p-4">
+      <div className="flex items-start gap-3">
+        <span className="text-2xl leading-8" aria-hidden>{area.emoji}</span>
+        <div className="flex-1 min-w-0">
+          <h2 className="font-semibold text-lg leading-8">{area.name}</h2>
+          {area.statement && <p className="text-sm text-stone-600">{area.statement}</p>}
+        </div>
+        <button onClick={onEdit} className="min-h-11 px-3 -my-2 -mr-2 text-sm text-stone-500">Edit</button>
+      </div>
+      <div className="mt-3 text-xs text-stone-500">
+        {target ? `${fmt(area.minutes_week)} of ${fmt(target)} this week` : `${fmt(area.minutes_week)} this week`}
+      </div>
+      {target && (
+        <div className="mt-1 h-1.5 rounded-full bg-stone-100 overflow-hidden">
+          <div className="h-full bg-emerald-500" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+type AreaFields = Partial<Pick<Area, "name" | "emoji" | "statement" | "weekly_minutes" | "focus">>;
+
+function AreasSheet({ areas, onClose, onSave, onArchive }: {
+  areas: Area[];
+  onClose: () => void;
+  onSave: (id: string | undefined, fields: AreaFields) => void;
+  onArchive: (id: string) => void;
+}) {
+  const [newName, setNewName] = useState("");
+
+  return (
+    <Sheet onClose={onClose}>
+      <h2 className="text-xl font-semibold mb-1">Intentions</h2>
+      <p className="text-sm text-stone-500 mb-4">The parts of life every card belongs to. Weekly targets nudge neglected ones up the list.</p>
+      <div className="space-y-3">
+        {areas.map((a) => (
+          <div key={a.id} className="rounded-2xl border border-stone-200 p-3 space-y-2">
+            <div className="flex gap-2">
+              <input defaultValue={a.emoji} aria-label="Emoji" maxLength={8}
+                onBlur={(e) => e.target.value.trim() && e.target.value !== a.emoji && onSave(a.id, { emoji: e.target.value })}
+                className="w-12 min-h-11 rounded-xl border border-stone-200 text-center text-xl" />
+              <input defaultValue={a.name} aria-label="Name"
+                onBlur={(e) => e.target.value.trim() && e.target.value !== a.name && onSave(a.id, { name: e.target.value })}
+                className="flex-1 min-w-0 min-h-11 rounded-xl border border-stone-200 px-3 text-base font-medium" />
+            </div>
+            <textarea defaultValue={a.statement ?? ""} rows={2} placeholder="Why this matters"
+              onBlur={(e) => e.target.value !== (a.statement ?? "") && onSave(a.id, { statement: e.target.value || null })}
+              className="w-full rounded-xl border border-stone-200 p-2 text-sm" />
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-sm text-stone-600">
+                <input type="number" inputMode="decimal" min={0} step={0.5}
+                  defaultValue={a.weekly_minutes ? a.weekly_minutes / 60 : ""}
+                  onBlur={(e) => {
+                    const h = parseFloat(e.target.value);
+                    const mins = Number.isFinite(h) && h > 0 ? Math.round(h * 60) : null;
+                    if (mins !== a.weekly_minutes) onSave(a.id, { weekly_minutes: mins });
+                  }}
+                  className="w-20 min-h-11 rounded-xl border border-stone-200 px-2 text-base" />
+                hrs / week
+              </label>
+              <select defaultValue={a.focus} aria-label="Best time"
+                onChange={(e) => onSave(a.id, { focus: e.target.value as Area["focus"] })}
+                className="min-h-11 rounded-xl border border-stone-200 px-2 text-sm bg-white">
+                <option value="any">Anytime</option>
+                <option value="work">Work hours</option>
+                <option value="personal">Evenings & weekends</option>
+              </select>
+              <button onClick={() => confirm(`Remove “${a.name}”? Its cards stay, just untagged.`) && onArchive(a.id)} className="ml-auto min-h-11 px-3 text-sm text-rose-600">Remove</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form
+        className="mt-4 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!newName.trim()) return;
+          onSave(undefined, { name: newName.trim() });
+          setNewName("");
+        }}
+      >
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New intention"
+          className="flex-1 min-w-0 min-h-11 rounded-xl border border-stone-200 px-3 text-base" />
+        <button className="min-h-11 px-4 rounded-full bg-stone-900 text-white font-medium">Add</button>
+      </form>
+    </Sheet>
   );
 }
 
@@ -696,15 +860,21 @@ function Sheet({ onClose, children }: { onClose: () => void; children: React.Rea
   );
 }
 
-function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (text: string, single: boolean) => Promise<void> }) {
+function CaptureSheet({ areas, defaultArea, onClose, onSubmit }: {
+  areas: Area[];
+  defaultArea: string | null;
+  onClose: () => void;
+  onSubmit: (text: string, single: boolean, areaId: string | null) => Promise<void>;
+}) {
   const [text, setText] = useState("");
+  const [areaId, setAreaId] = useState<string>(defaultArea ?? "auto");
   const [single, setSingle] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
-    try { await onSubmit(text, single); } catch { /* toast shown */ } finally { setBusy(false); }
+    try { await onSubmit(text, single, areaId === "auto" ? null : areaId); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
   return (
@@ -731,6 +901,16 @@ function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (t
         placeholder={single ? "Get Whitney to do her insurance…" : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."}
         className="w-full rounded-2xl border border-stone-200 p-3 text-base outline-none focus:border-stone-400"
       />
+      {areas.length > 0 && (
+        <div className="mt-3">
+          <Label>Intention</Label>
+          <ChipRow
+            active={areaId}
+            onSelect={setAreaId}
+            items={[{ id: "auto", label: "✨ Auto" }, ...areas.map((a) => ({ id: a.id, label: `${a.emoji} ${a.name}` }))]}
+          />
+        </div>
+      )}
       <button
         disabled={busy || !text.trim()}
         onClick={submit}
@@ -743,12 +923,13 @@ function CaptureSheet({ onClose, onSubmit }: { onClose: () => void; onSubmit: (t
 }
 
 function CardSheet({
-  card, today, related, kindOrder, onClose, onOpenRelated, onSave, onStart, onDone, onDelete,
+  card, today, related, kindOrder, areas, onClose, onOpenRelated, onSave, onStart, onDone, onDelete,
 }: {
   card: Card;
   today: string;
   related: Card[];
   kindOrder: Kind[];
+  areas: Area[];
   onClose: () => void;
   onOpenRelated: (id: string) => void;
   onSave: (fields: Partial<Card>) => void;
@@ -772,6 +953,20 @@ function CardSheet({
         onBlur={() => title.trim() && title !== card.title && onSave({ title: title.trim() })}
         className="w-full text-xl font-semibold resize-none outline-none"
       />
+      {areas.length > 0 && (
+        <div className="mb-3">
+          <Label>Intention</Label>
+          <ChipRow
+            active={card.area_id ?? "none"}
+            onSelect={(id) => onSave({ area_id: id === "none" ? null : id })}
+            items={[
+              ...areas.map((a) => ({ id: a.id, label: `${a.emoji} ${a.name}` })),
+              { id: "none", label: "None" },
+            ]}
+          />
+        </div>
+      )}
+      <Label>Type</Label>
       <ChipRow
         active={card.kind}
         onSelect={(k) => onSave({ kind: k })}

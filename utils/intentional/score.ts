@@ -12,6 +12,13 @@ export type ScorableCard = {
   last_done_on: string | null;
 };
 
+export type ScorableArea = {
+  name: string;
+  focus: string;
+  weekly_minutes: number | null;
+  minutes_week: number;
+};
+
 const MORNING = /\b(exercise|workout|gym|run|walk|bible|pray|prayer|devotion|breath|breathing|meditat\w*|stretch|journal)\b/;
 const EVENING = /\b(kids?|whitney|wife|family|dinner|read|book|wind down|date night)\b/;
 const WEEKEND = /\b(garage|yard|lawn|clean|organi[sz]e|car|house|fix|repair|errand)\b/;
@@ -29,7 +36,12 @@ function wobble(id: string, seed: string): number {
 }
 
 /** Higher = more worth your attention right now. Returns the strongest reason for display. */
-export function intentionScore(card: ScorableCard, now: Date, today: string): { score: number; reason: string | null } {
+export function intentionScore(
+  card: ScorableCard,
+  now: Date,
+  today: string,
+  area?: ScorableArea | null
+): { score: number; reason: string | null } {
   const hour = now.getHours();
   const day = now.getDay();
   const weekend = day === 0 || day === 6;
@@ -73,6 +85,22 @@ export function intentionScore(card: ScorableCard, now: Date, today: string): { 
   if (weekend && WEEKEND.test(text)) add(15, "Weekend project");
   if (workHours && WORK.test(text)) add(10, "Work hours");
   if (!workHours && !weekend && WORK.test(text)) add(-8);
+
+  if (area) {
+    if (area.focus === "work") add(workHours ? 12 : weekend ? -20 : -10, workHours ? "Work hours" : undefined);
+    if (area.focus === "personal") {
+      const personalTime = weekend || hour >= 17;
+      add(personalTime ? 12 : workHours ? -8 : 0, personalTime ? `${area.name} time` : undefined);
+    }
+    if (area.weekly_minutes) {
+      const weekFraction = (((day + 6) % 7) + hour / 24) / 7;
+      const deficit = area.weekly_minutes * weekFraction - area.minutes_week;
+      if (deficit > 0) {
+        const pts = Math.min(20, (deficit / area.weekly_minutes) * 40);
+        add(pts, `${area.name} needs time this week`);
+      }
+    }
+  }
 
   reasons.sort((a, b) => b[0] - a[0]);
   return { score, reason: reasons[0] && reasons[0][0] >= 10 ? reasons[0][1] : null };
