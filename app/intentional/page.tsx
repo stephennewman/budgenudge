@@ -69,7 +69,7 @@ function fmtClock(totalSec: number) {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-async function api(body?: object): Promise<State & { added?: number; addedIds?: string[]; error?: string }> {
+async function api(body?: object): Promise<State & { added?: number; addedIds?: string[]; aiFailed?: boolean; error?: string }> {
   const res = await fetch("/api/intentional", body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { cache: "no-store" });
@@ -321,7 +321,11 @@ export default function IntentionalPage() {
             setCaptureOpen(false);
             setJustAdded(res.addedIds ?? []);
             window.scrollTo({ top: 0, behavior: "smooth" });
-            setToast({ text: `Added ${res.added} card${res.added === 1 ? "" : "s"}` });
+            setToast({
+              text: res.aiFailed
+                ? "AI unavailable — saved as written"
+                : `Added ${res.added} card${res.added === 1 ? "" : "s"}`,
+            });
           }}
         />
       )}

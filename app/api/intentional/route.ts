@@ -176,7 +176,23 @@ export async function POST(request: NextRequest) {
           .order("created_at", { ascending: false })
           .limit(150);
 
-        const cards = await parseCards(text, !!body.single, existing ?? []);
+        let cards: ParsedCard[];
+        let aiFailed = false;
+        try {
+          cards = await parseCards(text, !!body.single, existing ?? []);
+        } catch (err) {
+          console.error("[intentional] parse failed, saving raw", err);
+          aiFailed = true;
+          cards = [{
+            kind: body.single ? "action" : "note",
+            title: (text.split("\n")[0] || text).slice(0, 120),
+            body: body.single && text.length <= 120 ? null : text,
+            est_minutes: null,
+            stars: 3,
+            due_date: null,
+            related_ids: [],
+          }];
+        }
         if (cards.length === 0) {
           return NextResponse.json({ error: "Couldn't find any cards in that" }, { status: 422 });
         }
@@ -199,6 +215,7 @@ export async function POST(request: NextRequest) {
         if (error) throw error;
         return NextResponse.json({
           added: cards.length,
+          aiFailed,
           addedIds: (inserted ?? []).map((r) => r.id),
           ...(await buildState(supabase)),
         });
