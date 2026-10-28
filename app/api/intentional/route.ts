@@ -43,6 +43,7 @@ function startOfTodayIso(): string {
 
 async function buildState(supabase: Supabase) {
   const recent = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const [{ data: cards, error }, { data: logs }, { data: jobs }] = await Promise.all([
     supabase
       .from("intentional_cards")
@@ -59,7 +60,7 @@ async function buildState(supabase: Supabase) {
     supabase
       .from("intentional_transcripts")
       .select("id, status, progress, log, created_at")
-      .or(`status.eq.processing,created_at.gte.${recent}`)
+      .or(`status.eq.processing,created_at.gte.${recent},and(status.eq.failed,created_at.gte.${dayAgo})`)
       .order("created_at", { ascending: false })
       .limit(3),
   ]);
@@ -358,6 +359,41 @@ export async function POST(request: NextRequest) {
           transcriptId,
           ...(await buildState(supabase)),
         });
+      }
+
+      case "reprocess": {
+        const { data: t } = await supabase
+          .from("intentional_transcripts")
+          .select("id, text")
+          .eq("id", body.id ?? "")
+          .maybeSingle();
+        if (!t) return NextResponse.json({ error: "Transcript not found" }, { status: 404 });
+
+        let { data: raw } = await supabase
+          .from("intentional_cards")
+          .select("id")
+          .eq("transcript_id", t.id)
+          .eq("kind", "note")
+          .eq("status", "open")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (!raw) {
+          const { data: created, error } = await supabase
+            .from("intentional_cards")
+            .insert({ kind: "note", title: (t.text.split("\n")[0] || t.text).slice(0, 120), body: t.text, transcript_id: t.id })
+            .select("id")
+            .single();
+          if (error) throw error;
+          raw = created;
+        }
+
+        await supabase
+          .from("intentional_transcripts")
+          .update({ status: "processing", progress: 2, log: ["▸ Retrying"] })
+          .eq("id", t.id);
+        after(() => enrich(user.id, raw!.id, t.text, false, t.id));
+        return NextResponse.json(await buildState(supabase));
       }
 
       case "update": {

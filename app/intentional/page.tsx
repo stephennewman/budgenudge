@@ -97,6 +97,12 @@ export default function IntentionalPage() {
   const [pending, setPending] = useState<Card[]>([]);
   const [since, setSince] = useState<string | null>(null);
   const [dismissedJobs, setDismissedJobs] = useState<string[]>([]);
+  useEffect(() => {
+    setDismissedJobs(JSON.parse(localStorage.getItem("intentional.dismissedJobs") || "[]"));
+  }, []);
+  useEffect(() => {
+    if (dismissedJobs.length) localStorage.setItem("intentional.dismissedJobs", JSON.stringify(dismissedJobs.slice(-20)));
+  }, [dismissedJobs]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const run = useCallback(async (body?: object) => {
@@ -295,7 +301,16 @@ export default function IntentionalPage() {
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
 
-        {job && <JobPanel job={job} onDismiss={() => setDismissedJobs((d) => [...d, job.id])} />}
+        {job && (
+          <JobPanel
+            job={job}
+            onDismiss={() => setDismissedJobs((d) => [...d, job.id])}
+            onRetry={() => {
+              setSince(new Date().toISOString());
+              run({ action: "reprocess", id: job.id }).catch(() => {});
+            }}
+          />
+        )}
 
         {fresh.map((c) => (
           <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
@@ -626,7 +641,7 @@ function CardRow({
   );
 }
 
-function JobPanel({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
+function JobPanel({ job, onDismiss, onRetry }: { job: Job; onDismiss: () => void; onRetry: () => void }) {
   const logRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
@@ -640,7 +655,12 @@ function JobPanel({ job, onDismiss }: { job: Job; onDismiss: () => void }) {
           {running ? "Processing transcript…" : job.status === "failed" ? "Stopped" : "Complete"} · {job.progress}%
         </span>
         {!running && (
-          <button onClick={onDismiss} aria-label="Dismiss" className="min-w-11 min-h-11 -my-3 -mr-2 text-stone-400">✕</button>
+          <span className="flex items-center -my-3 -mr-2">
+            {job.status === "failed" && (
+              <button onClick={onRetry} className="min-h-11 px-3 font-semibold text-amber-300">Retry</button>
+            )}
+            <button onClick={onDismiss} aria-label="Dismiss" className="min-w-11 min-h-11 text-stone-400">✕</button>
+          </span>
         )}
       </div>
       <div className="h-1.5 rounded-full bg-stone-700 overflow-hidden mb-2">
