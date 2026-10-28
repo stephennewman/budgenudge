@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/utils/styles";
 import { intentionScore } from "@/utils/intentional/score";
@@ -294,7 +295,9 @@ export default function IntentionalPage() {
     <main className="min-h-dvh max-w-xl mx-auto pb-32 text-stone-900">
       <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 pb-2 border-b border-stone-200 space-y-2"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+        <Image src="/favicon.png" alt="Krezzo" width={32} height={32} className="size-8 shrink-0" priority />
+        <div className="relative flex-1 min-w-0">
           <input
             type="search"
             value={query}
@@ -307,14 +310,30 @@ export default function IntentionalPage() {
             aria-label="Filters and settings"
             aria-expanded={menuOpen}
             className={cn("absolute right-0 top-0 size-11 flex items-center justify-center rounded-full",
-              menuOpen || view === "reflect" || filter !== "all" ? "text-stone-900" : "text-stone-400")}
+              menuOpen || view === "reflect" || filter !== "all" || areaFilter !== "all" ? "text-stone-900" : "text-stone-400")}
           >
             <SlidersHorizontal className="size-5" />
           </button>
         </div>
+        </div>
 
         {menuOpen && (
           <div className="rounded-2xl bg-white border border-stone-200 p-3 space-y-3">
+            <div>
+              <Label>Intention</Label>
+              <ChipRow
+                max={5}
+                active={areaFilter}
+                onSelect={(id) => { setAreaFilter(id); setMenuOpen(false); }}
+                items={[
+                  { id: "all", label: "All" },
+                  ...areaOrder.map((a) => ({
+                    id: a.id,
+                    label: `${a.emoji} ${a.name}${areaCounts.get(a.id) ? ` ${areaCounts.get(a.id)}` : ""}`,
+                  })),
+                ]}
+              />
+            </div>
             <div>
               <Label>Show</Label>
               <div className="flex gap-2">
@@ -348,28 +367,17 @@ export default function IntentionalPage() {
           </div>
         )}
 
-        <ChipRow
-          max={5}
-          active={areaFilter}
-          onSelect={setAreaFilter}
-          items={[
-            { id: "all", label: "All" },
-            ...areaOrder.map((a) => ({
-              id: a.id,
-              label: `${a.emoji} ${a.name}${areaCounts.get(a.id) ? ` ${areaCounts.get(a.id)}` : ""}`,
-            })),
-          ]}
-          extra={
-            <>
-              {view === "reflect" && <Chip active onClick={() => setView("plan")}>✓ Done ✕</Chip>}
-              {view === "plan" && filter !== "all" && (
-                <Chip active onClick={() => setFilter("all")}>
-                  {filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`} ✕
-                </Chip>
-              )}
-            </>
-          }
-        />
+        {(activeArea || view === "reflect" || filter !== "all") && (
+          <div className="flex flex-wrap gap-2">
+            {activeArea && <Chip active onClick={() => setAreaFilter("all")}>{activeArea.emoji} {activeArea.name} ✕</Chip>}
+            {view === "reflect" && <Chip active onClick={() => setView("plan")}>✓ Done ✕</Chip>}
+            {view === "plan" && filter !== "all" && (
+              <Chip active onClick={() => setFilter("all")}>
+                {filter === "prioritized" ? "★ Prioritized" : `${KIND_META[filter as Kind].emoji} ${KIND_META[filter as Kind].label}`} ✕
+              </Chip>
+            )}
+          </div>
+        )}
       </nav>
 
       <section className="px-3 pt-3 space-y-2">
