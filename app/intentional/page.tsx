@@ -238,11 +238,10 @@ export default function IntentionalPage() {
     setToast({ text: `Deleted “${card.title}”`, undo: () => run({ action: "restore", id: card.id }).catch(() => {}) });
   };
 
-  const togglePriority = (card: Card) => {
+  const markDone = (card: Card) => {
     if (card.id.startsWith("tmp-")) return;
-    patchLocal(card.id, { prioritized: !card.prioritized });
-    run({ action: "update", id: card.id, fields: { prioritized: !card.prioritized } }).catch(() => {});
-    setToast({ text: card.prioritized ? "Unprioritized" : "Prioritized ★" });
+    if (card.kind === "habit" && card.last_done_on === today) return;
+    complete(card);
   };
 
   const play = (card: Card) => {
@@ -271,7 +270,10 @@ export default function IntentionalPage() {
     if (card.kind === "habit") patchLocal(card.id, { last_done_on: today });
     else patchLocal(card.id, null);
     run({ action: "complete", id: card.id, started_at: startedAt }).catch(() => {});
-    setToast({ text: startedAt ? "Done — time logged" : "Done 🎉" });
+    setToast({
+      text: startedAt ? "Done — time logged" : "Done 🎉",
+      undo: card.kind === "habit" ? undefined : () => run({ action: "restore", id: card.id }).catch(() => {}),
+    });
   };
 
   if (authError) {
@@ -418,7 +420,7 @@ export default function IntentionalPage() {
           </button>
         )}
         {fresh.map((c) => (
-          <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
+          <CardRow key={c.id} card={c} today={today} isNew onOpen={setOpenId} onLeft={archive} onRight={markDone}
             onPlay={play} area={activeArea ? null : areaOf(c)} />
         ))}
 
@@ -436,7 +438,7 @@ export default function IntentionalPage() {
               {shown.map((c) => (
                 <SortableCardRow key={c.id} card={c} today={today} reason={scores.get(c.id)?.reason}
                   area={activeArea ? null : areaOf(c)}
-                  onOpen={setOpenId} onLeft={archive} onRight={togglePriority} onPlay={play}
+                  onOpen={setOpenId} onLeft={archive} onRight={markDone} onPlay={play}
                   {...(c.kind === "habit" ? { done: c.last_done_on === today, onCheck: () => complete(c) } : {})} />
               ))}
             </div>
@@ -671,8 +673,8 @@ function CardRow({
   return (
     <div className="relative overflow-hidden rounded-2xl">
       <div className={cn("absolute inset-0 flex items-center px-5 text-sm font-semibold text-white",
-        dx > 0 ? "bg-amber-500 justify-start" : "bg-rose-500 justify-end")}>
-        {dx > 0 ? (card.prioritized ? "Unprioritize" : "★ Prioritize") : "Delete"}
+        dx > 0 ? "bg-emerald-500 justify-start" : "bg-rose-500 justify-end")}>
+        {dx > 0 ? "✓ Done" : "Delete"}
       </div>
       <div
         className={cn("group relative bg-white border rounded-2xl px-4 py-3 flex items-start gap-3 select-none cursor-pointer",
@@ -737,11 +739,11 @@ function CardRow({
           <div className="hidden pointer-fine:flex -my-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={(e) => { e.stopPropagation(); onRight(card); }}
-              aria-label={card.prioritized ? "Unprioritize" : "Prioritize"}
-              title={card.prioritized ? "Unprioritize" : "Prioritize"}
-              className={cn("size-11 rounded-full hover:bg-stone-100", card.prioritized ? "text-amber-500" : "text-stone-400")}
+              aria-label="Mark done"
+              title="Mark done"
+              className="size-11 rounded-full text-stone-400 hover:bg-emerald-50 hover:text-emerald-600"
             >
-              ★
+              ✓
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onLeft(card); }}
