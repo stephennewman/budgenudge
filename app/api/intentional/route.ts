@@ -192,11 +192,16 @@ export async function POST(request: NextRequest) {
           transcriptId = t.id;
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from("intentional_cards")
-          .insert(cards.map((c) => ({ ...c, transcript_id: transcriptId })));
+          .insert(cards.map((c) => ({ ...c, transcript_id: transcriptId })))
+          .select("id");
         if (error) throw error;
-        return NextResponse.json({ added: cards.length, ...(await buildState(supabase)) });
+        return NextResponse.json({
+          added: cards.length,
+          addedIds: (inserted ?? []).map((r) => r.id),
+          ...(await buildState(supabase)),
+        });
       }
 
       case "update": {

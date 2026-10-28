@@ -69,7 +69,7 @@ function fmtClock(totalSec: number) {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-async function api(body?: object): Promise<State & { added?: number; error?: string }> {
+async function api(body?: object): Promise<State & { added?: number; addedIds?: string[]; error?: string }> {
   const res = await fetch("/api/intentional", body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { cache: "no-store" });
@@ -89,6 +89,7 @@ export default function IntentionalPage() {
   const [timer, setTimer] = useState<Timer | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [mindsetIdx, setMindsetIdx] = useState(0);
+  const [justAdded, setJustAdded] = useState<string[]>([]);
 
   const run = useCallback(async (body?: object) => {
     try {
@@ -136,6 +137,8 @@ export default function IntentionalPage() {
     (c) => c.kind !== "principle" || kindFilter === "principle"
   );
   const mindset = principles.length ? principles[mindsetIdx % principles.length] : null;
+  const fresh = justAdded.map((id) => byId.get(id)).filter((c): c is Card => !!c);
+  const show = (list: Card[]) => list.filter((c) => !justAdded.includes(c.id));
 
   const patchLocal = (id: string, patch: Partial<Card> | null) =>
     setState((s) =>
@@ -222,10 +225,24 @@ export default function IntentionalPage() {
       <section className="px-3 pt-3 space-y-2">
         {!state && <p className="text-center text-stone-500 py-10">Loading…</p>}
 
+        {fresh.length > 0 && (
+          <div className="rounded-3xl bg-emerald-50 p-2 space-y-2">
+            <div className="flex items-center justify-between pl-2">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Just added</h2>
+              <button onClick={() => setJustAdded([])} className="min-h-11 px-3 text-sm text-emerald-700">
+                Dismiss
+              </button>
+            </div>
+            {fresh.map((c) => (
+              <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
+            ))}
+          </div>
+        )}
+
         {state && tab === "today" && (
           <>
             {habits.length > 0 && <SectionTitle>Daily</SectionTitle>}
-            {[...habitsLeft, ...habits.filter((h) => h.last_done_on === today)].map((c) => (
+            {show([...habitsLeft, ...habits.filter((h) => h.last_done_on === today)]).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority}
                 done={c.last_done_on === today} onCheck={() => complete(c)} />
             ))}
@@ -233,7 +250,7 @@ export default function IntentionalPage() {
             {upNext.length === 0 && (
               <Empty>Nothing pressing. Swipe right on cards in “All” to put them on your board.</Empty>
             )}
-            {upNext.map((c) => (
+            {show(upNext).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
             ))}
           </>
@@ -242,7 +259,7 @@ export default function IntentionalPage() {
         {state && tab === "board" && (
           <>
             {board.length === 0 && <Empty>Swipe right on a card to add it to your board.</Empty>}
-            {board.map((c) => (
+            {show(board).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
             ))}
           </>
@@ -259,7 +276,7 @@ export default function IntentionalPage() {
               ))}
             </div>
             {allList.length === 0 && <Empty>No cards yet. Tap + to dump a transcript.</Empty>}
-            {allList.map((c) => (
+            {show(allList).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
             ))}
           </>
@@ -268,7 +285,7 @@ export default function IntentionalPage() {
         {state && tab === "mindset" && (
           <>
             {principles.length === 0 && <Empty>Add reminders like “Lead without permission” or “Be concise.”</Empty>}
-            {principles.map((c) => (
+            {show(principles).map((c) => (
               <CardRow key={c.id} card={c} today={today} onOpen={setOpenId} onLeft={archive} onRight={togglePriority} />
             ))}
           </>
@@ -302,6 +319,8 @@ export default function IntentionalPage() {
           onSubmit={async (text, single) => {
             const res = await run({ action: "capture", text, single });
             setCaptureOpen(false);
+            setJustAdded(res.addedIds ?? []);
+            window.scrollTo({ top: 0, behavior: "smooth" });
             setToast({ text: `Added ${res.added} card${res.added === 1 ? "" : "s"}` });
           }}
         />
