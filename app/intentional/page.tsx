@@ -69,7 +69,7 @@ function fmtClock(totalSec: number) {
   return `${h ? `${h}:` : ""}${mm}:${String(s).padStart(2, "0")}`;
 }
 
-async function api(body?: object): Promise<State & { added?: number; addedIds?: string[]; aiFailed?: boolean; error?: string }> {
+async function api(body?: object): Promise<State & { addedId?: string; addedSince?: string; error?: string }> {
   const res = await fetch("/api/intentional", body
     ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
     : { cache: "no-store" });
@@ -89,7 +89,8 @@ export default function IntentionalPage() {
   const [timer, setTimer] = useState<Timer | null>(null);
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null);
   const [mindsetIdx, setMindsetIdx] = useState(0);
-  const [justAdded, setJustAdded] = useState<string[]>([]);
+  const [pending, setPending] = useState<Card[]>([]);
+  const [since, setSince] = useState<string | null>(null);
 
   const run = useCallback(async (body?: object) => {
     try {
@@ -137,8 +138,14 @@ export default function IntentionalPage() {
     (c) => c.kind !== "principle" || kindFilter === "principle"
   );
   const mindset = principles.length ? principles[mindsetIdx % principles.length] : null;
-  const fresh = justAdded.map((id) => byId.get(id)).filter((c): c is Card => !!c);
-  const show = (list: Card[]) => list.filter((c) => !justAdded.includes(c.id));
+  const fresh = [
+    ...pending,
+    ...(since ? cards.filter((c) => c.created_at >= since) : []).sort((a, b) =>
+      b.created_at.localeCompare(a.created_at)
+    ),
+  ];
+  const freshIds = new Set(fresh.map((c) => c.id));
+  const show = (list: Card[]) => list.filter((c) => !freshIds.has(c.id));
 
   const patchLocal = (id: string, patch: Partial<Card> | null) =>
     setState((s) =>
@@ -151,12 +158,14 @@ export default function IntentionalPage() {
     );
 
   const archive = (card: Card) => {
+    if (card.id.startsWith("tmp-")) return;
     patchLocal(card.id, null);
     run({ action: "archive", id: card.id }).catch(() => {});
     setToast({ text: `Deleted “${card.title}”`, undo: () => run({ action: "restore", id: card.id }).catch(() => {}) });
   };
 
   const togglePriority = (card: Card) => {
+    if (card.id.startsWith("tmp-")) return;
     patchLocal(card.id, { prioritized: !card.prioritized });
     run({ action: "update", id: card.id, fields: { prioritized: !card.prioritized } }).catch(() => {});
     setToast({ text: card.prioritized ? "Removed from board" : "Added to your board ⭐" });
@@ -229,7 +238,7 @@ export default function IntentionalPage() {
           <div className="rounded-3xl bg-emerald-50 p-2 space-y-2">
             <div className="flex items-center justify-between pl-2">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Just added</h2>
-              <button onClick={() => setJustAdded([])} className="min-h-11 px-3 text-sm text-emerald-700">
+              <button onClick={() => setSince(null)} className="min-h-11 px-3 text-sm text-emerald-700">
                 Dismiss
               </button>
             </div>
@@ -317,15 +326,34 @@ export default function IntentionalPage() {
         <CaptureSheet
           onClose={() => setCaptureOpen(false)}
           onSubmit={async (text, single) => {
-            const res = await run({ action: "capture", text, single });
+            const temp: Card = {
+              id: `tmp-${Date.now()}`,
+              kind: single ? "action" : "note",
+              title: (text.split("\n")[0] || text).slice(0, 120),
+              body: null,
+              est_minutes: null,
+              stars: 3,
+              prioritized: false,
+              status: "open",
+              due_date: null,
+              related_ids: [],
+              last_done_on: null,
+              created_at: new Date().toISOString(),
+            };
+            setPending((p) => [temp, ...p]);
             setCaptureOpen(false);
-            setJustAdded(res.addedIds ?? []);
             window.scrollTo({ top: 0, behavior: "smooth" });
-            setToast({
-              text: res.aiFailed
-                ? "AI unavailable — saved as written"
-                : `Added ${res.added} card${res.added === 1 ? "" : "s"}`,
-            });
+            try {
+              const res = await run({ action: "capture", text, single });
+              const at = res.addedSince!;
+              setSince((s) => (s && s < at ? s : at));
+              // pick up the background AI sorting
+              [4000, 10000, 20000].forEach((ms) => setTimeout(() => run().catch(() => {}), ms));
+            } catch {
+              /* toast shown */
+            } finally {
+              setPending((p) => p.filter((c) => c.id !== temp.id));
+            }
           }}
         />
       )}
@@ -486,13 +514,11 @@ function CardRow({
 
 function Sheet({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-xl max-h-[90dvh] overflow-y-auto rounded-t-3xl bg-white p-5"
-        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+        className="w-full max-w-lg max-h-[85dvh] overflow-y-auto rounded-3xl bg-white p-5 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-stone-200" />
         {children}
       </div>
     </div>

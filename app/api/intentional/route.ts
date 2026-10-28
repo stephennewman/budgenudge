@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 import { createSupabaseClient } from "@/utils/supabase/server";
 
@@ -6,8 +7,9 @@ import { createSupabaseClient } from "@/utils/supabase/server";
 //
 // GET  → open cards + minutes logged today.
 // POST json { action, ... }:
-//   "capture"  { text, single? } → GPT splits a transcript (or one quick note
-//              when single) into typed cards, linking them to existing cards.
+//   "capture"  { text, single? } → saves the raw text as a card immediately,
+//              then (after responding) GPT types/estimates it, or splits a
+//              transcript into cards that replace the raw note.
 //   "update"   { id, fields }
 //   "archive" | "restore" { id }
 //   "complete" { id, started_at? } → done (habits: done for today); logs time
@@ -15,6 +17,7 @@ import { createSupabaseClient } from "@/utils/supabase/server";
 //
 // AUTH: Supabase session; tables are RLS-scoped to auth.uid().
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 const TZ = "America/New_York";
 const KINDS = ["action", "thought", "idea", "reminder", "note", "habit", "principle"] as const;
@@ -128,6 +131,60 @@ Return ONLY JSON: {"cards":[{"kind":"action","title":"","body":null,"est_minutes
   return single ? cards.slice(0, 1) : cards;
 }
 
+// Runs after the response, so it can't rely on request cookies; scoped by userId.
+async function enrich(
+  userId: string,
+  rawId: string,
+  text: string,
+  single: boolean,
+  transcriptId: string | null
+) {
+  const admin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+  try {
+    const { data: existing } = await admin
+      .from("intentional_cards")
+      .select("id, kind, title")
+      .eq("user_id", userId)
+      .eq("status", "open")
+      .neq("id", rawId)
+      .order("created_at", { ascending: false })
+      .limit(150);
+
+    const cards = await parseCards(text, single, existing ?? []);
+    if (cards.length === 0) return;
+
+    if (single) {
+      const c = cards[0];
+      await admin
+        .from("intentional_cards")
+        .update({
+          kind: c.kind,
+          // keep what the user typed unless it was long
+          ...(text.length > 120 ? { title: c.title, body: text } : {}),
+          est_minutes: c.est_minutes,
+          stars: c.stars,
+          due_date: c.due_date,
+          related_ids: c.related_ids,
+        })
+        .eq("id", rawId)
+        .eq("user_id", userId)
+        .eq("status", "open");
+      return;
+    }
+
+    const { error } = await admin
+      .from("intentional_cards")
+      .insert(cards.map((c) => ({ ...c, user_id: userId, transcript_id: transcriptId })));
+    if (error) throw error;
+    await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
+  } catch (err) {
+    console.error("[intentional] enrich failed; raw card kept", err);
+  }
+}
+
 export async function GET() {
   const supabase = await createSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -169,36 +226,9 @@ export async function POST(request: NextRequest) {
         if (!text) return NextResponse.json({ error: "Nothing to add" }, { status: 400 });
         if (text.length > 30000) return NextResponse.json({ error: "Transcript too long" }, { status: 413 });
 
-        const { data: existing } = await supabase
-          .from("intentional_cards")
-          .select("id, kind, title")
-          .eq("status", "open")
-          .order("created_at", { ascending: false })
-          .limit(150);
-
-        let cards: ParsedCard[];
-        let aiFailed = false;
-        try {
-          cards = await parseCards(text, !!body.single, existing ?? []);
-        } catch (err) {
-          console.error("[intentional] parse failed, saving raw", err);
-          aiFailed = true;
-          cards = [{
-            kind: body.single ? "action" : "note",
-            title: (text.split("\n")[0] || text).slice(0, 120),
-            body: body.single && text.length <= 120 ? null : text,
-            est_minutes: null,
-            stars: 3,
-            due_date: null,
-            related_ids: [],
-          }];
-        }
-        if (cards.length === 0) {
-          return NextResponse.json({ error: "Couldn't find any cards in that" }, { status: 422 });
-        }
-
+        const single = !!body.single;
         let transcriptId: string | null = null;
-        if (!body.single) {
+        if (!single) {
           const { data: t, error } = await supabase
             .from("intentional_transcripts")
             .insert({ text })
@@ -208,15 +238,24 @@ export async function POST(request: NextRequest) {
           transcriptId = t.id;
         }
 
-        const { data: inserted, error } = await supabase
+        // Save the raw text now; AI sorting happens after the response.
+        const { data: raw, error } = await supabase
           .from("intentional_cards")
-          .insert(cards.map((c) => ({ ...c, transcript_id: transcriptId })))
-          .select("id");
+          .insert({
+            kind: single ? "action" : "note",
+            title: (text.split("\n")[0] || text).slice(0, 120),
+            body: single && text.length <= 120 ? null : text,
+            transcript_id: transcriptId,
+          })
+          .select("id, created_at")
+          .single();
         if (error) throw error;
+
+        after(() => enrich(user.id, raw.id, text, single, transcriptId));
+
         return NextResponse.json({
-          added: cards.length,
-          aiFailed,
-          addedIds: (inserted ?? []).map((r) => r.id),
+          addedId: raw.id,
+          addedSince: raw.created_at,
           ...(await buildState(supabase)),
         });
       }
