@@ -45,6 +45,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Area = { id: string; name: string; emoji: string; statement: string | null };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Admin = ReturnType<typeof createClient<any>>;
+
 type Supabase = Awaited<ReturnType<typeof createSupabaseClient>>;
 
 function todayLocal(): string {
@@ -176,7 +179,54 @@ function cleanCard(c: Partial<ParsedCard>, validIds: Set<string>, areaIds: Set<s
   };
 }
 
-async function parseSingle(text: string, existing: Existing[], areas: Area[]): Promise<ParsedCard | null> {
+// Input can mix plans and retrospection; each card says which.
+const PAST_SPEC = `Some input describes things that ALREADY happened (done, worked on, mistakes made). For each card also give:
+- "past": true if it already happened, else false.
+- For past cards: kind "action" for things done or worked on (title in past tense, e.g. "Took kids to the park"), "lesson" for a mistake and what to do differently, "thought" for other reflections.
+- "occurred_on": YYYY-MM-DD when a past card happened (resolve "yesterday", "Monday" from today; default today), else null.
+- "minutes_spent": minutes spent on a past card if stated or clearly implied, else null.
+- "duplicate_of": for a past card, the id of an existing OPEN card it completes (e.g. "called Prudential" completes "Call Prudential"); for a future card, an existing card it duplicates. Else null.`;
+
+type Extra = { past?: boolean; duplicate_of?: string | null; occurred_on?: string | null; minutes_spent?: number | null };
+
+// a past local date → roughly noon that day; today → now
+function whenIso(d: string | null | undefined): string {
+  return d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < todayLocal()
+    ? new Date(`${d}T16:00:00Z`).toISOString()
+    : new Date().toISOString();
+}
+
+async function logTime(admin: Admin, userId: string, cardId: string, areaId: string | null, minutes: unknown, endedAt: string) {
+  if (typeof minutes !== "number" || minutes <= 0 || minutes > 24 * 60) return;
+  const secs = Math.round(minutes * 60);
+  await admin.from("intentional_time_logs").insert({
+    user_id: userId,
+    card_id: cardId,
+    area_id: areaId,
+    started_at: new Date(Date.parse(endedAt) - secs * 1000).toISOString(),
+    ended_at: endedAt,
+    seconds: secs,
+  });
+}
+
+// Marks an open card done because the user said they did it.
+async function completeFromPast(admin: Admin, userId: string, dup: Existing, extra: Extra) {
+  const at = whenIso(extra.occurred_on);
+  const { data: updated } = await admin
+    .from("intentional_cards")
+    .update(dup.kind === "habit" ? { last_done_on: extra.occurred_on ?? todayLocal() } : { status: "done", completed_at: at })
+    .eq("id", dup.id)
+    .eq("user_id", userId)
+    .select("area_id")
+    .maybeSingle();
+  await logTime(admin, userId, dup.id, updated?.area_id ?? null, extra.minutes_spent, at);
+}
+
+async function parseSingle(
+  text: string,
+  existing: Existing[],
+  areas: Area[]
+): Promise<{ card: ParsedCard; extra: Extra } | null> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -184,18 +234,16 @@ async function parseSingle(text: string, existing: Existing[], areas: Area[]): P
       { role: "system", content: "You convert notes into structured cards. Always return valid JSON." },
       {
         role: "user",
-        content: `Turn this ONE quick note into exactly one card for an intentional-living app.\n\nNote: """${text}"""\n\n${cardSpec(existing, areas)}\n\nReturn ONLY JSON: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
+        content: `Turn this ONE quick note into exactly one card for an intentional-living app.\n\nNote: """${text}"""\n\n${cardSpec(existing, areas)}\n\n${PAST_SPEC}\n\nReturn ONLY JSON: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"past":false,"duplicate_of":null,"occurred_on":null,"minutes_spent":null}`,
       },
     ],
     temperature: 0.2,
     response_format: { type: "json_object" },
   });
-  const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as Partial<ParsedCard>;
-  return cleanCard(parsed, new Set(existing.map((c) => c.id)), new Set(areas.map((a) => a.id)));
+  const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as Partial<ParsedCard> & Extra;
+  const card = cleanCard(parsed, new Set(existing.map((c) => c.id)), new Set(areas.map((a) => a.id)));
+  return card ? { card, extra: parsed } : null;
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Admin = ReturnType<typeof createClient<any>>;
 
 // Streams cards out of a transcript one at a time (NDJSON), inserting each as it
 // arrives and writing a progress log the client polls.
@@ -212,21 +260,6 @@ async function processTranscript(
 ) {
   const log: string[] = [];
   const today = todayLocal();
-  // a past local date → roughly noon that day; today → now
-  const whenIso = (d: string | null | undefined) =>
-    d && /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today ? new Date(`${d}T16:00:00Z`).toISOString() : new Date().toISOString();
-  const logTime = async (cardId: string, areaId: string | null, minutes: unknown, endedAt: string) => {
-    if (typeof minutes !== "number" || minutes <= 0 || minutes > 24 * 60) return;
-    const secs = Math.round(minutes * 60);
-    await admin.from("intentional_time_logs").insert({
-      user_id: userId,
-      card_id: cardId,
-      area_id: areaId,
-      started_at: new Date(Date.parse(endedAt) - secs * 1000).toISOString(),
-      ended_at: endedAt,
-      seconds: secs,
-    });
-  };
   const step = async (line: string, progress: number, status = "processing") => {
     log.push(line);
     await admin
@@ -240,7 +273,7 @@ async function processTranscript(
   const areaById = new Map(areas.map((a) => [a.id, a]));
 
   try {
-    await step(`▸ Reading ${reflect ? "reflection" : "transcript"} · ${text.split(/\s+/).length} words`, 5);
+    await step(`▸ Reading · ${text.split(/\s+/).length} words`, 5);
     await step(`▸ Comparing against ${existing.length} existing cards`, 10);
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -252,9 +285,7 @@ async function processTranscript(
         { role: "system", content: "You convert voice memos into structured cards. Output NDJSON only: one compact JSON object per line, no prose, no code fences." },
         {
           role: "user",
-          content: reflect
-            ? `This is a RETROSPECTIVE: the user reflecting on what already happened (things done, worked on, mistakes made). Split it into every distinct card, all in the past.\n\nReflection: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nFor reflections also:\n- Use kind "action" for things done or worked on (title in past tense, e.g. "Took kids to the park"), "lesson" for mistakes and what to do differently, "thought" for other reflections.\n- "occurred_on": YYYY-MM-DD when it happened (resolve "yesterday", "Monday" etc. from today; default today).\n- "minutes_spent": minutes spent if stated or clearly implied, else null.\n- "duplicate_of": id of an existing OPEN card this completes (e.g. reflection "called Prudential" completes card "Call Prudential"), else null.\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"stars":3,"related_ids":[],"area_id":null,"duplicate_of":null,"occurred_on":"${today}","minutes_spent":null}`
-            : `Split this voice-memo transcript into every distinct card for an intentional-living app.\n\nTranscript: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"duplicate_of":null}`,
+          content: `Split this input into every distinct card for an intentional-living app.${reflect ? " It is a retrospective: every card is past." : ""}\n\nInput: """${text}"""\n\n${forcedArea ? `Everything here belongs to the intention ${forcedArea}; use it as area_id.\n\n` : ""}${cardSpec(existing, areas)}\n\n${PAST_SPEC}\n\nOutput format (NDJSON):\nLine 1: {"count": <number of cards you will output>}\nThen one line per card: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"past":false,"duplicate_of":null,"occurred_on":null,"minutes_spent":null}`,
         },
       ],
     });
@@ -262,36 +293,26 @@ async function processTranscript(
     let buffer = "";
     let total = 0;
     let added = 0;
+    let logged = 0;
+    let completed = 0;
     let dupes = 0;
     const handle = async (line: string) => {
       const trimmed = line.trim().replace(/^```\w*|```$/g, "");
       if (!trimmed.startsWith("{")) return;
-      let obj: Partial<ParsedCard> & {
-        count?: number;
-        duplicate_of?: string | null;
-        occurred_on?: string | null;
-        minutes_spent?: number | null;
-      };
+      let obj: Partial<ParsedCard> & Extra & { count?: number };
       try { obj = JSON.parse(trimmed); } catch { return; }
       if (typeof obj.count === "number") {
         total = obj.count;
         await step(`▸ Found ${total} card${total === 1 ? "" : "s"} — organizing`, 15);
         return;
       }
-      const done = added + dupes + 1;
+      const done = added + logged + completed + dupes + 1;
       const pct = 15 + 80 * Math.min(1, done / Math.max(total, done));
+      const past = reflect || obj.past === true;
       const dup = obj.duplicate_of && byId.get(obj.duplicate_of);
-      if (dup && reflect) {
-        dupes++;
-        const at = whenIso(obj.occurred_on);
-        const { data: updated } = await admin
-          .from("intentional_cards")
-          .update(dup.kind === "habit" ? { last_done_on: (obj.occurred_on ?? today) } : { status: "done", completed_at: at })
-          .eq("id", dup.id)
-          .eq("user_id", userId)
-          .select("area_id")
-          .maybeSingle();
-        await logTime(dup.id, updated?.area_id ?? null, obj.minutes_spent, at);
+      if (dup && past) {
+        completed++;
+        await completeFromPast(admin, userId, dup, obj);
         await step(`✓ Marked done: “${dup.title}”`, pct);
         return;
       }
@@ -310,24 +331,26 @@ async function processTranscript(
           ...card,
           user_id: userId,
           transcript_id: transcriptId,
-          ...(reflect ? { status: "done", completed_at: at, due_date: null, est_minutes: null } : {}),
+          ...(past ? { status: "done", completed_at: at, due_date: null, est_minutes: null } : {}),
         })
         .select("id")
         .single();
       if (error) throw error;
-      if (reflect) await logTime(inserted.id, card.area_id, obj.minutes_spent, at);
-      added++;
+      if (past) {
+        await logTime(admin, userId, inserted.id, card.area_id, obj.minutes_spent, at);
+        logged++;
+      } else added++;
       const links = card.related_ids.map((id) => byId.get(id)?.title).filter(Boolean);
       const area = card.area_id ? areaById.get(card.area_id) : null;
       const extras = [
         area && `${area.emoji} ${area.name}`,
-        !reflect && card.est_minutes && `~${card.est_minutes}m`,
-        reflect && typeof obj.minutes_spent === "number" && obj.minutes_spent > 0 && `${obj.minutes_spent}m logged`,
-        reflect && obj.occurred_on && obj.occurred_on !== today && obj.occurred_on,
-        card.stars >= 4 && "★".repeat(card.stars),
-        card.due_date && `due ${card.due_date}`,
+        !past && card.est_minutes && `~${card.est_minutes}m`,
+        past && typeof obj.minutes_spent === "number" && obj.minutes_spent > 0 && `${obj.minutes_spent}m logged`,
+        past && obj.occurred_on && obj.occurred_on !== today && obj.occurred_on,
+        !past && card.stars >= 4 && "★".repeat(card.stars),
+        !past && card.due_date && `due ${card.due_date}`,
       ].filter(Boolean).join(" · ");
-      await step(`+ ${card.kind} · ${card.title}${extras ? ` (${extras})` : ""}`, pct);
+      await step(`${past ? "◷ done" : "+"} ${card.kind} · ${card.title}${extras ? ` (${extras})` : ""}`, pct);
       if (links.length) await step(`  🔗 linked to “${links.join("”, “")}”`, pct);
     };
 
@@ -342,15 +365,19 @@ async function processTranscript(
     }
     await handle(buffer);
 
-    if (added === 0 && !(reflect && dupes)) {
+    if (added + logged + completed === 0) {
       await step("✗ No new cards found — kept your transcript as a note", 100, "done");
       return;
     }
     await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
+    const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
     await step(
-      reflect
-        ? `✓ Done · ${added} reflection${added === 1 ? "" : "s"} logged${dupes ? ` · ${dupes} open card${dupes === 1 ? "" : "s"} marked done` : ""}`
-        : `✓ Done · ${added} card${added === 1 ? "" : "s"} added${dupes ? ` · ${dupes} duplicate${dupes === 1 ? "" : "s"} skipped` : ""}`,
+      `✓ Done · ${[
+        added && `${plural(added, "card")} added`,
+        logged && `${plural(logged, "reflection")} logged`,
+        completed && `${plural(completed, "open card")} marked done`,
+        dupes && `${plural(dupes, "duplicate")} skipped`,
+      ].filter(Boolean).join(" · ")}`,
       100,
       "done"
     );
@@ -394,8 +421,34 @@ async function enrich(
   }
 
   try {
-    const c = await parseSingle(text, (existing ?? []) as Existing[], (areas ?? []) as Area[]);
-    if (!c) return;
+    const parsed = await parseSingle(text, (existing ?? []) as Existing[], (areas ?? []) as Area[]);
+    if (!parsed) return;
+    const { card: c, extra } = parsed;
+    if (extra.past) {
+      const dup = extra.duplicate_of ? (existing ?? []).find((e) => e.id === extra.duplicate_of) : null;
+      if (dup) {
+        await completeFromPast(admin, userId, dup as Existing, extra);
+        await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
+        return;
+      }
+      const at = whenIso(extra.occurred_on);
+      const areaId = forcedArea ?? c.area_id;
+      await admin
+        .from("intentional_cards")
+        .update({
+          kind: c.kind,
+          ...(text.length > 120 ? { title: c.title, body: text } : {}),
+          status: "done",
+          completed_at: at,
+          due_date: null,
+          related_ids: c.related_ids,
+          area_id: areaId,
+        })
+        .eq("id", rawId)
+        .eq("user_id", userId);
+      await logTime(admin, userId, rawId, areaId, extra.minutes_spent, at);
+      return;
+    }
     await admin
       .from("intentional_cards")
       .update({
@@ -513,7 +566,8 @@ export async function POST(request: NextRequest) {
         if (text.length > 30000) return NextResponse.json({ error: "Transcript too long" }, { status: 413 });
 
         const reflect = body.mode === "reflect";
-        const single = !reflect && !!body.single;
+        const single =
+          !reflect && (body.mode === "auto" ? text.length <= 200 && !text.includes("\n") : !!body.single);
         const forcedArea = await validArea(supabase, body.area_id);
         let transcriptId: string | null = null;
         if (!single) {

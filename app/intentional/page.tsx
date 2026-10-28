@@ -31,7 +31,6 @@ type Card = {
 };
 
 type Log = { card_id: string | null; area_id: string | null; seconds: number; ended_at: string };
-type CaptureMode = "single" | "dump" | "reflect";
 
 type Area = {
   id: string;
@@ -469,19 +468,10 @@ export default function IntentionalPage() {
 
       {captureOpen && (
         <CaptureSheet
-          areas={areaOrder}
-          defaultArea={activeArea?.id ?? null}
-          defaultMode={view === "reflect" ? "reflect" : "single"}
           onClose={() => setCaptureOpen(false)}
-          onSubmit={async (text, mode, areaId) => {
-            const single = mode === "single";
-            if (mode === "reflect") {
-              setCaptureOpen(false);
-              setView("reflect");
-              window.scrollTo({ top: 0, behavior: "smooth" });
-              await run({ action: "capture", text, mode, area_id: areaId }).catch(() => {});
-              return;
-            }
+          onSubmit={async (text) => {
+            const single = text.length <= 200 && !text.includes("\n");
+            const areaId = activeArea?.id ?? null;
             const temp: Card = {
               id: `tmp-${Date.now()}`,
               kind: single ? "action" : "note",
@@ -502,7 +492,7 @@ export default function IntentionalPage() {
             setCaptureOpen(false);
             window.scrollTo({ top: 0, behavior: "smooth" });
             try {
-              const res = await run({ action: "capture", text, single, mode, area_id: areaId });
+              const res = await run({ action: "capture", text, mode: "auto", area_id: areaId });
               const at = res.addedSince!;
               setSince((s) => (s && s < at ? s : at));
               // single cards: pick up the background AI sorting (transcripts poll their job)
@@ -1027,23 +1017,17 @@ function Sheet({ onClose, children }: { onClose: () => void; children: React.Rea
   );
 }
 
-function CaptureSheet({ areas, defaultArea, defaultMode, onClose, onSubmit }: {
-  areas: Area[];
-  defaultArea: string | null;
+function CaptureSheet({ onClose, onSubmit }: {
   onClose: () => void;
-  onSubmit: (text: string, mode: CaptureMode, areaId: string | null) => Promise<void>;
-  defaultMode: CaptureMode;
+  onSubmit: (text: string) => Promise<void>;
 }) {
   const [text, setText] = useState("");
-  const [areaId, setAreaId] = useState<string>(defaultArea ?? "auto");
-  const [mode, setMode] = useState<CaptureMode>(defaultMode);
-  const single = mode === "single";
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
     if (busy || !text.trim()) return;
     setBusy(true);
-    try { await onSubmit(text, mode, areaId === "auto" ? null : areaId); } catch { /* toast shown */ } finally { setBusy(false); }
+    try { await onSubmit(text.trim()); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
   // Track the visible viewport so the bottom button sits above the on-screen keyboard.
@@ -1071,16 +1055,8 @@ function CaptureSheet({ areas, defaultArea, defaultMode, onClose, onSubmit }: {
       className="fixed inset-x-0 z-40 flex flex-col bg-white"
       style={{ top: vp?.top ?? 0, height: vp ? `${vp.h}px` : "100dvh", paddingTop: "env(safe-area-inset-top)" }}
     >
-      <div className="flex items-center gap-2 px-3 pt-2">
+      <div className="flex items-center px-3 pt-2">
         <button onClick={onClose} aria-label="Close" className="size-11 shrink-0 rounded-full text-xl text-stone-500">✕</button>
-        <div className="flex-1 flex gap-1 rounded-full bg-stone-100 p-1">
-          {([{ v: "single", l: "One card" }, { v: "dump", l: "Brain dump" }, { v: "reflect", l: "Reflect" }] as const).map((o) => (
-            <button key={o.l} onClick={() => setMode(o.v)}
-              className={cn("flex-1 min-h-10 rounded-full text-sm font-medium", mode === o.v ? "bg-white shadow" : "text-stone-600")}>
-              {o.l}
-            </button>
-          ))}
-        </div>
       </div>
       <div className="flex-1 min-h-0 flex flex-col px-4 pt-3 max-w-xl w-full mx-auto">
         <textarea
@@ -1093,33 +1069,18 @@ function CaptureSheet({ areas, defaultArea, defaultMode, onClose, onSubmit }: {
               submit();
             }
           }}
-          placeholder={
-            single
-              ? "Get Whitney to do her insurance…"
-              : mode === "reflect"
-                ? "Look back: what did you do, work on, or get wrong? “Took the kids to the park, finally called Prudential, spent an hour on Context Memo, snapped at Whitney — should’ve planned the night before.”"
-                : "Paste a voice memo transcript. It’ll be split into actions, ideas, thoughts, daily habits, and mindset reminders."
-          }
+          placeholder="Anything: a to-do, a brain dump, or what you got done today."
           className="flex-1 min-h-0 w-full resize-none text-lg leading-relaxed outline-none placeholder:text-stone-400"
         />
       </div>
       <div className="border-t border-stone-100 px-4 pt-3 max-w-xl w-full mx-auto"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-        {areas.length > 0 && (
-          <div className="mb-3 max-h-28 overflow-y-auto">
-            <ChipRow
-              active={areaId}
-              onSelect={setAreaId}
-              items={[{ id: "auto", label: "✨ Auto" }, ...areas.map((a) => ({ id: a.id, label: `${a.emoji} ${a.name}` }))]}
-            />
-          </div>
-        )}
         <button
           disabled={busy || !text.trim()}
           onClick={submit}
           className="w-full min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
         >
-          {busy ? "Saving…" : single ? "Add card" : mode === "reflect" ? "Log reflection" : "Make cards"}
+          {busy ? "Saving…" : "Add"}
         </button>
       </div>
     </div>
