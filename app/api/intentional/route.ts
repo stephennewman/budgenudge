@@ -222,11 +222,12 @@ async function completeFromPast(admin: Admin, userId: string, dup: Existing, ext
   await logTime(admin, userId, dup.id, updated?.area_id ?? null, extra.minutes_spent, at);
 }
 
-async function parseSingle(
+// Short notes: usually one card, but split when the note lists several things.
+async function parseQuick(
   text: string,
   existing: Existing[],
   areas: Area[]
-): Promise<{ card: ParsedCard; extra: Extra } | null> {
+): Promise<{ card: ParsedCard; extra: Extra }[]> {
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const response = await openai.chat.completions.create({
     model: "gpt-4o",
@@ -234,15 +235,19 @@ async function parseSingle(
       { role: "system", content: "You convert notes into structured cards. Always return valid JSON." },
       {
         role: "user",
-        content: `Turn this ONE quick note into exactly one card for an intentional-living app.\n\nNote: """${text}"""\n\n${cardSpec(existing, areas)}\n\n${PAST_SPEC}\n\nReturn ONLY JSON: {"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"past":false,"duplicate_of":null,"occurred_on":null,"minutes_spent":null}`,
+        content: `Turn this quick note into cards for an intentional-living app. Usually it is ONE card; if it lists several distinct things (e.g. "trim the hose, book Troy's dentist, buy a microwave"), make one card per thing.\n\nNote: """${text}"""\n\n${cardSpec(existing, areas)}\n\n${PAST_SPEC}\n\nReturn ONLY JSON: {"cards":[{"kind":"action","title":"","body":null,"est_minutes":null,"stars":3,"due_date":null,"related_ids":[],"area_id":null,"past":false,"duplicate_of":null,"occurred_on":null,"minutes_spent":null}]}`,
       },
     ],
     temperature: 0.2,
     response_format: { type: "json_object" },
   });
-  const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as Partial<ParsedCard> & Extra;
-  const card = cleanCard(parsed, new Set(existing.map((c) => c.id)), new Set(areas.map((a) => a.id)));
-  return card ? { card, extra: parsed } : null;
+  const parsed = JSON.parse(response.choices[0]?.message?.content || "{}") as { cards?: (Partial<ParsedCard> & Extra)[] };
+  const validIds = new Set(existing.map((c) => c.id));
+  const areaIds = new Set(areas.map((a) => a.id));
+  return (parsed.cards ?? []).flatMap((raw) => {
+    const card = cleanCard(raw, validIds, areaIds);
+    return card ? [{ card, extra: raw }] : [];
+  });
 }
 
 // Streams cards out of a transcript one at a time (NDJSON), inserting each as it
@@ -421,49 +426,49 @@ async function enrich(
   }
 
   try {
-    const parsed = await parseSingle(text, (existing ?? []) as Existing[], (areas ?? []) as Area[]);
-    if (!parsed) return;
-    const { card: c, extra } = parsed;
-    if (extra.past) {
-      const dup = extra.duplicate_of ? (existing ?? []).find((e) => e.id === extra.duplicate_of) : null;
-      if (dup) {
-        await completeFromPast(admin, userId, dup as Existing, extra);
-        await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
-        return;
+    const items = await parseQuick(text, (existing ?? []) as Existing[], (areas ?? []) as Area[]);
+    if (!items.length) return;
+    const multi = items.length > 1;
+    let rawUsed = false;
+    for (const { card: c, extra } of items) {
+      if (extra.past) {
+        const dup = extra.duplicate_of ? (existing ?? []).find((e) => e.id === extra.duplicate_of) : null;
+        if (dup) {
+          await completeFromPast(admin, userId, dup as Existing, extra);
+          continue;
+        }
       }
-      const at = whenIso(extra.occurred_on);
       const areaId = forcedArea ?? c.area_id;
-      await admin
-        .from("intentional_cards")
-        .update({
-          kind: c.kind,
-          ...(text.length > 120 ? { title: c.title, body: text } : {}),
-          status: "done",
-          completed_at: at,
-          due_date: null,
-          related_ids: c.related_ids,
-          area_id: areaId,
-        })
-        .eq("id", rawId)
-        .eq("user_id", userId);
-      await logTime(admin, userId, rawId, areaId, extra.minutes_spent, at);
-      return;
-    }
-    await admin
-      .from("intentional_cards")
-      .update({
+      const at = whenIso(extra.occurred_on);
+      // keep what the user typed for a single short card
+      const keepTyped = !multi && text.length <= 120;
+      const fields = {
         kind: c.kind,
-        // keep what the user typed unless it was long
-        ...(text.length > 120 ? { title: c.title, body: text } : {}),
-        est_minutes: c.est_minutes,
+        ...(keepTyped ? {} : { title: c.title, body: multi ? c.body : text }),
         stars: c.stars,
-        ...(c.due_date ? { due_date: c.due_date } : {}),
         related_ids: c.related_ids,
-        ...(!forcedArea && c.area_id ? { area_id: c.area_id } : {}),
-      })
-      .eq("id", rawId)
-      .eq("user_id", userId)
-      .eq("status", "open");
+        area_id: areaId,
+        ...(extra.past
+          ? { status: "done", completed_at: at, due_date: null, est_minutes: null }
+          : { est_minutes: c.est_minutes, ...(c.due_date ? { due_date: c.due_date } : {}) }),
+      };
+      let cardId: string;
+      if (!rawUsed) {
+        await admin.from("intentional_cards").update(fields).eq("id", rawId).eq("user_id", userId);
+        cardId = rawId;
+        rawUsed = true;
+      } else {
+        const { data, error } = await admin
+          .from("intentional_cards")
+          .insert({ ...fields, title: c.title, user_id: userId })
+          .select("id")
+          .single();
+        if (error) throw error;
+        cardId = data.id;
+      }
+      if (extra.past) await logTime(admin, userId, cardId, areaId, extra.minutes_spent, at);
+    }
+    if (!rawUsed) await admin.from("intentional_cards").delete().eq("id", rawId).eq("user_id", userId);
   } catch (err) {
     console.error("[intentional] enrich failed; raw card kept", err);
   }
