@@ -120,6 +120,10 @@ export default function IntentionalPage() {
   const [view, setView] = useState<"plan" | "reflect">("plan");
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshedFlash, setRefreshedFlash] = useState(false);
+  const [rankNonce, setRankNonce] = useState(0);
   const q = query.trim().toLowerCase();
   const matches = (c: Card) => !q || `${c.title} ${c.body ?? ""}`.toLowerCase().includes(q);
   const [now, setNow] = useState(() => new Date());
@@ -178,6 +182,60 @@ export default function IntentionalPage() {
     return () => clearInterval(t);
   }, [processing, run]);
 
+  // Pull down at the top of the list to refresh (and re-rank for the current time).
+  const overlayOpen = captureOpen || !!openId || !!timer || areasOpen;
+  useEffect(() => {
+    if (overlayOpen) return;
+    // indicator px (finger travel is 2×)
+    const TRIGGER = 40;
+    let startY: number | null = null;
+    let startX = 0;
+    let dist = 0;
+    const onStart = (e: TouchEvent) => {
+      if (window.scrollY > 0 || refreshing) return;
+      if ((e.target as HTMLElement).closest("[data-no-pull]")) return;
+      startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX;
+      dist = 0;
+    };
+    const onMove = (e: TouchEvent) => {
+      if (startY === null) return;
+      const dy = e.touches[0].clientY - startY;
+      const dx = Math.abs(e.touches[0].clientX - startX);
+      if (dy <= 0 || dx > dy || window.scrollY > 0) { dist = 0; setPull(0); return; }
+      dist = Math.min(110, dy * 0.5);
+      setPull(dist);
+    };
+    const onEnd = async () => {
+      if (startY === null) return;
+      startY = null;
+      if (dist < TRIGGER) { setPull(0); return; }
+      setRefreshing(true);
+      setPull(48);
+      try {
+        await run();
+        setRankNonce((n) => n + 1);
+        setRefreshedFlash(true);
+        setTimeout(() => setRefreshedFlash(false), 1500);
+      } catch {
+        /* toast shown */
+      } finally {
+        setRefreshing(false);
+        setPull(0);
+      }
+    };
+    window.addEventListener("touchstart", onStart, { passive: true });
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+    window.addEventListener("touchcancel", onEnd);
+    return () => {
+      window.removeEventListener("touchstart", onStart);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+      window.removeEventListener("touchcancel", onEnd);
+    };
+  }, [overlayOpen, refreshing, run]);
+
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 4000);
@@ -197,7 +255,7 @@ export default function IntentionalPage() {
     return new Map(cards.map((c) => [c.id, intentionScore(c, at, today, c.area_id ? areaById.get(c.area_id) : null)]));
     // re-rank on the hour, not every tick
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, today, hourKey, areaById]);
+  }, [cards, today, hourKey, areaById, rankNonce]);
   const total = (c: Card) => (scores.get(c.id)?.score ?? 0) + (c.boost ?? 0);
   const counts = new Map<Filter, number>();
   const areaCounts = new Map<string, number>();
@@ -352,6 +410,22 @@ export default function IntentionalPage() {
 
   return (
     <main className="min-h-dvh max-w-xl mx-auto pb-32 text-stone-900">
+      <div
+        aria-live="polite"
+        className={cn("flex items-end justify-center overflow-hidden text-sm text-stone-500",
+          pull === 0 && "transition-[height] duration-200")}
+        style={{ height: refreshedFlash ? 36 : pull, paddingTop: pull || refreshedFlash ? "env(safe-area-inset-top)" : 0 }}
+      >
+        <span className="pb-2 flex items-center gap-2">
+          {refreshing ? (
+            <span className="size-4 rounded-full border-2 border-stone-300 border-t-stone-900 animate-spin" />
+          ) : refreshedFlash ? (
+            <span className="text-emerald-700 font-medium">✓ Updated</span>
+          ) : (
+            <span className={cn("transition-transform", pull >= 40 && "rotate-180")}>↓</span>
+          )}
+        </span>
+      </div>
       <nav className="sticky top-0 z-10 bg-stone-50/95 backdrop-blur px-3 pb-2 border-b border-stone-200 space-y-2"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.5rem)" }}>
         <div className="flex items-center gap-2">
@@ -666,6 +740,7 @@ function SortableCardRow(props: CardRowProps) {
           onPointerDown={(e) => { listeners?.onPointerDown?.(e); e.stopPropagation(); }}
           onClick={(e) => e.stopPropagation()}
           aria-label="Drag to reorder"
+          data-no-pull
           className="-ml-3 -my-1 w-8 h-11 shrink-0 flex items-center justify-center text-stone-300 cursor-grab active:cursor-grabbing touch-none"
         >
           ⋮⋮
