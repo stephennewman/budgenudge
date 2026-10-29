@@ -10,6 +10,7 @@ export type ScorableCard = {
   prioritized: boolean;
   due_date: string | null;
   last_done_on: string | null;
+  created_at: string;
 };
 
 export type ScorableArea = {
@@ -74,6 +75,12 @@ export function intentionScore(
     else if (d === 1) add(hour >= 15 ? 30 : 18, "Tomorrow — prep now");
     else if (d <= 6) add(-6 * d);
     else add(-35);
+  }
+
+  // Stale cards sink (fast at first, then flattening); recurring cards and deadlines don't age.
+  if (!due && card.kind !== "habit" && card.kind !== "principle") {
+    const ageDays = Math.max(0, (now.getTime() - Date.parse(card.created_at)) / 86400000);
+    add(-Math.min(25, 3 * Math.sqrt(ageDays)));
   }
 
   if (card.kind === "thought" || card.kind === "idea" || card.kind === "note") add(-15);

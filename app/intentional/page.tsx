@@ -86,6 +86,14 @@ function dueLabel(due: string, today: string) {
   });
 }
 
+function ageLabel(createdAt: string): string | null {
+  const days = (Date.now() - Date.parse(createdAt)) / 86400000;
+  if (days < 1) return null;
+  if (days < 14) return `${Math.floor(days)}d`;
+  if (days < 60) return `${Math.floor(days / 7)}w`;
+  return `${Math.floor(days / 30)}mo`;
+}
+
 function fmtClock(totalSec: number) {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -676,8 +684,9 @@ function CardRow({
   const moved = useRef(false);
   const meta = KIND_META[card.kind];
   const important = card.kind !== "principle" && card.stars >= 4;
+  const age = card.kind === "habit" || card.kind === "principle" || isNew ? null : ageLabel(card.created_at);
   const playable = !done && !card.id.startsWith("tmp-") && ["action", "habit", "reminder"].includes(card.kind);
-  const hasMeta = isNew || !!reason || !!area || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
+  const hasMeta = isNew || !!reason || !!area || !!age || card.kind !== "action" || !!card.due_date || !!card.est_minutes || important
     || card.related_ids.length > 0;
 
   const end = () => {
@@ -750,6 +759,7 @@ function CardRow({
               {card.est_minutes && <span>~{card.est_minutes} min</span>}
               {important && <Stars value={card.stars} size="text-xs" />}
               {card.related_ids.length > 0 && <span>🔗 {card.related_ids.length}</span>}
+              {age && <span className="text-stone-400" title="Age">{age}</span>}
             </div>
           )}
         </div>
