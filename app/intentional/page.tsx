@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Mic, SlidersHorizontal } from "lucide-react";
+import { ArrowUp, Mic, SlidersHorizontal, Square } from "lucide-react";
 import { cn } from "@/utils/styles";
 import { intentionScore } from "@/utils/intentional/score";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -276,6 +276,56 @@ export default function IntentionalPage() {
     });
   };
 
+  const tempCard = (title: string, kind: Kind, areaId: string | null): Card => ({
+    id: `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    kind,
+    title,
+    body: null,
+    est_minutes: null,
+    stars: 3,
+    prioritized: false,
+    status: "open",
+    due_date: null,
+    related_ids: [],
+    last_done_on: null,
+    created_at: new Date().toISOString(),
+    boost: 0,
+    area_id: areaId,
+  });
+
+  const submitText = async (text: string) => {
+    const single = text.length <= 200 && !text.includes("\n");
+    const areaId = activeArea?.id ?? null;
+    const temp = tempCard((text.split("\n")[0] || text).slice(0, 120), single ? "action" : "note", areaId);
+    setPending((p) => [temp, ...p]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const res = await run({ action: "capture", text, mode: "auto", area_id: areaId });
+      const at = res.addedSince!;
+      setSince((s) => (s && s < at ? s : at));
+      // single cards: pick up the background AI sorting (transcripts poll their job)
+      if (single) [4000, 10000].forEach((ms) => setTimeout(() => run().catch(() => {}), ms));
+    } catch {
+      /* toast shown */
+    } finally {
+      setPending((p) => p.filter((c) => c.id !== temp.id));
+    }
+  };
+
+  const sendAudio = async (audio: Blob, prefix: string) => {
+    const temp = tempCard("🎙 Transcribing voice memo…", "note", activeArea?.id ?? null);
+    setPending((p) => [temp, ...p]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    try {
+      const transcript = await transcribeBlob(audio);
+      setPending((p) => p.filter((c) => c.id !== temp.id));
+      await submitText(prefix ? `${prefix}\n${transcript}` : transcript);
+    } catch (err) {
+      setPending((p) => p.filter((c) => c.id !== temp.id));
+      setToast({ text: (err as Error).message });
+    }
+  };
+
   if (authError) {
     return (
       <main className="min-h-dvh flex flex-col items-center justify-center gap-4 p-6 text-center">
@@ -471,40 +521,8 @@ export default function IntentionalPage() {
       {captureOpen && (
         <CaptureSheet
           onClose={() => setCaptureOpen(false)}
-          onSubmit={async (text) => {
-            const single = text.length <= 200 && !text.includes("\n");
-            const areaId = activeArea?.id ?? null;
-            const temp: Card = {
-              id: `tmp-${Date.now()}`,
-              kind: single ? "action" : "note",
-              title: (text.split("\n")[0] || text).slice(0, 120),
-              body: null,
-              est_minutes: null,
-              stars: 3,
-              prioritized: false,
-              status: "open",
-              due_date: null,
-              related_ids: [],
-              last_done_on: null,
-              created_at: new Date().toISOString(),
-              boost: 0,
-              area_id: areaId,
-            };
-            setPending((p) => [temp, ...p]);
-            setCaptureOpen(false);
-            window.scrollTo({ top: 0, behavior: "smooth" });
-            try {
-              const res = await run({ action: "capture", text, mode: "auto", area_id: areaId });
-              const at = res.addedSince!;
-              setSince((s) => (s && s < at ? s : at));
-              // single cards: pick up the background AI sorting (transcripts poll their job)
-              if (single) [4000, 10000].forEach((ms) => setTimeout(() => run().catch(() => {}), ms));
-            } catch {
-              /* toast shown */
-            } finally {
-              setPending((p) => p.filter((c) => c.id !== temp.id));
-            }
-          }}
+          onSubmit={async (text) => { setCaptureOpen(false); await submitText(text); }}
+          onSendAudio={(audio, prefix) => { setCaptureOpen(false); sendAudio(audio, prefix); }}
         />
       )}
 
@@ -965,43 +983,43 @@ function AreasSheet({ areas, onClose, onSave, onArchive }: {
 }
 
 function JobPanel({ job, onDismiss, onRetry }: { job: Job; onDismiss: () => void; onRetry: () => void }) {
-  const logRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
-  }, [job.log.length]);
+  const [open, setOpen] = useState(false);
   const running = job.status === "processing";
+  const failed = job.status === "failed";
+  const found = job.log.filter((l) => l.startsWith("+") || l.startsWith("◷") || l.startsWith("✓ Marked")).length;
+  const final = job.log[job.log.length - 1] ?? "";
+
+  const dismissRef = useRef(onDismiss);
+  dismissRef.current = onDismiss;
+  useEffect(() => {
+    if (job.status !== "done") return;
+    const t = setTimeout(() => dismissRef.current(), 4000);
+    return () => clearTimeout(t);
+  }, [job.status]);
+
+  const label = running
+    ? found ? `Processing · ${found} card${found === 1 ? "" : "s"} so far` : "Processing…"
+    : failed ? "Couldn’t process — saved as a note" : final.replace(/^✓ Done · /, "✓ ");
 
   return (
-    <div className="rounded-2xl bg-stone-900 text-stone-100 p-3 font-mono text-xs shadow-lg">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className={cn("font-semibold", job.status === "failed" ? "text-rose-300" : "text-emerald-300")}>
-          {running ? "Processing transcript…" : job.status === "failed" ? "Stopped" : "Complete"} · {job.progress}%
-        </span>
-        {!running && (
-          <span className="flex items-center -my-3 -mr-2">
-            {job.status === "failed" && (
-              <button onClick={onRetry} className="min-h-11 px-3 font-semibold text-amber-300">Retry</button>
-            )}
-            <button onClick={onDismiss} aria-label="Dismiss" className="min-w-11 min-h-11 text-stone-400">✕</button>
-          </span>
-        )}
+    <div className="rounded-2xl bg-white border border-stone-200 overflow-hidden">
+      <div className="flex items-center gap-2 pl-4 pr-1">
+        <button onClick={() => setOpen((v) => !v)} className="flex-1 min-w-0 min-h-11 flex items-center gap-2 text-left text-sm">
+          {running && <span className="size-3.5 shrink-0 rounded-full border-2 border-stone-300 border-t-stone-900 animate-spin" />}
+          <span className={cn("truncate", failed ? "text-rose-600" : running ? "text-stone-700" : "text-emerald-700 font-medium")}>{label}</span>
+        </button>
+        {failed && <button onClick={onRetry} className="min-h-11 px-3 text-sm font-semibold text-stone-900">Retry</button>}
+        {!running && <button onClick={onDismiss} aria-label="Dismiss" className="min-w-11 min-h-11 text-stone-400">✕</button>}
       </div>
-      <div className="h-1.5 rounded-full bg-stone-700 overflow-hidden mb-2">
-        <div
-          className={cn("h-full transition-all duration-500", job.status === "failed" ? "bg-rose-400" : "bg-emerald-400")}
-          style={{ width: `${job.progress}%` }}
-        />
+      <div className="h-0.5 bg-stone-100">
+        <div className={cn("h-full transition-all duration-500", failed ? "bg-rose-400" : "bg-emerald-500")}
+          style={{ width: `${job.progress}%` }} />
       </div>
-      <div ref={logRef} className="max-h-40 overflow-y-auto space-y-0.5 leading-relaxed">
-        {job.log.map((line, i) => (
-          <p key={i} className={cn("whitespace-pre-wrap break-words",
-            line.startsWith("+") ? "text-emerald-300" : line.startsWith("↺") ? "text-amber-300"
-              : line.startsWith("✗") ? "text-rose-300" : line.startsWith("✓") ? "text-emerald-200 font-semibold" : "text-stone-400")}>
-            {line}
-          </p>
-        ))}
-        {running && <p className="text-stone-500 animate-pulse">▌</p>}
-      </div>
+      {open && (
+        <div className="max-h-40 overflow-y-auto px-4 py-2 font-mono text-[11px] leading-relaxed text-stone-500 space-y-0.5">
+          {job.log.map((line, i) => <p key={i} className="whitespace-pre-wrap break-words">{line}</p>)}
+        </div>
+      )}
     </div>
   );
 }
@@ -1019,12 +1037,29 @@ function Sheet({ onClose, children }: { onClose: () => void; children: React.Rea
   );
 }
 
-function CaptureSheet({ onClose, onSubmit }: {
+async function transcribeBlob(blob: Blob): Promise<string> {
+  const form = new FormData();
+  form.append("audio", new File([blob], `memo.${blob.type.includes("mp4") ? "mp4" : "webm"}`, { type: blob.type }));
+  const res = await fetch("/api/intentional", { method: "POST", body: form });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.error || "Couldn't transcribe that");
+  return json.transcript as string;
+}
+
+const WAVE_BARS = 40;
+const LIVE_EVERY_MS = 4000;
+// Live preview re-transcribes the whole clip so far; stop previewing long memos to bound cost.
+const LIVE_MAX_SECS = 240;
+
+function CaptureSheet({ onClose, onSubmit, onSendAudio }: {
   onClose: () => void;
   onSubmit: (text: string) => Promise<void>;
+  onSendAudio: (audio: Blob, prefix: string) => void;
 }) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const textRef = useRef(text);
+  textRef.current = text;
 
   const submit = async () => {
     if (busy || !text.trim()) return;
@@ -1032,61 +1067,93 @@ function CaptureSheet({ onClose, onSubmit }: {
     try { await onSubmit(text.trim()); } catch { /* toast shown */ } finally { setBusy(false); }
   };
 
-  // Tap to start, tap to stop. The transcript is appended to the text box.
+  // Voice: tap mic to start; ■ stops and shows the transcript, ↑ stops and sends.
   const [rec, setRec] = useState<"idle" | "recording" | "transcribing">("idle");
   const [recStart, setRecStart] = useState(0);
   const [recNow, setRecNow] = useState(0);
   const [recError, setRecError] = useState<string | null>(null);
+  const [levels, setLevels] = useState<number[]>(() => Array(WAVE_BARS).fill(0));
+  const [live, setLive] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const sendRef = useRef(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
+  const liveBusy = useRef(false);
 
-  useEffect(() => {
-    if (rec !== "recording") return;
-    const t = setInterval(() => setRecNow(Date.now()), 250);
-    return () => clearInterval(t);
-  }, [rec]);
+  useEffect(() => () => cleanupRef.current?.(), []);
 
-  useEffect(() => () => recorderRef.current?.stream.getTracks().forEach((t) => t.stop()), []);
-
-  const transcribe = async (blob: Blob) => {
-    setRec("transcribing");
-    try {
-      const form = new FormData();
-      form.append("audio", new File([blob], `memo.${blob.type.includes("mp4") ? "mp4" : "webm"}`, { type: blob.type }));
-      const res = await fetch("/api/intentional", { method: "POST", body: form });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Couldn't transcribe that");
-      setText((t) => (t.trim() ? `${t.trim()}\n${json.transcript}` : json.transcript));
-    } catch (err) {
-      setRecError((err as Error).message);
-    } finally {
-      setRec("idle");
-    }
-  };
-
-  const toggleRecording = async () => {
-    if (rec === "recording") {
-      recorderRef.current?.stop();
-      return;
-    }
+  const startRecording = async () => {
     if (rec !== "idle") return;
     setRecError(null);
+    setLive("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mime = MediaRecorder.isTypeSupported("audio/webm")
         ? "audio/webm"
         : MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "";
       const r = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      const type = () => r.mimeType || "audio/webm";
       chunksRef.current = [];
       r.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      r.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: r.mimeType || "audio/webm" });
-        if (blob.size > 0) transcribe(blob);
-        else setRec("idle");
+
+      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new Ctx();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 1024;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      const buf = new Uint8Array(analyser.fftSize);
+      let raf = 0;
+      let last = 0;
+      const tick = (t: number) => {
+        raf = requestAnimationFrame(tick);
+        if (t - last < 60) return;
+        last = t;
+        analyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) sum += ((v - 128) / 128) ** 2;
+        const level = Math.min(1, Math.sqrt(sum / buf.length) * 5);
+        setLevels((l) => [...l.slice(1), level]);
+        setRecNow(Date.now());
       };
+      raf = requestAnimationFrame(tick);
+
+      const startedAt = Date.now();
+      const liveTimer = setInterval(async () => {
+        if (liveBusy.current || !chunksRef.current.length || Date.now() - startedAt > LIVE_MAX_SECS * 1000) return;
+        liveBusy.current = true;
+        try {
+          setLive(await transcribeBlob(new Blob(chunksRef.current, { type: type() })));
+        } catch {
+          /* preview only */
+        } finally {
+          liveBusy.current = false;
+        }
+      }, LIVE_EVERY_MS);
+
+      cleanupRef.current = () => {
+        cancelAnimationFrame(raf);
+        clearInterval(liveTimer);
+        ctx.close().catch(() => {});
+        stream.getTracks().forEach((t) => t.stop());
+      };
+
+      r.onstop = () => {
+        cleanupRef.current?.();
+        cleanupRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: type() });
+        if (!blob.size) { setRec("idle"); return; }
+        if (sendRef.current) { onSendAudio(blob, textRef.current.trim()); return; }
+        setRec("transcribing");
+        transcribeBlob(blob)
+          .then((t) => setText((prev) => (prev.trim() ? `${prev.trim()}\n${t}` : t)))
+          .catch((err) => setRecError((err as Error).message))
+          .finally(() => { setRec("idle"); setLive(""); });
+      };
+
       recorderRef.current = r;
+      sendRef.current = false;
       r.start(1000);
+      setLevels(Array(WAVE_BARS).fill(0));
       setRecStart(Date.now());
       setRecNow(Date.now());
       setRec("recording");
@@ -1094,9 +1161,14 @@ function CaptureSheet({ onClose, onSubmit }: {
       setRecError("Microphone blocked — allow it in your browser settings");
     }
   };
+
+  const stopRecording = (send: boolean) => {
+    sendRef.current = send;
+    recorderRef.current?.stop();
+  };
   const recSecs = Math.max(0, Math.floor((recNow - recStart) / 1000));
 
-  // Track the visible viewport so the bottom button sits above the on-screen keyboard.
+  // Track the visible viewport so the bottom bar sits above the on-screen keyboard.
   const [vp, setVp] = useState<{ h: number; top: number } | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
@@ -1116,6 +1188,8 @@ function CaptureSheet({ onClose, onSubmit }: {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  const listening = rec !== "idle";
+
   return (
     <div
       className="fixed inset-x-0 z-40 flex flex-col bg-white"
@@ -1125,54 +1199,72 @@ function CaptureSheet({ onClose, onSubmit }: {
         <button onClick={onClose} aria-label="Close" className="size-11 shrink-0 rounded-full text-xl text-stone-500">✕</button>
       </div>
       <div className="flex-1 min-h-0 flex flex-col px-4 pt-3 max-w-xl w-full mx-auto">
-        <textarea
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder="Anything: a to-do, a brain dump, or what you got done today."
-          className="flex-1 min-h-0 w-full resize-none text-lg leading-relaxed outline-none placeholder:text-stone-400"
-        />
+        {listening ? (
+          <div className="flex-1 min-h-0 overflow-y-auto text-lg leading-relaxed whitespace-pre-wrap">
+            {text.trim() && <span>{text.trim()}{"\n"}</span>}
+            {live ? <span className="text-stone-500">{live}</span>
+              : <span className="text-stone-400">{rec === "transcribing" ? "Transcribing…" : "Listening…"}</span>}
+          </div>
+        ) : (
+          <textarea
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder="Anything: a to-do, a brain dump, or what you got done today."
+            className="flex-1 min-h-0 w-full resize-none text-lg leading-relaxed outline-none placeholder:text-stone-400"
+          />
+        )}
       </div>
       <div className="border-t border-stone-100 px-4 pt-3 max-w-xl w-full mx-auto"
         style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
         {recError && <p className="mb-2 text-sm text-rose-600">{recError}</p>}
-        <div className="flex gap-2">
-          <button
-            onClick={toggleRecording}
-            disabled={rec === "transcribing"}
-            aria-label={rec === "recording" ? "Stop recording" : "Record voice"}
-            className={cn(
-              "min-h-12 shrink-0 rounded-full font-semibold flex items-center justify-center gap-2 transition-colors",
-              rec === "recording" ? "bg-rose-600 text-white px-5" : "bg-stone-100 text-stone-800 w-12",
-              rec === "transcribing" && "px-5 w-auto"
-            )}
-          >
-            {rec === "recording" ? (
-              <>
-                <span className="size-2.5 rounded-full bg-white animate-pulse" />
-                <span className="tabular-nums">{Math.floor(recSecs / 60)}:{String(recSecs % 60).padStart(2, "0")}</span>
-                <span aria-hidden>■</span>
-              </>
-            ) : rec === "transcribing" ? (
-              <span className="text-sm">Transcribing…</span>
-            ) : (
+        {rec === "recording" ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0 h-12 rounded-full bg-stone-100 px-4 flex items-center gap-3 overflow-hidden">
+              <span className="text-sm tabular-nums text-stone-600 shrink-0">
+                {Math.floor(recSecs / 60)}:{String(recSecs % 60).padStart(2, "0")}
+              </span>
+              <div className="flex-1 min-w-0 h-8 flex items-center justify-end gap-[3px]" aria-hidden>
+                {levels.map((l, i) => (
+                  <span key={i} className="w-[3px] shrink-0 rounded-full bg-rose-500 transition-[height] duration-75"
+                    style={{ height: `${Math.max(3, l * 32)}px` }} />
+                ))}
+              </div>
+            </div>
+            <button onClick={() => stopRecording(false)} aria-label="Stop and review"
+              className="size-12 shrink-0 rounded-full bg-stone-100 text-stone-800 flex items-center justify-center">
+              <Square className="size-4 fill-current" />
+            </button>
+            <button onClick={() => stopRecording(true)} aria-label="Send"
+              className="size-12 shrink-0 rounded-full bg-stone-900 text-white flex items-center justify-center">
+              <ArrowUp className="size-5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={startRecording}
+              disabled={rec === "transcribing"}
+              aria-label="Record voice"
+              className="size-12 shrink-0 rounded-full bg-stone-100 text-stone-800 flex items-center justify-center disabled:opacity-40"
+            >
               <Mic className="size-5" />
-            )}
-          </button>
-          <button
-            disabled={busy || !text.trim() || rec !== "idle"}
-            onClick={submit}
-            className="flex-1 min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
-          >
-            {busy ? "Saving…" : "Add"}
-          </button>
-        </div>
+            </button>
+            <button
+              disabled={busy || !text.trim() || rec !== "idle"}
+              onClick={submit}
+              className="flex-1 min-h-12 rounded-full bg-stone-900 text-white font-semibold disabled:opacity-40"
+            >
+              {rec === "transcribing" ? "Transcribing…" : busy ? "Saving…" : "Add"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
