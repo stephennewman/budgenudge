@@ -169,6 +169,9 @@ type WeatherData = {
   };
   dailyUnits: Record<string, string>;
   aqi: number | null;
+  // Seconds east of UTC for the forecast timezone. Open-Meteo sends local
+  // clock times with no offset; Safari parses those inconsistently.
+  utcOffsetSeconds?: number;
 };
 
 type GeoResult = {
@@ -325,6 +328,14 @@ type SpendData = {
 type Size = "small" | "medium" | "large" | "xlarge";
 
 const STORAGE_KEY = "mirror.location";
+// Bathroom wall display. Geolocation times out indoors and in the installed
+// iPad app, which left the rail on "Loading forecast…" forever. Home
+// coordinates load weather immediately; a searched or saved city still wins.
+const DEFAULT_LOCATION: Location = {
+  lat: 28.085,
+  lon: -82.764,
+  label: "Palm Harbor",
+};
 const PROVIDERS_KEY = "mirror.movieProviders.v1";
 const ORDER_KEY = "mirror.order.v3";
 const SIZES_KEY = "mirror.sizes.v3";
@@ -342,11 +353,17 @@ const RAIL_PANEL_MIN_PX = 90;
 
 // Keep the rail within bounds and leave the main column at least 400px.
 function clampRailWidth(w: number): number {
-  const max = Math.min(
+  const view = typeof window !== "undefined" ? window.innerWidth : RAIL_MAX_WIDTH + 400;
+  const n = Math.round(w);
+  const base = Math.min(
     RAIL_MAX_WIDTH,
-    typeof window !== "undefined" ? window.innerWidth - 400 : RAIL_MAX_WIDTH
+    Math.max(RAIL_MIN_WIDTH, Number.isFinite(n) ? n : RAIL_DEFAULT_WIDTH)
   );
-  return Math.min(max, Math.max(RAIL_MIN_WIDTH, Math.round(w)));
+  // While the rail is hidden, keep a real width so rotating or widening the
+  // window doesn't leave weather crushed into a sliver.
+  if (view < 640) return base;
+  const max = Math.min(RAIL_MAX_WIDTH, Math.max(RAIL_MIN_WIDTH, view - 400));
+  return Math.min(max, base);
 }
 
 // Dragging the divider scales the main column and the rail with their width
@@ -501,6 +518,18 @@ const DEFAULT_SIZE: Record<string, Size> = {
   whitneygrowth: "medium",
   whitneyconnect: "medium",
 };
+
+// Open-Meteo local time ("2026-10-29T20:00" or "2026-10-29") plus the
+// forecast's UTC offset. Avoid `new Date(iso)`, which Safari may reject or
+// treat as UTC and then drop every hour as "in the past".
+function parseForecastTime(iso: string, offsetSeconds = 0): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2})(?::(\d{2}))?)?/.exec(iso);
+  if (!m) return new Date(iso);
+  const utc =
+    Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0)) -
+    offsetSeconds * 1000;
+  return new Date(utc);
+}
 
 // Map WMO weather codes to a label + icon. Day/night aware where it matters.
 function weatherInfo(code: number, isDay: boolean): { label: string; Icon: LucideIcon } {
@@ -720,9 +749,14 @@ export default function MirrorPage() {
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT_WIDTH);
   useEffect(() => {
     const saved = readJSON<number>(RAIL_WIDTH_KEY);
+    const apply = () => {
+      setRailWidth((w) => clampRailWidth(w));
+    };
     setRailWidth(
       clampRailWidth(typeof saved === "number" ? saved : RAIL_DEFAULT_WIDTH)
     );
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
   }, []);
 
   const startRailDrag = useCallback((e: React.PointerEvent) => {
@@ -885,7 +919,9 @@ export default function MirrorPage() {
     }
   }, []);
 
-  // Resolve a location: URL params -> saved -> browser geolocation.
+  // Resolve a location: URL params -> saved city -> home default.
+  // Don't wait on geolocation. It times out in the bathroom and in the
+  // installed iPad app, and the rail then sits on "Loading forecast…".
   useEffect(() => {
     if (hasInit.current) return;
     hasInit.current = true;
@@ -925,27 +961,21 @@ export default function MirrorPage() {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setLocation(JSON.parse(saved));
-        return;
+        const parsed = JSON.parse(saved) as Partial<Location>;
+        if (Number.isFinite(parsed.lat) && Number.isFinite(parsed.lon)) {
+          setLocation({
+            lat: Number(parsed.lat),
+            lon: Number(parsed.lon),
+            label: parsed.label || DEFAULT_LOCATION.label,
+          });
+          return;
+        }
       }
     } catch {
       /* ignore */
     }
 
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) =>
-          saveLocation({
-            lat: Number(pos.coords.latitude.toFixed(4)),
-            lon: Number(pos.coords.longitude.toFixed(4)),
-            label: "Your location",
-          }),
-        () => setNeedsLocation(true),
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 }
-      );
-    } else {
-      setNeedsLocation(true);
-    }
+    saveLocation(DEFAULT_LOCATION);
   }, [saveLocation]);
 
   // Fetch weather when location is known, then refresh every 5 minutes.
@@ -956,10 +986,12 @@ export default function MirrorPage() {
     const load = async () => {
       try {
         const res = await fetch(
-          `/api/mirror/weather?lat=${location.lat}&lon=${location.lon}`
+          `/api/mirror/weather?lat=${location.lat}&lon=${location.lon}`,
+          { cache: "no-store" }
         );
         if (!res.ok) throw new Error("weather");
         const json = (await res.json()) as WeatherData;
+        if (!json?.current || !json?.hourly?.time) throw new Error("weather");
         if (active) {
           setData(json);
           setError(null);
@@ -1222,6 +1254,8 @@ export default function MirrorPage() {
     100;
 
   const unitLabel = data?.tempUnit === "celsius" ? "°C" : "°F";
+  // Null once a forecast is on screen. Otherwise the rail explains why it isn't.
+  const weatherStatus = error ?? (!data ? "Loading weather…" : null);
 
   const current = data?.current;
   const currentInfo = current
@@ -1232,15 +1266,23 @@ export default function MirrorPage() {
   const hours = useMemo(() => {
     if (!data) return [];
     const nowMs = Date.now();
-    const out: { time: string; temp: number; pop: number; code: number; isDay: boolean }[] =
-      [];
+    const out: {
+      time: string;
+      at: number;
+      temp: number;
+      pop: number;
+      code: number;
+      isDay: boolean;
+    }[] = [];
     const times = data.hourly?.time;
     if (!times) return [];
+    const offset = data.utcOffsetSeconds ?? 0;
     for (let i = 0; i < times.length && out.length < 8; i++) {
-      const t = new Date(data.hourly.time[i]).getTime();
-      if (t < nowMs - 60 * 60 * 1000) continue;
+      const at = parseForecastTime(data.hourly.time[i], offset).getTime();
+      if (!Number.isFinite(at) || at < nowMs - 60 * 60 * 1000) continue;
       out.push({
         time: data.hourly.time[i],
+        at,
         temp: data.hourly.temperature_2m[i],
         pop: data.hourly.precipitation_probability[i],
         code: data.hourly.weather_code[i],
@@ -2330,6 +2372,7 @@ export default function MirrorPage() {
           data={data}
           unitLabel={unitLabel}
           hours={hours}
+          weatherStatus={weatherStatus}
           clockDigits={clockDigits}
           meridiem={meridiem}
           dateWeekday={dateWeekday}
@@ -2359,6 +2402,7 @@ function RightRail({
   data,
   unitLabel,
   hours,
+  weatherStatus,
   clockDigits,
   meridiem,
   dateWeekday,
@@ -2373,7 +2417,8 @@ function RightRail({
   currentInfo: { label: string; Icon: LucideIcon } | null;
   data: WeatherData | null;
   unitLabel: string;
-  hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
+  hours: { time: string; at: number; temp: number; pop: number; code: number; isDay: boolean }[];
+  weatherStatus: string | null;
   clockDigits: string;
   meridiem: string | undefined;
   dateWeekday: string;
@@ -2556,7 +2601,7 @@ function RightRail({
         </div>
       ) : (
         <div className={cn(miniShell, "text-xs text-white/50")}>
-          Set a location to see the weather.
+          {weatherStatus ?? "Loading weather…"}
         </div>
       )}
       </div>
@@ -2578,7 +2623,7 @@ function RightRail({
                   <span className="text-[10px] text-white/60">
                     {i === 0
                       ? "Now"
-                      : new Date(h.time).toLocaleTimeString(undefined, {
+                      : new Date(h.at).toLocaleTimeString(undefined, {
                           hour: "numeric",
                         })}
                   </span>
@@ -2595,7 +2640,9 @@ function RightRail({
           </div>
         </div>
       ) : (
-        <div className={cn(miniShell, "text-xs text-white/50")}>Loading forecast…</div>
+        <div className={cn(miniShell, "text-xs text-white/50")}>
+          {weatherStatus ?? "Forecast unavailable"}
+        </div>
       )}
       </div>
       </div>
@@ -3463,7 +3510,7 @@ function GlanceCard({
 function HourlyCard({
   hours,
 }: {
-  hours: { time: string; temp: number; pop: number; code: number; isDay: boolean }[];
+  hours: { time: string; at: number; temp: number; pop: number; code: number; isDay: boolean }[];
 }) {
   return (
     <div className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/15 p-6">
@@ -3484,7 +3531,7 @@ function HourlyCard({
               <span className="text-sm text-white/70">
                 {i === 0
                   ? "Now"
-                  : new Date(h.time).toLocaleTimeString(undefined, { hour: "numeric" })}
+                  : new Date(h.at).toLocaleTimeString(undefined, { hour: "numeric" })}
               </span>
               <info.Icon
                 className={cn("h-8 w-8", weatherColor(h.code, h.isDay))}

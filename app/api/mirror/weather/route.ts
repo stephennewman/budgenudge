@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       tempUnit,
       windUnit,
       timezone: forecast.timezone,
+      utcOffsetSeconds: forecast.utc_offset_seconds ?? 0,
       current: forecast.current,
       currentUnits: forecast.current_units,
       hourly: forecast.hourly,
