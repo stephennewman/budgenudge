@@ -336,6 +336,10 @@ const DEFAULT_LOCATION: Location = {
   lon: -82.764,
   label: "Palm Harbor",
 };
+// Last good forecast per device, shown instantly on load or while offline.
+const WEATHER_CACHE_KEY = "mirror.weather.v1";
+const WEATHER_CACHE_MAX_MS = 6 * 60 * 60 * 1000;
+const WEATHER_REFRESH_MS = 5 * 60 * 1000;
 const PROVIDERS_KEY = "mirror.movieProviders.v1";
 const ORDER_KEY = "mirror.order.v3";
 const SIZES_KEY = "mirror.sizes.v3";
@@ -979,33 +983,79 @@ export default function MirrorPage() {
   }, [saveLocation]);
 
   // Fetch weather when location is known, then refresh every 5 minutes.
+  // The iPad sleeps, drops Wi-Fi, and freezes timers, so: show the last good
+  // forecast right away, retry failures quickly, and refetch on wake.
   useEffect(() => {
     if (!location) return;
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let lastOk = 0;
+    const key = `${location.lat},${location.lon}`;
 
-    const load = async () => {
+    const cached = readJSON<{ key: string; at: number; data: WeatherData }>(
+      WEATHER_CACHE_KEY
+    );
+    let haveData =
+      cached?.key === key &&
+      Date.now() - cached.at < WEATHER_CACHE_MAX_MS &&
+      !!cached.data?.current;
+    if (haveData) {
+      setData(cached!.data);
+      setError(null);
+    } else {
+      setData(null);
+    }
+
+    const schedule = (ms: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(load, ms);
+    };
+
+    async function load() {
       try {
         const res = await fetch(
-          `/api/mirror/weather?lat=${location.lat}&lon=${location.lon}`,
+          `/api/mirror/weather?lat=${location!.lat}&lon=${location!.lon}`,
           { cache: "no-store" }
         );
         if (!res.ok) throw new Error("weather");
         const json = (await res.json()) as WeatherData;
         if (!json?.current || !json?.hourly?.time) throw new Error("weather");
-        if (active) {
-          setData(json);
-          setError(null);
-        }
+        if (!active) return;
+        failures = 0;
+        haveData = true;
+        lastOk = Date.now();
+        setData(json);
+        setError(null);
+        writeJSON(WEATHER_CACHE_KEY, { key, at: lastOk, data: json });
+        schedule(WEATHER_REFRESH_MS);
       } catch {
-        if (active) setError("Couldn't load weather");
+        if (!active) return;
+        failures += 1;
+        // Only surface an error when there's nothing to show.
+        if (!haveData) setError("Couldn't load weather — retrying…");
+        schedule(Math.min(WEATHER_REFRESH_MS, 15_000 * 2 ** (failures - 1)));
+      }
+    }
+
+    const wake = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastOk > 60_000) {
+        failures = 0;
+        load();
       }
     };
 
     load();
-    const id = setInterval(load, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("pageshow", wake);
     return () => {
       active = false;
-      clearInterval(id);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("pageshow", wake);
     };
   }, [location]);
 
@@ -1262,7 +1312,9 @@ export default function MirrorPage() {
     ? weatherInfo(current.weather_code, current.is_day === 1)
     : null;
 
-  // Next 8 hours starting from the current hour.
+  // Next 8 hours starting from the current hour. Re-slices every 10 minutes
+  // so "Now" keeps moving even if a refresh is delayed.
+  const hourTick = Math.floor(now.getTime() / 600_000);
   const hours = useMemo(() => {
     if (!data) return [];
     const nowMs = Date.now();
@@ -1290,7 +1342,8 @@ export default function MirrorPage() {
       });
     }
     return out;
-  }, [data]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, hourTick]);
 
   const todaySun = useMemo(
     () =>

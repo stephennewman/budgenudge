@@ -44,13 +44,20 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    const [forecastRes, airRes] = await Promise.all([
+    // AQI is optional: a slow or failing air-quality call must not take the
+    // forecast down with it. Both calls are capped well under the function
+    // timeout so the client gets a fast error and retries.
+    const [forecastRes, air] = await Promise.all([
       fetch(`${FORECAST_URL}?${forecastParams.toString()}`, {
         next: { revalidate },
+        signal: AbortSignal.timeout(8000),
       }),
       fetch(`${AIR_QUALITY_URL}?${airParams.toString()}`, {
         next: { revalidate },
-      }),
+        signal: AbortSignal.timeout(4000),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
     ]);
 
     if (!forecastRes.ok) {
@@ -61,7 +68,6 @@ export async function GET(request: NextRequest) {
     }
 
     const forecast = await forecastRes.json();
-    const air = airRes.ok ? await airRes.json() : null;
 
     return NextResponse.json({
       tempUnit,
