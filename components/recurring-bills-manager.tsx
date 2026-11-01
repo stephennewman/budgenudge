@@ -6,7 +6,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ContentAreaLoader } from '@/components/ui/content-area-loader';
 import SplitAccountsModal from '@/components/split-accounts-modal';
-import { Check, Clock, AlertTriangle, ChevronRight, MoreHorizontal, Pencil, GitBranch, Trash2, Merge, X } from 'lucide-react';
+import BillsCalendar from '@/components/bills-calendar';
+import { Check, Clock, AlertTriangle, ChevronRight, MoreHorizontal, Pencil, GitBranch, Trash2, Merge, X, List, CalendarDays } from 'lucide-react';
 
 interface BillTimelineEntry {
   id: number;
@@ -77,6 +78,7 @@ function generateMonthTabs(count: number): { key: string; label: string; shortLa
 export default function RecurringBillsManager() {
   const monthTabs = generateMonthTabs(6);
   const [activeMonthKey, setActiveMonthKey] = useState(monthTabs[0].key);
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [loading, setLoading] = useState(true);
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [initializing, setInitializing] = useState(false);
@@ -692,8 +694,33 @@ export default function RecurringBillsManager() {
         </Card>
       )}
 
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-md border overflow-hidden">
+          {([['list', List, 'List'], ['calendar', CalendarDays, 'Calendar']] as const).map(([mode, Icon, label]) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              className={`flex items-center gap-1.5 px-3 min-h-[44px] text-sm ${viewMode === mode ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Monthly Timeline */}
-      {timeline.paid.length === 0 && timeline.upcoming.length === 0 ? (
+      {viewMode === 'calendar' ? (
+        <BillsCalendar
+          key={activeMonthKey}
+          monthKey={activeMonthKey}
+          bills={[
+            ...timeline.paid.map(e => ({ key: `${e.id}-paid-${e.actual_date}`, name: getDisplayName(e.id, e.merchant_name), amount: e.actual_amount || e.expected_amount, date: e.actual_date || e.predicted_date, isPaid: true })),
+            ...(isCurrentMonth ? timeline.upcoming : []).map(e => ({ key: `${e.id}-upcoming-${e.predicted_date}`, name: getDisplayName(e.id, e.merchant_name), amount: e.expected_amount, date: e.predicted_date, isPaid: false })),
+          ]}
+        />
+      ) : timeline.paid.length === 0 && timeline.upcoming.length === 0 ? (
         <Card className="p-6">
           <p className="text-gray-500 text-center py-8">
             {isCurrentMonth

@@ -131,20 +131,36 @@ async function processUserExpenses(userId: string): Promise<{
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-  const { data: transactions } = await supabase
-    .from('transactions')
-    .select('id, amount, date, merchant_name, name, ai_merchant_name, ai_category_tag')
-    .in('plaid_item_id', itemIds)
-    .gt('amount', 0) // Only expenses
-    .gte('date', sixMonthsAgo.toISOString().split('T')[0])
-    .order('date', { ascending: false });
+  // Page through results: Supabase caps a single select at 1000 rows
+  const PAGE_SIZE = 1000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transactions: any[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data: page } = await supabase
+      .from('transactions')
+      .select('id, amount, date, merchant_name, name, ai_merchant_name, ai_category_tag, pfc_primary')
+      .in('plaid_item_id', itemIds)
+      .gt('amount', 0) // Only expenses
+      .gte('date', sixMonthsAgo.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (!page || page.length === 0) break;
+    transactions.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
 
-  if (!transactions || transactions.length === 0) {
+  if (transactions.length === 0) {
     return { newBills: 0, paidBills: 0, dormantBills: 0, amountChanges: 0, multiPatternSplits: 0 };
   }
 
+  // Transfers (savings moves, Venmo, Zelle) are not bills
+  const spendTransactions = transactions.filter(tx =>
+    tx.pfc_primary !== 'TRANSFER_OUT' && tx.ai_category_tag !== 'Transfer'
+  );
+
   // Step 1: Detect recurring patterns
-  const recurringPatterns = await detectRecurringPatterns(transactions);
+  const recurringPatterns = await detectRecurringPatterns(spendTransactions);
   // Step 2: Detect multi-pattern merchants with AI
   const multiPatternMerchants = await detectMultiPatternMerchants(transactions, recurringPatterns);
   // Step 3: Get existing tagged merchants
@@ -197,7 +213,37 @@ async function processUserExpenses(userId: string): Promise<{
     );
 
     if (!matchingPattern && existingBill.is_active) {
-      // Bill hasn't occurred in 6 months - mark as dormant
+      // Long-interval bills (quarterly, bi-monthly) rarely hit 3 occurrences in the window, and bank
+      // descriptors drift ("TRB SOLAR SANITATION"), so check for a recent charge containing the bill name
+      const needle = existingBill.merchant_name.toLowerCase().trim();
+      const lastSeen = transactions.find(tx =>
+        [tx.ai_merchant_name, tx.merchant_name, tx.name].some(
+          (c: string | null) => c && c.toLowerCase().includes(needle)
+        )
+      );
+      const intervalDays = existingBill.interval_days || getIntervalDays(existingBill.prediction_frequency);
+      const daysSince = lastSeen
+        ? (Date.now() - new Date(lastSeen.date).getTime()) / (1000 * 60 * 60 * 24)
+        : Infinity;
+
+      if (lastSeen && daysSince <= Math.max(45, intervalDays * 2)) {
+        if (!existingBill.last_paid_date || lastSeen.date > existingBill.last_paid_date) {
+          const nextDate = new Date(lastSeen.date);
+          nextDate.setDate(nextDate.getDate() + Math.round(intervalDays));
+          await supabase
+            .from('tagged_merchants')
+            .update({
+              status: 'paid',
+              last_paid_date: lastSeen.date,
+              next_predicted_date: nextDate.toISOString().split('T')[0],
+              last_status_check: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingBill.id);
+        }
+        continue;
+      }
+
       await markBillAsDormant(existingBill.id);
       stats.dormantBills++;
     }
@@ -535,6 +581,23 @@ async function updateExistingBill(
       .eq('id', existingBill.id);
 
     paid = true;
+  } else if (
+    !existingBill.next_predicted_date ||
+    new Date(pattern.lastDate).getTime() >= new Date(existingBill.next_predicted_date).getTime() - 3 * 24 * 60 * 60 * 1000
+  ) {
+    // A charge landed on/after the predicted window but failed the amount/±3 day match; resync so the prediction doesn't stay stuck
+    await supabase
+      .from('tagged_merchants')
+      .update({
+        status: 'paid',
+        last_paid_date: pattern.lastDate,
+        next_predicted_date: pattern.nextPredictedDate,
+        last_status_check: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existingBill.id);
+
+    paid = true;
   }
 
   // Always update the interval-based stats from the latest pattern analysis
@@ -548,6 +611,12 @@ async function updateExistingBill(
     confidence_score: pattern.confidence,
     updated_at: new Date().toISOString()
   };
+
+  // Only revive bills the scan itself marked dormant; manual toggles never set lifecycle_state
+  if (existingBill.lifecycle_state === 'dormant') {
+    updatePayload.lifecycle_state = 'active';
+    updatePayload.is_active = true;
+  }
 
   if (Math.abs(pattern.averageAmount - existingBill.expected_amount) / existingBill.expected_amount > 0.1) {
     updatePayload.expected_amount = pattern.averageAmount;
