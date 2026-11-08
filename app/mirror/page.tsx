@@ -2552,9 +2552,19 @@ function RightRail({
       {/* Clock card: time, date, and day-completion bar. Tapping it jumps to
           the Today channel. */}
       <div className="min-h-0" style={panel(0)}>
-      <button
+      {/* A div, not a <button>: iPad Safari shrink-wraps button content, which
+          collapses the cqw containers below to zero width. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onClockClick}
-        className="flex h-full w-full flex-col justify-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left transition hover:from-sky-400/30 hover:to-violet-400/30"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClockClick();
+          }
+        }}
+        className="flex h-full w-full cursor-pointer flex-col justify-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-sky-400/20 via-white/10 to-violet-400/20 p-4 text-left transition hover:from-sky-400/30 hover:to-violet-400/30"
       >
         <div className="flex items-stretch gap-3">
           {/* Digits scale with the card width (cqw units) but keep the
@@ -2593,7 +2603,7 @@ function RightRail({
             12p
           </span>
         </div>
-      </button>
+      </div>
       </div>
 
       {handle(0)}
