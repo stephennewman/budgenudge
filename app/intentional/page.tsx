@@ -1437,6 +1437,20 @@ function CardSheet({
           />
         </label>
       </div>
+      <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Due date presets">
+        {([
+          { label: "Today", due: today },
+          { label: "Tomorrow", due: addDays(today, 1) },
+          { label: "Next week", due: addDays(today, 7) },
+        ] as const).map((p) => (
+          <Chip key={p.label} active={card.due_date === p.due} onClick={() => onSave({ due_date: p.due })}>
+            {p.label}
+          </Chip>
+        ))}
+        {card.due_date && (
+          <Chip active={false} onClick={() => onSave({ due_date: null })}>Clear</Chip>
+        )}
+      </div>
 
       <label className="block mt-3">
         <Label>Notes</Label>
